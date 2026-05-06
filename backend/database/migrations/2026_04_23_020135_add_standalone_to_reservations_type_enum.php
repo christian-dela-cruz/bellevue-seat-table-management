@@ -12,7 +12,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement("ALTER TABLE reservations MODIFY COLUMN type ENUM('whole', 'individual', 'standalone') DEFAULT 'whole'");
+        // DB::statement("ALTER TABLE reservations MODIFY COLUMN type ENUM('whole', 'individual', 'standalone') DEFAULT 'whole'");
     }
 
     /**
@@ -20,6 +20,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement("ALTER TABLE reservations MODIFY COLUMN type ENUM('whole', 'individual') DEFAULT 'whole'");
+        // DB::statement("ALTER TABLE reservations MODIFY COLUMN type ENUM('whole', 'individual') DEFAULT 'whole'");
     }
 };
