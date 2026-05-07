@@ -16,12 +16,14 @@ class Reservation extends Model
         'room',
         'table_number',
         'seat_number',
+        'seat_id',
         'guests_count',
         'event_date',
         'event_time',
         'special_requests',
         'status',
         'type',
+        'is_standalone',
         'submitted_at',
         'rejection_reason',
         'cancellation_reason',
@@ -32,6 +34,7 @@ class Reservation extends Model
         'event_date'   => 'date:Y-m-d',   // ← fixed: was 'datetime', now serialises as YYYY-MM-DD
         'submitted_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'is_standalone' => 'boolean',
     ];
 
     public function venue(): BelongsTo
