@@ -27,4 +27,7 @@ export const reservationAPI = {
 
   // Reject reservation
   reject: (id, reason) => api.patch(`/admin/reservations/${id}/reject`, { reason }),
+
+  // Revert rejected reservation to pending
+  revert: (id) => api.patch(`/admin/reservations/${id}/revert`),
 };

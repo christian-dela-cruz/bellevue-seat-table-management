@@ -4,6 +4,7 @@ import {
   Bell, BellDot, Clock, X, CalendarDays,
   MapPin, Users, Phone, Mail, FileText, Hash, CheckCircle,
   Wifi, WifiOff, ThumbsUp, ChevronLeft, ChevronRight,
+  XCircle,
 } from "lucide-react";
 import { reservationAPI } from "../../../services/reservationAPI";
 import bellevueLogo from "../../../assets/bellevue-logo.png";
@@ -66,6 +67,7 @@ const POLL_INTERVAL_MS = 1000;
 const RECONNECT_WINDOW_MS = 60000;
 const MAX_RECONNECTS_IN_WINDOW = 5;
 const WS_RECOVERY_RETRY_MS = 45000;
+const ACK_STORAGE_KEY = "notification_acknowledgments";
 
 // ─── Shared optimisticSeatUpdate (mirrors ReservationDashboard) ───────────────
 // When approving from NotificationDashboard, this updates localStorage so the
@@ -218,15 +220,22 @@ function normaliseRow(r) {
 }
 function shouldTrack(r) {
   const s = (r.status || "").toLowerCase().trim();
-  return s !== "rejected" && s !== "cancelled" && s !== "canceled" && s !== "deleted" && s !== "archived";
+  return s !== "cancelled" && s !== "canceled" && s !== "deleted" && s !== "archived";
 }
 function isApproved(r) {
   const s = (r.status || "").toLowerCase().trim();
   return ["reserved","approved","confirmed","done","completed","accepted"].includes(s);
 }
+function isDeclined(r) {
+  const s = (r.status || "").toLowerCase().trim();
+  return ["rejected","declined"].includes(s);
+}
 function isPending(r) {
   const s = (r.status || "").toLowerCase().trim();
   return s === "pending" || s === "awaiting" || s === "under review";
+}
+function getOutletName(res) {
+  return String(res.room || res.venue?.name || res.venue || "Unassigned Outlet").trim();
 }
 function parseEventDate(d, t) {
   if (!d) return null;
@@ -252,6 +261,15 @@ function fmtDate(d) { if (!d) return "—"; const dt = new Date(d); return isNaN
 function relLabel(ms) { if (ms<=0) return "now"; const m=Math.round(ms/60000); if (m<60) return `${m} min`; const h=Math.floor(m/60),r=m%60; return r===0?`${h} hr`:`${h} hr ${r} min`; }
 function clockStr() { return new Date().toLocaleTimeString("en-PH",{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
 function dateStr()  { return new Date().toLocaleDateString("en-PH",{weekday:"long",month:"long",day:"numeric",year:"numeric"}); }
+function notificationId(res) { return String(res?.id ?? res?.db_id ?? res?.reference_code ?? ""); }
+
+function loadAcknowledgments() {
+  try {
+    return JSON.parse(localStorage.getItem(ACK_STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
 
 // ─── Audio ────────────────────────────────────────────────────────────────────
 let _alertId = null;
@@ -275,6 +293,13 @@ function Spinner({ size=13, C }) {
 
 function StatusBadge({ status, C }) {
   const s = (status||"").toLowerCase().trim();
+  if (s==="rejected"||s==="declined") {
+    return (
+      <span style={{ display:"inline-flex",alignItems:"center",gap:5,background:C.badgeRejected.bg,color:C.badgeRejected.color,padding:"4px 10px 4px 8px",borderRadius:4,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",fontFamily:F.label,border:`1px solid ${C.badgeRejected.color}30` }}>
+        <span style={{ width:4,height:4,borderRadius:"50%",background:C.badgeRejected.dot }} />Declined
+      </span>
+    );
+  }
   const cfg = s==="reserved"||s==="approved"||s==="confirmed" ? {...C.badgeApproved,label:"Reserved"} : s==="done" ? {bg:C.blueFaint,color:C.blue,dot:C.blue,label:"Done"} : s==="pending" ? {...C.badgePending,label:"Pending"} : {bg:C.borderDefault,color:C.textSecondary,dot:C.textSecondary,label:s||"—"};
   return (
     <span style={{ display:"inline-flex",alignItems:"center",gap:5,background:cfg.bg,color:cfg.color,padding:"4px 10px 4px 8px",borderRadius:4,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",fontFamily:F.label,border:`1px solid ${cfg.color}30` }}>
@@ -290,8 +315,8 @@ function SectionLabel({ children, C, style={} }) {
 // ─── Modal Shell + Header ─────────────────────────────────────────────────────
 function ModalShell({ children, onClose, disabled, C, maxWidth=520, zIndex=4000 }) {
   return (
-    <div style={{ position:"fixed",inset:0,background:C.modalOverlay,zIndex,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)" }} onClick={e=>{ if(e.target===e.currentTarget&&!disabled)onClose(); }}>
-      <div style={{ background:C.surfaceBase,borderRadius:14,width:"100%",maxWidth,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 24px 80px rgba(0,0,0,0.30)",border:`1px solid ${C.borderDefault}`,fontFamily:F.body,animation:"modalIn 0.20s cubic-bezier(0.16,1,0.3,1)",overflow:"hidden" }}>
+    <div style={{ position:"fixed",inset:0,background:C.modalOverlay,zIndex,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)" }} onClick={e=>{ if(e.target===e.currentTarget&&!disabled)onClose(); }}>
+      <div style={{ background:C.surfaceBase,borderRadius:14,width:"100%",maxWidth,maxHeight:"92vh",boxShadow:"0 20px 60px rgba(0,0,0,0.20)",border:`1px solid ${C.borderDefault}`,fontFamily:F.body,animation:"modalIn 0.20s cubic-bezier(0.16,1,0.3,1)",overflow:"hidden" }}>
         <div style={{ height:"2px",background:`linear-gradient(90deg,transparent,${C.gold}80 30%,${C.gold}80 70%,transparent)` }} />
         {children}
       </div>
@@ -302,12 +327,12 @@ function ModalShell({ children, onClose, disabled, C, maxWidth=520, zIndex=4000 
 // FIX: ModalHeader now renders title in dark text (C.textPrimary) since the
 // headerGradient is light (#FAF8F4 → #F2EFE8). Previously the title was
 // inheriting "#EDE8DF" (near-white) which was invisible on the light background.
-function ModalHeader({ eyebrow, title, onClose, disabled, C, right }) {
+function ModalHeader({ eyebrow, title, onClose, disabled, C, right, hideClose=false }) {
   return (
     <div style={{ background:C.headerGradient,padding:"20px 22px 18px",position:"sticky",top:0,zIndex:2,borderBottom:`1px solid ${C.divider}` }}>
       <div style={{ position:"absolute",top:14,right:16,zIndex:20,display:"flex",alignItems:"center",gap:10 }}>
         {right}
-        <button
+        {!hideClose&&<button
           onClick={onClose}
           disabled={disabled}
           style={{ width:32,height:32,borderRadius:"50%",background:"transparent",border:`1px solid ${C.borderDefault}`,cursor:disabled?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,transition:"all 0.18s" }}
@@ -315,7 +340,7 @@ function ModalHeader({ eyebrow, title, onClose, disabled, C, right }) {
           onMouseLeave={e=>{ if(!disabled){e.currentTarget.style.borderColor=C.borderDefault;e.currentTarget.style.background="transparent";} }}
         >
           <X size={12} color={C.textSecondary} strokeWidth={2.5} />
-        </button>
+        </button>}
       </div>
       <div style={{ paddingRight:80 }}>
         {eyebrow && (
@@ -351,9 +376,9 @@ function ApproveConfirmModal({ res, onConfirm, onCancel, isApproving, C }) {
   if (!res) return null;
   return (
     <ModalShell onClose={onCancel} disabled={isApproving} C={C} maxWidth={400} zIndex={5000}>
-      <ModalHeader eyebrow="Confirmation Required" title="Approve Reservation" onClose={onCancel} disabled={isApproving} C={C} />
+      <ModalHeader eyebrow="Confirm Approval" title={res.guest_name||res.name||"Reservation"} onClose={onCancel} disabled={isApproving} C={C} hideClose />
       <div style={{ padding:"20px 24px 26px" }}>
-        <div style={{ padding:"14px 16px",borderRadius:10,marginBottom:18,background:C.goldFaintest,border:`1px solid ${C.borderAccent}` }}>
+        <div style={{ display:"none",padding:"14px 16px",borderRadius:10,marginBottom:18,background:C.goldFaintest,border:`1px solid ${C.borderAccent}` }}>
           <div style={{ fontFamily:F.body,fontSize:14,fontWeight:600,color:C.textPrimary,marginBottom:4 }}>{res.guest_name||res.name||"Unknown Guest"}</div>
           <div style={{ fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.6 }}>
             {res.room||res.venue?.name||res.venue||"—"} · {fmtDate(res.event_date||res.eventDate)} · {fmtTime(res.event_time||res.eventTime)}
@@ -363,7 +388,15 @@ function ApproveConfirmModal({ res, onConfirm, onCancel, isApproving, C }) {
           </div>
         </div>
         <div style={{ padding:"10px 14px",borderRadius:8,marginBottom:20,background:C.greenFaint,border:`1px solid ${C.greenBorder}`,fontFamily:F.body,fontSize:12.5,color:C.textSecondary,lineHeight:1.65 }}>
-          Status will update to <strong style={{ color:C.green }}>Reserved</strong>. This cannot be undone.
+          This will approve the reservation, reserve the selected seat/table, and send a confirmation email to the guest. This cannot be undone from this action.
+        </div>
+        <div style={{ display:"grid",gap:8,marginBottom:16 }}>
+          {[["Current Status","Pending"],["New Status","Reserved"],["Reference",res.reference_code||res.id||"-"]].map(([label,value])=>(
+            <div key={label} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"8px 0",borderBottom:`1px solid ${C.divider}`}}>
+              <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>{label}</span>
+              <span style={{fontFamily:F.body,fontSize:12.5,fontWeight:600,color:C.textPrimary,textAlign:"right"}}>{value}</span>
+            </div>
+          ))}
         </div>
         <div style={{ display:"flex",gap:8 }}>
           <button
@@ -387,35 +420,145 @@ function ApproveConfirmModal({ res, onConfirm, onCancel, isApproving, C }) {
 }
 
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
-function DetailModal({ res, onClose, onApprove, approvingIds, C }) {
+function DeclineConfirmModal({ res, onConfirm, onCancel, isDeclining, C }) {
+  const [reason,setReason]=useState("");
+  const [showConfirmation,setShowConfirmation]=useState(false);
+  const trimmed=reason.trim();
+  const canSubmit=trimmed.length>=5&&!isDeclining;
+  if (!res) return null;
+  if (showConfirmation) {
+    return (
+      <ModalShell onClose={()=>setShowConfirmation(false)} disabled={isDeclining} C={C} maxWidth={440} zIndex={5100}>
+        <ModalHeader eyebrow="Confirm Rejection" title={res.guest_name||res.name||"Reservation"} onClose={()=>setShowConfirmation(false)} disabled={isDeclining} C={C} />
+        <div style={{ padding:"20px 22px 24px" }}>
+          <div style={{ padding:"10px 14px",borderRadius:8,marginBottom:14,background:C.redFaint,border:`1px solid ${C.redBorder}`,fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.65 }}>
+            This will mark the reservation as rejected, move it to inactive, release the selected seat/table, and send the rejection reason to the guest.
+          </div>
+          <div style={{ fontFamily:F.label,fontSize:9,letterSpacing:"0.18em",color:C.textSecondary,fontWeight:700,textTransform:"uppercase",marginBottom:7 }}>Reason to Send</div>
+          <div style={{ padding:"11px 13px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:"rgba(0,0,0,0.02)",fontFamily:F.body,fontSize:12,color:C.textPrimary,lineHeight:1.6,whiteSpace:"pre-wrap",maxHeight:120,overflowY:"auto" }}>{trimmed}</div>
+          <div style={{ display:"flex",gap:8,marginTop:16 }}>
+            <button onClick={()=>setShowConfirmation(false)} disabled={isDeclining} style={{ flex:1,padding:"11px",background:"transparent",border:`1px solid ${C.borderDefault}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textSecondary,cursor:isDeclining?"not-allowed":"pointer" }}>Back</button>
+            <button onClick={()=>onConfirm(trimmed)} disabled={isDeclining} style={{ flex:2,padding:"11px",background:isDeclining?"rgba(160,56,56,0.35)":C.red,border:"none",borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:"#fff",cursor:isDeclining?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7 }}>{isDeclining?<><Spinner C={C} size={12}/>Rejecting...</>:"Confirm Reject"}</button>
+          </div>
+        </div>
+      </ModalShell>
+    );
+  }
+  return (
+    <ModalShell onClose={onCancel} disabled={isDeclining} C={C} maxWidth={420} zIndex={5000}>
+      <ModalHeader eyebrow="Reject Reservation" title={res.guest_name||res.name||"Reservation"} onClose={onCancel} disabled={isDeclining} C={C} />
+      <div style={{ padding:"20px 24px 26px" }}>
+        <div style={{ padding:"10px 14px",borderRadius:8,marginBottom:18,background:C.redFaint,border:`1px solid ${C.redBorder}`,fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.65 }}>
+          A rejection email will be sent to <strong style={{ color:C.textPrimary }}>{res.email||res.guest_email||"the guest"}</strong> after you review and confirm the rejection.
+        </div>
+        <div style={{ fontFamily:F.label,fontSize:9,letterSpacing:"0.18em",color:C.textSecondary,fontWeight:700,textTransform:"uppercase",marginBottom:7 }}>Reason for Rejection <span style={{ color:C.red }}>*</span></div>
+        <textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="e.g. Venue fully booked for the requested date, capacity exceeded..." disabled={isDeclining} rows={4} style={{ width:"100%",resize:"vertical",minHeight:92,padding:"11px 12px",border:`1px solid ${C.borderDefault}`,borderRadius:8,outline:"none",fontFamily:F.body,fontSize:13,color:C.textPrimary,background:C.surfaceBase,marginBottom:8 }} />
+        <div style={{ fontFamily:F.body,fontSize:11,color:canSubmit?C.textSecondary:C.red,marginBottom:16 }}>Enter at least 5 characters before confirming.</div>
+        <div style={{ display:"flex",gap:8 }}>
+          <button onClick={onCancel} disabled={isDeclining} style={{ flex:1,padding:"12px",background:"transparent",border:`1px solid ${C.borderDefault}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.textSecondary,cursor:isDeclining?"not-allowed":"pointer" }}>Cancel</button>
+          <button onClick={()=>canSubmit&&setShowConfirmation(true)} disabled={!canSubmit} style={{ flex:2,padding:"12px",border:"none",borderRadius:8,background:canSubmit?C.red:"rgba(160,56,56,0.35)",color:"#fff",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",cursor:canSubmit?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>Review Rejection</button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+function reservationStateForStatus(status) {
+  const s = (status || "").toLowerCase();
+  return s === "rejected" || s === "cancelled" || s === "declined" ? "inactive" : "active";
+}
+
+function getReservationState(reservation) {
+  return (reservation?.reservation_state || reservationStateForStatus(reservation?.status)).toLowerCase();
+}
+
+function StateBadge({ state, C }) {
+  const s = (state || "active").toLowerCase();
+  const active = s === "active";
+  const color = active ? C.green : C.textSecondary;
+  const bg = active ? C.greenFaint : "rgba(0,0,0,0.05)";
+  const border = active ? C.greenBorder : C.borderDefault;
+  return (
+    <span style={{ display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px 4px 8px",background:bg,border:`1px solid ${border}`,borderRadius:4,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color,flexShrink:0 }}>
+      <span style={{ width:4,height:4,borderRadius:"50%",background:color,flexShrink:0 }}/>
+      {active ? "Active" : "Inactive"}
+    </span>
+  );
+}
+
+function DetailModal({ res, onClose, onApprove, onDecline, approvingIds, decliningIds, C }) {
   if (!res) return null;
   const rawStatus = (res.status||"").toLowerCase();
   const resIsPending = rawStatus === "pending";
+  const reservationState = getReservationState(res);
   const resId = res.id ?? res.db_id;
   const isApprovingThis = approvingIds?.has(resId);
+  const isDecliningThis = decliningIds?.has(resId);
+  const fmtDateTime=(value)=>{if(!value)return"-";try{return new Date(value).toLocaleString("en-US",{year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}catch{return value;}};
+  const reservationRows=[
+    ["Reference", res.reference_code||res.id||"-"],
+    ["Room", getOutletName(res)],
+    ["Type", res.type==="whole"?"Whole Table":res.type==="standalone"?"Standalone Seat":res.type==="individual"?"Individual Seat":res.type||"-"],
+    ["Table", res.table_number??res.table?`Table ${res.table_number||res.table}`:"-"],
+    ["Seat", res.seat_number??res.seat?`Seat ${res.seat_number||res.seat}`:"-"],
+    ["Guests", (res.guests_count||res.guests||1)>0?`${res.guests_count||res.guests||1} guest${(res.guests_count||res.guests||1)!==1?"s":""}`:"-"],
+    ["Event Date", fmtDate(res.event_date||res.eventDate||res.reservationDate)],
+    ["Event Time", fmtTime(res.event_time||res.eventTime||res.reservationTime)],
+  ];
+  const guestRows=[
+    ["Full Name", res.guest_name||res.name||"-"],
+    ["Email", res.email||res.guest_email||"-"],
+    ["Phone", res.phone||res.contact||res.guest_phone||"-"],
+    ["Special Requests", res.special_requests||res.specialRequests||res.notes||"None"],
+  ];
+  const trackingRows=[
+    ["Previous Status", res.previous_status||"-"],
+    ["Last Status Change", fmtDateTime(res.status_last_changed_at||res.updated_at)],
+    ["Rejected At", fmtDateTime(res.rejected_at)],
+    ["Reverted At", fmtDateTime(res.reverted_at)],
+  ];
+  const historyItems = Array.isArray(res.transaction_history) ? res.transaction_history.slice(0, 6) : [];
+  const formatHistoryAction = (action) => String(action || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase()) || "Transaction";
+  const renderRows=(rows)=>rows.map(([label,value],i,arr)=>(
+    <div key={label} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"8px 0",borderBottom:i<arr.length-1?`1px solid ${C.divider}`:"none"}}>
+      <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary,minWidth:120,flexShrink:0}}>{label}</span>
+      <span style={{fontFamily:F.body,fontSize:12.5,color:label==="Reference"?C.gold:C.textPrimary,fontWeight:label==="Reference"?700:500,textAlign:"right",maxWidth:280,lineHeight:1.5}}>{value}</span>
+    </div>
+  ));
   return (
     <ModalShell onClose={onClose} C={C} maxWidth={520}>
-      <ModalHeader eyebrow="Reservation Record" title={res.guest_name||res.name||"Guest"} onClose={onClose} C={C} right={<StatusBadge status={rawStatus} C={C}/>} />
-      {resIsPending&&<div style={{ padding:"10px 22px",display:"flex",alignItems:"center",gap:8,background:C.statusNote.pending,borderBottom:`1px solid ${C.statusNoteBorder.pending}` }}><Clock size={12} color={C.gold}/><span style={{ fontFamily:F.body,fontSize:12,color:C.gold }}>Awaiting approval</span></div>}
-      <div style={{ padding:"20px 22px",maxHeight:"60vh",overflowY:"auto" }}>
-        <SectionLabel C={C}>Guest Information</SectionLabel>
-        <DetailRow icon={<Users/>} label="Guest Name" value={res.guest_name||res.name} C={C}/>
-        <DetailRow icon={<Mail/>}  label="Email"      value={res.email||res.guest_email} C={C}/>
-        <DetailRow icon={<Phone/>} label="Phone"      value={res.phone||res.contact||res.guest_phone} C={C}/>
-        <DetailRow icon={<Users/>} label="Guests"     value={(res.guests_count??res.guests)?`${res.guests_count??res.guests} pax`:"1 pax"} C={C}/>
+      <ModalHeader eyebrow="Reservation Detail" title={res.guest_name||res.name||"Guest"} onClose={onClose} C={C} right={<><StatusBadge status={rawStatus} C={C}/><StateBadge state={reservationState} C={C}/></>} />
+      <div style={{ padding:"18px 22px 24px",maxHeight:"66vh",overflowY:"auto" }}>
         <SectionLabel C={C} style={{ marginTop:18 }}>Reservation Details</SectionLabel>
-        <DetailRow icon={<Hash/>}         label="Reference"  value={res.reference_code||res.id} C={C} accent/>
-        <DetailRow icon={<MapPin/>}       label="Venue"      value={res.room||res.venue?.name||res.venue} C={C}/>
-        <DetailRow icon={<FileText/>}     label="Table"      value={res.table_number??res.table} C={C}/>
-        <DetailRow icon={<FileText/>}     label="Seat"       value={res.seat_number??res.seat} C={C}/>
-        <DetailRow icon={<CalendarDays/>} label="Event Date" value={fmtDate(res.event_date||res.eventDate||res.reservationDate)} C={C}/>
-        <DetailRow icon={<Clock/>}        label="Event Time" value={fmtTime(res.event_time||res.eventTime||res.reservationTime)} C={C}/>
-        <SectionLabel C={C} style={{ marginTop:18 }}>Additional Info</SectionLabel>
-        <DetailRow icon={<FileText/>}    label="Special Requests" value={res.special_requests||res.notes||"None"} C={C}/>
-        <DetailRow icon={<CheckCircle/>} label="Status"           value={<StatusBadge status={rawStatus} C={C}/>} C={C}/>
+        {renderRows(reservationRows)}
+        <SectionLabel C={C} style={{ marginTop:18 }}>Guest Information</SectionLabel>
+        {renderRows(guestRows)}
+        <SectionLabel C={C} style={{ marginTop:18 }}>Status Tracking</SectionLabel>
+        {renderRows(trackingRows)}
+        <SectionLabel C={C} style={{ marginTop:18 }}>Reservation History</SectionLabel>
+        {historyItems.length ? historyItems.map((item,i)=>(
+          <div key={item.id || `${item.action}-${i}`} style={{padding:"9px 0",borderBottom:i<historyItems.length-1?`1px solid ${C.divider}`:"none"}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}>
+              <span style={{fontFamily:F.body,fontSize:12.5,fontWeight:700,color:C.textPrimary,lineHeight:1.4}}>{formatHistoryAction(item.action)}</span>
+              <span style={{fontFamily:F.body,fontSize:11,color:C.textSecondary,textAlign:"right",whiteSpace:"nowrap"}}>{fmtDateTime(item.created_at)}</span>
+            </div>
+            <div style={{fontFamily:F.body,fontSize:11.5,color:C.textSecondary,lineHeight:1.5,marginTop:3}}>
+              {(item.from_status || item.to_status) && <span style={{textTransform:"capitalize"}}>{item.from_status || "-"} {"->"} {item.to_status || "-"}</span>}
+              {item.notes ? <span>{item.from_status || item.to_status ? " - " : ""}{item.notes}</span> : null}
+            </div>
+          </div>
+        )) : (
+          <div style={{fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.5}}>No transaction history recorded yet.</div>
+        )}
       </div>
+      {resIsPending&&onApprove&&(
       <div style={{ padding:"14px 22px",borderTop:`1px solid ${C.divider}`,display:"flex",gap:8 }}>
-        {resIsPending&&onApprove&&(
+          <>
+          <button onClick={()=>onDecline(res)} disabled={isApprovingThis||isDecliningThis} style={{ flex:1,padding:"12px",background:"transparent",border:`1px solid ${C.redBorder}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.red,cursor:isApprovingThis||isDecliningThis?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
+            {isDecliningThis?<><Spinner C={C} size={12}/>Declining...</>:<><XCircle size={12}/>Decline</>}
+          </button>
           <button
             onClick={()=>onApprove(res)}
             disabled={isApprovingThis}
@@ -423,14 +566,9 @@ function DetailModal({ res, onClose, onApprove, approvingIds, C }) {
           >
             {isApprovingThis?<><Spinner C={C} size={12}/>Approving…</>:<><ThumbsUp size={12}/>Approve</>}
           </button>
-        )}
-        <button
-          onClick={onClose}
-          style={{ flex:1,padding:"12px",background:"transparent",border:`1px solid ${C.borderDefault}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.textSecondary,cursor:"pointer",transition:"all 0.18s" }}
-          onMouseEnter={e=>{e.currentTarget.style.borderColor=C.borderAccent;e.currentTarget.style.color=C.gold;}}
-          onMouseLeave={e=>{e.currentTarget.style.borderColor=C.borderDefault;e.currentTarget.style.color=C.textSecondary;}}
-        >Close</button>
+          </>
       </div>
+      )}
     </ModalShell>
   );
 }
@@ -474,7 +612,7 @@ function EventPickerModal({ items, allCards, onSelect, onClose, C }) {
 }
 
 // ─── Reminder Popup ───────────────────────────────────────────────────────────
-function ReminderPopup({ popup, onView, onClose, queueCount, C }) {
+function ReminderPopup({ popup, onView, onClose, onAcknowledge, queueCount, C }) {
   const [nowMs,setNowMs]=useState(Date.now());
   useEffect(()=>{ const t=setInterval(()=>setNowMs(Date.now()),30000); return()=>clearInterval(t); },[]);
   const items=popup.items||[];
@@ -512,7 +650,7 @@ function ReminderPopup({ popup, onView, onClose, queueCount, C }) {
         </div>
         <div style={{ borderTop:`1px solid ${C.divider}`,display:"grid",gridTemplateColumns:"1fr 1fr" }}>
           <button onClick={()=>onView(popup)} style={{ padding:"13px 0",background:"transparent",border:"none",borderRight:`1px solid ${C.divider}`,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.green,cursor:"pointer",transition:"background 0.18s" }} onMouseEnter={e=>e.currentTarget.style.background=C.greenFaint} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>View</button>
-          <button onClick={onClose} style={{ padding:"13px 0",background:"transparent",border:"none",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.red,cursor:"pointer",transition:"background 0.18s" }} onMouseEnter={e=>e.currentTarget.style.background=C.redFaint} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>Dismiss</button>
+          <button onClick={()=>onAcknowledge(popup)} style={{ padding:"13px 0",background:"transparent",border:"none",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.gold,cursor:"pointer",transition:"background 0.18s" }} onMouseEnter={e=>e.currentTarget.style.background=C.goldFaint} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>Acknowledge</button>
         </div>
       </div>
     </div>
@@ -520,11 +658,11 @@ function ReminderPopup({ popup, onView, onClose, queueCount, C }) {
 }
 
 // ─── Reservation Card ─────────────────────────────────────────────────────────
-function ReservationCard({ res, isNew, onClick, onApprove, approvingIds, C }) {
+function ReservationCard({ res, isNew, onClick, onApprove, onDecline, approvingIds, decliningIds, C }) {
   const [hi,setHi]=useState(isNew);
   useEffect(()=>{ if(isNew){const t=setTimeout(()=>setHi(false),4000);return()=>clearTimeout(t);} },[isNew]);
   const rawStatus=(res.status||"").toLowerCase(),resIsPending=rawStatus==="pending";
-  const resId=res.id??res.db_id,isApprovingThis=approvingIds?.has(resId);
+  const resId=res.id??res.db_id,isApprovingThis=approvingIds?.has(resId),isDecliningThis=decliningIds?.has(resId);
   return (
     <div style={{ background:hi?C.goldFaintest:C.cardBg,border:`1px solid ${hi?C.borderAccent:C.cardBorder}`,borderRadius:10,padding:"15px 16px",marginBottom:8,boxShadow:hi?`0 0 0 3px ${C.goldFaint}`:"none",transition:"all 0.30s ease",animation:isNew?"cardSlideIn 0.40s cubic-bezier(0.34,1.5,0.64,1)":"none",cursor:"pointer" }} onClick={()=>onClick(res)} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.borderAccent;e.currentTarget.style.background=C.goldFaintest;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=hi?C.borderAccent:C.cardBorder;e.currentTarget.style.background=hi?C.goldFaintest:C.cardBg;}}>
       <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,gap:10 }}>
@@ -547,7 +685,10 @@ function ReservationCard({ res, isNew, onClick, onApprove, approvingIds, C }) {
         ))}
       </div>
       {resIsPending&&onApprove&&(
-        <div style={{ marginTop:12,paddingTop:10,borderTop:`1px solid ${C.divider}` }}>
+        <div style={{ marginTop:12,paddingTop:10,borderTop:`1px solid ${C.divider}`,display:"grid",gridTemplateColumns:"1fr 1.4fr",gap:8 }}>
+          <button onClick={e=>{e.stopPropagation();onDecline(res);}} disabled={isApprovingThis||isDecliningThis} style={{ width:"100%",padding:"9px",background:"transparent",border:`1px solid ${C.redBorder}`,borderRadius:8,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:C.red,cursor:isApprovingThis||isDecliningThis?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,transition:"all 0.18s" }}>
+            {isDecliningThis?<><Spinner C={C} size={11}/>Declining...</>:<><XCircle size={11}/>Decline</>}
+          </button>
           <button onClick={e=>{e.stopPropagation();onApprove(res);}} disabled={isApprovingThis} style={{ width:"100%",padding:"9px",background:isApprovingThis?C.green+"80":C.green,border:"none",borderRadius:8,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:"#fff",cursor:isApprovingThis?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,transition:"all 0.18s" }} onMouseEnter={e=>{if(!isApprovingThis)e.currentTarget.style.opacity="0.85";}} onMouseLeave={e=>{if(!isApprovingThis)e.currentTarget.style.opacity="1";}}>
             {isApprovingThis?<><Spinner C={C} size={11}/>Approving…</>:<><ThumbsUp size={11}/>Approve Reservation</>}
           </button>
@@ -563,9 +704,7 @@ function DoneCard({ res, onClick, C }) {
     <div onClick={()=>onClick(res)} style={{ background:C.cardBg,border:`1px solid ${C.greenBorder}`,borderRadius:10,padding:"13px 15px",marginBottom:8,cursor:"pointer",transition:"all 0.18s" }} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.green;e.currentTarget.style.background=C.greenFaint;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.greenBorder;e.currentTarget.style.background=C.cardBg;}}>
       <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:7,gap:8 }}>
         <div style={{ fontFamily:F.body,fontSize:13,fontWeight:600,color:C.textPrimary,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{res.guest_name||res.name||"Unknown Guest"}</div>
-        <span style={{ display:"inline-flex",alignItems:"center",gap:4,background:C.greenFaint,border:`1px solid ${C.greenBorder}`,borderRadius:4,padding:"3px 8px",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.green }}>
-          <span style={{ width:4,height:4,borderRadius:"50%",background:C.green }}/>Done
-        </span>
+        <StatusBadge status={res.status} C={C}/>
       </div>
       <div style={{ display:"flex",gap:12,flexWrap:"wrap" }}>
         {[fmtDate(res.event_date||res.eventDate||res.reservationDate),fmtTime(res.event_time||res.eventTime||res.reservationTime),res.room||res.venue].filter(Boolean).map((v,i)=>(
@@ -645,6 +784,38 @@ function Panel({ children, accentColor, C, style={} }) {
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
+function AcknowledgmentMonitor({ activeAlerts, acknowledgedAlerts, onAcknowledge, C }) {
+  return (
+    <Panel C={C} accentColor={activeAlerts.length ? C.gold : C.green} style={{ flexShrink:0 }}>
+      <div style={{ padding:"12px 16px 10px",borderBottom:`1px solid ${C.divider}` }}>
+        <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+            <BellDot size={13} color={activeAlerts.length ? C.gold : C.green}/>
+            <span style={{ fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:activeAlerts.length ? C.gold : C.green }}>Acknowledgment Monitor</span>
+          </div>
+          <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
+            <span style={{ background:C.goldFaint,border:`1px solid ${C.borderAccent}`,borderRadius:4,padding:"3px 8px",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.gold }}>{activeAlerts.length} Unacknowledged</span>
+            <span style={{ background:C.greenFaint,border:`1px solid ${C.greenBorder}`,borderRadius:4,padding:"3px 8px",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.green }}>{acknowledgedAlerts.length} Acknowledged</span>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding:"10px 12px",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:8 }}>
+        {activeAlerts.length===0 ? (
+          <div style={{ fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",color:C.textTertiary,padding:"10px 4px" }}>No active alerts needing acknowledgment</div>
+        ) : activeAlerts.slice(0,4).map(alert=>(
+          <div key={alert.id} style={{ border:`1px solid ${C.borderAccent}`,borderRadius:8,padding:"10px 12px",background:C.goldFaintest,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12 }}>
+            <div style={{ minWidth:0 }}>
+              <div style={{ fontFamily:F.body,fontSize:12.5,fontWeight:700,color:C.textPrimary,marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{alert.name}</div>
+              <div style={{ fontFamily:F.body,fontSize:11,color:C.textSecondary,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{alert.room} - {fmtDate(alert.eventDate)} - {fmtTime(alert.eventTime)}</div>
+            </div>
+            <button onClick={()=>onAcknowledge([alert])} title="Acknowledge alert" style={{ flex:"0 0 auto",padding:"7px 12px",border:`1px solid ${C.borderAccent}`,borderRadius:6,background:C.gold,color:"#fff",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer",whiteSpace:"nowrap" }}>Acknowledge</button>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
 function NotificationDashboard() {
   const C=getTokens();
 
@@ -659,14 +830,20 @@ function NotificationDashboard() {
   const [loading,setLoading]=useState(true);
   const [wsStatus,setWsStatus]=useState("connecting");
   const [approvingIds,setApprovingIds]=useState(new Set());
+  const [decliningIds,setDecliningIds]=useState(new Set());
   const [confirmRes,setConfirmRes]=useState(null);
+  const [declineRes,setDeclineRes]=useState(null);
   const [isApproving,setIsApproving]=useState(false);
+  const [isDeclining,setIsDeclining]=useState(false);
   const [toasts,setToasts]=useState([]);
   const [pendingPage,setPendingPage]=useState(1);
   const [donePage,setDonePage]=useState(1);
   const [pendingPerPage,setPendingPerPage]=useState(20);
   const [donePerPage,setDonePerPage]=useState(20);
   const [leftTab,setLeftTab]=useState("pending");
+  const [rightTab,setRightTab]=useState("accepted");
+  const [outletFilter,setOutletFilter]=useState("ALL");
+  const [acknowledgments,setAcknowledgments]=useState(()=>loadAcknowledgments());
 
   const knownIds=useRef(new Set()),firedAlerts=useRef(new Set()),leftRef=useRef(null);
   const echoRef=useRef(null),reconnectDelay=useRef(2000),reconnectTimer=useRef(null),isMounted=useRef(true);
@@ -675,11 +852,29 @@ function NotificationDashboard() {
   useEffect(()=>{isMounted.current=true;return()=>{isMounted.current=false;};},[]);
   const addToast=useCallback((message,type="success")=>{const id=Date.now();setToasts(p=>[...p,{id,message,type}]);setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),3500);},[]);
   const dismissPopup=useCallback(()=>{setPopupQueue(q=>{const next=q.slice(1);if(!next.length)stopAlert();return next;});},[]);
+  const acknowledgeAlerts=useCallback((alerts)=>{
+    const items=Array.isArray(alerts)?alerts:(alerts?.items||[]);
+    if(!items.length)return;
+    const now=new Date().toISOString();
+    setAcknowledgments(prev=>{
+      const next={...prev};
+      items.forEach(item=>{
+        const id=notificationId(item);
+        if(id)next[id]={id,name:item.name||item.guest_name||"Reservation",room:item.room||"",eventDate:item.eventDate||item.event_date,eventTime:item.eventTime||item.event_time,acknowledgedAt:now};
+      });
+      localStorage.setItem(ACK_STORAGE_KEY,JSON.stringify(next));
+      return next;
+    });
+    setPopupQueue(q=>q.slice(1));
+    stopAlert();
+    addToast("Notification acknowledged.","success");
+  },[addToast]);
   useEffect(()=>{const t=setInterval(()=>{setClock(clockStr());setDate(dateStr());},1000);return()=>clearInterval(t);},[]);
 
   const checkAlerts=useCallback((list)=>{
     const cands=list.filter(isApproved).map(res=>{
       const id=res.id??res.db_id,key=`${id}-alert`;
+      if(acknowledgments[String(id)])return null;
       if(firedAlerts.current.has(key))return null;
       const dt=parseEventDate(res.event_date||res.eventDate||res.reservationDate,res.event_time||res.eventTime||res.reservationTime);
       if(!dt)return null;
@@ -693,7 +888,7 @@ function NotificationDashboard() {
     const first=cands[0].res,rel=relLabel(cands[0].diff);
     if(cands.length===1)playAlertThenSpeak(`Reminder. ${first.guest_name||first.name||"A guest"}'s reservation starts in ${rel}.`);
     else playAlertThenSpeak(`Reminder. ${cands.length} reservations coming up. Earliest in ${rel}.`);
-  },[]);
+  },[acknowledgments]);
 
   const upsertReservation=useCallback((res,isInit=false)=>{
     const id=res.id??res.db_id;if(!id)return;
@@ -711,6 +906,7 @@ function NotificationDashboard() {
   },[checkAlerts]);
 
   const handleApproveRequest=useCallback(res=>setConfirmRes(res),[]);
+  const handleDeclineRequest=useCallback(res=>setDeclineRes(res),[]);
 
   // FIX: handleApproveConfirm now calls optimisticSeatUpdate so the seatmap
   // turns red immediately when approving from NotificationDashboard, same as
@@ -720,9 +916,16 @@ function NotificationDashboard() {
     const id=confirmRes.id??confirmRes.db_id,dbId=confirmRes.db_id??Number(confirmRes.id);
     setIsApproving(true);setApprovingIds(p=>new Set([...p,id]));
     try{
-      await reservationAPI.update(dbId,{status:"reserved"});
+      const result = await reservationAPI.approve(dbId);
       // Update local card state
-      upsertReservation({...confirmRes,status:"reserved"},false);
+      upsertReservation({
+        ...confirmRes,
+        status:"reserved",
+        reservation_state:"active",
+        previous_status:result?.previous_status||confirmRes.status,
+        status_last_changed_at:result?.status_last_changed_at||new Date().toISOString(),
+        transaction_history:result?.transaction_history||confirmRes.transaction_history
+      },false);
       // FIX: Update seatmap in localStorage and broadcast to client pages
       optimisticSeatUpdate(confirmRes, "reserved");
       playApproveSound();
@@ -733,6 +936,31 @@ function NotificationDashboard() {
     catch{addToast("Failed to approve. Please try again.","error");}
     finally{setIsApproving(false);setApprovingIds(p=>{const n=new Set(p);n.delete(id);return n;});}
   },[confirmRes,upsertReservation,addToast]);
+
+  const handleDeclineConfirm=useCallback(async(reason)=>{
+    if(!declineRes)return;
+    const id=declineRes.id??declineRes.db_id,dbId=declineRes.db_id??Number(declineRes.id);
+    setIsDeclining(true);setDecliningIds(p=>new Set([...p,id]));
+    try{
+      const result = await reservationAPI.reject(dbId,reason);
+      upsertReservation({
+        ...declineRes,
+        status:"rejected",
+        reservation_state:"inactive",
+        previous_status:result?.previous_status||declineRes.status,
+        status_last_changed_at:result?.status_last_changed_at||new Date().toISOString(),
+        rejected_at:result?.rejected_at||new Date().toISOString(),
+        rejection_reason:reason,
+        transaction_history:result?.transaction_history||declineRes.transaction_history
+      },false);
+      optimisticSeatUpdate(declineRes, "available");
+      addToast(`${declineRes.guest_name||declineRes.name||"Reservation"} declined.`,"success");
+      setDeclineRes(null);
+      setRightTab("declined");
+    }
+    catch{addToast("Failed to decline. Please try again.","error");}
+    finally{setIsDeclining(false);setDecliningIds(p=>{const n=new Set(p);n.delete(id);return n;});}
+  },[declineRes,upsertReservation,addToast]);
 
   const syncReservations=useCallback(async({silent=true}={})=>{
     if(!silent)setLoading(true);
@@ -847,20 +1075,40 @@ function NotificationDashboard() {
     };
   },[syncReservations,upsertReservation]);
 
-  const{upcomingCards,pendingCards,doneCards}=useMemo(()=>{
-    const u=[],p=[],d=[];
-    allCards.forEach(res=>{
+  const outletOptions=useMemo(()=>["ALL",...Array.from(new Set(allCards.map(getOutletName))).sort((a,b)=>a.localeCompare(b))],[allCards]);
+
+  const{upcomingCards,pendingCards,acceptedCards,declinedCards}=useMemo(()=>{
+    const u=[],p=[],a=[],x=[];
+    allCards.filter(res=>outletFilter==="ALL"||getOutletName(res)===outletFilter).forEach(res=>{
       if(isPending(res)){p.push(res);return;}
+      if(isDeclined(res)){x.push(res);return;}
       if(!isApproved(res))return;
+      a.push(res);
       const dt=parseEventDate(res.event_date||res.eventDate||res.reservationDate,res.event_time||res.eventTime||res.reservationTime);
-      if(!dt||dt.getTime()>Date.now())u.push(res);else d.push(res);
+      if(!dt||dt.getTime()>Date.now())u.push(res);
     });
-    return{upcomingCards:u,pendingCards:p,doneCards:d};
-  },[allCards]);
+    return{upcomingCards:u,pendingCards:p,acceptedCards:a,declinedCards:x};
+  },[allCards,outletFilter]);
 
   const leftCards=leftTab==="upcoming"?upcomingCards:pendingCards;
+  const rightCards=rightTab==="declined"?declinedCards:acceptedCards;
   const leftVisible=leftCards.slice((pendingPage-1)*pendingPerPage,pendingPage*pendingPerPage);
-  const doneVisible=doneCards.slice((donePage-1)*donePerPage,donePage*donePerPage);
+  const doneVisible=rightCards.slice((donePage-1)*donePerPage,donePage*donePerPage);
+  const {activeAlerts,acknowledgedAlerts}=useMemo(()=>{
+    const now=Date.now();
+    const active=allCards
+      .filter(isApproved)
+      .map(res=>{
+        const id=notificationId(res);
+        const dt=parseEventDate(res.event_date||res.eventDate||res.reservationDate,res.event_time||res.eventTime||res.reservationTime);
+        if(!id||!dt||acknowledgments[id])return null;
+        const diff=dt.getTime()-now;
+        if(diff<=0||diff>2*3_600_000)return null;
+        return {id,name:res.guest_name||res.name||"Guest",room:getOutletName(res),eventDate:res.event_date||res.eventDate||res.reservationDate,eventTime:res.event_time||res.eventTime||res.reservationTime};
+      })
+      .filter(Boolean);
+    return {activeAlerts:active,acknowledgedAlerts:Object.values(acknowledgments)};
+  },[allCards,acknowledgments]);
 
   const handlePopupView=useCallback(p=>{dismissPopup();const items=p.items||[];if(items.length===1){const full=allCards.find(r=>(r.id??r.db_id)===items[0].id);if(full)setDetailRes(full);}else setPickerItems(items);},[allCards,dismissPopup]);
 
@@ -914,12 +1162,18 @@ function NotificationDashboard() {
                 <h1 style={{ fontFamily:F.display,fontSize:"clamp(24px,4vw,40px)",fontWeight:700,color:C.textPrimary,lineHeight:1.12,margin:"0 0 8px",letterSpacing:"0.01em" }}>
                   Notification Monitor
                 </h1>
+                <select value={outletFilter} onChange={e=>{setOutletFilter(e.target.value);setPendingPage(1);setDonePage(1);}} style={{ marginBottom:8,padding:"6px 10px",border:`1px solid ${C.borderDefault}`,borderRadius:6,background:C.surfaceBase,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.textSecondary,outline:"none" }}>
+                  {outletOptions.map(outlet=><option key={outlet} value={outlet}>{outlet==="ALL"?"All Outlets":outlet}</option>)}
+                </select>
                 <div style={{ fontFamily:F.label,fontSize:11,fontWeight:500,color:C.textSecondary,letterSpacing:"0.02em",textTransform:"uppercase" }}>
                   {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })} • {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
                 </div>
               </div>
 
               <div style={{ display:"grid",gridTemplateColumns:"minmax(0,3fr) minmax(0,1.4fr)",gap:14,flex:1,minHeight:0 }} className="nd-grid">
+                <div style={{ gridColumn:"1 / -1" }}>
+                  <AcknowledgmentMonitor activeAlerts={activeAlerts} acknowledgedAlerts={acknowledgedAlerts} onAcknowledge={acknowledgeAlerts} C={C}/>
+                </div>
 
                 {/* LEFT */}
                 <Panel C={C} style={{ maxHeight:"clamp(360px, calc(100vh - 280px), 700px)" }}>
@@ -942,7 +1196,9 @@ function NotificationDashboard() {
                             isNew={newIds.has(res.id??res.db_id)}
                             onClick={setDetailRes}
                             onApprove={handleApproveRequest}
+                            onDecline={handleDeclineRequest}
                             approvingIds={approvingIds}
+                            decliningIds={decliningIds}
                             C={C}
                           />
                         ))
@@ -952,25 +1208,25 @@ function NotificationDashboard() {
                 </Panel>
 
                 {/* RIGHT */}
-                <Panel accentColor={C.green} C={C} style={{ maxHeight:"clamp(360px, calc(100vh - 280px), 700px)" }}>
+                <Panel accentColor={rightTab==="declined"?C.red:C.green} C={C} style={{ maxHeight:"clamp(360px, calc(100vh - 280px), 700px)" }}>
                   <div style={{ padding:"12px 16px 10px",borderBottom:`1px solid ${C.divider}`,flexShrink:0 }}>
                     <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
-                      <div style={{ display:"flex",alignItems:"center",gap:7 }}>
-                        <CheckCircle size={12} color={C.green}/>
-                        <span style={{ fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:C.green }}>Done</span>
+                      <div style={{ display:"flex",gap:6 }}>
+                        <TabBtn active={rightTab==="accepted"} onClick={()=>{setRightTab("accepted");setDonePage(1);}} activeColor={C.green} count={acceptedCards.length} C={C}><CheckCircle size={10}/>Accepted</TabBtn>
+                        <TabBtn active={rightTab==="declined"} onClick={()=>{setRightTab("declined");setDonePage(1);}} activeColor={C.red} count={declinedCards.length} C={C}><XCircle size={10}/>Declined</TabBtn>
                       </div>
-                      <span style={{ background:C.greenFaint,border:`1px solid ${C.greenBorder}`,borderRadius:4,padding:"2px 8px",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.12em",color:C.green }}>{doneCards.length}</span>
+                      <span style={{ fontFamily:F.label,fontSize:9,color:C.textTertiary,letterSpacing:"0.10em",textTransform:"uppercase" }}>{rightTab==="declined"?"Rejected reservations":"Approved reservations"}</span>
                     </div>
                   </div>
                   <div style={{ flex:1,overflowY:"auto",padding:"10px 12px",minHeight:0 }}>
-                    {doneCards.length===0
-                      ? <EmptyState msg="No completed reservations" C={C}/>
+                    {rightCards.length===0
+                      ? <EmptyState msg={rightTab==="declined"?"No declined reservations":"No accepted reservations"} C={C}/>
                       : doneVisible.map(res=>(
                           <DoneCard key={`done-${res.id??res.db_id}`} res={res} onClick={setDetailRes} C={C}/>
                         ))
                     }
                   </div>
-                  <Pagination page={donePage} total={doneCards.length} perPage={donePerPage} setPage={setDonePage} setPerPage={setDonePerPage} C={C}/>
+                  <Pagination page={donePage} total={rightCards.length} perPage={donePerPage} setPage={setDonePage} setPerPage={setDonePerPage} C={C}/>
                 </Panel>
 
               </div>
@@ -979,10 +1235,11 @@ function NotificationDashboard() {
         </div>
       </div>
 
-      {popup&&<ReminderPopup popup={popup} queueCount={popupQueue.length} onView={handlePopupView} onClose={dismissPopup} C={C}/>}
+      {popup&&<ReminderPopup popup={popup} queueCount={popupQueue.length} onView={handlePopupView} onClose={dismissPopup} onAcknowledge={acknowledgeAlerts} C={C}/>}
       {pickerItems&&<EventPickerModal items={pickerItems} allCards={allCards} onSelect={r=>{setPickerItems(null);setDetailRes(r);}} onClose={()=>setPickerItems(null)} C={C}/>}
-      {detailRes&&<DetailModal res={detailRes} onClose={()=>setDetailRes(null)} onApprove={handleApproveRequest} approvingIds={approvingIds} C={C}/>}
+      {detailRes&&<DetailModal res={detailRes} onClose={()=>setDetailRes(null)} onApprove={handleApproveRequest} onDecline={handleDeclineRequest} approvingIds={approvingIds} decliningIds={decliningIds} C={C}/>}
       {confirmRes&&<ApproveConfirmModal res={confirmRes} onConfirm={handleApproveConfirm} onCancel={()=>{if(!isApproving)setConfirmRes(null);}} isApproving={isApproving} C={C}/>}
+      {declineRes&&<DeclineConfirmModal res={declineRes} onConfirm={handleDeclineConfirm} onCancel={()=>{if(!isDeclining)setDeclineRes(null);}} isDeclining={isDeclining} C={C}/>}
       <Toast toasts={toasts} C={C}/>
     </>
   );

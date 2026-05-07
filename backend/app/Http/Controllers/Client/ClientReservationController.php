@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\Reservation;
+use App\Models\ReservationTransaction;
 use App\Models\Venue;
 use App\Services\WebsocketBroadcaster;
 use App\Events\ReservationCreated;
@@ -257,6 +258,7 @@ class ClientReservationController extends Controller
 
             $cancelReason = trim((string)($validated['reason'] ?? ''));
             $cancelReason = $cancelReason !== '' ? $cancelReason : null;
+            $fromStatus = $reservation->status;
 
             $reservation->update([
                 'status' => 'rejected',
@@ -265,12 +267,37 @@ class ClientReservationController extends Controller
                 'cancelled_at' => now(),
             ]);
 
+            ReservationTransaction::create([
+                'reservation_id' => $reservation->id,
+                'action' => 'status_changed',
+                'from_status' => $fromStatus,
+                'to_status' => $reservation->status,
+                'notes' => 'Reservation cancelled by guest.',
+                'metadata' => $cancelReason ? ['reason' => $cancelReason] : null,
+            ]);
+
             // Send cancellation email to client
             try {
                 Mail::to($reservation->email)
                     ->send(new ReservationStatusMail($reservation, 'cancelled', $cancelReason ?: 'Cancelled by guest'));
+                ReservationTransaction::create([
+                    'reservation_id' => $reservation->id,
+                    'action' => 'notification_sent',
+                    'from_status' => $reservation->status,
+                    'to_status' => $reservation->status,
+                    'notes' => 'Cancellation email sent to guest.',
+                    'metadata' => ['channel' => 'email', 'type' => 'reservation_cancelled'],
+                ]);
             } catch (\Exception $e) {
                 \Log::error('Failed to send cancellation email: ' . $e->getMessage());
+                ReservationTransaction::create([
+                    'reservation_id' => $reservation->id,
+                    'action' => 'notification_failed',
+                    'from_status' => $reservation->status,
+                    'to_status' => $reservation->status,
+                    'notes' => 'Cancellation email failed to send.',
+                    'metadata' => ['channel' => 'email', 'type' => 'reservation_cancelled', 'error' => $e->getMessage()],
+                ]);
             }
 
             // Broadcast update

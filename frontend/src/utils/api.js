@@ -47,7 +47,7 @@ export async function approveReservation(reservationId) {
     // Update localStorage as backup
     const reservations = JSON.parse(localStorage.getItem('bellevue_reservations') || '[]');
     const updatedReservations = reservations.map(r => 
-      r.id === reservationId ? { ...r, status: 'approved' } : r
+      r.id === reservationId ? { ...r, status: 'approved', reservation_state: 'active' } : r
     );
     localStorage.setItem('bellevue_reservations', JSON.stringify(updatedReservations));
     
@@ -58,7 +58,7 @@ export async function approveReservation(reservationId) {
     try {
       const reservations = JSON.parse(localStorage.getItem('bellevue_reservations') || '[]');
       const updatedReservations = reservations.map(r => 
-        r.id === reservationId ? { ...r, status: 'approved' } : r
+        r.id === reservationId ? { ...r, status: 'approved', reservation_state: 'active' } : r
       );
       localStorage.setItem('bellevue_reservations', JSON.stringify(updatedReservations));
       return { success: true, message: 'Reservation approved successfully' };
@@ -86,7 +86,7 @@ export async function rejectReservation(reservationId, reason = '') {
     // Update localStorage as backup
     const reservations = JSON.parse(localStorage.getItem('bellevue_reservations') || '[]');
     const updatedReservations = reservations.map(r => 
-      r.id === reservationId ? { ...r, status: 'rejected' } : r
+      r.id === reservationId ? { ...r, status: 'rejected', reservation_state: 'inactive' } : r
     );
     localStorage.setItem('bellevue_reservations', JSON.stringify(updatedReservations));
     
@@ -97,12 +97,56 @@ export async function rejectReservation(reservationId, reason = '') {
     try {
       const reservations = JSON.parse(localStorage.getItem('bellevue_reservations') || '[]');
       const updatedReservations = reservations.map(r => 
-        r.id === reservationId ? { ...r, status: 'rejected' } : r
+        r.id === reservationId ? { ...r, status: 'rejected', reservation_state: 'inactive' } : r
       );
       localStorage.setItem('bellevue_reservations', JSON.stringify(updatedReservations));
       return { success: true, message: 'Reservation rejected successfully' };
     } catch {
       return { success: false, message: 'Failed to reject reservation' };
+    }
+  }
+}
+
+// Revert a rejected reservation back to pending review
+export async function revertReservation(reservationId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/reservations/${reservationId}/revert`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    const now = new Date().toISOString();
+
+    // Update localStorage as backup
+    const reservations = JSON.parse(localStorage.getItem('bellevue_reservations') || '[]');
+    const updatedReservations = reservations.map(r =>
+      r.id === reservationId
+        ? { ...r, status: 'pending', reservation_state: 'active', previous_status: 'rejected', reverted_at: now, status_last_changed_at: now }
+        : r
+    );
+    localStorage.setItem('bellevue_reservations', JSON.stringify(updatedReservations));
+
+    return result;
+  } catch (error) {
+    console.error('[API] Failed to revert reservation:', error);
+    // Fallback to localStorage if API fails
+    try {
+      const now = new Date().toISOString();
+      const reservations = JSON.parse(localStorage.getItem('bellevue_reservations') || '[]');
+      const updatedReservations = reservations.map(r =>
+        r.id === reservationId
+          ? { ...r, status: 'pending', reservation_state: 'active', previous_status: 'rejected', reverted_at: now, status_last_changed_at: now }
+          : r
+      );
+      localStorage.setItem('bellevue_reservations', JSON.stringify(updatedReservations));
+      return { success: true, message: 'Reservation reverted to pending successfully' };
+    } catch {
+      return { success: false, message: 'Failed to revert reservation' };
     }
   }
 }
@@ -131,6 +175,7 @@ export async function createReservation(reservationData) {
         ...reservationData,
         id: Date.now().toString(),
         status: 'pending',
+        reservation_state: 'active',
         created_at: new Date().toISOString()
       };
       reservations.push(newReservation);
@@ -231,10 +276,12 @@ export async function getReservationStats() {
         total: reservations.length,
         pending: reservations.filter(r => r.status === 'pending').length,
         approved: reservations.filter(r => r.status === 'approved').length,
-        rejected: reservations.filter(r => r.status === 'rejected').length
+        rejected: reservations.filter(r => r.status === 'rejected').length,
+        active: reservations.filter(r => (r.reservation_state || (['rejected', 'cancelled'].includes(r.status) ? 'inactive' : 'active')) === 'active').length,
+        inactive: reservations.filter(r => (r.reservation_state || (['rejected', 'cancelled'].includes(r.status) ? 'inactive' : 'active')) === 'inactive').length
       };
     } catch {
-      return { total: 0, pending: 0, approved: 0, rejected: 0 };
+      return { total: 0, pending: 0, approved: 0, rejected: 0, active: 0, inactive: 0 };
     }
   }
 }

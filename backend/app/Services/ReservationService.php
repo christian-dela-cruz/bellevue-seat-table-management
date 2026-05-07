@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Reservation;
+use App\Models\ReservationTransaction;
 use App\Models\Seat;
 
 class ReservationService
@@ -32,6 +33,7 @@ class ReservationService
      */
     public function approveReservation(Reservation $reservation): Reservation
     {
+        $fromStatus = $reservation->status;
         $reservation->update(['status' => 'reserved']);
 
         // Update the specific seat status if seat_number is specified
@@ -42,6 +44,16 @@ class ReservationService
                 ->update(['status' => 'reserved']);
         }
 
+        $reservation = $reservation->fresh(['venue']);
+
+        $this->recordTransaction(
+            $reservation,
+            'status_changed',
+            $fromStatus,
+            $reservation->status,
+            'Reservation approved and selected seat/table reserved.'
+        );
+
         return $reservation->fresh(['venue']);
     }
 
@@ -50,6 +62,7 @@ class ReservationService
      */
     public function rejectReservation(Reservation $reservation, string $reason): Reservation
     {
+        $fromStatus = $reservation->status;
         $reservation->update([
             'status' => 'rejected',
             'rejection_reason' => $reason,
@@ -63,7 +76,59 @@ class ReservationService
                 ->update(['status' => 'available']);
         }
 
+        $reservation = $reservation->fresh(['venue']);
+
+        $this->recordTransaction(
+            $reservation,
+            'status_changed',
+            $fromStatus,
+            $reservation->status,
+            'Reservation rejected by admin.',
+            ['reason' => $reason]
+        );
+
         return $reservation->fresh(['venue']);
+    }
+
+    /**
+     * Revert a rejected reservation back to pending review.
+     */
+    public function revertRejectedReservation(Reservation $reservation): Reservation
+    {
+        $fromStatus = $reservation->status;
+        $reservation->update([
+            'status' => 'pending',
+        ]);
+
+        $reservation = $reservation->fresh(['venue']);
+
+        $this->recordTransaction(
+            $reservation,
+            'status_changed',
+            $fromStatus,
+            $reservation->status,
+            'Rejected reservation reverted to pending review.'
+        );
+
+        return $reservation->fresh(['venue']);
+    }
+
+    public function recordTransaction(
+        Reservation $reservation,
+        string $action,
+        ?string $fromStatus = null,
+        ?string $toStatus = null,
+        ?string $notes = null,
+        array $metadata = []
+    ): ReservationTransaction {
+        return ReservationTransaction::create([
+            'reservation_id' => $reservation->id,
+            'action' => $action,
+            'from_status' => $fromStatus,
+            'to_status' => $toStatus,
+            'notes' => $notes,
+            'metadata' => $metadata ?: null,
+        ]);
     }
 
     /**
@@ -131,6 +196,12 @@ class ReservationService
                         'event_time'       => $reservation->event_time,
                         'special_requests' => $reservation->special_requests,
                         'status'           => $reservation->status,
+                        'reservation_state' => $reservation->reservation_state,
+                        'previous_status'  => $reservation->previous_status,
+                        'status_last_changed_at' => optional($reservation->status_last_changed_at)->toISOString(),
+                        'rejected_at'      => optional($reservation->rejected_at)->toISOString(),
+                        'reverted_at'      => optional($reservation->reverted_at)->toISOString(),
+                        'transaction_history' => $this->formatTransactionHistory($reservation),
                         'type'             => $reservation->type,
                         'rejection_reason' => $reservation->rejection_reason,
                         'submittedAt'      => $submittedAt,
@@ -171,6 +242,12 @@ class ReservationService
                     'eventTime'        => $reservation->event_time,
                     'specialRequests'  => $reservation->special_requests,
                     'status'           => $reservation->status,
+                    'reservation_state' => $reservation->reservation_state,
+                    'previous_status'  => $reservation->previous_status,
+                    'status_last_changed_at' => optional($reservation->status_last_changed_at)->toISOString(),
+                    'rejected_at'      => optional($reservation->rejected_at)->toISOString(),
+                    'reverted_at'      => optional($reservation->reverted_at)->toISOString(),
+                    'transaction_history' => $this->formatTransactionHistory($reservation),
                     'type'             => $reservation->type,
                     'rejectionReason'  => $reservation->rejection_reason,
                     'submittedAt'      => $reservation->submitted_at->format('M j, Y · g:i A'),
@@ -193,6 +270,8 @@ class ReservationService
             'approved' => $reservations->where('status', 'reserved')->count(),
             'rejected' => $reservations->where('status', 'rejected')->count(),
             'cancelled' => $reservations->where('status', 'cancelled')->count(),
+            'active' => $reservations->where('reservation_state', 'active')->count(),
+            'inactive' => $reservations->where('reservation_state', 'inactive')->count(),
         ];
     }
 
@@ -202,6 +281,25 @@ class ReservationService
     public function deleteReservation(Reservation $reservation): bool
     {
         return $reservation->delete();
+    }
+
+    private function formatTransactionHistory(Reservation $reservation): array
+    {
+        return $reservation->transactions()
+            ->latest()
+            ->limit(8)
+            ->get()
+            ->map(fn (ReservationTransaction $transaction) => [
+                'id' => $transaction->id,
+                'action' => $transaction->action,
+                'from_status' => $transaction->from_status,
+                'to_status' => $transaction->to_status,
+                'notes' => $transaction->notes,
+                'metadata' => $transaction->metadata,
+                'created_at' => optional($transaction->created_at)->toISOString(),
+            ])
+            ->values()
+            ->toArray();
     }
 
     /**

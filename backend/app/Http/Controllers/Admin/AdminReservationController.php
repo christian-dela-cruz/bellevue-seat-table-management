@@ -176,7 +176,7 @@ class AdminReservationController extends Controller
             $reservation = Reservation::findOrFail($id);
             \Log::info('Reservation found: ' . $reservation->email . ', status: ' . $reservation->status);
             
-            $this->reservationService->approveReservation($reservation);
+            $reservation = $this->reservationService->approveReservation($reservation);
             \Log::info('Reservation approved, sending email to: ' . $reservation->email);
 
             // Send approval email to the client
@@ -184,8 +184,24 @@ class AdminReservationController extends Controller
                 Mail::to($reservation->email)
                     ->send(new ReservationStatusMail($reservation, 'reserved'));
                 \Log::info('Approval email sent successfully to: ' . $reservation->email);
+                $this->reservationService->recordTransaction(
+                    $reservation,
+                    'notification_sent',
+                    $reservation->status,
+                    $reservation->status,
+                    'Confirmation email sent to guest.',
+                    ['channel' => 'email', 'type' => 'reservation_confirmed']
+                );
             } catch (\Exception $e) {
                 \Log::error('Failed to send approval email: ' . $e->getMessage());
+                $this->reservationService->recordTransaction(
+                    $reservation,
+                    'notification_failed',
+                    $reservation->status,
+                    $reservation->status,
+                    'Confirmation email failed to send.',
+                    ['channel' => 'email', 'type' => 'reservation_confirmed', 'error' => $e->getMessage()]
+                );
             }
 
             try {
@@ -200,7 +216,12 @@ class AdminReservationController extends Controller
             return response()->json([
                 'success'        => true,
                 'message'        => 'Reservation approved successfully',
-                'reservation_id' => $reservation->reference_code
+                'reservation_id' => $reservation->reference_code,
+                'status'         => $reservation->status,
+                'reservation_state' => $reservation->reservation_state,
+                'previous_status' => $reservation->previous_status,
+                'status_last_changed_at' => optional($reservation->status_last_changed_at)->toISOString(),
+                'transaction_history' => $reservation->transactions()->latest()->limit(8)->get(),
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -218,8 +239,15 @@ class AdminReservationController extends Controller
 
             $reservation = Reservation::findOrFail($id);
             \Log::info('Reservation found: ' . $reservation->email . ', status: ' . $reservation->status);
+
+            if ($reservation->status !== 'pending') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only pending reservations can be rejected.',
+                ], 422);
+            }
             
-            $this->reservationService->rejectReservation($reservation, $validated['reason']);
+            $reservation = $this->reservationService->rejectReservation($reservation, $validated['reason']);
             \Log::info('Reservation rejected, sending email to: ' . $reservation->email . ' with reason: ' . $validated['reason']);
 
             // Send rejection email to the client
@@ -227,8 +255,24 @@ class AdminReservationController extends Controller
                 Mail::to($reservation->email)
                     ->send(new ReservationStatusMail($reservation, 'rejected', $validated['reason']));
                 \Log::info('Rejection email sent successfully to: ' . $reservation->email);
+                $this->reservationService->recordTransaction(
+                    $reservation,
+                    'notification_sent',
+                    $reservation->status,
+                    $reservation->status,
+                    'Rejection email sent to guest.',
+                    ['channel' => 'email', 'type' => 'reservation_rejected']
+                );
             } catch (\Exception $e) {
                 \Log::error('Failed to send rejection email: ' . $e->getMessage());
+                $this->reservationService->recordTransaction(
+                    $reservation,
+                    'notification_failed',
+                    $reservation->status,
+                    $reservation->status,
+                    'Rejection email failed to send.',
+                    ['channel' => 'email', 'type' => 'reservation_rejected', 'error' => $e->getMessage()]
+                );
             }
 
             try {
@@ -243,13 +287,61 @@ class AdminReservationController extends Controller
             return response()->json([
                 'success'        => true,
                 'message'        => 'Reservation rejected successfully',
-                'reservation_id' => $reservation->reference_code
+                'reservation_id' => $reservation->reference_code,
+                'status'         => $reservation->status,
+                'reservation_state' => $reservation->reservation_state,
+                'rejection_reason' => $reservation->rejection_reason,
+                'previous_status' => $reservation->previous_status,
+                'status_last_changed_at' => optional($reservation->status_last_changed_at)->toISOString(),
+                'rejected_at' => optional($reservation->rejected_at)->toISOString(),
+                'transaction_history' => $reservation->transactions()->latest()->limit(8)->get(),
             ]);
         } catch (ValidationException $e) {
             return response()->json([
                 'message' => 'The given data was invalid.',
                 'errors' => $e->errors(),
             ], 422);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function revert(int $id): JsonResponse
+    {
+        \Log::info('AdminReservationController::revert called for reservation ID: ' . $id);
+
+        try {
+            $reservation = Reservation::findOrFail($id);
+
+            if ($reservation->status !== 'rejected') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only rejected reservations can be reverted.',
+                ], 422);
+            }
+
+            $reservation = $this->reservationService->revertRejectedReservation($reservation);
+
+            try {
+                broadcast(new ReservationUpdated($reservation))->toOthers();
+                WebsocketBroadcaster::broadcast('reservations', 'ReservationUpdated', [
+                    'reservation' => $reservation
+                ]);
+            } catch (\Throwable $broadcastError) {
+                \Log::warning('Reservation revert broadcast failed: ' . $broadcastError->getMessage());
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Reservation reverted to pending successfully',
+                'reservation_id' => $reservation->reference_code,
+                'status' => $reservation->status,
+                'reservation_state' => $reservation->reservation_state,
+                'previous_status' => $reservation->previous_status,
+                'status_last_changed_at' => optional($reservation->status_last_changed_at)->toISOString(),
+                'reverted_at' => optional($reservation->reverted_at)->toISOString(),
+                'transaction_history' => $reservation->transactions()->latest()->limit(8)->get(),
+            ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }

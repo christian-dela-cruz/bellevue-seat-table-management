@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
-import { fetchReservations, approveReservation, rejectReservation, getReservationStats } from "../../../utils/api";
+import { fetchReservations, approveReservation, rejectReservation, revertReservation, getReservationStats } from "../../../utils/api";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -115,6 +115,39 @@ function StatusBadge({ status }) {
     }}>
       <span style={{width:5,height:5,borderRadius:"50%",background:badge.dot,flexShrink:0}}/>
       {s.charAt(0).toUpperCase()+s.slice(1)}
+    </span>
+  );
+}
+
+function reservationStateForStatus(status) {
+  const s = (status || "").toLowerCase();
+  return s === "rejected" || s === "cancelled" ? "inactive" : "active";
+}
+
+function getReservationState(reservation) {
+  return (reservation?.reservation_state || reservationStateForStatus(reservation?.status)).toLowerCase();
+}
+
+function StateBadge({ state }) {
+  const s = (state || "active").toLowerCase();
+  const active = s === "active";
+  const color = active ? C.green : C.textSecondary;
+  const bg = active ? C.greenFaint : "rgba(0,0,0,0.05)";
+  const border = active ? C.greenBorder : C.borderDefault;
+
+  return (
+    <span style={{
+      display:"inline-flex",alignItems:"center",gap:5,
+      padding:"3px 9px 3px 7px",
+      background:bg,
+      border:`1px solid ${border}`,
+      borderRadius:20,
+      fontFamily:F.label,fontSize:9,fontWeight:700,
+      letterSpacing:"0.12em",textTransform:"uppercase",
+      color,flexShrink:0,
+    }}>
+      <span style={{width:5,height:5,borderRadius:"50%",background:color,flexShrink:0}}/>
+      {active ? "Active" : "Inactive"}
     </span>
   );
 }
@@ -422,7 +455,116 @@ function RoomFilterDropdown({ rooms, selectedRoom, onSelect, isMobile }) {
 function RejectReasonModal({ reservation, onConfirm, onCancel, loading }) {
   const [reason,setReason]=useState("");
   const [focused,setFocused]=useState(false);
-  const canSubmit=reason.trim().length>0&&!loading;
+  const [showConfirmation,setShowConfirmation]=useState(false);
+  const MIN_REASON_LENGTH = 5;
+  const trimmedReason = reason.trim();
+  const canReview=trimmedReason.length>=MIN_REASON_LENGTH&&!loading;
+
+  if (showConfirmation) {
+    return (
+      <div
+        style={{
+          position:"fixed",inset:0,
+          background:"rgba(0,0,0,0.60)",
+          zIndex:5100,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          padding:20,
+          backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",
+        }}
+        onClick={(e)=>{if(e.target===e.currentTarget&&!loading)setShowConfirmation(false);}}
+      >
+        <div style={{
+          background:C.surfaceBase,borderRadius:14,
+          width:"100%",maxWidth:440,
+          boxShadow:"0 20px 60px rgba(0,0,0,0.20)",
+          border:`1px solid ${C.borderDefault}`,
+          fontFamily:F.body,
+          animation:"modalIn 0.20s cubic-bezier(0.16,1,0.3,1)",
+          overflow:"hidden",
+        }}>
+          <div style={{height:2,background:`linear-gradient(90deg,transparent 0%,${C.red}90 30%,${C.red}90 70%,transparent 100%)`}}/>
+
+          <div style={{
+            background:C.headerGradient,
+            padding:"18px 22px 16px",
+            borderBottom:`1px solid ${C.divider}`,
+          }}>
+            <div style={{fontFamily:F.label,fontSize:9,letterSpacing:"0.22em",color:C.red,fontWeight:700,textTransform:"uppercase",marginBottom:5,opacity:0.85}}>
+              Confirm Rejection
+            </div>
+            <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.textPrimary,lineHeight:1.2}}>
+              {reservation.name||"Reservation"}
+            </div>
+          </div>
+
+          <div style={{padding:"20px 22px 24px"}}>
+            <div style={{
+              padding:"10px 14px",borderRadius:8,marginBottom:14,
+              background:C.statusNote.rejected,border:`1px solid ${C.statusNoteBorder.rejected}`,
+              fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.65,
+            }}>
+              This will mark the reservation as rejected, move it to inactive, release the selected seat/table, and send the rejection reason to the guest.
+            </div>
+
+            <div style={{fontFamily:F.label,fontSize:9,letterSpacing:"0.18em",color:C.textSecondary,fontWeight:700,textTransform:"uppercase",marginBottom:7}}>
+              Reason to Send
+            </div>
+            <div style={{
+              padding:"11px 13px",
+              border:`1px solid ${C.borderDefault}`,
+              borderRadius:8,
+              background:"rgba(0,0,0,0.02)",
+              fontFamily:F.body,
+              fontSize:12,
+              color:C.textPrimary,
+              lineHeight:1.6,
+              whiteSpace:"pre-wrap",
+              maxHeight:120,
+              overflowY:"auto",
+            }}>
+              {trimmedReason}
+            </div>
+
+            <div style={{display:"flex",gap:8,marginTop:16}}>
+              <button
+                onClick={()=>setShowConfirmation(false)}
+                disabled={loading}
+                style={{
+                  flex:1,padding:"11px",
+                  background:"transparent",border:`1px solid ${C.borderDefault}`,
+                  borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,
+                  letterSpacing:"0.14em",textTransform:"uppercase",
+                  color:C.textSecondary,cursor:loading?"not-allowed":"pointer",transition:"all 0.18s",
+                }}
+                onMouseEnter={(e)=>{if(!loading){e.currentTarget.style.borderColor=C.borderAccent;e.currentTarget.style.color=C.gold;}}}
+                onMouseLeave={(e)=>{e.currentTarget.style.borderColor=C.borderDefault;e.currentTarget.style.color=C.textSecondary;}}
+              >
+                Back
+              </button>
+              <button
+                onClick={()=>!loading&&onConfirm(trimmedReason)}
+                disabled={loading}
+                style={{
+                  flex:2,padding:"11px",
+                  background:loading?"rgba(160,56,56,0.35)":C.red,
+                  border:"none",borderRadius:8,
+                  fontFamily:F.label,fontSize:10,fontWeight:700,
+                  letterSpacing:"0.14em",textTransform:"uppercase",
+                  color:"#fff",cursor:loading?"not-allowed":"pointer",
+                  transition:"all 0.18s",
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+                }}
+                onMouseEnter={(e)=>{if(!loading)e.currentTarget.style.background="#8a2e2e";}}
+                onMouseLeave={(e)=>{if(!loading)e.currentTarget.style.background=C.red;}}
+              >
+                {loading?<><Spinner/>Rejecting...</>:"Confirm Reject"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -486,7 +628,7 @@ function RejectReasonModal({ reservation, onConfirm, onCancel, loading }) {
           }}>
             A rejection email will be sent to{" "}
             <strong style={{color:C.textPrimary}}>{reservation.email}</strong>{" "}
-            with your reason included.
+            after you review and confirm the rejection.
           </div>
 
           <label style={{
@@ -514,6 +656,11 @@ function RejectReasonModal({ reservation, onConfirm, onCancel, loading }) {
               resize:"vertical",minHeight:90,
             }}
           />
+          {trimmedReason.length > 0 && trimmedReason.length < MIN_REASON_LENGTH && (
+            <div style={{fontFamily:F.body,fontSize:11,color:C.red,marginTop:7}}>
+              Reason must be at least {MIN_REASON_LENGTH} characters.
+            </div>
+          )}
 
           <div style={{display:"flex",gap:8,marginTop:16}}>
             <button onClick={onCancel} disabled={loading}
@@ -528,22 +675,191 @@ function RejectReasonModal({ reservation, onConfirm, onCancel, loading }) {
               onMouseLeave={(e)=>{e.currentTarget.style.borderColor=C.borderDefault;e.currentTarget.style.color=C.textSecondary;}}
             >Cancel</button>
             <button
-              onClick={()=>canSubmit&&onConfirm(reason.trim())}
-              disabled={!canSubmit}
+              onClick={()=>canReview&&setShowConfirmation(true)}
+              disabled={!canReview}
               style={{
                 flex:2,padding:"11px",
-                background:canSubmit?C.red:"rgba(160,56,56,0.35)",
+                background:canReview?C.red:"rgba(160,56,56,0.35)",
                 border:"none",borderRadius:8,
                 fontFamily:F.label,fontSize:10,fontWeight:700,
                 letterSpacing:"0.14em",textTransform:"uppercase",
-                color:"#fff",cursor:canSubmit?"pointer":"not-allowed",
+                color:"#fff",cursor:canReview?"pointer":"not-allowed",
                 transition:"all 0.18s",
                 display:"flex",alignItems:"center",justifyContent:"center",gap:7,
               }}
-              onMouseEnter={(e)=>{if(canSubmit)e.currentTarget.style.background="#8a2e2e";}}
-              onMouseLeave={(e)=>{if(canSubmit)e.currentTarget.style.background=C.red;}}
+              onMouseEnter={(e)=>{if(canReview)e.currentTarget.style.background="#8a2e2e";}}
+              onMouseLeave={(e)=>{if(canReview)e.currentTarget.style.background=C.red;}}
             >
-              {loading?<><Spinner/>Rejecting…</>:"Confirm Rejection"}
+              Review Rejection
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RevertConfirmModal({ reservation, onConfirm, onCancel, loading }) {
+  return (
+    <div
+      style={{
+        position:"fixed",inset:0,
+        background:"rgba(0,0,0,0.60)",
+        zIndex:5100,
+        display:"flex",alignItems:"center",justifyContent:"center",
+        padding:20,
+        backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",
+      }}
+      onClick={(e)=>{if(e.target===e.currentTarget&&!loading)onCancel();}}
+    >
+      <div style={{
+        background:C.surfaceBase,borderRadius:14,
+        width:"100%",maxWidth:440,
+        boxShadow:"0 20px 60px rgba(0,0,0,0.20)",
+        border:`1px solid ${C.borderDefault}`,
+        fontFamily:F.body,
+        animation:"modalIn 0.20s cubic-bezier(0.16,1,0.3,1)",
+        overflow:"hidden",
+      }}>
+        <div style={{height:2,background:`linear-gradient(90deg,transparent 0%,${C.gold}90 30%,${C.gold}90 70%,transparent 100%)`}}/>
+
+        <div style={{
+          background:C.headerGradient,
+          padding:"18px 22px 16px",
+          borderBottom:`1px solid ${C.divider}`,
+        }}>
+          <div style={{fontFamily:F.label,fontSize:9,letterSpacing:"0.22em",color:C.gold,fontWeight:700,textTransform:"uppercase",marginBottom:5,opacity:0.85}}>
+            Confirm Revert
+          </div>
+          <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.textPrimary,lineHeight:1.2}}>
+            {reservation.name||"Reservation"}
+          </div>
+        </div>
+
+        <div style={{padding:"20px 22px 24px"}}>
+          <div style={{
+            padding:"10px 14px",borderRadius:8,marginBottom:14,
+            background:C.goldFaint,border:`1px solid ${C.borderAccent}`,
+            fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.65,
+          }}>
+            This will move the rejected reservation back to pending review, mark it active again, and keep the previous rejection reason for history.
+          </div>
+
+          <div style={{display:"grid",gap:8,marginBottom:16}}>
+            {[
+              ["Current Status", "Rejected"],
+              ["New Status", "Pending"],
+              ["Reference", reservation.reference_code||reservation.id||"—"],
+            ].map(([label,value])=>(
+              <div key={label} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"8px 0",borderBottom:`1px solid ${C.divider}`}}>
+                <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>{label}</span>
+                <span style={{fontFamily:F.body,fontSize:12.5,fontWeight:600,color:C.textPrimary,textAlign:"right"}}>{value}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{display:"flex",gap:8}}>
+            <button
+              onClick={onCancel}
+              disabled={loading}
+              style={{
+                flex:1,padding:"11px",
+                background:"transparent",border:`1px solid ${C.borderDefault}`,
+                borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,
+                letterSpacing:"0.14em",textTransform:"uppercase",
+                color:C.textSecondary,cursor:loading?"not-allowed":"pointer",transition:"all 0.18s",
+              }}
+              onMouseEnter={(e)=>{if(!loading){e.currentTarget.style.borderColor=C.borderAccent;e.currentTarget.style.color=C.textPrimary;}}}
+              onMouseLeave={(e)=>{e.currentTarget.style.borderColor=C.borderDefault;e.currentTarget.style.color=C.textSecondary;}}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={loading}
+              style={{
+                flex:2,padding:"11px",
+                background:loading?"rgba(140,107,42,0.45)":C.gold,
+                border:"none",borderRadius:8,
+                fontFamily:F.label,fontSize:10,fontWeight:700,
+                letterSpacing:"0.14em",textTransform:"uppercase",
+                color:"#fff",cursor:loading?"not-allowed":"pointer",
+                transition:"all 0.18s",
+                display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+              }}
+              onMouseEnter={(e)=>{if(!loading)e.currentTarget.style.background=C.goldLight;}}
+              onMouseLeave={(e)=>{if(!loading)e.currentTarget.style.background=C.gold;}}
+            >
+              {loading?<><Spinner/>Reverting...</>:"Confirm Revert"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ApproveConfirmModal({ reservation, onConfirm, onCancel, loading }) {
+  return (
+    <div
+      style={{
+        position:"fixed",inset:0,
+        background:"rgba(0,0,0,0.60)",
+        zIndex:5100,
+        display:"flex",alignItems:"center",justifyContent:"center",
+        padding:20,
+        backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",
+      }}
+      onClick={(e)=>{if(e.target===e.currentTarget&&!loading)onCancel();}}
+    >
+      <div style={{
+        background:C.surfaceBase,borderRadius:14,
+        width:"100%",maxWidth:440,
+        boxShadow:"0 20px 60px rgba(0,0,0,0.20)",
+        border:`1px solid ${C.borderDefault}`,
+        fontFamily:F.body,
+        animation:"modalIn 0.20s cubic-bezier(0.16,1,0.3,1)",
+        overflow:"hidden",
+      }}>
+        <div style={{height:2,background:`linear-gradient(90deg,transparent 0%,${C.green}90 30%,${C.green}90 70%,transparent 100%)`}}/>
+
+        <div style={{background:C.headerGradient,padding:"18px 22px 16px",borderBottom:`1px solid ${C.divider}`}}>
+          <div style={{fontFamily:F.label,fontSize:9,letterSpacing:"0.22em",color:C.green,fontWeight:700,textTransform:"uppercase",marginBottom:5,opacity:0.85}}>
+            Confirm Approval
+          </div>
+          <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.textPrimary,lineHeight:1.2}}>
+            {reservation.name||"Reservation"}
+          </div>
+        </div>
+
+        <div style={{padding:"20px 22px 24px"}}>
+          <div style={{
+            padding:"10px 14px",borderRadius:8,marginBottom:14,
+            background:C.greenFaint,border:`1px solid ${C.greenBorder}`,
+            fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.65,
+          }}>
+            This will approve the reservation, reserve the selected seat/table, and send a confirmation email to the guest. This cannot be undone from this action.
+          </div>
+
+          <div style={{display:"grid",gap:8,marginBottom:16}}>
+            {[
+              ["Current Status", "Pending"],
+              ["New Status", "Reserved"],
+              ["Reference", reservation.reference_code||reservation.id||"-"],
+            ].map(([label,value])=>(
+              <div key={label} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"8px 0",borderBottom:`1px solid ${C.divider}`}}>
+                <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>{label}</span>
+                <span style={{fontFamily:F.body,fontSize:12.5,fontWeight:600,color:C.textPrimary,textAlign:"right"}}>{value}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={onCancel} disabled={loading} style={{flex:1,padding:"11px",background:"transparent",border:`1px solid ${C.borderDefault}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textSecondary,cursor:loading?"not-allowed":"pointer"}}>
+              Cancel
+            </button>
+            <button onClick={onConfirm} disabled={loading} style={{flex:2,padding:"11px",background:loading?"rgba(46,122,90,0.45)":C.green,border:"none",borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:"#fff",cursor:loading?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+              {loading?<><Spinner/>Approving...</>:"Confirm Approval"}
             </button>
           </div>
         </div>
@@ -553,9 +869,11 @@ function RejectReasonModal({ reservation, onConfirm, onCancel, loading }) {
 }
 
 // ─── Detail Modal ──────────────────────────────────────────────────────────────
-function DetailModal({ reservation, onClose, onApprove, onReject }) {
+function DetailModal({ reservation, onClose, onApprove, onReject, onRevert }) {
   const [actionLoading,setActionLoading]=useState(null);
   const [showRejectModal,setShowRejectModal]=useState(false);
+  const [showRevertModal,setShowRevertModal]=useState(false);
+  const [showApproveModal,setShowApproveModal]=useState(false);
 
   const fmtDate=(d)=>{
     if(!d)return"—";
@@ -567,11 +885,17 @@ function DetailModal({ reservation, onClose, onApprove, onReject }) {
     const[h,m]=t.split(":");const hr=parseInt(h);
     return`${hr%12||12}:${m} ${hr>=12?"PM":"AM"}`;
   };
+  const fmtDateTime=(value)=>{
+    if(!value)return"—";
+    try{return new Date(value).toLocaleString("en-US",{year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}
+    catch{return value;}
+  };
 
-  const handleApprove=async()=>{
+  const handleApproveConfirm=async()=>{
     setActionLoading("approve");
     await onApprove(reservation);
     setActionLoading(null);
+    setShowApproveModal(false);
     onClose();
   };
 
@@ -583,13 +907,23 @@ function DetailModal({ reservation, onClose, onApprove, onReject }) {
     onClose();
   };
 
+  const handleRevertConfirm=async()=>{
+    setActionLoading("revert");
+    await onRevert(reservation);
+    setActionLoading(null);
+    setShowRevertModal(false);
+    onClose();
+  };
+
   const isPending=(reservation.status||"").toLowerCase()==="pending";
+  const isRejected=(reservation.status||"").toLowerCase()==="rejected";
 
   const isStandaloneReservation =
     String(reservation.table_number || "").toUpperCase() === "STANDALONE" ||
     reservation.type === "standalone" ||
     reservation.is_standalone === 1 ||
     reservation.is_standalone === true;
+  const reservationState = getReservationState(reservation);
 
   const resRows=[
     ["Reference",  reservation.reference_code||"—"],
@@ -608,6 +942,18 @@ function DetailModal({ reservation, onClose, onApprove, onReject }) {
     ["Phone",            reservation.phone||"—"],
     ["Special Requests", reservation.special_requests||"None"],
   ];
+  const trackingRows=[
+    ["Previous Status", reservation.previous_status || "—"],
+    ["Last Status Change", fmtDateTime(reservation.status_last_changed_at)],
+    ["Rejected At", fmtDateTime(reservation.rejected_at)],
+    ["Reverted At", fmtDateTime(reservation.reverted_at)],
+  ];
+  const historyItems = Array.isArray(reservation.transaction_history)
+    ? reservation.transaction_history.slice(0, 6)
+    : [];
+  const formatHistoryAction = (action) => String(action || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase()) || "Transaction";
 
   return (
     <>
@@ -651,6 +997,7 @@ function DetailModal({ reservation, onClose, onApprove, onReject }) {
               </div>
               <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                 <StatusBadge status={reservation.status}/>
+                <StateBadge state={reservationState}/>
                 {isStandaloneReservation && (
                   <span style={{
                     display:"inline-flex",alignItems:"center",gap:4,
@@ -709,6 +1056,41 @@ function DetailModal({ reservation, onClose, onApprove, onReject }) {
               </div>
             ))}
 
+            <SectionLabel style={{marginTop:18}}>Status Tracking</SectionLabel>
+            {trackingRows.map(([label,value],i,arr)=>(
+              <div key={label} style={{
+                display:"flex",justifyContent:"space-between",alignItems:"flex-start",
+                padding:"8px 0",
+                borderBottom:i<arr.length-1?`1px solid ${C.divider}`:"none",
+              }}>
+                <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary,minWidth:120,flexShrink:0}}>{label}</span>
+                <span style={{fontFamily:F.body,fontSize:12.5,color:C.textPrimary,fontWeight:500,textAlign:"right",maxWidth:260,lineHeight:1.5,textTransform:label==="Previous Status"&&value!=="—"?"capitalize":"none"}}>{value}</span>
+              </div>
+            ))}
+
+            <SectionLabel style={{marginTop:18}}>Reservation History</SectionLabel>
+            {historyItems.length ? historyItems.map((item,i)=>(
+              <div key={item.id || `${item.action}-${i}`} style={{
+                padding:"9px 0",
+                borderBottom:i<historyItems.length-1?`1px solid ${C.divider}`:"none",
+              }}>
+                <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}>
+                  <span style={{fontFamily:F.body,fontSize:12.5,fontWeight:700,color:C.textPrimary,lineHeight:1.4}}>{formatHistoryAction(item.action)}</span>
+                  <span style={{fontFamily:F.body,fontSize:11,color:C.textSecondary,textAlign:"right",whiteSpace:"nowrap"}}>{fmtDateTime(item.created_at)}</span>
+                </div>
+                <div style={{fontFamily:F.body,fontSize:11.5,color:C.textSecondary,lineHeight:1.5,marginTop:3}}>
+                  {(item.from_status || item.to_status) && (
+                    <span style={{textTransform:"capitalize"}}>{item.from_status || "-"} {"->"} {item.to_status || "-"}</span>
+                  )}
+                  {item.notes ? <span>{item.from_status || item.to_status ? " - " : ""}{item.notes}</span> : null}
+                </div>
+              </div>
+            )) : (
+              <div style={{fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.5}}>
+                No transaction history recorded yet.
+              </div>
+            )}
+
             {isPending?(
               <div style={{display:"flex",gap:8,marginTop:22}}>
                 <button
@@ -730,7 +1112,7 @@ function DetailModal({ reservation, onClose, onApprove, onReject }) {
                   {actionLoading==="reject"?<><Spinner/>Rejecting…</>:"Reject"}
                 </button>
                 <button
-                  onClick={handleApprove}
+                  onClick={()=>setShowApproveModal(true)}
                   disabled={!!actionLoading}
                   style={{
                     flex:2,padding:"11px",border:"none",borderRadius:8,
@@ -747,14 +1129,35 @@ function DetailModal({ reservation, onClose, onApprove, onReject }) {
                 </button>
               </div>
             ):(
-              <div style={{
-                marginTop:18,padding:"10px 14px",borderRadius:8,
-                background:C.statusNote[(reservation.status||"pending").toLowerCase()]||C.goldFaintest,
-                border:`1px solid ${C.statusNoteBorder[(reservation.status||"pending").toLowerCase()]||C.borderAccent}`,
-                fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.6,
-              }}>
-                This reservation has been <strong style={{color:C.textPrimary}}>{(reservation.status||"").toLowerCase()}</strong> and cannot be modified.
-              </div>
+              <>
+                <div style={{
+                  marginTop:18,padding:"10px 14px",borderRadius:8,
+                  background:C.statusNote[(reservation.status||"pending").toLowerCase()]||C.goldFaintest,
+                  border:`1px solid ${C.statusNoteBorder[(reservation.status||"pending").toLowerCase()]||C.borderAccent}`,
+                  fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.6,
+                }}>
+                  This reservation has been <strong style={{color:C.textPrimary}}>{(reservation.status||"").toLowerCase()}</strong>{isRejected ? " and can be reverted to pending review." : " and cannot be modified."}
+                </div>
+                {isRejected&&(
+                  <button
+                    onClick={()=>setShowRevertModal(true)}
+                    disabled={!!actionLoading}
+                    style={{
+                      width:"100%",marginTop:10,padding:"11px",
+                      border:"none",borderRadius:8,
+                      background:actionLoading?"rgba(140,107,42,0.45)":C.gold,
+                      color:"#fff",fontFamily:F.label,fontSize:10,fontWeight:700,
+                      letterSpacing:"0.14em",textTransform:"uppercase",
+                      cursor:actionLoading?"not-allowed":"pointer",transition:"all 0.18s",
+                      display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+                    }}
+                    onMouseEnter={(e)=>{if(!actionLoading)e.currentTarget.style.background=C.goldLight;}}
+                    onMouseLeave={(e)=>{if(!actionLoading)e.currentTarget.style.background=C.gold;}}
+                  >
+                    {actionLoading==="revert"?<><Spinner/>Reverting...</>:"Revert to Pending"}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -766,6 +1169,22 @@ function DetailModal({ reservation, onClose, onApprove, onReject }) {
           onConfirm={handleRejectConfirm}
           onCancel={()=>setShowRejectModal(false)}
           loading={actionLoading==="reject"}
+        />
+      )}
+      {showApproveModal&&(
+        <ApproveConfirmModal
+          reservation={reservation}
+          onConfirm={handleApproveConfirm}
+          onCancel={()=>setShowApproveModal(false)}
+          loading={actionLoading==="approve"}
+        />
+      )}
+      {showRevertModal&&(
+        <RevertConfirmModal
+          reservation={reservation}
+          onConfirm={handleRevertConfirm}
+          onCancel={()=>setShowRevertModal(false)}
+          loading={actionLoading==="revert"}
         />
       )}
     </>
@@ -912,7 +1331,7 @@ export default function ReservationDashboard() {
   const [selectedReservation,setSelectedReservation]=useState(null);
   const [showModal,setShowModal]=useState(false);
   const [sidebarOpen,setSidebarOpen]=useState(true);
-  const [stats,setStats]=useState({total:0,pending:0,approved:0,rejected:0});
+  const [stats,setStats]=useState({total:0,pending:0,approved:0,rejected:0,active:0,inactive:0});
   const [toast,setToast]=useState(null);
   const [pagination,setPagination]=useState({currentPage:1,lastPage:1,totalItems:0,rowsPerPage:10});
   const [loading,setLoading]=useState(true);
@@ -1084,6 +1503,10 @@ export default function ReservationDashboard() {
     if(filterStatus!=="ALL"){
       filtered=filtered.filter((r)=>{
         const status=r.status?.toLowerCase();
+        const state=getReservationState(r);
+        if(filterStatus.toLowerCase()==="active"||filterStatus.toLowerCase()==="inactive"){
+          return state===filterStatus.toLowerCase();
+        }
         if(filterStatus.toLowerCase()==="approved"){
           return status==="approved"||status==="reserved";
         }
@@ -1122,7 +1545,9 @@ export default function ReservationDashboard() {
     const pending  = reservations.filter(r=>r.status?.toLowerCase()==="pending").length;
     const approved = reservations.filter(r=>r.status?.toLowerCase()==="approved"||r.status?.toLowerCase()==="reserved").length;
     const rejected = reservations.filter(r=>r.status?.toLowerCase()==="rejected").length;
-    setStats({total,pending,approved,rejected});
+    const active = reservations.filter(r=>getReservationState(r)==="active").length;
+    const inactive = reservations.filter(r=>getReservationState(r)==="inactive").length;
+    setStats({total,pending,approved,rejected,active,inactive});
   },[reservations]);
 
   const handlePageChange = (page) => {
@@ -1188,7 +1613,14 @@ export default function ReservationDashboard() {
       const result = await approveReservation(reservation.db_id);
       if (result.success) {
         setReservations(prev =>
-          prev.map(r => r.id === reservation.id ? { ...r, status: "approved" } : r)
+          prev.map(r => r.id === reservation.id ? {
+            ...r,
+            status: result.status || "reserved",
+            reservation_state: "active",
+            previous_status: result.previous_status || reservation.status,
+            status_last_changed_at: result.status_last_changed_at || new Date().toISOString(),
+            transaction_history: result.transaction_history || r.transaction_history
+          } : r)
         );
         optimisticSeatUpdate(reservation, "reserved");
         setToast({ message: `Approved! Confirmation email sent to ${reservation.email}.`, type: "success" });
@@ -1204,8 +1636,18 @@ export default function ReservationDashboard() {
     try {
       const result = await rejectReservation(reservation.db_id, reason);
       if (result.success) {
+        const now = new Date().toISOString();
         setReservations(prev =>
-          prev.map(r => r.id === reservation.id ? { ...r, status: "rejected" } : r)
+          prev.map(r => r.id === reservation.id ? {
+            ...r,
+            status: "rejected",
+            reservation_state: "inactive",
+            previous_status: reservation.status,
+            status_last_changed_at: result.status_last_changed_at || now,
+            rejected_at: result.rejected_at || now,
+            rejection_reason: reason,
+            transaction_history: result.transaction_history || r.transaction_history
+          } : r)
         );
         optimisticSeatUpdate(reservation, "available");
         setToast({ message: `Rejected. Notification email sent to ${reservation.email}.`, type: "success" });
@@ -1217,11 +1659,39 @@ export default function ReservationDashboard() {
     }
   };
 
+  const handleRevert = async (reservation) => {
+    try {
+      const result = await revertReservation(reservation.db_id);
+      if (result.success) {
+        const now = new Date().toISOString();
+        setReservations(prev =>
+          prev.map(r => r.id === reservation.id ? {
+            ...r,
+            status: "pending",
+            reservation_state: "active",
+            previous_status: reservation.status,
+            status_last_changed_at: result.status_last_changed_at || now,
+            reverted_at: result.reverted_at || now,
+            transaction_history: result.transaction_history || r.transaction_history
+          } : r)
+        );
+        optimisticSeatUpdate(reservation, "pending");
+        setToast({ message: "Reservation reverted to pending review.", type: "success" });
+      } else {
+        setToast({ message: result.message || "Failed to revert reservation", type: "error" });
+      }
+    } catch {
+      setToast({ message: "Error reverting reservation", type: "error" });
+    }
+  };
+
   const statCards=[
     {label:"Total",    count:stats.total,    filter:"ALL",      color:C.gold,               bg:C.goldFaint,           border:C.borderAccent              },
     {label:"Pending",  count:stats.pending,  filter:"PENDING",  color:C.badgePending.color,  bg:C.statusNote.pending,  border:C.statusNoteBorder.pending  },
     {label:"Approved", count:stats.approved, filter:"APPROVED", color:C.badgeApproved.color, bg:C.statusNote.approved, border:C.statusNoteBorder.approved },
     {label:"Rejected", count:stats.rejected, filter:"REJECTED", color:C.badgeRejected.color, bg:C.statusNote.rejected, border:C.statusNoteBorder.rejected },
+    {label:"Active",   count:stats.active,   filter:"ACTIVE",   color:C.green,              bg:C.greenFaint,          border:C.greenBorder               },
+    {label:"Inactive", count:stats.inactive, filter:"INACTIVE", color:C.textSecondary,      bg:"rgba(0,0,0,0.04)",    border:C.borderDefault             },
   ];
 
   const pagedReservations=filteredReservations.slice(
@@ -1567,6 +2037,7 @@ export default function ReservationDashboard() {
                               </div>
                               <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:7,flexShrink:0}}>
                                 <StatusBadge status={reservation.status}/>
+                                <StateBadge state={getReservationState(reservation)}/>
                                 <div style={{display:"flex",alignItems:"center",gap:3,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.textTertiary}}>
                                   View
                                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -1602,6 +2073,7 @@ export default function ReservationDashboard() {
             onClose={()=>{setShowModal(false);setSelectedReservation(null);}}
             onApprove={handleApprove}
             onReject={handleReject}
+            onRevert={handleRevert}
           />
         )}
       </div>
