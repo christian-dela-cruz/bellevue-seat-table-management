@@ -280,8 +280,8 @@ class AdminRejectReservationReasonTest extends TestCase
         $firstVenue = $this->createVenue();
         $secondVenue = Venue::create([
             'name' => 'Second Hall',
-            'wing' => 'Tower Wing',
-            'type' => 'function room',
+            'wing' => 'Dining',
+            'type' => 'dining',
             'capacity' => 40,
             'price_per_hour' => 1500,
             'description' => 'Second venue',
@@ -340,6 +340,55 @@ class AdminRejectReservationReasonTest extends TestCase
         $staffHeaders = $this->adminHeaders('staff');
 
         $this->getJson('/api/admin/accounts', $staffHeaders)
+            ->assertForbidden();
+    }
+
+    public function test_outlet_reports_respect_role_and_outlet_scope(): void
+    {
+        $firstVenue = $this->createVenue();
+        $secondVenue = Venue::create([
+            'name' => 'Second Hall',
+            'wing' => 'Dining',
+            'type' => 'dining',
+            'capacity' => 40,
+            'price_per_hour' => 1500,
+            'description' => 'Second venue',
+            'is_active' => true,
+        ]);
+
+        $this->createReservation($firstVenue, ['status' => 'reserved']);
+        $this->createReservation($secondVenue, [
+            'status' => 'pending',
+            'room' => 'Second Hall',
+            'special_requests' => 'Use birthday promo package.',
+        ]);
+
+        $directorHeaders = $this->adminHeaders('fb_director');
+
+        $this->getJson('/api/admin/reports/outlets', $directorHeaders)
+            ->assertOk()
+            ->assertJsonPath('summary.reservations', 2)
+            ->assertJsonPath('summary.dine_in', 1)
+            ->assertJsonPath('summary.promotion_mentions', 1)
+            ->assertJsonPath('status_breakdown.pending', 1)
+            ->assertJsonPath('category_breakdown.dine_in.reservations', 1)
+            ->assertJsonFragment([
+                'room' => 'Second Hall',
+                'promotion_mentions' => 1,
+            ]);
+
+        $managerHeaders = $this->adminHeaders('outlet_manager', 'assigned', [$firstVenue->id]);
+
+        $this->getJson('/api/admin/reports/outlets', $managerHeaders)
+            ->assertOk()
+            ->assertJsonPath('summary.reservations', 1)
+            ->assertJsonFragment([
+                'venue_id' => $firstVenue->id,
+            ]);
+
+        $staffHeaders = $this->adminHeaders('staff');
+
+        $this->getJson('/api/admin/reports/outlets', $staffHeaders)
             ->assertForbidden();
     }
 }

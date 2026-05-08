@@ -7,6 +7,7 @@ use App\Http\Controllers\SeatMapController;
 use App\Http\Controllers\VenueController;
 use App\Http\Controllers\Admin\AdminReservationController;
 use App\Http\Controllers\Admin\AdminAccountController;
+use App\Http\Controllers\Admin\AdminReportController;
 use App\Http\Controllers\Client\ClientReservationController;
 use App\Http\Middleware\AdminAccess;
 
@@ -38,6 +39,10 @@ Route::prefix('admin/accounts')->group(function () {
     Route::post('/', [AdminAccountController::class, 'store'])->middleware(AdminAccess::class . ':manage_accounts');
     Route::put('/me', [AdminAccountController::class, 'updateProfile'])->middleware(AdminAccess::class . ':view_admin');
     Route::put('/{admin}', [AdminAccountController::class, 'update'])->middleware(AdminAccess::class . ':manage_accounts');
+});
+
+Route::prefix('admin/reports')->group(function () {
+    Route::get('/outlets', [AdminReportController::class, 'outletReports'])->middleware(AdminAccess::class . ':view_outlet_reports');
 });
 
 // Venue routes

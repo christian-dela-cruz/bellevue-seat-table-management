@@ -1,6 +1,7 @@
 // src/components/layout/AdminNavbar.jsx
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { authAPI } from "../../services/authAPI";
 import bellevueLogo from "../../assets/bellevue-logo.png";
 
 function AdminNavbar({ onLogout, pendingCount: pendingProp }) {
@@ -24,6 +25,16 @@ function AdminNavbar({ onLogout, pendingCount: pendingProp }) {
   }, [pendingProp]);
 
   const isNotifActive = location.pathname === "/admin/notifications";
+
+  const handleLogout = async () => {
+    if (onLogout) {
+      await onLogout();
+      return;
+    }
+
+    await authAPI.logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <nav style={{
@@ -120,7 +131,7 @@ function AdminNavbar({ onLogout, pendingCount: pendingProp }) {
 
         {/* Logout */}
         <button
-          onClick={onLogout}
+          onClick={handleLogout}
           title="Sign Out"
           style={{
             padding: "8px 12px",

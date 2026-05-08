@@ -1,13 +1,16 @@
 // src/components/admin/Sidebar.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, ClipboardList, Map, UserCog } from "lucide-react";
+import { X, ClipboardList, Map, UserCog, BarChart3, BellDot } from "lucide-react";
+import { authAPI } from "../../services/authAPI";
 
 const F = { body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" };
 
 const NAV_ITEMS = [
   { id: "reservations", label: "Reservations", icon: ClipboardList, iconStyle: "lucide" },
   { id: "cancelled",    label: "Cancelled",    icon: X,           iconStyle: "lucide" },
+  { id: "notifications",label: "Notifications",icon: BellDot,     iconStyle: "lucide" },
+  { id: "reports",      label: "Reports",      icon: BarChart3,   iconStyle: "lucide", permission: "view_outlet_reports" },
   { id: "accounts",     label: "Accounts",     icon: UserCog,     iconStyle: "lucide" },
   { 
     id: "seat-map", 
@@ -72,6 +75,8 @@ function NavItem({ item, isActive, isOpen, onClick }) {
     const routes = {
       "reservations": "/admin/reservations",
       "cancelled":    "/admin/cancelled",
+      "notifications":"/admin/notifications",
+      "reports":      "/admin/reports",
       "accounts":     "/admin/accounts",
       "seat-map":     "/admin/seatmap",
     };
@@ -155,6 +160,8 @@ export default function Sidebar({
   isOpen = true,
   onToggle = () => {},
 }) {
+  const visibleItems = NAV_ITEMS.filter((item) => !item.permission || authAPI.hasPermission(item.permission));
+
   return (
     <aside style={{
       width: isOpen ? 220 : 52,
@@ -201,7 +208,7 @@ export default function Sidebar({
             Navigation
           </div>
         )}
-        {NAV_ITEMS.map(item => (
+        {visibleItems.map(item => (
           <NavItem
             key={item.id}
             item={item}

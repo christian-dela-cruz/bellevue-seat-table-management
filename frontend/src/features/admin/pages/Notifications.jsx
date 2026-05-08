@@ -6,6 +6,7 @@ import {
   Wifi, WifiOff, ThumbsUp, ChevronLeft, ChevronRight,
   XCircle,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { reservationAPI } from "../../../services/reservationAPI";
 import { authAPI } from "../../../services/authAPI";
 import bellevueLogo from "../../../assets/bellevue-logo.png";
@@ -819,6 +820,7 @@ function AcknowledgmentMonitor({ activeAlerts, acknowledgedAlerts, onAcknowledge
 
 function NotificationDashboard() {
   const C=getTokens();
+  const navigate = useNavigate();
   const canManageReservations = authAPI.hasPermission("manage_reservations");
   const canAcknowledgeNotifications = authAPI.hasPermission("acknowledge_notifications");
 
@@ -851,6 +853,11 @@ function NotificationDashboard() {
   const knownIds=useRef(new Set()),firedAlerts=useRef(new Set()),leftRef=useRef(null);
   const echoRef=useRef(null),reconnectDelay=useRef(2000),reconnectTimer=useRef(null),isMounted=useRef(true);
   const reconnectAttempts=useRef([]),pollTimer=useRef(null),recoveryTimer=useRef(null);
+
+  const handleLogout = useCallback(async()=>{
+    await authAPI.logout();
+    navigate("/login", { replace:true });
+  },[navigate]);
 
   useEffect(()=>{isMounted.current=true;return()=>{isMounted.current=false;};},[]);
   const addToast=useCallback((message,type="success")=>{const id=Date.now();setToasts(p=>[...p,{id,message,type}]);setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),3500);},[]);
@@ -1139,19 +1146,43 @@ function NotificationDashboard() {
           <div style={{ position:"absolute",inset:0,background:C.bgOverlay,transition:"background 0.40s" }}/>
         </div>
 
-        <nav style={{ position:"fixed",top:0,left:0,right:0,zIndex:9000,height:64,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 clamp(20px,5vw,64px)",background:C.navBg,backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",borderBottom:`1px solid ${C.navBorder}`,boxSizing:"border-box" }}>
-          <div style={{ display:"flex",alignItems:"center",gap:20 }}>
+        <nav style={{ position:"fixed",top:0,left:0,right:0,zIndex:9000,height:60,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 32px",background:"#FFFFFF",borderBottom:"1px solid #E1E4E8",boxSizing:"border-box" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:14 }}>
+            <button
+              onClick={()=>navigate("/admin/reservations")}
+              title="Back to reservations"
+              style={{ height:36,padding:"0 12px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:"#FFFFFF",color:C.textSecondary,fontFamily:F.label,fontSize:10,fontWeight:800,letterSpacing:"0.10em",textTransform:"uppercase",cursor:"pointer",display:"inline-flex",alignItems:"center",gap:7 }}
+            >
+              <ChevronLeft size={14} strokeWidth={2.4}/>
+              Back
+            </button>
             <img src={bellevueLogo} alt="The Bellevue Manila" style={{ height:26,width:"auto",display:"block",flexShrink:0,filter:"brightness(0) saturate(100%)" }}/>
           </div>
           <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-            <div style={{ width:36,height:36,borderRadius:"50%",background:popup?C.goldFaint:C.surfaceInput,border:`1px solid ${popup?C.borderAccent:C.borderDefault}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.2s",position:"relative",animation:popup?"bellRing 0.6s ease infinite":"none" }}>
+            <div style={{ width:38,height:38,borderRadius:8,background:popup?C.goldFaint:"transparent",border:`1px solid ${popup?C.borderAccent:"transparent"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.2s",position:"relative",animation:popup?"bellRing 0.6s ease infinite":"none" }}>
               {popup?<BellDot size={15} color={C.gold}/>:<Bell size={15} color={C.textSecondary}/>}
               {popup&&<div style={{ position:"absolute",top:3,right:3,width:7,height:7,borderRadius:"50%",background:C.red,border:`1.5px solid ${C.surfaceBase}`,animation:"dotPulse 1.2s ease infinite" }}/>}
             </div>
+            <button
+              onClick={handleLogout}
+              title="Sign out"
+              style={{ width:38,height:38,border:"1px solid rgba(201,168,76,0.3)",borderRadius:6,background:"transparent",color:"#C9A84C",cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",lineHeight:0 }}
+            >
+              <svg
+                width="16" height="16" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor"
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                style={{ pointerEvents:"none",display:"block" }}
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16,17 21,12 16,7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
           </div>
         </nav>
 
-        <div style={{ position:"relative",zIndex:1,paddingTop:64,minHeight:"100vh",display:"flex",flexDirection:"column" }}>
+        <div style={{ position:"relative",zIndex:1,paddingTop:60,minHeight:"100vh",display:"flex",flexDirection:"column" }}>
           {loading&&(
             <div style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16 }}>
               <Spinner C={C} size={22}/>

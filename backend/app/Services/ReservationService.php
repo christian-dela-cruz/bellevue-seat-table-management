@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Reservation;
 use App\Models\ReservationTransaction;
 use App\Models\Seat;
+use App\Models\Venue;
 
 class ReservationService
 {
@@ -276,6 +277,50 @@ class ReservationService
         ];
     }
 
+    public function getOutletReports(?array $admin = null, ?string $startDate = null, ?string $endDate = null): array
+    {
+        $reservations = $this->scopedReservationQuery($admin)
+            ->with('venue')
+            ->when($startDate, fn ($query) => $query->whereDate('event_date', '>=', $startDate))
+            ->when($endDate, fn ($query) => $query->whereDate('event_date', '<=', $endDate))
+            ->orderByDesc('event_date')
+            ->get();
+
+        $venueQuery = Venue::query()->orderBy('wing')->orderBy('name');
+        $this->applyVenueScope($venueQuery, $admin);
+        $venues = $venueQuery->get();
+
+        $reports = $venues->map(function (Venue $venue) use ($reservations) {
+            $items = $reservations->where('venue_id', $venue->id)->values();
+            return $this->formatOutletReport($venue, $items);
+        });
+
+        $unmatched = $reservations
+            ->filter(fn (Reservation $reservation) => !$reservation->venue_id)
+            ->groupBy(fn (Reservation $reservation) => $reservation->room ?: 'Unassigned Outlet')
+            ->map(fn ($items, $name) => $this->formatOutletReport(null, $items->values(), $name));
+
+        $allReports = $reports->concat($unmatched)->values();
+
+        return [
+            'summary' => [
+                'outlets' => $allReports->count(),
+                'reservations' => $reservations->count(),
+                'guests' => $reservations->sum('guests_count'),
+                'pending' => $reservations->where('status', 'pending')->count(),
+                'reserved' => $reservations->filter(fn ($reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                'rejected' => $reservations->where('status', 'rejected')->count(),
+                'cancelled' => $reservations->where('status', 'cancelled')->count(),
+                'dine_in' => $reservations->filter(fn (Reservation $reservation) => $this->isDineInReservation($reservation))->count(),
+                'promotion_mentions' => $reservations->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
+            ],
+            'status_breakdown' => $this->formatStatusBreakdown($reservations),
+            'category_breakdown' => $this->formatCategoryBreakdown($reservations),
+            'room_details' => $this->formatRoomDetails($reservations),
+            'data' => $allReports->sortByDesc('total_reservations')->values()->toArray(),
+        ];
+    }
+
     /**
      * Delete a reservation and release seats
      */
@@ -360,6 +405,164 @@ class ReservationService
                 $scopedQuery->{$method}('room', $roomNames);
             }
         });
+    }
+
+    private function applyVenueScope($query, ?array $admin): void
+    {
+        if (!$admin || ($admin['scope_type'] ?? 'all') !== 'assigned') {
+            return;
+        }
+
+        $scope = $admin['outlet_scope'] ?? [];
+
+        if (!is_array($scope) || empty($scope)) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        $venueIds = array_values(array_filter(array_map(
+            fn ($value) => is_numeric($value) ? (int) $value : null,
+            $scope
+        )));
+        $venueNames = array_values(array_filter(array_map(
+            fn ($value) => is_numeric($value) ? null : (string) $value,
+            $scope
+        )));
+
+        $query->where(function ($scopedQuery) use ($venueIds, $venueNames) {
+            if (!empty($venueIds)) {
+                $scopedQuery->whereIn('id', $venueIds);
+            }
+
+            if (!empty($venueNames)) {
+                $method = !empty($venueIds) ? 'orWhereIn' : 'whereIn';
+                $scopedQuery->{$method}('name', $venueNames);
+            }
+        });
+    }
+
+    private function formatOutletReport(?Venue $venue, $reservations, ?string $fallbackName = null): array
+    {
+        $total = $reservations->count();
+        $reserved = $reservations->filter(fn ($reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count();
+        $pending = $reservations->where('status', 'pending')->count();
+        $rejected = $reservations->where('status', 'rejected')->count();
+        $cancelled = $reservations->where('status', 'cancelled')->count();
+        $active = $reservations->where('reservation_state', 'active')->count();
+        $inactive = $reservations->where('reservation_state', 'inactive')->count();
+        $latest = $reservations->sortByDesc('event_date')->first();
+        $dineIn = $reservations->filter(fn (Reservation $reservation) => $this->isDineInReservation($reservation))->count();
+        $promotionMentions = $reservations->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count();
+
+        return [
+            'venue_id' => $venue?->id,
+            'name' => $venue?->name ?? $fallbackName ?? 'Unassigned Outlet',
+            'wing' => $venue?->wing ?? null,
+            'type' => $venue?->type ?? null,
+            'capacity' => $venue?->capacity ?? 0,
+            'total_reservations' => $total,
+            'pending' => $pending,
+            'reserved' => $reserved,
+            'rejected' => $rejected,
+            'cancelled' => $cancelled,
+            'active' => $active,
+            'inactive' => $inactive,
+            'dine_in' => $dineIn,
+            'promotion_mentions' => $promotionMentions,
+            'guests' => $reservations->sum('guests_count'),
+            'acceptance_rate' => $total > 0 ? round(($reserved / $total) * 100, 1) : 0,
+            'latest_event_date' => $latest?->event_date?->format('Y-m-d'),
+            'latest_event_time' => $latest?->event_time,
+            'status_breakdown' => $this->formatStatusBreakdown($reservations),
+            'room_details' => $this->formatRoomDetails($reservations),
+        ];
+    }
+
+    private function formatStatusBreakdown($reservations): array
+    {
+        $statuses = ['pending', 'reserved', 'approved', 'rejected', 'cancelled'];
+
+        return collect($statuses)
+            ->mapWithKeys(fn (string $status) => [
+                $status => $reservations->where('status', $status)->count(),
+            ])
+            ->toArray();
+    }
+
+    private function formatCategoryBreakdown($reservations): array
+    {
+        $dineIn = $reservations->filter(fn (Reservation $reservation) => $this->isDineInReservation($reservation));
+        $roomReservations = $reservations->reject(fn (Reservation $reservation) => $this->isDineInReservation($reservation));
+        $promotionMentions = $reservations->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation));
+
+        return [
+            'dine_in' => [
+                'reservations' => $dineIn->count(),
+                'guests' => $dineIn->sum('guests_count'),
+            ],
+            'room_reservations' => [
+                'reservations' => $roomReservations->count(),
+                'guests' => $roomReservations->sum('guests_count'),
+            ],
+            'promotion_mentions' => [
+                'reservations' => $promotionMentions->count(),
+                'guests' => $promotionMentions->sum('guests_count'),
+            ],
+        ];
+    }
+
+    private function formatRoomDetails($reservations): array
+    {
+        return $reservations
+            ->groupBy(fn (Reservation $reservation) => $this->roomLabel($reservation))
+            ->map(function ($items, string $room) {
+                $latest = $items->sortByDesc('event_date')->first();
+
+                return [
+                    'room' => $room,
+                    'reservations' => $items->count(),
+                    'guests' => $items->sum('guests_count'),
+                    'pending' => $items->where('status', 'pending')->count(),
+                    'reserved' => $items->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                    'rejected' => $items->where('status', 'rejected')->count(),
+                    'cancelled' => $items->where('status', 'cancelled')->count(),
+                    'dine_in' => $items->filter(fn (Reservation $reservation) => $this->isDineInReservation($reservation))->count(),
+                    'promotion_mentions' => $items->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
+                    'latest_event_date' => $latest?->event_date?->format('Y-m-d'),
+                    'latest_event_time' => $latest?->event_time,
+                ];
+            })
+            ->sortByDesc('reservations')
+            ->values()
+            ->toArray();
+    }
+
+    private function isDineInReservation(Reservation $reservation): bool
+    {
+        $venueType = strtolower((string) ($reservation->venue?->type ?? ''));
+        $wing = strtolower((string) ($reservation->venue?->wing ?? ''));
+
+        return str_contains($venueType, 'dining')
+            || str_contains($venueType, 'restaurant')
+            || str_contains($wing, 'dining');
+    }
+
+    private function hasPromotionMention(Reservation $reservation): bool
+    {
+        $notes = strtolower((string) $reservation->special_requests);
+
+        return str_contains($notes, 'promo')
+            || str_contains($notes, 'promotion')
+            || str_contains($notes, 'voucher')
+            || str_contains($notes, 'discount')
+            || str_contains($notes, 'package');
+    }
+
+    private function roomLabel(Reservation $reservation): string
+    {
+        return $reservation->room
+            ?: $reservation->venue?->name
+            ?: 'Unassigned Room';
     }
 
     /**

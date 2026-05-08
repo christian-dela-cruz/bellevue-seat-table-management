@@ -27,6 +27,7 @@ import UnifiedSeatMapEditor from "../features/admin/pages/UnifiedSeatMapEditor";
 import NotificationDashboard from "../features/admin/pages/Notifications";
 import CancelledDashboard from "../features/admin/pages/CancelledDashboard";
 import Accounts from "../features/admin/pages/Accounts";
+import Reports from "../features/admin/pages/Reports";
 import ForgotCode from "../features/client/pages/ForgotCode";
 import LoginPage from "../features/auth/pages/LoginPage";
 import { authAPI } from "../services/authAPI";
@@ -143,6 +144,14 @@ export default function AppRoutes() {
           element={
             <RequireAdminAuth>
               <Accounts />
+            </RequireAdminAuth>
+          }
+        />
+        <Route
+          path="/admin/reports"
+          element={
+            <RequireAdminAuth>
+              <Reports />
             </RequireAdminAuth>
           }
         />
