@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
 import { fetchReservations, approveReservation, rejectReservation, revertReservation, getReservationStats } from "../../../utils/api";
+import { authAPI } from "../../../services/authAPI";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -869,7 +870,7 @@ function ApproveConfirmModal({ reservation, onConfirm, onCancel, loading }) {
 }
 
 // ─── Detail Modal ──────────────────────────────────────────────────────────────
-function DetailModal({ reservation, onClose, onApprove, onReject, onRevert }) {
+function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, canManage }) {
   const [actionLoading,setActionLoading]=useState(null);
   const [showRejectModal,setShowRejectModal]=useState(false);
   const [showRevertModal,setShowRevertModal]=useState(false);
@@ -1091,7 +1092,7 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert }) {
               </div>
             )}
 
-            {isPending?(
+            {isPending && canManage ? (
               <div style={{display:"flex",gap:8,marginTop:22}}>
                 <button
                   onClick={()=>setShowRejectModal(true)}
@@ -1128,7 +1129,7 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert }) {
                   {actionLoading==="approve"?<><Spinner/>Approving…</>:"Approve & Notify"}
                 </button>
               </div>
-            ):(
+            ) : (
               <>
                 <div style={{
                   marginTop:18,padding:"10px 14px",borderRadius:8,
@@ -1136,9 +1137,11 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert }) {
                   border:`1px solid ${C.statusNoteBorder[(reservation.status||"pending").toLowerCase()]||C.borderAccent}`,
                   fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.6,
                 }}>
-                  This reservation has been <strong style={{color:C.textPrimary}}>{(reservation.status||"").toLowerCase()}</strong>{isRejected ? " and can be reverted to pending review." : " and cannot be modified."}
+                  {canManage
+                    ? <>This reservation has been <strong style={{color:C.textPrimary}}>{(reservation.status||"").toLowerCase()}</strong>{isRejected ? " and can be reverted to pending review." : " and cannot be modified."}</>
+                    : <>Your account can view this reservation, but cannot modify it.</>}
                 </div>
-                {isRejected&&(
+                {isRejected&&canManage&&(
                   <button
                     onClick={()=>setShowRevertModal(true)}
                     disabled={!!actionLoading}
@@ -1323,6 +1326,8 @@ function PaginationControls({ pagination, onPageChange, onRowsChange, filteredCo
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function ReservationDashboard() {
   const navigate = useNavigate();
+  const canManageReservations = authAPI.hasPermission("manage_reservations");
+  const canDeleteReservations = authAPI.hasPermission("delete_reservations");
   const [reservations,setReservations]=useState([]);
   const [filteredReservations,setFilteredReservations]=useState([]);
   const [filterStatus,setFilterStatus]=useState("ALL");
@@ -1565,6 +1570,7 @@ export default function ReservationDashboard() {
   };
 
   const handleSelectReservation = (reservationId) => {
+    if (!canDeleteReservations) return;
     setSelectedReservations(prev => {
       const newSet = new Set(prev);
       if (newSet.has(reservationId)) newSet.delete(reservationId);
@@ -1574,6 +1580,10 @@ export default function ReservationDashboard() {
   };
 
   const handleDeleteSelected = async () => {
+    if (!canDeleteReservations) {
+      setToast({ message: "You are not authorized to delete reservations.", type: "error" });
+      return;
+    }
     if (selectedReservations.size === 0) return;
     if (!window.confirm(`Are you sure you want to delete ${selectedReservations.size} selected reservation(s)? This action cannot be undone.`)) return;
 
@@ -1581,7 +1591,11 @@ export default function ReservationDashboard() {
       const toDelete = reservations.filter(r => selectedReservations.has(r.id));
 
       const deletePromises = Array.from(selectedReservations).map(async (reservationId) => {
-        const response = await fetch(`${API_BASE_URL}/admin/reservations/${reservationId}`, { method: "DELETE" });
+        const token = localStorage.getItem("admin_token");
+        const response = await fetch(`${API_BASE_URL}/admin/reservations/${reservationId}`, {
+          method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
         return { id: reservationId, ok: response.ok };
       });
 
@@ -1890,7 +1904,7 @@ export default function ReservationDashboard() {
                       </span>
                     )}
 
-                    {selectedReservations.size > 0 && (
+                    {canDeleteReservations && selectedReservations.size > 0 && (
                       <button
                         onClick={handleDeleteSelected}
                         style={{padding:"4px 10px",background:C.red,color:"#fff",border:"none",borderRadius:6,fontFamily:F.label,fontSize:9,fontWeight:700,cursor:"pointer",transition:"all 0.15s",letterSpacing:"0.10em",textTransform:"uppercase"}}
@@ -1916,7 +1930,7 @@ export default function ReservationDashboard() {
                   </div>
 
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <input
+                    {canDeleteReservations && <input
                       type="checkbox"
                       checked={selectedReservations.size === filteredReservations.length && filteredReservations.length > 0}
                       onChange={(e) => {
@@ -1924,8 +1938,8 @@ export default function ReservationDashboard() {
                         else setSelectedReservations(new Set());
                       }}
                       style={{width:16,height:16,border:`1px solid ${C.borderDefault}`,borderRadius:4,backgroundColor:C.surfaceBase,cursor:"pointer"}}
-                    />
-                    <span style={{fontSize:11,color:C.textSecondary,fontFamily:F.body}}>Select All</span>
+                    />}
+                    {canDeleteReservations && <span style={{fontSize:11,color:C.textSecondary,fontFamily:F.body}}>Select All</span>}
                   </div>
                 </div>
 
@@ -1988,13 +2002,13 @@ export default function ReservationDashboard() {
                         >
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:isMobile?"wrap":"nowrap"}}>
                             <div style={{display:"flex",alignItems:"flex-start",gap:10,flex:1,minWidth:0}}>
-                              <input
+                              {canDeleteReservations && <input
                                 type="checkbox"
                                 checked={selectedReservations.has(reservation.id)}
                                 onChange={(e) => { e.stopPropagation(); handleSelectReservation(reservation.id); }}
                                 onClick={(e) => e.stopPropagation()}
                                 style={{width:16,height:16,border:`1px solid ${C.borderDefault}`,borderRadius:4,backgroundColor:C.surfaceBase,cursor:"pointer",marginTop:2,flexShrink:0}}
-                              />
+                              />}
                               <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{setSelectedReservation(reservation);setShowModal(true);}}>
                                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
                                   <div style={{fontFamily:F.body,fontSize:14,fontWeight:600,color:C.textPrimary}}>{reservation.name||"-"}</div>
@@ -2074,6 +2088,7 @@ export default function ReservationDashboard() {
             onApprove={handleApprove}
             onReject={handleReject}
             onRevert={handleRevert}
+            canManage={canManageReservations}
           />
         )}
       </div>

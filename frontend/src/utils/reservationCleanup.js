@@ -183,7 +183,10 @@ async function getCurrentReservations() {
   try {
     const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
     
-    const response = await fetch(`${API_BASE_URL}/admin/reservations?per_page=9999`);
+    const token = localStorage.getItem("admin_token");
+    const response = await fetch(`${API_BASE_URL}/admin/reservations?per_page=9999`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
     if (response.ok) {
       const data = await response.json();
       return Array.isArray(data) ? data : (data.data || []);

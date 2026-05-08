@@ -170,9 +170,10 @@ class ReservationService
         int    $page      = 1,
         int    $perPage   = 10,
         string $sort      = 'submitted_at',  // ← was hardcoded to event_date asc
-        string $direction = 'desc'           // ← was hardcoded to asc
+        string $direction = 'desc',
+        ?array $admin = null
     ): \Illuminate\Pagination\LengthAwarePaginator {
-        return Reservation::with(['venue'])->orderBy($sort, $direction)
+        return $this->scopedReservationQuery($admin)->with(['venue'])->orderBy($sort, $direction)
             ->paginate($perPage, ['*'], 'page', $page)
             ->through(
                 function ($reservation) {
@@ -260,9 +261,9 @@ class ReservationService
     /**
      * Get reservation statistics
      */
-    public function getReservationStats(): array
+    public function getReservationStats(?array $admin = null): array
     {
-        $reservations = Reservation::all();
+        $reservations = $this->scopedReservationQuery($admin)->get();
 
         return [
             'total'    => $reservations->count(),
@@ -283,6 +284,30 @@ class ReservationService
         return $reservation->delete();
     }
 
+    public function canAccessReservation(?array $admin, Reservation $reservation): bool
+    {
+        return $this->canAccessVenue($admin, $reservation->venue_id, $reservation->room);
+    }
+
+    public function canAccessVenue(?array $admin, ?int $venueId, ?string $room = null): bool
+    {
+        if (!$admin || ($admin['scope_type'] ?? 'all') !== 'assigned') {
+            return true;
+        }
+
+        $scope = $admin['outlet_scope'] ?? [];
+
+        if (!is_array($scope) || empty($scope)) {
+            return false;
+        }
+
+        $venueIds = array_map('intval', array_filter($scope, 'is_numeric'));
+        $roomNames = array_map(fn ($value) => strtolower((string) $value), $scope);
+
+        return in_array((int) $venueId, $venueIds, true)
+            || ($room && in_array(strtolower($room), $roomNames, true));
+    }
+
     private function formatTransactionHistory(Reservation $reservation): array
     {
         return $reservation->transactions()
@@ -300,6 +325,41 @@ class ReservationService
             ])
             ->values()
             ->toArray();
+    }
+
+    private function scopedReservationQuery(?array $admin)
+    {
+        $query = Reservation::query();
+
+        if (!$admin || ($admin['scope_type'] ?? 'all') !== 'assigned') {
+            return $query;
+        }
+
+        $scope = $admin['outlet_scope'] ?? [];
+
+        if (!is_array($scope) || empty($scope)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $venueIds = array_values(array_filter(array_map(
+            fn ($value) => is_numeric($value) ? (int) $value : null,
+            $scope
+        )));
+        $roomNames = array_values(array_filter(array_map(
+            fn ($value) => is_numeric($value) ? null : (string) $value,
+            $scope
+        )));
+
+        return $query->where(function ($scopedQuery) use ($venueIds, $roomNames) {
+            if (!empty($venueIds)) {
+                $scopedQuery->whereIn('venue_id', $venueIds);
+            }
+
+            if (!empty($roomNames)) {
+                $method = !empty($venueIds) ? 'orWhereIn' : 'whereIn';
+                $scopedQuery->{$method}('room', $roomNames);
+            }
+        });
     }
 
     /**

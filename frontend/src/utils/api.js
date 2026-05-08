@@ -3,6 +3,15 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
+function authHeaders(extra = {}) {
+  const token = localStorage.getItem('admin_token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...extra,
+  };
+}
+
 // Fetch all reservations from database
 export async function fetchReservations(page = 1, perPage = 10, status = 'ALL', search = '') {
   try {
@@ -13,7 +22,9 @@ export async function fetchReservations(page = 1, perPage = 10, status = 'ALL', 
       ...(search && { search })
     });
     
-    const response = await fetch(`${API_BASE_URL}/admin/reservations?${params}`);
+    const response = await fetch(`${API_BASE_URL}/admin/reservations?${params}`, {
+      headers: authHeaders(),
+    });
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -35,10 +46,18 @@ export async function approveReservation(reservationId) {
   try {
     const response = await fetch(`${API_BASE_URL}/admin/reservations/${reservationId}/approve`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' }
+      headers: authHeaders()
     });
     
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return {
+          success: false,
+          message: response.status === 403
+            ? 'You are not authorized to approve reservations.'
+            : 'Please log in again before approving reservations.',
+        };
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
@@ -73,11 +92,19 @@ export async function rejectReservation(reservationId, reason = '') {
   try {
     const response = await fetch(`${API_BASE_URL}/admin/reservations/${reservationId}/reject`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ reason: reason })
     });
     
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return {
+          success: false,
+          message: response.status === 403
+            ? 'You are not authorized to reject reservations.'
+            : 'Please log in again before rejecting reservations.',
+        };
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
@@ -112,10 +139,18 @@ export async function revertReservation(reservationId) {
   try {
     const response = await fetch(`${API_BASE_URL}/admin/reservations/${reservationId}/revert`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' }
+      headers: authHeaders()
     });
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return {
+          success: false,
+          message: response.status === 403
+            ? 'You are not authorized to revert reservations.'
+            : 'Please log in again before reverting reservations.',
+        };
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
@@ -156,11 +191,19 @@ export async function createReservation(reservationData) {
   try {
     const response = await fetch(`${API_BASE_URL}/admin/reservations`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify(reservationData)
     });
     
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return {
+          success: false,
+          message: response.status === 403
+            ? 'You are not authorized to create reservations.'
+            : 'Please log in again before creating reservations.',
+        };
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
@@ -192,11 +235,19 @@ export async function updateReservation(reservationId, reservationData) {
   try {
     const response = await fetch(`${API_BASE_URL}/admin/reservations/${reservationId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify(reservationData)
     });
     
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return {
+          success: false,
+          message: response.status === 403
+            ? 'You are not authorized to update reservations.'
+            : 'Please log in again before updating reservations.',
+        };
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
@@ -230,10 +281,19 @@ export async function updateReservation(reservationId, reservationData) {
 export async function deleteReservation(reservationId) {
   try {
     const response = await fetch(`${API_BASE_URL}/admin/reservations/${reservationId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: authHeaders(),
     });
     
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return {
+          success: false,
+          message: response.status === 403
+            ? 'You are not authorized to delete reservations.'
+            : 'Please log in again before deleting reservations.',
+        };
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
@@ -262,7 +322,9 @@ export async function deleteReservation(reservationId) {
 // Get reservation statistics from database
 export async function getReservationStats() {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/reservations/stats`);
+    const response = await fetch(`${API_BASE_URL}/admin/reservations/stats`, {
+      headers: authHeaders(),
+    });
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }

@@ -51,6 +51,41 @@ export const authAPI = {
     return !!localStorage.getItem('admin_token');
   },
 
+  hasPermission: (permission) => {
+    const user = authAPI.getCurrentUser();
+    const role = String(user?.role || '').toLowerCase();
+    const rolePermissions = {
+      super_admin: ['view_admin', 'manage_reservations', 'adjust_reservation_details', 'delete_reservations', 'acknowledge_notifications', 'manage_seat_maps', 'manage_venues', 'view_outlet_reports', 'view_global_reports', 'view_transactions', 'manage_accounts', 'manage_users'],
+      admin: ['view_admin', 'manage_reservations', 'adjust_reservation_details', 'delete_reservations', 'acknowledge_notifications', 'manage_seat_maps', 'manage_venues', 'view_outlet_reports', 'view_transactions', 'manage_accounts'],
+      fb_director: ['view_admin', 'view_outlet_reports', 'view_global_reports', 'view_transactions'],
+      outlet_manager: ['view_admin', 'manage_reservations', 'adjust_reservation_details', 'acknowledge_notifications', 'view_outlet_reports', 'view_transactions'],
+      manager: ['view_admin', 'manage_reservations', 'adjust_reservation_details', 'acknowledge_notifications', 'view_outlet_reports', 'view_transactions'],
+      staff: ['view_admin', 'acknowledge_notifications'],
+      viewer: ['view_admin'],
+      view_only: ['view_admin'],
+    };
+
+    const permissions = Array.isArray(user?.permissions) ? user.permissions : rolePermissions[role];
+
+    return (permissions || []).includes(permission);
+  },
+
+  getAccounts: () => api.get('/admin/accounts'),
+
+  createAccount: (accountData) => api.post('/admin/accounts', accountData),
+
+  updateAccount: (id, accountData) => api.put(`/admin/accounts/${id}`, accountData),
+
+  updateProfile: async (profileData) => {
+    const response = await api.put('/admin/accounts/me', profileData);
+
+    if (response.success && response.admin) {
+      localStorage.setItem('admin_user', JSON.stringify(response.admin));
+    }
+
+    return response;
+  },
+
   // Clear auth data
   clearAuth: () => {
     localStorage.removeItem('admin_token');

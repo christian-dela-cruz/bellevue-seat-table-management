@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Models\Admin;
+use App\Http\Middleware\AdminAccess;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class AuthService
 {
@@ -14,18 +17,24 @@ class AuthService
     {
         // Check for hardcoded superadmin credentials first
         if ($username === 'super@admin.com' && $password === 'superadmin123') {
+            $token = 'admin-token-' . Str::random(64);
+            $admin = [
+                'id' => 0,
+                'name' => 'Super Administrator',
+                'username' => 'super@admin.com',
+                'email' => 'super@admin.com',
+                'role' => 'viewer',
+                'permissions' => AdminAccess::permissionsForRole('viewer'),
+                'scope_type' => 'all',
+                'outlet_scope' => [],
+            ];
+            Cache::put('admin_token:' . hash('sha256', $token), $admin, now()->addHours(8));
+
             return [
                 'success' => true,
                 'message' => 'Login successful',
-                'token' => 'superadmin-token-' . md5(time()),
-                'admin' => [
-                    'id' => 0,
-                    'name' => 'Super Administrator',
-                    'username' => 'super@admin.com',
-                    'email' => 'super@admin.com',
-                    'role' => 'super_admin',
-                    'permissions' => ['view_only'] // Read-only access
-                ]
+                'token' => $token,
+                'admin' => $admin,
             ];
         }
 
@@ -41,28 +50,28 @@ class AuthService
             return null;
         }
 
-        // Generate simple token (in production, use Sanctum or JWT)
-        $token = 'admin-token-' . md5($admin->id . time());
+        $token = 'admin-token-' . Str::random(64);
+        $adminPayload = $this->adminPayload($admin);
+
+        Cache::put('admin_token:' . hash('sha256', $token), $adminPayload, now()->addHours(8));
 
         return [
             'success' => true,
             'message' => 'Login successful',
             'token' => $token,
-            'admin' => [
-                'id' => $admin->id,
-                'name' => $admin->name,
-                'username' => $admin->username,
-                'email' => $admin->email,
-                'role' => $admin->role
-            ]
+            'admin' => $adminPayload,
         ];
     }
 
     /**
      * Logout user (clear token)
      */
-    public function logout(): array
+    public function logout(?string $token = null): array
     {
+        if ($token) {
+            Cache::forget('admin_token:' . hash('sha256', $token));
+        }
+
         return [
             'success' => true,
             'message' => 'Logout successful'
@@ -72,17 +81,22 @@ class AuthService
     /**
      * Get current authenticated user
      */
-    public function getCurrentUser(): array
+    public function getCurrentUser(?string $token = null): array
     {
+        if ($token) {
+            $admin = Cache::get('admin_token:' . hash('sha256', $token));
+
+            if ($admin) {
+                return [
+                    'success' => true,
+                    'admin' => $admin,
+                ];
+            }
+        }
+
         return [
-            'success' => true,
-            'admin' => [
-                'id' => 1,
-                'name' => 'System Administrator',
-                'username' => 'admin',
-                'email' => 'admin@bellevue.com',
-                'role' => 'super_admin'
-            ]
+            'success' => false,
+            'message' => 'Invalid or expired admin session.',
         ];
     }
 
@@ -98,5 +112,22 @@ class AuthService
         }
         
         return Hash::check($password, $admin->password);
+    }
+
+    public function adminPayload(Admin $admin): array
+    {
+        $role = AdminAccess::normalizeRole($admin->role);
+        $scopeType = $admin->scope_type ?: 'all';
+
+        return [
+            'id' => $admin->id,
+            'name' => $admin->name,
+            'username' => $admin->username,
+            'email' => $admin->email,
+            'role' => $role,
+            'permissions' => AdminAccess::permissionsForRole($role),
+            'scope_type' => $scopeType,
+            'outlet_scope' => $scopeType === 'assigned' ? ($admin->outlet_scope ?: []) : [],
+        ];
     }
 }

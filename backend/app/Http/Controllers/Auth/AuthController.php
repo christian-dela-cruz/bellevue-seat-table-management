@@ -77,7 +77,7 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         try {
-            $result = $this->authService->logout();
+            $result = $this->authService->logout($request->bearerToken() ?: $request->header('X-Admin-Token'));
             return response()->json($result);
         } catch (\Exception $e) {
             return response()->json([
@@ -93,8 +93,8 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         try {
-            $result = $this->authService->getCurrentUser();
-            return response()->json($result);
+            $result = $this->authService->getCurrentUser($request->bearerToken() ?: $request->header('X-Admin-Token'));
+            return response()->json($result, $result['success'] ? 200 : 401);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

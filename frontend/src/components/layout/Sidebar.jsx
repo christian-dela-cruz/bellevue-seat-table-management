@@ -1,13 +1,14 @@
 // src/components/admin/Sidebar.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, ClipboardList, Map } from "lucide-react";
+import { X, ClipboardList, Map, UserCog } from "lucide-react";
 
 const F = { body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" };
 
 const NAV_ITEMS = [
   { id: "reservations", label: "Reservations", icon: ClipboardList, iconStyle: "lucide" },
   { id: "cancelled",    label: "Cancelled",    icon: X,           iconStyle: "lucide" },
+  { id: "accounts",     label: "Accounts",     icon: UserCog,     iconStyle: "lucide" },
   { 
     id: "seat-map", 
     label: "Seat Map", 
@@ -71,6 +72,7 @@ function NavItem({ item, isActive, isOpen, onClick }) {
     const routes = {
       "reservations": "/admin/reservations",
       "cancelled":    "/admin/cancelled",
+      "accounts":     "/admin/accounts",
       "seat-map":     "/admin/seatmap",
     };
     navigate(routes[item.id] || "/admin/dashboard");

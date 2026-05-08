@@ -7,6 +7,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { reservationAPI } from "../../../services/reservationAPI";
+import { authAPI } from "../../../services/authAPI";
 import bellevueLogo from "../../../assets/bellevue-logo.png";
 
 function getTokens() {
@@ -486,7 +487,7 @@ function StateBadge({ state, C }) {
   );
 }
 
-function DetailModal({ res, onClose, onApprove, onDecline, approvingIds, decliningIds, C }) {
+function DetailModal({ res, onClose, onApprove, onDecline, approvingIds, decliningIds, canManage, C }) {
   if (!res) return null;
   const rawStatus = (res.status||"").toLowerCase();
   const resIsPending = rawStatus === "pending";
@@ -553,7 +554,7 @@ function DetailModal({ res, onClose, onApprove, onDecline, approvingIds, declini
           <div style={{fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.5}}>No transaction history recorded yet.</div>
         )}
       </div>
-      {resIsPending&&onApprove&&(
+      {resIsPending&&onApprove&&canManage&&(
       <div style={{ padding:"14px 22px",borderTop:`1px solid ${C.divider}`,display:"flex",gap:8 }}>
           <>
           <button onClick={()=>onDecline(res)} disabled={isApprovingThis||isDecliningThis} style={{ flex:1,padding:"12px",background:"transparent",border:`1px solid ${C.redBorder}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.red,cursor:isApprovingThis||isDecliningThis?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
@@ -612,7 +613,7 @@ function EventPickerModal({ items, allCards, onSelect, onClose, C }) {
 }
 
 // ─── Reminder Popup ───────────────────────────────────────────────────────────
-function ReminderPopup({ popup, onView, onClose, onAcknowledge, queueCount, C }) {
+function ReminderPopup({ popup, onView, onClose, onAcknowledge, canAcknowledge, queueCount, C }) {
   const [nowMs,setNowMs]=useState(Date.now());
   useEffect(()=>{ const t=setInterval(()=>setNowMs(Date.now()),30000); return()=>clearInterval(t); },[]);
   const items=popup.items||[];
@@ -648,9 +649,9 @@ function ReminderPopup({ popup, onView, onClose, onAcknowledge, queueCount, C })
             })}
           </div>
         </div>
-        <div style={{ borderTop:`1px solid ${C.divider}`,display:"grid",gridTemplateColumns:"1fr 1fr" }}>
+        <div style={{ borderTop:`1px solid ${C.divider}`,display:"grid",gridTemplateColumns:canAcknowledge?"1fr 1fr":"1fr" }}>
           <button onClick={()=>onView(popup)} style={{ padding:"13px 0",background:"transparent",border:"none",borderRight:`1px solid ${C.divider}`,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.green,cursor:"pointer",transition:"background 0.18s" }} onMouseEnter={e=>e.currentTarget.style.background=C.greenFaint} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>View</button>
-          <button onClick={()=>onAcknowledge(popup)} style={{ padding:"13px 0",background:"transparent",border:"none",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.gold,cursor:"pointer",transition:"background 0.18s" }} onMouseEnter={e=>e.currentTarget.style.background=C.goldFaint} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>Acknowledge</button>
+          {canAcknowledge&&<button onClick={()=>onAcknowledge(popup)} style={{ padding:"13px 0",background:"transparent",border:"none",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.gold,cursor:"pointer",transition:"background 0.18s" }} onMouseEnter={e=>e.currentTarget.style.background=C.goldFaint} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>Acknowledge</button>}
         </div>
       </div>
     </div>
@@ -658,7 +659,7 @@ function ReminderPopup({ popup, onView, onClose, onAcknowledge, queueCount, C })
 }
 
 // ─── Reservation Card ─────────────────────────────────────────────────────────
-function ReservationCard({ res, isNew, onClick, onApprove, onDecline, approvingIds, decliningIds, C }) {
+function ReservationCard({ res, isNew, onClick, onApprove, onDecline, approvingIds, decliningIds, canManage, C }) {
   const [hi,setHi]=useState(isNew);
   useEffect(()=>{ if(isNew){const t=setTimeout(()=>setHi(false),4000);return()=>clearTimeout(t);} },[isNew]);
   const rawStatus=(res.status||"").toLowerCase(),resIsPending=rawStatus==="pending";
@@ -684,7 +685,7 @@ function ReservationCard({ res, isNew, onClick, onApprove, onDecline, approvingI
           </div>
         ))}
       </div>
-      {resIsPending&&onApprove&&(
+      {resIsPending&&onApprove&&canManage&&(
         <div style={{ marginTop:12,paddingTop:10,borderTop:`1px solid ${C.divider}`,display:"grid",gridTemplateColumns:"1fr 1.4fr",gap:8 }}>
           <button onClick={e=>{e.stopPropagation();onDecline(res);}} disabled={isApprovingThis||isDecliningThis} style={{ width:"100%",padding:"9px",background:"transparent",border:`1px solid ${C.redBorder}`,borderRadius:8,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:C.red,cursor:isApprovingThis||isDecliningThis?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,transition:"all 0.18s" }}>
             {isDecliningThis?<><Spinner C={C} size={11}/>Declining...</>:<><XCircle size={11}/>Decline</>}
@@ -784,7 +785,7 @@ function Panel({ children, accentColor, C, style={} }) {
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
-function AcknowledgmentMonitor({ activeAlerts, acknowledgedAlerts, onAcknowledge, C }) {
+function AcknowledgmentMonitor({ activeAlerts, acknowledgedAlerts, onAcknowledge, canAcknowledge, C }) {
   return (
     <Panel C={C} accentColor={activeAlerts.length ? C.gold : C.green} style={{ flexShrink:0 }}>
       <div style={{ padding:"12px 16px 10px",borderBottom:`1px solid ${C.divider}` }}>
@@ -808,7 +809,7 @@ function AcknowledgmentMonitor({ activeAlerts, acknowledgedAlerts, onAcknowledge
               <div style={{ fontFamily:F.body,fontSize:12.5,fontWeight:700,color:C.textPrimary,marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{alert.name}</div>
               <div style={{ fontFamily:F.body,fontSize:11,color:C.textSecondary,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{alert.room} - {fmtDate(alert.eventDate)} - {fmtTime(alert.eventTime)}</div>
             </div>
-            <button onClick={()=>onAcknowledge([alert])} title="Acknowledge alert" style={{ flex:"0 0 auto",padding:"7px 12px",border:`1px solid ${C.borderAccent}`,borderRadius:6,background:C.gold,color:"#fff",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer",whiteSpace:"nowrap" }}>Acknowledge</button>
+            {canAcknowledge&&<button onClick={()=>onAcknowledge([alert])} title="Acknowledge alert" style={{ flex:"0 0 auto",padding:"7px 12px",border:`1px solid ${C.borderAccent}`,borderRadius:6,background:C.gold,color:"#fff",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer",whiteSpace:"nowrap" }}>Acknowledge</button>}
           </div>
         ))}
       </div>
@@ -818,6 +819,8 @@ function AcknowledgmentMonitor({ activeAlerts, acknowledgedAlerts, onAcknowledge
 
 function NotificationDashboard() {
   const C=getTokens();
+  const canManageReservations = authAPI.hasPermission("manage_reservations");
+  const canAcknowledgeNotifications = authAPI.hasPermission("acknowledge_notifications");
 
   const [allCards,setAllCards]=useState([]);
   const [popupQueue,setPopupQueue]=useState([]);
@@ -1172,7 +1175,7 @@ function NotificationDashboard() {
 
               <div style={{ display:"grid",gridTemplateColumns:"minmax(0,3fr) minmax(0,1.4fr)",gap:14,flex:1,minHeight:0 }} className="nd-grid">
                 <div style={{ gridColumn:"1 / -1" }}>
-                  <AcknowledgmentMonitor activeAlerts={activeAlerts} acknowledgedAlerts={acknowledgedAlerts} onAcknowledge={acknowledgeAlerts} C={C}/>
+                  <AcknowledgmentMonitor activeAlerts={activeAlerts} acknowledgedAlerts={acknowledgedAlerts} onAcknowledge={acknowledgeAlerts} canAcknowledge={canAcknowledgeNotifications} C={C}/>
                 </div>
 
                 {/* LEFT */}
@@ -1199,6 +1202,7 @@ function NotificationDashboard() {
                             onDecline={handleDeclineRequest}
                             approvingIds={approvingIds}
                             decliningIds={decliningIds}
+                            canManage={canManageReservations}
                             C={C}
                           />
                         ))
@@ -1235,9 +1239,9 @@ function NotificationDashboard() {
         </div>
       </div>
 
-      {popup&&<ReminderPopup popup={popup} queueCount={popupQueue.length} onView={handlePopupView} onClose={dismissPopup} onAcknowledge={acknowledgeAlerts} C={C}/>}
+      {popup&&<ReminderPopup popup={popup} queueCount={popupQueue.length} onView={handlePopupView} onClose={dismissPopup} onAcknowledge={acknowledgeAlerts} canAcknowledge={canAcknowledgeNotifications} C={C}/>}
       {pickerItems&&<EventPickerModal items={pickerItems} allCards={allCards} onSelect={r=>{setPickerItems(null);setDetailRes(r);}} onClose={()=>setPickerItems(null)} C={C}/>}
-      {detailRes&&<DetailModal res={detailRes} onClose={()=>setDetailRes(null)} onApprove={handleApproveRequest} onDecline={handleDeclineRequest} approvingIds={approvingIds} decliningIds={decliningIds} C={C}/>}
+      {detailRes&&<DetailModal res={detailRes} onClose={()=>setDetailRes(null)} onApprove={handleApproveRequest} onDecline={handleDeclineRequest} approvingIds={approvingIds} decliningIds={decliningIds} canManage={canManageReservations} C={C}/>}
       {confirmRes&&<ApproveConfirmModal res={confirmRes} onConfirm={handleApproveConfirm} onCancel={()=>{if(!isApproving)setConfirmRes(null);}} isApproving={isApproving} C={C}/>}
       {declineRes&&<DeclineConfirmModal res={declineRes} onConfirm={handleDeclineConfirm} onCancel={()=>{if(!isDeclining)setDeclineRes(null);}} isDeclining={isDeclining} C={C}/>}
       <Toast toasts={toasts} C={C}/>

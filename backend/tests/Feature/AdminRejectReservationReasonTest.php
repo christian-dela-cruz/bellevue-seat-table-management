@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Mail\ReservationStatusMail;
+use App\Models\Admin;
 use App\Models\Reservation;
 use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,6 +53,31 @@ class AdminRejectReservationReasonTest extends TestCase
         return Reservation::create(array_merge($defaults, $overrides));
     }
 
+    private function adminHeaders(string $role = 'admin', string $scopeType = 'all', array $outletScope = []): array
+    {
+        static $sequence = 1;
+
+        $admin = Admin::create([
+            'name' => 'Test Admin ' . $sequence,
+            'email' => 'admin' . $sequence . '@example.com',
+            'username' => 'admin' . $sequence,
+            'password' => 'password123',
+            'role' => $role,
+            'scope_type' => $scopeType,
+            'outlet_scope' => $outletScope,
+        ]);
+        $sequence++;
+
+        $response = $this->postJson('/api/auth/login', [
+            'username' => $admin->username,
+            'password' => 'password123',
+        ])->assertOk();
+
+        return [
+            'Authorization' => 'Bearer ' . $response->json('token'),
+        ];
+    }
+
     public function test_admin_reservation_notifications_send_for_reserved_and_rejected_states(): void
     {
         Mail::fake();
@@ -66,20 +92,22 @@ class AdminRejectReservationReasonTest extends TestCase
             'event_time' => '19:00',
         ]);
 
-        $this->patchJson("/api/admin/reservations/{$rejectedReservation->id}/reject", [])
+        $headers = $this->adminHeaders();
+
+        $this->patchJson("/api/admin/reservations/{$rejectedReservation->id}/reject", [], $headers)
             ->assertStatus(422)
             ->assertJsonValidationErrors(['reason']);
 
         $this->patchJson("/api/admin/reservations/{$rejectedReservation->id}/reject", [
             'reason' => 'Venue is fully booked for that date',
-        ])
+        ], $headers)
             ->assertOk()
             ->assertJsonFragment([
                 'success' => true,
                 'message' => 'Reservation rejected successfully',
             ]);
 
-        $this->patchJson("/api/admin/reservations/{$reservedReservation->id}/approve")
+        $this->patchJson("/api/admin/reservations/{$reservedReservation->id}/approve", [], $headers)
             ->assertOk()
             ->assertJsonFragment([
                 'success' => true,
@@ -185,12 +213,13 @@ class AdminRejectReservationReasonTest extends TestCase
 
         $venue = $this->createVenue();
         $reservation = $this->createReservation($venue);
+        $headers = $this->adminHeaders();
 
         $this->patchJson("/api/admin/reservations/{$reservation->id}/reject", [
             'reason' => 'Venue is fully booked for that date',
-        ])->assertOk();
+        ], $headers)->assertOk();
 
-        $this->patchJson("/api/admin/reservations/{$reservation->id}/revert")
+        $this->patchJson("/api/admin/reservations/{$reservation->id}/revert", [], $headers)
             ->assertOk()
             ->assertJsonFragment([
                 'success' => true,
@@ -215,5 +244,102 @@ class AdminRejectReservationReasonTest extends TestCase
             'from_status' => 'rejected',
             'to_status' => 'pending',
         ]);
+    }
+
+    public function test_admin_modifications_require_manage_reservation_permission(): void
+    {
+        Mail::fake();
+
+        $venue = $this->createVenue();
+        $reservation = $this->createReservation($venue);
+
+        $this->patchJson("/api/admin/reservations/{$reservation->id}/approve")
+            ->assertUnauthorized();
+
+        $viewerHeaders = $this->adminHeaders('fb_director');
+
+        $this->getJson('/api/admin/reservations', $viewerHeaders)
+            ->assertOk();
+
+        $this->patchJson("/api/admin/reservations/{$reservation->id}/approve", [], $viewerHeaders)
+            ->assertForbidden()
+            ->assertJsonFragment([
+                'message' => 'You are not authorized to perform this action.',
+            ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_outlet_manager_access_is_limited_to_assigned_outlets(): void
+    {
+        Mail::fake();
+
+        $firstVenue = $this->createVenue();
+        $secondVenue = Venue::create([
+            'name' => 'Second Hall',
+            'wing' => 'Tower Wing',
+            'type' => 'function room',
+            'capacity' => 40,
+            'price_per_hour' => 1500,
+            'description' => 'Second venue',
+            'is_active' => true,
+        ]);
+
+        $ownReservation = $this->createReservation($firstVenue);
+        $otherReservation = $this->createReservation($secondVenue);
+        $headers = $this->adminHeaders('outlet_manager', 'assigned', [$firstVenue->id]);
+
+        $this->getJson('/api/admin/reservations/stats', $headers)
+            ->assertOk()
+            ->assertJsonFragment([
+                'total' => 1,
+            ]);
+
+        $this->patchJson("/api/admin/reservations/{$ownReservation->id}/approve", [], $headers)
+            ->assertOk();
+
+        $this->patchJson("/api/admin/reservations/{$otherReservation->id}/approve", [], $headers)
+            ->assertForbidden()
+            ->assertJsonFragment([
+                'message' => 'You are not authorized to access this outlet.',
+            ]);
+    }
+
+    public function test_account_creation_respects_role_hierarchy(): void
+    {
+        $adminHeaders = $this->adminHeaders('admin');
+
+        $this->postJson('/api/admin/accounts', [
+            'name' => 'Blocked Super Admin',
+            'email' => 'blocked.super@example.com',
+            'username' => 'blocked.super@example.com',
+            'password' => 'password123',
+            'role' => 'super_admin',
+            'scope_type' => 'all',
+            'outlet_scope' => [],
+        ], $adminHeaders)->assertStatus(422);
+
+        $this->postJson('/api/admin/accounts', [
+            'name' => 'Allowed Staff',
+            'email' => 'allowed.staff@example.com',
+            'username' => 'allowed.staff@example.com',
+            'password' => 'password123',
+            'role' => 'staff',
+            'scope_type' => 'assigned',
+            'outlet_scope' => [1],
+        ], $adminHeaders)
+            ->assertCreated()
+            ->assertJsonFragment([
+                'message' => 'Admin account created successfully.',
+                'role' => 'staff',
+            ]);
+
+        $staffHeaders = $this->adminHeaders('staff');
+
+        $this->getJson('/api/admin/accounts', $staffHeaders)
+            ->assertForbidden();
     }
 }

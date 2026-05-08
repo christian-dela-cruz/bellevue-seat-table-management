@@ -17,6 +17,8 @@ class Admin extends Model
         'username',
         'password',
         'role',
+        'scope_type',
+        'outlet_scope',
     ];
 
     protected $hidden = [
@@ -28,5 +30,7 @@ class Admin extends Model
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
         'role' => 'string',
+        'scope_type' => 'string',
+        'outlet_scope' => 'array',
     ];
 }

@@ -7,10 +7,12 @@ class ApiService {
 
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+    const token = localStorage.getItem('admin_token');
     const config = {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
       ...options,

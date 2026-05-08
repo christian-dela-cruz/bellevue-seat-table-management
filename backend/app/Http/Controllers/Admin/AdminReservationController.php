@@ -40,7 +40,7 @@ class AdminReservationController extends Controller
                             : 'desc';
 
             $reservations = $this->reservationService
-                                 ->getAllReservationsPaginated($page, $perPage, $sort, $direction);
+                                 ->getAllReservationsPaginated($page, $perPage, $sort, $direction, $this->currentAdmin($request));
 
             return response()->json([
                 'data' => $reservations->items(),
@@ -56,10 +56,10 @@ class AdminReservationController extends Controller
         }
     }
 
-    public function getStats(): JsonResponse
+    public function getStats(Request $request): JsonResponse
     {
         try {
-            $stats = $this->reservationService->getReservationStats();
+            $stats = $this->reservationService->getReservationStats($this->currentAdmin($request));
             return response()->json($stats);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -86,6 +86,10 @@ class AdminReservationController extends Controller
         $validated['status']         = 'pending';
         $validated['submitted_at']   = now();
 
+        if (!$this->reservationService->canAccessVenue($this->currentAdmin($request), (int) $validated['venue_id'], $validated['room'] ?? null)) {
+            return $this->scopeDeniedResponse();
+        }
+
         $reservation = Reservation::create($validated);
 
         // Send pending confirmation email to the client
@@ -106,12 +110,20 @@ class AdminReservationController extends Controller
 
     public function show(Reservation $reservation): JsonResponse
     {
+        if (!$this->reservationService->canAccessReservation($this->currentAdmin(request()), $reservation)) {
+            return $this->scopeDeniedResponse();
+        }
+
         $reservation->load(['venue', 'seats']);
         return response()->json($reservation);
     }
 
     public function update(Request $request, Reservation $reservation): JsonResponse
     {
+        if (!$this->reservationService->canAccessReservation($this->currentAdmin($request), $reservation)) {
+            return $this->scopeDeniedResponse();
+        }
+
         $validated = $request->validate([
             'name'             => 'sometimes|required|string|max:255',
             'email'            => 'sometimes|required|email|max:255',
@@ -139,6 +151,10 @@ class AdminReservationController extends Controller
             $reservation = Reservation::where('id', $id)->first();
             if (!$reservation) {
                 $reservation = Reservation::where('reference_code', $id)->firstOrFail();
+            }
+
+            if (!$this->reservationService->canAccessReservation($this->currentAdmin(request()), $reservation)) {
+                return $this->scopeDeniedResponse();
             }
 
             $this->reservationService->deleteReservation($reservation);
@@ -175,6 +191,10 @@ class AdminReservationController extends Controller
         try {
             $reservation = Reservation::findOrFail($id);
             \Log::info('Reservation found: ' . $reservation->email . ', status: ' . $reservation->status);
+
+            if (!$this->reservationService->canAccessReservation($this->currentAdmin(request()), $reservation)) {
+                return $this->scopeDeniedResponse();
+            }
             
             $reservation = $this->reservationService->approveReservation($reservation);
             \Log::info('Reservation approved, sending email to: ' . $reservation->email);
@@ -239,6 +259,10 @@ class AdminReservationController extends Controller
 
             $reservation = Reservation::findOrFail($id);
             \Log::info('Reservation found: ' . $reservation->email . ', status: ' . $reservation->status);
+
+            if (!$this->reservationService->canAccessReservation($this->currentAdmin($request), $reservation)) {
+                return $this->scopeDeniedResponse();
+            }
 
             if ($reservation->status !== 'pending') {
                 return response()->json([
@@ -313,6 +337,10 @@ class AdminReservationController extends Controller
         try {
             $reservation = Reservation::findOrFail($id);
 
+            if (!$this->reservationService->canAccessReservation($this->currentAdmin(request()), $reservation)) {
+                return $this->scopeDeniedResponse();
+            }
+
             if ($reservation->status !== 'rejected') {
                 return response()->json([
                     'success' => false,
@@ -345,5 +373,18 @@ class AdminReservationController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    private function currentAdmin(Request $request): ?array
+    {
+        return $request->attributes->get('admin');
+    }
+
+    private function scopeDeniedResponse(): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'You are not authorized to access this outlet.',
+        ], 403);
     }
 }
