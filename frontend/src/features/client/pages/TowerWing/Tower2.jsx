@@ -540,7 +540,7 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
 
   useEffect(() => {
     if (prefill) setForm({ firstName: prefill.firstName || "", lastName: prefill.lastName || "", email: prefill.email || "", phone: prefill.phone || "+63", eventDate: prefill.eventDate || today, eventTime: prefill.eventTime || "19:00", specialRequests: prefill.specialRequests || "" });
-  }, [prefill]);
+  }, [prefill?.firstName, prefill?.lastName, prefill?.email, prefill?.phone, prefill?.eventDate, prefill?.eventTime, prefill?.specialRequests, today]);
 
   useEffect(() => { if (secondsLeft <= 0) onTimerExpired(); }, [secondsLeft]);
 

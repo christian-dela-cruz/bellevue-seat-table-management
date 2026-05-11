@@ -564,7 +564,7 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
       eventDate: prefill.eventDate || today, eventTime: prefill.eventTime || "19:00",
       specialRequests: prefill.specialRequests || "",
     });
-  }, [prefill]);
+  }, [prefill?.firstName, prefill?.lastName, prefill?.email, prefill?.phone, prefill?.eventDate, prefill?.eventTime, prefill?.specialRequests, today]);
 
   useEffect(() => { if (secondsLeft <= 0) onTimerExpired(); }, [secondsLeft]);
 
