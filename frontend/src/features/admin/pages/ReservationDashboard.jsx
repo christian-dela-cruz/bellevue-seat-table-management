@@ -1701,11 +1701,11 @@ export default function ReservationDashboard() {
 
   const statCards=[
     {label:"Total",    count:stats.total,    filter:"ALL",      color:C.gold,               bg:C.goldFaint,           border:C.borderAccent              },
+    {label:"Active",   count:stats.active,   filter:"ACTIVE",   color:C.green,              bg:C.greenFaint,          border:C.greenBorder               },
+    {label:"Inactive", count:stats.inactive, filter:"INACTIVE", color:C.textSecondary,      bg:"rgba(0,0,0,0.04)",    border:C.borderDefault             },
     {label:"Pending",  count:stats.pending,  filter:"PENDING",  color:C.badgePending.color,  bg:C.statusNote.pending,  border:C.statusNoteBorder.pending  },
     {label:"Approved", count:stats.approved, filter:"APPROVED", color:C.badgeApproved.color, bg:C.statusNote.approved, border:C.statusNoteBorder.approved },
     {label:"Rejected", count:stats.rejected, filter:"REJECTED", color:C.badgeRejected.color, bg:C.statusNote.rejected, border:C.statusNoteBorder.rejected },
-    {label:"Active",   count:stats.active,   filter:"ACTIVE",   color:C.green,              bg:C.greenFaint,          border:C.greenBorder               },
-    {label:"Inactive", count:stats.inactive, filter:"INACTIVE", color:C.textSecondary,      bg:"rgba(0,0,0,0.04)",    border:C.borderDefault             },
   ];
 
   const pagedReservations=filteredReservations.slice(
@@ -1820,7 +1820,7 @@ export default function ReservationDashboard() {
               </div>
 
               {/* ── Stat cards ── */}
-              <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:isMobile?10:12,marginBottom:isMobile?18:22}}>
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(3,1fr)",gap:isMobile?10:12,marginBottom:isMobile?18:22}}>
                 {statCards.map(({label,count,filter,color,bg,border})=>{
                   const active=filterStatus===filter;
                   return(
@@ -1844,12 +1844,6 @@ export default function ReservationDashboard() {
                       <div style={{fontFamily:F.label,fontSize:9,color:active?color:C.textTertiary,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.14em",transition:"color 0.18s"}}>
                         {label}
                       </div>
-                      {active&&(
-                        <div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:6,fontFamily:F.label,fontSize:8,fontWeight:700,color:color,letterSpacing:"0.10em",textTransform:"uppercase"}}>
-                          <span style={{width:4,height:4,borderRadius:"50%",background:color}}/>
-                          Active Filter
-                        </div>
-                      )}
                     </button>
                   );
                 })}

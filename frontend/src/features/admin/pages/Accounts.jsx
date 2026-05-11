@@ -103,19 +103,16 @@ export default function Accounts() {
   const [accounts,setAccounts] = useState([]);
   const [form,setForm] = useState(DEFAULT_FORM);
   const [editingId,setEditingId] = useState(null);
-  const [profile,setProfile] = useState({
-    name: currentUser?.name || "",
-    email: currentUser?.email || "",
-    username: currentUser?.username || "",
-    current_password: "",
-    password: "",
-    password_confirmation: "",
-  });
   const [loading,setLoading] = useState(false);
-  const [profileLoading,setProfileLoading] = useState(false);
   const [toast,setToast] = useState(null);
 
   const assignableRoles = useMemo(() => roleOptionsFor(currentUser?.role), [currentUser?.role]);
+  const visibleAccounts = useMemo(
+    () => currentUser?.role === "super_admin"
+      ? accounts
+      : accounts.filter((account) => account.role !== "super_admin"),
+    [accounts, currentUser?.role]
+  );
 
   const loadAccounts = async () => {
     if (!canManage) return;
@@ -180,32 +177,6 @@ export default function Accounts() {
     });
   };
 
-  const submitProfile = async (event) => {
-    event.preventDefault();
-    setProfileLoading(true);
-
-    try {
-      const payload = {
-        name: profile.name,
-        email: profile.email,
-        username: profile.username,
-        ...(profile.password ? {
-          current_password: profile.current_password,
-          password: profile.password,
-          password_confirmation: profile.password_confirmation,
-        } : {}),
-      };
-
-      await authAPI.updateProfile(payload);
-      setProfile((prev) => ({ ...prev, current_password:"", password:"", password_confirmation:"" }));
-      setToast({ type:"success", message:"Profile updated. Log in again if you changed username or password." });
-    } catch (error) {
-      setToast({ type:"error", message:error.message || "Failed to update profile." });
-    } finally {
-      setProfileLoading(false);
-    }
-  };
-
   return (
     <div style={{ minHeight:"100vh",background:C.pageBg,fontFamily:F.body }}>
       <AdminNavbar />
@@ -220,37 +191,12 @@ export default function Accounts() {
             </div>
           )}
 
-          <div style={{ display:"grid",gridTemplateColumns:canManage?"minmax(360px, 0.85fr) minmax(460px, 1.15fr)":"minmax(360px, 620px)",gap:18,alignItems:"start" }}>
-            <section style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:18 }}>
-              <SectionTitle eyebrow="My Account" title="Profile" />
-              <form onSubmit={submitProfile} style={{ display:"grid",gap:12 }}>
-                <Field label="Name">
-                  <input value={profile.name} onChange={(e)=>setProfile({...profile,name:e.target.value})} style={inputStyle()} />
-                </Field>
-                <Field label="Email">
-                  <input type="email" value={profile.email} onChange={(e)=>setProfile({...profile,email:e.target.value})} style={inputStyle()} />
-                </Field>
-                <Field label="Username">
-                  <input value={profile.username} onChange={(e)=>setProfile({...profile,username:e.target.value})} style={inputStyle()} />
-                </Field>
-                <div style={{ height:1,background:C.divider,margin:"4px 0" }} />
-                <Field label="Current Password">
-                  <input type="password" value={profile.current_password} onChange={(e)=>setProfile({...profile,current_password:e.target.value})} placeholder="Required only when changing password" style={inputStyle()} />
-                </Field>
-                <Field label="New Password">
-                  <input type="password" value={profile.password} onChange={(e)=>setProfile({...profile,password:e.target.value})} style={inputStyle()} />
-                </Field>
-                <Field label="Confirm Password">
-                  <input type="password" value={profile.password_confirmation} onChange={(e)=>setProfile({...profile,password_confirmation:e.target.value})} style={inputStyle()} />
-                </Field>
-                <button disabled={profileLoading} style={{ marginTop:4,padding:"11px 14px",border:"none",borderRadius:8,background:C.gold,color:"#fff",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",cursor:profileLoading?"not-allowed":"pointer" }}>
-                  {profileLoading ? "Saving..." : "Save Profile"}
-                </button>
-              </form>
-            </section>
-
-            {canManage && (
-              <section style={{ display:"grid",gap:18 }}>
+          {!canManage ? (
+            <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:22,color:C.muted,fontSize:13,maxWidth:620 }}>
+              Account creation and role management are restricted to authorized administrators. Use the account menu in the header to view or update your personal account.
+            </div>
+          ) : (
+            <div style={{ display:"grid",gridTemplateColumns:"minmax(0, 0.95fr) minmax(420px, 1.05fr)",gap:18,alignItems:"start",maxWidth:1280 }}>
                 <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:18 }}>
                   <SectionTitle eyebrow={editingId ? "Edit Account" : "New Account"} title={editingId ? "Update Role Account" : "Create Role Account"} />
                   <form onSubmit={submitAccount} style={{ display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12 }}>
@@ -294,10 +240,10 @@ export default function Accounts() {
                 <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,overflow:"hidden" }}>
                   <div style={{ padding:"14px 18px",borderBottom:`1px solid ${C.divider}`,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                     <span style={{ fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",color:C.gold }}>Account List</span>
-                    <span style={{ fontSize:12,color:C.muted }}>{accounts.length} accounts</span>
+                    <span style={{ fontSize:12,color:C.muted }}>{visibleAccounts.length} accounts</span>
                   </div>
                   <div style={{ display:"grid" }}>
-                    {accounts.map((account) => (
+                    {visibleAccounts.map((account) => (
                       <button key={account.id} onClick={()=>editAccount(account)} style={{ display:"grid",gridTemplateColumns:"1fr auto",gap:14,alignItems:"center",padding:"13px 18px",border:"none",borderBottom:`1px solid ${C.divider}`,background:"transparent",textAlign:"left",cursor:"pointer" }}>
                         <div style={{ minWidth:0 }}>
                           <div style={{ fontSize:13,fontWeight:700,color:C.text,marginBottom:3 }}>{account.name}</div>
@@ -311,9 +257,8 @@ export default function Accounts() {
                     ))}
                   </div>
                 </div>
-              </section>
-            )}
-          </div>
+            </div>
+          )}
         </main>
       </div>
     </div>

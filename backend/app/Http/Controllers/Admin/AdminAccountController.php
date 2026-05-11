@@ -26,10 +26,16 @@ class AdminAccountController extends Controller
     {
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $actor = $this->currentAdmin($request);
+
         return response()->json([
             'data' => Admin::query()
+                ->when(
+                    ($actor['role'] ?? '') !== 'super_admin',
+                    fn ($query) => $query->where('role', '!=', 'super_admin')
+                )
                 ->orderBy('role')
                 ->orderBy('name')
                 ->get()

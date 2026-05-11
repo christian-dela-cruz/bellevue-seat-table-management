@@ -310,7 +310,23 @@ class AdminRejectReservationReasonTest extends TestCase
 
     public function test_account_creation_respects_role_hierarchy(): void
     {
+        Admin::create([
+            'name' => 'Existing Super Admin',
+            'email' => 'existing.super@example.com',
+            'username' => 'existing.super@example.com',
+            'password' => 'password123',
+            'role' => 'super_admin',
+            'scope_type' => 'all',
+            'outlet_scope' => [],
+        ]);
+
         $adminHeaders = $this->adminHeaders('admin');
+
+        $this->getJson('/api/admin/accounts', $adminHeaders)
+            ->assertOk()
+            ->assertJsonMissing([
+                'role' => 'super_admin',
+            ]);
 
         $this->postJson('/api/admin/accounts', [
             'name' => 'Blocked Super Admin',
