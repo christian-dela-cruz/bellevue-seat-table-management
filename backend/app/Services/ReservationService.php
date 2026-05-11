@@ -37,14 +37,6 @@ class ReservationService
         $fromStatus = $reservation->status;
         $reservation->update(['status' => 'reserved']);
 
-        // Update the specific seat status if seat_number is specified
-        if ($reservation->seat_number) {
-            Seat::where('venue_id', $reservation->venue_id)
-                ->where('table_number', $reservation->table_number)
-                ->where('seat_number', $reservation->seat_number)
-                ->update(['status' => 'reserved']);
-        }
-
         $reservation = $reservation->fresh(['venue']);
 
         $this->recordTransaction(
@@ -68,14 +60,6 @@ class ReservationService
             'status' => 'rejected',
             'rejection_reason' => $reason,
         ]);
-
-        // Update the specific seat status back to available if seat_number is specified
-        if ($reservation->seat_number) {
-            Seat::where('venue_id', $reservation->venue_id)
-                ->where('table_number', $reservation->table_number)
-                ->where('seat_number', $reservation->seat_number)
-                ->update(['status' => 'available']);
-        }
 
         $reservation = $reservation->fresh(['venue']);
 
@@ -160,6 +144,77 @@ class ReservationService
             'available' => $availableSeats,
             'reserved' => $totalSeats - $availableSeats,
         ];
+    }
+
+    public function hasScheduleConflict(array $data, ?int $ignoreReservationId = null): bool
+    {
+        $tableNumber = trim((string) ($data['table_number'] ?? ''));
+        $seatNumber = trim((string) ($data['seat_number'] ?? ''));
+        $eventDate = $data['event_date'] ?? null;
+        $eventTime = isset($data['event_time']) ? substr((string) $data['event_time'], 0, 5) : null;
+        $type = strtolower((string) ($data['type'] ?? 'whole'));
+        $isStandalone = $type === 'standalone'
+            || filter_var($data['is_standalone'] ?? false, FILTER_VALIDATE_BOOLEAN)
+            || strtoupper($tableNumber) === 'STANDALONE';
+
+        if (empty($data['venue_id']) || !$eventDate || !$eventTime || !$tableNumber) {
+            return false;
+        }
+
+        $query = Reservation::query()
+            ->where('venue_id', (int) $data['venue_id'])
+            ->whereDate('event_date', $eventDate)
+            ->where('event_time', $eventTime)
+            ->whereIn('status', ['pending', 'approved', 'reserved']);
+
+        if ($ignoreReservationId) {
+            $query->whereKeyNot($ignoreReservationId);
+        }
+
+        if ($isStandalone) {
+            $seatId = trim((string) ($data['seat_id'] ?? ''));
+
+            return $query
+                ->where(function ($conflictQuery) {
+                    $conflictQuery->where('type', 'standalone')
+                        ->orWhere('is_standalone', true)
+                        ->orWhereRaw('UPPER(table_number) = ?', ['STANDALONE']);
+                })
+                ->when($seatNumber !== '' || $seatId !== '', function ($conflictQuery) use ($seatNumber, $seatId) {
+                    $conflictQuery->where(function ($seatQuery) use ($seatNumber, $seatId) {
+                        if ($seatNumber !== '') {
+                            $seatQuery->where('seat_number', $seatNumber);
+                        }
+
+                        if ($seatId !== '') {
+                            $seatQuery->orWhere('seat_id', $seatId);
+                        }
+                    });
+                })
+                ->exists();
+        }
+
+        $requestedSeats = array_filter(array_map('trim', explode(',', $seatNumber)));
+
+        return $query
+            ->where('table_number', $tableNumber)
+            ->where(function ($conflictQuery) use ($type, $requestedSeats) {
+                if ($type === 'whole' || empty($requestedSeats)) {
+                    $conflictQuery->whereNotNull('table_number');
+                    return;
+                }
+
+                $conflictQuery->where('type', 'whole')
+                    ->orWhereNull('seat_number');
+
+                foreach ($requestedSeats as $seat) {
+                    $conflictQuery->orWhere('seat_number', $seat)
+                        ->orWhere('seat_number', 'like', $seat . ',%')
+                        ->orWhere('seat_number', 'like', '%,' . $seat)
+                        ->orWhere('seat_number', 'like', '%,' . $seat . ',%');
+                }
+            })
+            ->exists();
     }
 
     /**

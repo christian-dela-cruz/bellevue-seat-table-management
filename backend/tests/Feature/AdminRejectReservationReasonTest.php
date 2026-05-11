@@ -6,6 +6,7 @@ use App\Mail\ReservationStatusMail;
 use App\Models\Admin;
 use App\Models\Reservation;
 use App\Models\ReservationTransaction;
+use App\Models\Seat;
 use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -620,6 +621,94 @@ class AdminRejectReservationReasonTest extends TestCase
             'event_time' => '18:00',
         ], $scopedHeaders)
             ->assertStatus(422)
-            ->assertJsonPath('message', 'The selected table or seat is already assigned for that date and time.');
+            ->assertJsonPath('message', 'The selected seat or table is already reserved for that date and time.');
+    }
+
+    public function test_seatmap_availability_is_scoped_by_selected_date_and_time(): void
+    {
+        $venue = $this->createVenue();
+
+        Seat::create([
+            'venue_id' => $venue->id,
+            'table_number' => 'T1',
+            'seat_number' => 'S1',
+            'status' => 'available',
+            'x_position' => 10,
+            'y_position' => 20,
+        ]);
+        Seat::create([
+            'venue_id' => $venue->id,
+            'table_number' => 'T1',
+            'seat_number' => 'S2',
+            'status' => 'available',
+            'x_position' => 30,
+            'y_position' => 20,
+        ]);
+
+        $this->createReservation($venue, [
+            'table_number' => 'T1',
+            'seat_number' => 'S1',
+            'event_date' => '2026-06-15',
+            'event_time' => '18:00',
+            'status' => 'pending',
+            'type' => 'individual',
+        ]);
+
+        $path = '/api/seatmap/' . rawurlencode($venue->wing) . '/' . rawurlencode($venue->name);
+
+        $this->getJson($path . '?event_date=2026-06-15&event_time=18:00')
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => 'S1',
+                'num' => 'S1',
+                'status' => 'pending',
+            ]);
+
+        $this->getJson($path . '?event_date=2026-06-15&event_time=19:00')
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => 'S1',
+                'num' => 'S1',
+                'status' => 'available',
+            ]);
+    }
+
+    public function test_reservation_creation_rejects_same_seat_same_schedule_conflict(): void
+    {
+        $venue = $this->createVenue();
+
+        $this->createReservation($venue, [
+            'table_number' => 'T2',
+            'seat_number' => 'S1',
+            'event_date' => '2026-06-15',
+            'event_time' => '18:00',
+            'status' => 'reserved',
+            'type' => 'individual',
+        ]);
+
+        $payload = [
+            'name' => 'Duplicate Guest',
+            'email' => 'duplicate@example.com',
+            'phone' => '09170000000',
+            'venue_id' => $venue->id,
+            'room' => $venue->name,
+            'table_number' => 'T2',
+            'seat_number' => 'S1',
+            'guests_count' => 2,
+            'event_date' => '2026-06-15',
+            'event_time' => '18:00',
+            'special_requests' => null,
+            'type' => 'individual',
+        ];
+
+        $this->postJson('/api/reservations', $payload)
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'The selected seat or table is already reserved for that date and time.');
+
+        $this->postJson('/api/reservations', array_merge($payload, [
+            'event_time' => '19:00',
+            'email' => 'allowed@example.com',
+        ]))
+            ->assertCreated();
     }
 }

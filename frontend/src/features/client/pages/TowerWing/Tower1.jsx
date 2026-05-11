@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import SharedNavbar from "../../../../components/SharedNavbar.jsx";
 
 import SeatMap, { STATUS_COLORS } from "../../../../components/seatmap/SeatMap";
+import ScheduleGate, { normalizeSchedule, withSeatmapSchedule } from "../../../../components/seatmap/ScheduleGate";
 import Echo from "../../../../utils/websocket.js";
 
 function getActualWingForRoom(room) {
@@ -959,6 +960,7 @@ export default function Tower1Reserve() {
   const [modal,              setModal]              = useState(null);
   const [guests,             setGuests]             = useState(2);
   const [formData,           setFormData]           = useState(null);
+  const [schedule,           setSchedule]           = useState(() => normalizeSchedule());
   const [refCode,            setRefCode]            = useState(null);
   const [submitting,         setSubmitting]         = useState(false);
   const [rebookFrom,         setRebookFrom]         = useState(null);
@@ -1024,7 +1026,7 @@ export default function Tower1Reserve() {
       if (!res.ok) {
         // Fallback: try /rooms/3/seats and parse flat seat list
         const fallback = await fetch(
-          `${API_BASE_URL}/rooms/3/seats`,
+          withSeatmapSchedule(`${API_BASE_URL}/rooms/3/seats`),
           { headers: { Accept: "application/json" } }
         );
         if (!fallback.ok) return;
@@ -1158,6 +1160,15 @@ export default function Tower1Reserve() {
     if (localLayout) setTableData(localLayout);
     fetchAndMerge();
   }, [fetchAndMerge]);
+  useEffect(() => {
+    const onScheduleChanged = () => {
+      setSelectedSeat(null);
+      setSelectedTable(null);
+      fetchAndMerge();
+    };
+    window.addEventListener("seatmap:schedule-changed", onScheduleChanged);
+    return () => window.removeEventListener("seatmap:schedule-changed", onScheduleChanged);
+  }, [fetchAndMerge]);
 
   useEffect(() => {
     const h = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
@@ -1221,9 +1232,7 @@ export default function Tower1Reserve() {
       startPolling();
       return () => stopPolling();
     }
-  }, [fetchAndMerge]);
-
-  // Cleanup on unmount
+  }, [fetchAndMerge]);// Cleanup on unmount
   useEffect(() => {
     return () => {
       if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
@@ -1235,9 +1244,7 @@ export default function Tower1Reserve() {
     const onSeatMapSaved = () => { fetchAndMerge(); };
     window.addEventListener("seatmap:saved", onSeatMapSaved);
     return () => window.removeEventListener("seatmap:saved", onSeatMapSaved);
-  }, [fetchAndMerge]);
-
-  const getTables          = () => { if (!tableData) return []; if (tableData.tables) return tableData.tables; if (Array.isArray(tableData)) return tableData; return [tableData]; };
+  }, [fetchAndMerge]);const getTables          = () => { if (!tableData) return []; if (tableData.tables) return tableData.tables; if (Array.isArray(tableData)) return tableData; return [tableData]; };
   const getStandaloneSeats = () => tableData?.standaloneSeats || [];
 
   const isStandaloneSelected = useCallback(() => {
@@ -1265,7 +1272,7 @@ export default function Tower1Reserve() {
     setSelectedTable(parentTable);
   };
   const handleGuestContinue = g => { setGuests(g); startHoldTimer(); setModal("details"); };
-  const handleReview        = form => { setFormData(form); setModal("review"); };
+  const handleReview        = form => { setFormData(form); setSchedule(normalizeSchedule({ eventDate: form.eventDate, eventTime: form.eventTime })); setModal("review"); };
   const handleEditDetails   = ()   => { setModal("details"); };
 
   const handleSubmit = async () => {
@@ -1375,7 +1382,7 @@ export default function Tower1Reserve() {
   const displaySeat  = mode === "individual" ? (selectedSeat ? `Seat ${selectedSeat.num ?? selectedSeat.id}` : "Select a seat") : getWholeSeatLabel(guests, activeTable);
 
   const rebookPrefill  = rebookFrom ? { firstName: (rebookFrom.name || "").split(/\s+/)[0] || "", lastName: (rebookFrom.name || "").split(/\s+/).slice(1).join(" ") || "", email: rebookFrom.email || "", phone: rebookFrom.phone || "", eventDate: rebookFrom.event_date || "", eventTime: rebookFrom.event_time || "19:00", specialRequests: rebookFrom.special_requests || "" } : null;
-  const detailsPrefill = formData ? { firstName: formData.firstName || "", lastName: formData.lastName || "", email: formData.email || "", phone: formData.phone || "+63", eventDate: formData.eventDate || "", eventTime: formData.eventTime || "19:00", specialRequests: formData.specialRequests || "" } : rebookPrefill;
+  const detailsPrefill = formData ? { firstName: formData.firstName || "", lastName: formData.lastName || "", email: formData.email || "", phone: formData.phone || "+63", eventDate: formData.eventDate || "", eventTime: formData.eventTime || "19:00", specialRequests: formData.specialRequests || "" } : (rebookPrefill || { firstName: "", lastName: "", email: "", phone: "+63", eventDate: schedule.eventDate || "", eventTime: schedule.eventTime || "19:00", specialRequests: "" });
 
   const BOTTOM_SHEET_H = 180;
   const NAV_H = 64;
@@ -1624,6 +1631,7 @@ export default function Tower1Reserve() {
 
                 {/* Right panel */}
                 <div style={{ width: isTablet ? "100%" : 280, flexShrink: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+                  <ScheduleGate schedule={schedule} onChange={setSchedule} roomLabel={ROOM} isDark={isDark} />
                   <div style={{ display: isTablet ? "grid" : "flex", gridTemplateColumns: isTablet ? "1fr 1fr" : undefined, flexDirection: isTablet ? undefined : "column", gap: 14 }}>
 
                     {/* Legend */}

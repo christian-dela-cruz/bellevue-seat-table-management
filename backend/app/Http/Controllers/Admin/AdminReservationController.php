@@ -79,7 +79,9 @@ class AdminReservationController extends Controller
             'event_date'       => 'required|date',
             'event_time'       => 'required|string|max:50',
             'special_requests' => 'nullable|string',
-            'type'             => 'required|in:whole,individual',
+            'type'             => 'required|in:whole,individual,standalone',
+            'is_standalone'    => 'nullable|boolean',
+            'seat_id'          => 'nullable|string|max:50',
         ]);
 
         $validated['reference_code'] = date('Y') . '-' . str_pad(mt_rand(1, 9999), 4, '0', STR_PAD_LEFT);
@@ -88,6 +90,13 @@ class AdminReservationController extends Controller
 
         if (!$this->reservationService->canAccessVenue($this->currentAdmin($request), (int) $validated['venue_id'], $validated['room'] ?? null)) {
             return $this->scopeDeniedResponse();
+        }
+
+        if ($this->reservationService->hasScheduleConflict($validated)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected seat or table is already reserved for that date and time.',
+            ], 422);
         }
 
         $reservation = Reservation::create($validated);
@@ -161,36 +170,11 @@ class AdminReservationController extends Controller
             'is_standalone',
         ]), $validated);
 
-        $tableNumber = $merged['table_number'] ?? null;
-        $seatNumber = $merged['seat_number'] ?? null;
-        $isStandalone = ($merged['type'] ?? null) === 'standalone'
-            || filter_var($merged['is_standalone'] ?? false, FILTER_VALIDATE_BOOLEAN)
-            || strtoupper((string) $tableNumber) === 'STANDALONE';
-
-        if (!$isStandalone && $tableNumber) {
-            $conflict = Reservation::query()
-                ->whereKeyNot($reservation->id)
-                ->where('venue_id', $targetVenueId)
-                ->whereDate('event_date', $merged['event_date'])
-                ->where('event_time', $merged['event_time'])
-                ->whereNotIn('status', ['rejected', 'cancelled'])
-                ->where('table_number', $tableNumber)
-                ->where(function ($query) use ($seatNumber) {
-                    if ($seatNumber) {
-                        $query->whereNull('seat_number')
-                            ->orWhere('seat_number', $seatNumber);
-                    } else {
-                        $query->whereNotNull('table_number');
-                    }
-                })
-                ->exists();
-
-            if ($conflict) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'The selected table or seat is already assigned for that date and time.',
-                ], 422);
-            }
+        if ($this->reservationService->hasScheduleConflict($merged, $reservation->id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected seat or table is already reserved for that date and time.',
+            ], 422);
         }
 
         if (($validated['type'] ?? null) === 'standalone' || ($validated['is_standalone'] ?? false)) {

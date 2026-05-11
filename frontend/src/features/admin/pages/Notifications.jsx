@@ -265,6 +265,31 @@ function clockStr() { return new Date().toLocaleTimeString("en-PH",{hour:"2-digi
 function dateStr()  { return new Date().toLocaleDateString("en-PH",{weekday:"long",month:"long",day:"numeric",year:"numeric"}); }
 function notificationId(res) { return String(res?.id ?? res?.db_id ?? res?.reference_code ?? ""); }
 
+function outletCountsFor(cards) {
+  const counts = new Map();
+  cards.forEach((res) => {
+    const outlet = getOutletName(res);
+    const current = counts.get(outlet) || {
+      outlet,
+      total: 0,
+      pending: 0,
+      upcoming: 0,
+      accepted: 0,
+      declined: 0,
+    };
+    current.total += 1;
+    if (isPending(res)) current.pending += 1;
+    if (isDeclined(res)) current.declined += 1;
+    if (isApproved(res)) {
+      current.accepted += 1;
+      const dt = parseEventDate(res.event_date || res.eventDate || res.reservationDate, res.event_time || res.eventTime || res.reservationTime);
+      if (!dt || dt.getTime() > Date.now()) current.upcoming += 1;
+    }
+    counts.set(outlet, current);
+  });
+  return Array.from(counts.values()).sort((a, b) => a.outlet.localeCompare(b.outlet));
+}
+
 function loadAcknowledgments() {
   try {
     return JSON.parse(localStorage.getItem(ACK_STORAGE_KEY) || "{}");
@@ -665,15 +690,20 @@ function ReservationCard({ res, isNew, onClick, onApprove, onDecline, approvingI
   useEffect(()=>{ if(isNew){const t=setTimeout(()=>setHi(false),4000);return()=>clearTimeout(t);} },[isNew]);
   const rawStatus=(res.status||"").toLowerCase(),resIsPending=rawStatus==="pending";
   const resId=res.id??res.db_id,isApprovingThis=approvingIds?.has(resId),isDecliningThis=decliningIds?.has(resId);
+  const outletName = getOutletName(res);
   return (
     <div style={{ background:hi?C.goldFaintest:C.cardBg,border:`1px solid ${hi?C.borderAccent:C.cardBorder}`,borderRadius:10,padding:"15px 16px",marginBottom:8,boxShadow:hi?`0 0 0 3px ${C.goldFaint}`:"none",transition:"all 0.30s ease",animation:isNew?"cardSlideIn 0.40s cubic-bezier(0.34,1.5,0.64,1)":"none",cursor:"pointer" }} onClick={()=>onClick(res)} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.borderAccent;e.currentTarget.style.background=C.goldFaintest;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=hi?C.borderAccent:C.cardBorder;e.currentTarget.style.background=hi?C.goldFaintest:C.cardBg;}}>
       <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,gap:10 }}>
         <div style={{ fontFamily:F.body,fontSize:13.5,fontWeight:600,color:C.textPrimary,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{res.guest_name||res.name||"Unknown Guest"}</div>
+        <span style={{ display:"inline-flex",alignItems:"center",gap:5,maxWidth:180,background:C.goldFaintest,border:`1px solid ${C.borderAccent}`,borderRadius:4,padding:"4px 8px",fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.10em",textTransform:"uppercase",color:C.gold,overflow:"hidden",whiteSpace:"nowrap" }}>
+          <MapPin size={9} style={{ flexShrink:0 }}/>
+          <span style={{ overflow:"hidden",textOverflow:"ellipsis" }}>{outletName}</span>
+        </span>
         <StatusBadge status={rawStatus} C={C}/>
       </div>
       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"5px 8px" }}>
         {[
-          {icon:<MapPin size={10}/>,      val:res.room||res.venue},
+          {icon:<MapPin size={10}/>,      val:outletName},
           {icon:<CalendarDays size={10}/>,val:fmtDate(res.event_date||res.eventDate||res.reservationDate)},
           {icon:<Clock size={10}/>,       val:fmtTime(res.event_time||res.eventTime||res.reservationTime)},
           {icon:<FileText size={10}/>,    val:res.table_number??res.table?`Table ${res.table_number||res.table}`:"No table"},
@@ -702,14 +732,19 @@ function ReservationCard({ res, isNew, onClick, onApprove, onDecline, approvingI
 
 // ─── Done Card ────────────────────────────────────────────────────────────────
 function DoneCard({ res, onClick, C }) {
+  const outletName = getOutletName(res);
   return (
     <div onClick={()=>onClick(res)} style={{ background:C.cardBg,border:`1px solid ${C.greenBorder}`,borderRadius:10,padding:"13px 15px",marginBottom:8,cursor:"pointer",transition:"all 0.18s" }} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.green;e.currentTarget.style.background=C.greenFaint;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.greenBorder;e.currentTarget.style.background=C.cardBg;}}>
       <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:7,gap:8 }}>
         <div style={{ fontFamily:F.body,fontSize:13,fontWeight:600,color:C.textPrimary,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{res.guest_name||res.name||"Unknown Guest"}</div>
+        <span style={{ display:"inline-flex",alignItems:"center",gap:5,maxWidth:150,background:C.goldFaintest,border:`1px solid ${C.borderAccent}`,borderRadius:4,padding:"3px 7px",fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.10em",textTransform:"uppercase",color:C.gold,overflow:"hidden",whiteSpace:"nowrap" }}>
+          <MapPin size={8} style={{ flexShrink:0 }}/>
+          <span style={{ overflow:"hidden",textOverflow:"ellipsis" }}>{outletName}</span>
+        </span>
         <StatusBadge status={res.status} C={C}/>
       </div>
       <div style={{ display:"flex",gap:12,flexWrap:"wrap" }}>
-        {[fmtDate(res.event_date||res.eventDate||res.reservationDate),fmtTime(res.event_time||res.eventTime||res.reservationTime),res.room||res.venue].filter(Boolean).map((v,i)=>(
+        {[fmtDate(res.event_date||res.eventDate||res.reservationDate),fmtTime(res.event_time||res.eventTime||res.reservationTime),outletName].filter(Boolean).map((v,i)=>(
           <span key={i} style={{ fontFamily:F.body,fontSize:11,color:C.textSecondary }}>{v}</span>
         ))}
       </div>
@@ -751,6 +786,81 @@ function Pagination({ page, total, perPage, setPage, setPerPage, C }) {
 
 function EmptyState({ msg, C }) {
   return <div style={{ textAlign:"center",padding:"50px 20px",fontFamily:F.label,fontSize:9,letterSpacing:"0.18em",color:C.textTertiary,textTransform:"uppercase",fontWeight:700 }}>{msg}</div>;
+}
+
+function OutletMonitorBar({ outlets, selectedOutlet, onSelect, currentUser, C }) {
+  const visibleLabel = currentUser?.scope_type === "assigned"
+    ? "Assigned outlet view"
+    : "All outlet view";
+  const totalPending = outlets.reduce((sum, outlet) => sum + outlet.pending, 0);
+  const totalUpcoming = outlets.reduce((sum, outlet) => sum + outlet.upcoming, 0);
+
+  return (
+    <Panel C={C} accentColor={totalPending ? C.gold : C.green} style={{ flexShrink:0 }}>
+      <div style={{ padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",borderBottom:`1px solid ${C.divider}` }}>
+        <div>
+          <div style={{ fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:C.gold,marginBottom:4 }}>Inter-Outlet Routing</div>
+          <div style={{ fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.45 }}>
+            {visibleLabel} · {outlets.length} outlet{outlets.length === 1 ? "" : "s"} visible
+          </div>
+        </div>
+        <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
+          <span style={{ background:C.goldFaint,border:`1px solid ${C.borderAccent}`,borderRadius:4,padding:"4px 8px",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.gold }}>{totalPending} Pending</span>
+          <span style={{ background:C.blueFaint,border:`1px solid ${C.blueBorder}`,borderRadius:4,padding:"4px 8px",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.blue }}>{totalUpcoming} Upcoming</span>
+        </div>
+      </div>
+      <div style={{ padding:"10px 12px",display:"flex",gap:8,overflowX:"auto" }}>
+        <OutletChip
+          label="All Outlets"
+          active={selectedOutlet === "ALL"}
+          pending={totalPending}
+          total={outlets.reduce((sum, outlet) => sum + outlet.total, 0)}
+          onClick={() => onSelect("ALL")}
+          C={C}
+        />
+        {outlets.map((outlet) => (
+          <OutletChip
+            key={outlet.outlet}
+            label={outlet.outlet}
+            active={selectedOutlet === outlet.outlet}
+            pending={outlet.pending}
+            total={outlet.total}
+            onClick={() => onSelect(outlet.outlet)}
+            C={C}
+          />
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function OutletChip({ label, active, pending, total, onClick, C }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex:"0 0 auto",
+        display:"flex",
+        alignItems:"center",
+        gap:8,
+        padding:"8px 10px",
+        minWidth:150,
+        maxWidth:230,
+        border:`1px solid ${active ? C.borderAccent : C.borderDefault}`,
+        borderRadius:8,
+        background:active ? C.goldFaintest : C.surfaceBase,
+        color:active ? C.gold : C.textSecondary,
+        cursor:"pointer",
+        transition:"all 0.18s",
+      }}
+    >
+      <MapPin size={12} style={{ flexShrink:0 }} />
+      <span style={{ flex:1,minWidth:0,textAlign:"left",fontFamily:F.body,fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{label}</span>
+      <span style={{ flex:"0 0 auto",fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.08em",border:`1px solid ${pending ? C.borderAccent : C.borderDefault}`,borderRadius:12,padding:"2px 7px",background:pending ? C.goldFaint : "rgba(0,0,0,0.03)",color:pending ? C.gold : C.textTertiary }}>
+        {pending}/{total}
+      </span>
+    </button>
+  );
 }
 
 function Toast({ toasts, C }) {
@@ -821,6 +931,7 @@ function AcknowledgmentMonitor({ activeAlerts, acknowledgedAlerts, onAcknowledge
 function NotificationDashboard() {
   const C=getTokens();
   const navigate = useNavigate();
+  const currentUser = authAPI.getCurrentUser();
   const canManageReservations = authAPI.hasPermission("manage_reservations");
   const canAcknowledgeNotifications = authAPI.hasPermission("acknowledge_notifications");
 
@@ -1080,11 +1191,24 @@ function NotificationDashboard() {
     };
   },[syncReservations,upsertReservation]);
 
-  const outletOptions=useMemo(()=>["ALL",...Array.from(new Set(allCards.map(getOutletName))).sort((a,b)=>a.localeCompare(b))],[allCards]);
+  const outletSummaries=useMemo(()=>outletCountsFor(allCards),[allCards]);
+  const outletOptions=useMemo(()=>["ALL",...outletSummaries.map(item=>item.outlet)],[outletSummaries]);
+
+  useEffect(()=>{
+    if(outletFilter==="ALL")return;
+    if(!outletOptions.includes(outletFilter)){
+      setOutletFilter("ALL");
+    }
+  },[outletFilter,outletOptions]);
+
+  const filteredCards=useMemo(
+    ()=>allCards.filter(res=>outletFilter==="ALL"||getOutletName(res)===outletFilter),
+    [allCards,outletFilter]
+  );
 
   const{upcomingCards,pendingCards,acceptedCards,declinedCards}=useMemo(()=>{
     const u=[],p=[],a=[],x=[];
-    allCards.filter(res=>outletFilter==="ALL"||getOutletName(res)===outletFilter).forEach(res=>{
+    filteredCards.forEach(res=>{
       if(isPending(res)){p.push(res);return;}
       if(isDeclined(res)){x.push(res);return;}
       if(!isApproved(res))return;
@@ -1093,7 +1217,7 @@ function NotificationDashboard() {
       if(!dt||dt.getTime()>Date.now())u.push(res);
     });
     return{upcomingCards:u,pendingCards:p,acceptedCards:a,declinedCards:x};
-  },[allCards,outletFilter]);
+  },[filteredCards]);
 
   const leftCards=leftTab==="upcoming"?upcomingCards:pendingCards;
   const rightCards=rightTab==="declined"?declinedCards:acceptedCards;
@@ -1101,7 +1225,7 @@ function NotificationDashboard() {
   const doneVisible=rightCards.slice((donePage-1)*donePerPage,donePage*donePerPage);
   const {activeAlerts,acknowledgedAlerts}=useMemo(()=>{
     const now=Date.now();
-    const active=allCards
+    const active=filteredCards
       .filter(isApproved)
       .map(res=>{
         const id=notificationId(res);
@@ -1113,7 +1237,7 @@ function NotificationDashboard() {
       })
       .filter(Boolean);
     return {activeAlerts:active,acknowledgedAlerts:Object.values(acknowledgments)};
-  },[allCards,acknowledgments]);
+  },[filteredCards,acknowledgments]);
 
   const handlePopupView=useCallback(p=>{dismissPopup();const items=p.items||[];if(items.length===1){const full=allCards.find(r=>(r.id??r.db_id)===items[0].id);if(full)setDetailRes(full);}else setPickerItems(items);},[allCards,dismissPopup]);
 
@@ -1177,6 +1301,16 @@ function NotificationDashboard() {
               </div>
 
               <div style={{ display:"grid",gridTemplateColumns:"minmax(0,3fr) minmax(0,1.4fr)",gap:14,flex:1,minHeight:0 }} className="nd-grid">
+                <div style={{ gridColumn:"1 / -1" }}>
+                  <OutletMonitorBar
+                    outlets={outletSummaries}
+                    selectedOutlet={outletFilter}
+                    onSelect={(outlet)=>{setOutletFilter(outlet);setPendingPage(1);setDonePage(1);}}
+                    currentUser={currentUser}
+                    C={C}
+                  />
+                </div>
+
                 <div style={{ gridColumn:"1 / -1" }}>
                   <AcknowledgmentMonitor activeAlerts={activeAlerts} acknowledgedAlerts={acknowledgedAlerts} onAcknowledge={acknowledgeAlerts} canAcknowledge={canAcknowledgeNotifications} C={C}/>
                 </div>

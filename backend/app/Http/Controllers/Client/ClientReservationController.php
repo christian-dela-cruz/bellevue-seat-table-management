@@ -11,15 +11,42 @@ use App\Events\ReservationCreated;
 use App\Events\SeatReserved;
 use App\Events\TableReserved;
 use App\Mail\ReservationStatusMail;
+use App\Services\ReservationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Mail;
 
 class ClientReservationController extends Controller
 {
-    public function index(): JsonResponse
+    public function __construct(private ReservationService $reservationService)
     {
-        $reservations = Reservation::with('venue')->orderBy('event_date', 'asc')->get();
+    }
+
+    public function index(Request $request): JsonResponse
+    {
+        $reservations = Reservation::with('venue')
+            ->when($request->filled('venue_id'), function ($query) use ($request) {
+                $query->where('venue_id', $request->query('venue_id'));
+            })
+            ->when($request->filled('room'), function ($query) use ($request) {
+                $room = $request->query('room');
+                $query->where(function ($roomQuery) use ($room) {
+                    $roomQuery->where('room', $room)
+                        ->orWhereHas('venue', fn ($venueQuery) => $venueQuery->where('name', $room));
+                });
+            })
+            ->when($request->filled('wing'), function ($query) use ($request) {
+                $query->whereHas('venue', fn ($venueQuery) => $venueQuery->where('wing', $request->query('wing')));
+            })
+            ->when($request->filled('event_date'), function ($query) use ($request) {
+                $query->whereDate('event_date', $request->query('event_date'));
+            })
+            ->when($request->filled('event_time'), function ($query) use ($request) {
+                $query->where('event_time', substr((string) $request->query('event_time'), 0, 5));
+            })
+            ->orderBy('event_date', 'asc')
+            ->get();
+
         return response()->json($reservations);
     }
 
@@ -52,6 +79,13 @@ class ClientReservationController extends Controller
             }
         } else {
             $validated['room'] = Venue::find($validated['venue_id'])?->name;
+        }
+
+        if ($this->reservationService->hasScheduleConflict($validated)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected seat or table is already reserved for that date and time.',
+            ], 422);
         }
 
         $validated['reference_code'] = date('Y') . '-' . str_pad(mt_rand(1, 9999), 4, '0', STR_PAD_LEFT);

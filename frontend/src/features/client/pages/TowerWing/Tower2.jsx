@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext } f
 import { useNavigate, useLocation } from "react-router-dom";
 import SharedNavbar from "../../../../components/SharedNavbar.jsx";
 import SeatMap, { STATUS_COLORS } from "../../../../components/seatmap/SeatMap.jsx";
+import ScheduleGate, { normalizeSchedule, withSeatmapSchedule } from "../../../../components/seatmap/ScheduleGate";
 import Echo from "../../../../utils/websocket.js";
 import twentyTwentyImg from "../../../../assets/20-20.jpeg";
 
@@ -886,6 +887,7 @@ export default function Tower2() {
   const [modal,              setModal]              = useState(null);
   const [guests,             setGuests]             = useState(2);
   const [formData,           setFormData]           = useState(null);
+  const [schedule,           setSchedule]           = useState(() => normalizeSchedule());
   const [refCode,            setRefCode]            = useState(null);
   const [submitting,         setSubmitting]         = useState(false);
   const [rebookFrom,         setRebookFrom]         = useState(null);
@@ -918,7 +920,7 @@ export default function Tower2() {
         // Fallback: try seatmap endpoint
         try {
           const fallback = await fetch(
-            `${API_BASE_URL}/seatmap/${encodeURIComponent(WING)}/${encodeURIComponent(ROOM)}`,
+            withSeatmapSchedule(`${API_BASE_URL}/seatmap/${encodeURIComponent(WING)}/${encodeURIComponent(ROOM)}`),
             { headers: { Accept: "application/json" } }
           );
           if (!fallback.ok) return;
@@ -1040,15 +1042,22 @@ export default function Tower2() {
       window.removeEventListener("seatmap:saved", onSeatMapSaved);
     };
   }, [fetchAndMerge]);
+  useEffect(() => {
+    const onScheduleChanged = () => {
+      setSelectedSeat(null);
+      setSelectedTable(null);
+      fetchAndMerge();
+    };
+    window.addEventListener("seatmap:schedule-changed", onScheduleChanged);
+    return () => window.removeEventListener("seatmap:schedule-changed", onScheduleChanged);
+  }, [fetchAndMerge]);
 
   // ─── Initial load ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const localLayout = loadLayoutForClient(WING, ROOM);
     if (localLayout) setTableData(localLayout);
     fetchAndMerge();
-  }, [fetchAndMerge]);
-
-  // ─── WebSocket with polling fallback ──────────────────────────────────────────
+  }, [fetchAndMerge]);// ─── WebSocket with polling fallback ──────────────────────────────────────────
   useEffect(() => {
     const pusherKey     = import.meta.env.VITE_PUSHER_APP_KEY;
     const pusherCluster = import.meta.env.VITE_PUSHER_APP_CLUSTER;
@@ -1094,9 +1103,7 @@ export default function Tower2() {
       startPolling();
       return () => stopPolling();
     }
-  }, [fetchAndMerge]);
-
-  useEffect(() => {
+  }, [fetchAndMerge]);useEffect(() => {
     return () => {
       if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
     };
@@ -1135,7 +1142,7 @@ export default function Tower2() {
     setSelectedTable(parentTable);
   };
   const handleGuestContinue = g => { setGuests(g); startHoldTimer(); setModal("details"); };
-  const handleReview        = form => { setFormData(form); setModal("review"); };
+  const handleReview        = form => { setFormData(form); setSchedule(normalizeSchedule({ eventDate: form.eventDate, eventTime: form.eventTime })); setModal("review"); };
   const handleEditDetails   = ()   => setModal("details");
 
   const handleSubmit = async () => {
@@ -1265,7 +1272,7 @@ export default function Tower2() {
     email: formData.email || "", phone: formData.phone || "+63",
     eventDate: formData.eventDate || "", eventTime: formData.eventTime || "19:00",
     specialRequests: formData.specialRequests || "",
-  } : rebookPrefill;
+  } : (rebookPrefill || { firstName: "", lastName: "", email: "", phone: "+63", eventDate: schedule.eventDate || "", eventTime: schedule.eventTime || "19:00", specialRequests: "" });
 
   const BOTTOM_SHEET_H = 180;
   const NAV_H = 64;
@@ -1457,7 +1464,9 @@ export default function Tower2() {
 
                 {/* Right panel — same structure as Tower1 */}
                 <div style={{ width: isTablet ? "100%" : 280, flexShrink: 0, display: "flex", flexDirection: "column", gap: 14 }}>
-                  <div style={{ display: isTablet ? "grid" : "flex", gridTemplateColumns: isTablet ? "1fr 1fr" : undefined, flexDirection: isTablet ? undefined : "column", gap: 14 }}>
+                  
+                  <ScheduleGate schedule={schedule} onChange={setSchedule} roomLabel={ROOM} isDark={isDark} />
+<div style={{ display: isTablet ? "grid" : "flex", gridTemplateColumns: isTablet ? "1fr 1fr" : undefined, flexDirection: isTablet ? undefined : "column", gap: 14 }}>
 
                     {/* Legend */}
                     <div style={{ background: C.surfaceBase, borderRadius: 12, border: `1px solid ${C.borderDefault}`, overflow: "hidden", boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.30)" : "0 2px 12px rgba(0,0,0,0.06)" }}>

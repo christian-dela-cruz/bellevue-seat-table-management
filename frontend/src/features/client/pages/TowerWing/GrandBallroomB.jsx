@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import SharedNavbar from "../../../../components/SharedNavbar.jsx";
 
 import SeatMap, { STATUS_COLORS } from "../../../../components/seatmap/SeatMap";
+import ScheduleGate, { normalizeSchedule, withSeatmapSchedule } from "../../../../components/seatmap/ScheduleGate";
 import Echo from "../../../../utils/websocket.js";
 
 // ─── API base ─────────────────────────────────────────────────────────────────
@@ -971,6 +972,7 @@ export default function GrandBallroomBReserve() {
   const [modal,              setModal]              = useState(null);
   const [guests,             setGuests]             = useState(2);
   const [formData,           setFormData]           = useState(null);
+  const [schedule,           setSchedule]           = useState(() => normalizeSchedule());
   const [refCode,            setRefCode]            = useState(null);
   const [submitting,         setSubmitting]         = useState(false);
   const [rebookFrom,         setRebookFrom]         = useState(null);
@@ -1044,7 +1046,7 @@ export default function GrandBallroomBReserve() {
       if (!res.ok) {
         try {
           const fallback = await fetch(
-            `${API_BASE_URL}/seatmap/${encodeURIComponent(API_WING)}/${encodeURIComponent(ROOM)}`,
+            withSeatmapSchedule(`${API_BASE_URL}/seatmap/${encodeURIComponent(API_WING)}/${encodeURIComponent(ROOM)}`),
             { headers: { Accept: "application/json" } }
           );
           if (!fallback.ok) return;
@@ -1138,6 +1140,15 @@ export default function GrandBallroomBReserve() {
     if (local) setTableData(local);
     fetchAndMerge();
   }, [fetchAndMerge]);
+  useEffect(() => {
+    const onScheduleChanged = () => {
+      setSelectedSeat(null);
+      setSelectedTable(null);
+      fetchAndMerge();
+    };
+    window.addEventListener("seatmap:schedule-changed", onScheduleChanged);
+    return () => window.removeEventListener("seatmap:schedule-changed", onScheduleChanged);
+  }, [fetchAndMerge]);
 
   // Window resize
   useEffect(() => {
@@ -1218,7 +1229,7 @@ export default function GrandBallroomBReserve() {
     setSelectedTable(resolveTableForSeat(seat));
   };
   const handleGuestContinue = g => { setGuests(g); startHoldTimer(); setModal("details"); };
-  const handleReview        = form => { setFormData(form); setModal("review"); };
+  const handleReview        = form => { setFormData(form); setSchedule(normalizeSchedule({ eventDate: form.eventDate, eventTime: form.eventTime })); setModal("review"); };
   const handleEditDetails   = ()   => { setModal("details"); };
 
   const handleSubmit = async () => {
@@ -1336,7 +1347,7 @@ export default function GrandBallroomBReserve() {
     : null;
   const detailsPrefill = formData
     ? { firstName: formData.firstName || "", lastName: formData.lastName || "", email: formData.email || "", phone: formData.phone || "+63", eventDate: formData.eventDate || "", eventTime: formData.eventTime || "19:00", specialRequests: formData.specialRequests || "" }
-    : rebookPrefill;
+    : (rebookPrefill || { firstName: "", lastName: "", email: "", phone: "+63", eventDate: schedule.eventDate || "", eventTime: schedule.eventTime || "19:00", specialRequests: "" });
 
   const BOTTOM_SHEET_H  = 180;
   const NAV_H           = 64;
@@ -1523,6 +1534,7 @@ export default function GrandBallroomBReserve() {
 
                 {/* Right panel */}
                 <div style={{ width: isTablet ? "100%" : 280, flexShrink: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+                  <ScheduleGate schedule={schedule} onChange={setSchedule} roomLabel={ROOM} isDark={isDark} />
                   <div style={{ display: isTablet ? "grid" : "flex", gridTemplateColumns: isTablet ? "1fr 1fr" : undefined, flexDirection: isTablet ? undefined : "column", gap: 14 }}>
 
                     {/* Legend */}

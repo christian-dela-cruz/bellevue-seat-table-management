@@ -14,7 +14,7 @@ class SeatMapController extends Controller
     /**
      * Get seatmap data for a specific venue/room
      */
-    public function getSeatmap(string $wing, string $room): JsonResponse
+    public function getSeatmap(Request $request, string $wing, string $room): JsonResponse
     {
         try {
             // URL decode parameters
@@ -37,10 +37,7 @@ class SeatMapController extends Controller
             // Get all seats for this venue
             $seats = Seat::where('venue_id', $venue->id)->get();
 
-            // Get all reservations for this venue
-            $reservations = Reservation::where('venue_id', $venue->id)
-                ->whereIn('status', ['pending', 'approved', 'reserved'])
-                ->get();
+            $reservations = $this->scheduledReservations($request, $venue->id);
 
             // Group seats by table to match frontend structure
             $tables = [];
@@ -56,8 +53,10 @@ class SeatMapController extends Controller
                 }
                 
                 // Check if seat is reserved
-                $reservation = $reservations->firstWhere('seat_number', $seat->seat_number);
-                $status = $reservation ? $reservation->status : ($seat->status ?? 'available');
+                $reservation = $this->reservationForSeat($reservations, $seat->table_number, $seat->seat_number);
+                $status = $reservation
+                    ? ($reservation->status === 'approved' ? 'reserved' : $reservation->status)
+                    : ($request->filled('event_date') ? ($seat->status === 'maintenance' ? 'maintenance' : 'available') : ($seat->status ?? 'available'));
                 
                 // Add seat to table
                 $tables[$tableNumber]['seats'][] = [
@@ -117,7 +116,7 @@ class SeatMapController extends Controller
     /**
      * Get seatmap data by venue ID
      */
-    public function getSeatmapById(int $venueId): JsonResponse
+    public function getSeatmapById(Request $request, int $venueId): JsonResponse
     {
         try {
             // Find venue by ID
@@ -130,10 +129,7 @@ class SeatMapController extends Controller
             // Get all seats for this venue
             $seats = Seat::where('venue_id', $venue->id)->get();
 
-            // Get all reservations for this venue
-            $reservations = Reservation::where('venue_id', $venue->id)
-                ->whereIn('status', ['pending', 'approved', 'reserved'])
-                ->get();
+            $reservations = $this->scheduledReservations($request, $venue->id);
 
             // Group seats by table to match frontend structure
             $tables = [];
@@ -149,8 +145,10 @@ class SeatMapController extends Controller
                 }
                 
                 // Check if seat is reserved
-                $reservation = $reservations->firstWhere('seat_number', $seat->seat_number);
-                $status = $reservation ? $reservation->status : ($seat->status ?? 'available');
+                $reservation = $this->reservationForSeat($reservations, $seat->table_number, $seat->seat_number);
+                $status = $reservation
+                    ? ($reservation->status === 'approved' ? 'reserved' : $reservation->status)
+                    : ($request->filled('event_date') ? ($seat->status === 'maintenance' ? 'maintenance' : 'available') : ($seat->status ?? 'available'));
                 
                 // Add seat to table
                 $tables[$tableNumber]['seats'][] = [
@@ -205,5 +203,42 @@ class SeatMapController extends Controller
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
+    }
+
+    private function scheduledReservations(Request $request, int $venueId)
+    {
+        return Reservation::where('venue_id', $venueId)
+            ->whereIn('status', ['pending', 'approved', 'reserved'])
+            ->when($request->filled('event_date'), function ($query) use ($request) {
+                $query->whereDate('event_date', $request->query('event_date'));
+            })
+            ->when($request->filled('event_time'), function ($query) use ($request) {
+                $query->where('event_time', substr((string) $request->query('event_time'), 0, 5));
+            })
+            ->get();
+    }
+
+    private function reservationForSeat($reservations, ?string $tableNumber, ?string $seatNumber): ?Reservation
+    {
+        $table = trim((string) $tableNumber);
+        $seat = trim((string) $seatNumber);
+
+        return $reservations->first(function (Reservation $reservation) use ($table, $seat) {
+            if (strtoupper((string) $reservation->table_number) === 'STANDALONE') {
+                return false;
+            }
+
+            if (trim((string) $reservation->table_number) !== $table) {
+                return false;
+            }
+
+            if ($reservation->type === 'whole' || blank($reservation->seat_number)) {
+                return true;
+            }
+
+            $reservedSeats = array_map('trim', explode(',', (string) $reservation->seat_number));
+
+            return in_array($seat, $reservedSeats, true);
+        });
     }
 }

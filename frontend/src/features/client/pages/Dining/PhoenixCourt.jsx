@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import SharedNavbar from "../../../../components/SharedNavbar.jsx";
 
 import SeatMap, { STATUS_COLORS } from "../../../../components/seatmap/SeatMap.jsx";
+import ScheduleGate, { normalizeSchedule, withSeatmapSchedule } from "../../../../components/seatmap/ScheduleGate";
 import Echo from "../../../../utils/websocket.js";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
@@ -957,6 +958,7 @@ export default function PhoenixCourt() {
   const [modal,              setModal]              = useState(null);
   const [guests,             setGuests]             = useState(2);
   const [formData,           setFormData]           = useState(null);
+  const [schedule,           setSchedule]           = useState(() => normalizeSchedule());
   const [refCode,            setRefCode]            = useState(null);
   const [submitting,         setSubmitting]         = useState(false);
   const [rebookFrom,         setRebookFrom]         = useState(null);
@@ -990,7 +992,7 @@ export default function PhoenixCourt() {
       // CRITICAL FIX: Use /reservations endpoint to get actual reservation statuses
       // NOT /seatmap endpoint which only returns layout structure
       const res = await fetch(
-        `${API_BASE_URL}/reservations?room=${encodeURIComponent(ROOM)}&wing=${encodeURIComponent(WING)}&venue_id=1`,
+        withSeatmapSchedule(`${API_BASE_URL}/reservations?room=${encodeURIComponent(ROOM)}&wing=${encodeURIComponent(WING)}&venue_id=1`),
         { headers: { Accept: "application/json" } }
       );
       if (!res.ok) return;
@@ -1113,6 +1115,15 @@ export default function PhoenixCourt() {
     if (localLayout) setTableData(localLayout);
     fetchAndMerge();
   }, [fetchAndMerge]);
+  useEffect(() => {
+    const onScheduleChanged = () => {
+      setSelectedSeat(null);
+      setSelectedTable(null);
+      fetchAndMerge();
+    };
+    window.addEventListener("seatmap:schedule-changed", onScheduleChanged);
+    return () => window.removeEventListener("seatmap:schedule-changed", onScheduleChanged);
+  }, [fetchAndMerge]);
 
   // ─── Resize listener ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -1207,7 +1218,7 @@ export default function PhoenixCourt() {
     setSelectedTable(resolveTableForSeat(seat));
   };
   const handleGuestContinue = g => { setGuests(g); startHoldTimer(); setModal("details"); };
-  const handleReview        = form => { setFormData(form); setModal("review"); };
+  const handleReview        = form => { setFormData(form); setSchedule(normalizeSchedule({ eventDate: form.eventDate, eventTime: form.eventTime })); setModal("review"); };
   const handleEditDetails   = ()   => { setModal("details"); };
 
   // ─── Submit reservation ───────────────────────────────────────────────────
@@ -1348,7 +1359,7 @@ export default function PhoenixCourt() {
     email: formData.email || "", phone: formData.phone || "+63",
     eventDate: formData.eventDate || "", eventTime: formData.eventTime || "19:00",
     specialRequests: formData.specialRequests || "",
-  } : rebookPrefill;
+  } : (rebookPrefill || { firstName: "", lastName: "", email: "", phone: "+63", eventDate: schedule.eventDate || "", eventTime: schedule.eventTime || "19:00", specialRequests: "" });
 
   const modalTableData = seatIsStandalone
     ? null
@@ -1556,6 +1567,7 @@ export default function PhoenixCourt() {
 
                 {/* Right panel */}
                 <div style={{ width: isTablet ? "100%" : 280, flexShrink: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+                  <ScheduleGate schedule={schedule} onChange={setSchedule} roomLabel={ROOM} isDark={isDark} />
                   <div style={{ display: isTablet ? "grid" : "flex", gridTemplateColumns: isTablet ? "1fr 1fr" : undefined, flexDirection: isTablet ? undefined : "column", gap: 14 }}>
 
                     {/* Status Legend */}
