@@ -120,7 +120,9 @@ class AdminReservationController extends Controller
 
     public function update(Request $request, Reservation $reservation): JsonResponse
     {
-        if (!$this->reservationService->canAccessReservation($this->currentAdmin($request), $reservation)) {
+        $admin = $this->currentAdmin($request);
+
+        if (!$this->reservationService->canAccessReservation($admin, $reservation)) {
             return $this->scopeDeniedResponse();
         }
 
@@ -128,21 +130,125 @@ class AdminReservationController extends Controller
             'name'             => 'sometimes|required|string|max:255',
             'email'            => 'sometimes|required|email|max:255',
             'phone'            => 'sometimes|required|string|max:20',
+            'venue_id'         => 'sometimes|required|exists:venues,id',
+            'room'             => 'sometimes|nullable|string|max:255',
+            'table_number'     => 'sometimes|nullable|string|max:50',
+            'seat_number'      => 'sometimes|nullable|string|max:50',
+            'seat_id'          => 'sometimes|nullable|string|max:50',
             'guests_count'     => 'sometimes|required|integer|min:1',
             'event_date'       => 'sometimes|required|date',
             'event_time'       => 'sometimes|required|string|max:50',
             'special_requests' => 'sometimes|nullable|string',
-            'status'           => 'sometimes|required|in:pending,approved,rejected,reserved,cancelled',
+            'type'             => 'sometimes|required|in:whole,individual,standalone',
+            'is_standalone'    => 'sometimes|boolean',
         ]);
 
+        $targetVenueId = (int) ($validated['venue_id'] ?? $reservation->venue_id);
+        $targetRoom = array_key_exists('room', $validated) ? $validated['room'] : $reservation->room;
+
+        if (!$this->reservationService->canAccessVenue($admin, $targetVenueId, $targetRoom)) {
+            return $this->scopeDeniedResponse();
+        }
+
+        $merged = array_merge($reservation->only([
+            'venue_id',
+            'room',
+            'table_number',
+            'seat_number',
+            'event_date',
+            'event_time',
+            'type',
+            'is_standalone',
+        ]), $validated);
+
+        $tableNumber = $merged['table_number'] ?? null;
+        $seatNumber = $merged['seat_number'] ?? null;
+        $isStandalone = ($merged['type'] ?? null) === 'standalone'
+            || filter_var($merged['is_standalone'] ?? false, FILTER_VALIDATE_BOOLEAN)
+            || strtoupper((string) $tableNumber) === 'STANDALONE';
+
+        if (!$isStandalone && $tableNumber) {
+            $conflict = Reservation::query()
+                ->whereKeyNot($reservation->id)
+                ->where('venue_id', $targetVenueId)
+                ->whereDate('event_date', $merged['event_date'])
+                ->where('event_time', $merged['event_time'])
+                ->whereNotIn('status', ['rejected', 'cancelled'])
+                ->where('table_number', $tableNumber)
+                ->where(function ($query) use ($seatNumber) {
+                    if ($seatNumber) {
+                        $query->whereNull('seat_number')
+                            ->orWhere('seat_number', $seatNumber);
+                    } else {
+                        $query->whereNotNull('table_number');
+                    }
+                })
+                ->exists();
+
+            if ($conflict) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The selected table or seat is already assigned for that date and time.',
+                ], 422);
+            }
+        }
+
+        if (($validated['type'] ?? null) === 'standalone' || ($validated['is_standalone'] ?? false)) {
+            $validated['is_standalone'] = true;
+            $validated['type'] = 'standalone';
+            $validated['table_number'] = 'STANDALONE';
+        }
+
+        $original = $reservation->only(array_keys($validated));
         $reservation->update($validated);
+        $reservation = $reservation->fresh(['venue']);
+
+        $changes = [];
+        foreach ($validated as $field => $value) {
+            $before = $original[$field] ?? null;
+            $after = $reservation->{$field};
+
+            if ($before instanceof \DateTimeInterface) {
+                $before = $before->format('Y-m-d');
+            }
+
+            if ($after instanceof \DateTimeInterface) {
+                $after = $after->format('Y-m-d');
+            }
+
+            if ((string) $before !== (string) $after) {
+                $changes[$field] = [
+                    'from' => $before,
+                    'to' => $after,
+                ];
+            }
+        }
+
+        if (!empty($changes)) {
+            $this->reservationService->recordTransaction(
+                $reservation,
+                'details_updated',
+                $reservation->status,
+                $reservation->status,
+                'Reservation details updated by admin.',
+                [
+                    'changes' => $changes,
+                    'updated_by' => $admin['username'] ?? $admin['email'] ?? null,
+                ]
+            );
+        }
 
         broadcast(new ReservationUpdated($reservation))->toOthers();
         WebsocketBroadcaster::broadcast('reservations', 'ReservationUpdated', [
             'reservation' => $reservation
         ]);
 
-        return response()->json($reservation);
+        return response()->json([
+            'success' => true,
+            'message' => 'Reservation details updated successfully',
+            'reservation' => $reservation,
+            'transaction_history' => $reservation->transactions()->latest()->limit(8)->get(),
+        ]);
     }
 
     public function destroy(string $id): JsonResponse

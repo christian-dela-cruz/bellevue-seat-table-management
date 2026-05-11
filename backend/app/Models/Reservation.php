@@ -93,4 +93,9 @@ class Reservation extends Model
     {
         return $this->hasMany(ReservationTransaction::class)->latest();
     }
+
+    public function seats(): HasMany
+    {
+        return $this->hasMany(Seat::class);
+    }
 }

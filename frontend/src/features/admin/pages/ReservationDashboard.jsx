@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
-import { fetchReservations, approveReservation, rejectReservation, revertReservation, getReservationStats } from "../../../utils/api";
+import { fetchReservations, approveReservation, rejectReservation, revertReservation, updateReservation, getReservationStats } from "../../../utils/api";
 import { authAPI } from "../../../services/authAPI";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
@@ -870,11 +870,163 @@ function ApproveConfirmModal({ reservation, onConfirm, onCancel, loading }) {
 }
 
 // ─── Detail Modal ──────────────────────────────────────────────────────────────
-function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, canManage }) {
+function EditField({ label, children }) {
+  return (
+    <label style={{display:"block"}}>
+      <span style={{
+        display:"block",fontFamily:F.label,fontSize:9,fontWeight:700,
+        letterSpacing:"0.16em",textTransform:"uppercase",color:C.textTertiary,
+        marginBottom:7,
+      }}>
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function editInputStyle(focused = false) {
+  return {
+    width:"100%",
+    padding:"10px 12px",
+    border:`1.5px solid ${focused ? C.borderAccent : C.borderDefault}`,
+    borderRadius:8,
+    background:C.surfaceInput,
+    fontFamily:F.body,
+    fontSize:13,
+    color:C.textPrimary,
+    outline:"none",
+    boxShadow:focused ? C.inputFocusShadow : "none",
+  };
+}
+
+function ReservationEditForm({ form, setForm, disabled }) {
+  const [focused,setFocused]=useState(null);
+  const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+      <EditField label="Full Name">
+        <input disabled={disabled} value={form.name} onChange={(e)=>update("name",e.target.value)} onFocus={()=>setFocused("name")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="name")}/>
+      </EditField>
+      <EditField label="Email">
+        <input disabled={disabled} type="email" value={form.email} onChange={(e)=>update("email",e.target.value)} onFocus={()=>setFocused("email")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="email")}/>
+      </EditField>
+      <EditField label="Phone">
+        <input disabled={disabled} value={form.phone} onChange={(e)=>update("phone",e.target.value)} onFocus={()=>setFocused("phone")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="phone")}/>
+      </EditField>
+      <EditField label="Guests">
+        <input disabled={disabled} type="number" min="1" value={form.guests_count} onChange={(e)=>update("guests_count",e.target.value)} onFocus={()=>setFocused("guests_count")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="guests_count")}/>
+      </EditField>
+      <EditField label="Event Date">
+        <input disabled={disabled} type="date" value={form.event_date} onChange={(e)=>update("event_date",e.target.value)} onFocus={()=>setFocused("event_date")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="event_date")}/>
+      </EditField>
+      <EditField label="Event Time">
+        <input disabled={disabled} type="time" value={form.event_time} onChange={(e)=>update("event_time",e.target.value)} onFocus={()=>setFocused("event_time")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="event_time")}/>
+      </EditField>
+      <EditField label="Room">
+        <input disabled={disabled} value={form.room} onChange={(e)=>update("room",e.target.value)} onFocus={()=>setFocused("room")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="room")}/>
+      </EditField>
+      <EditField label="Type">
+        <select disabled={disabled} value={form.type} onChange={(e)=>update("type",e.target.value)} onFocus={()=>setFocused("type")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="type")}>
+          <option value="whole">Whole Table</option>
+          <option value="individual">Individual Seat</option>
+          <option value="standalone">Standalone Seat</option>
+        </select>
+      </EditField>
+      <EditField label="Table">
+        <input disabled={disabled || form.type === "standalone"} value={form.type === "standalone" ? "STANDALONE" : form.table_number} onChange={(e)=>update("table_number",e.target.value)} onFocus={()=>setFocused("table_number")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="table_number")}/>
+      </EditField>
+      <EditField label="Seat">
+        <input disabled={disabled} value={form.seat_number} onChange={(e)=>update("seat_number",e.target.value)} onFocus={()=>setFocused("seat_number")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="seat_number")}/>
+      </EditField>
+      <div style={{gridColumn:"1 / -1"}}>
+        <EditField label="Special Requests">
+          <textarea disabled={disabled} rows={3} value={form.special_requests} onChange={(e)=>update("special_requests",e.target.value)} onFocus={()=>setFocused("special_requests")} onBlur={()=>setFocused(null)} style={{...editInputStyle(focused==="special_requests"),resize:"vertical",minHeight:78}}/>
+        </EditField>
+      </div>
+    </div>
+  );
+}
+
+function SaveChangesConfirmModal({ reservation, changes, onConfirm, onCancel, loading }) {
+  return (
+    <div
+      style={{
+        position:"fixed",inset:0,
+        background:"rgba(0,0,0,0.60)",
+        zIndex:5100,
+        display:"flex",alignItems:"center",justifyContent:"center",
+        padding:20,
+        backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",
+      }}
+      onClick={(e)=>{if(e.target===e.currentTarget&&!loading)onCancel();}}
+    >
+      <div style={{
+        background:C.surfaceBase,borderRadius:14,
+        width:"100%",maxWidth:460,
+        boxShadow:"0 20px 60px rgba(0,0,0,0.20)",
+        border:`1px solid ${C.borderDefault}`,
+        fontFamily:F.body,
+        animation:"modalIn 0.20s cubic-bezier(0.16,1,0.3,1)",
+        overflow:"hidden",
+      }}>
+        <div style={{height:2,background:`linear-gradient(90deg,transparent 0%,${C.gold}90 30%,${C.gold}90 70%,transparent 100%)`}}/>
+        <div style={{background:C.headerGradient,padding:"18px 22px 16px",borderBottom:`1px solid ${C.divider}`}}>
+          <div style={{fontFamily:F.label,fontSize:9,letterSpacing:"0.22em",color:C.gold,fontWeight:700,textTransform:"uppercase",marginBottom:5,opacity:0.85}}>
+            Confirm Detail Update
+          </div>
+          <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.textPrimary,lineHeight:1.2}}>
+            {reservation.name||"Reservation"}
+          </div>
+        </div>
+        <div style={{padding:"20px 22px 24px"}}>
+          <div style={{padding:"10px 14px",borderRadius:8,marginBottom:14,background:C.goldFaint,border:`1px solid ${C.borderAccent}`,fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.65}}>
+            This will update the reservation details and record the modification in reservation history. It will not send a guest email.
+          </div>
+          <div style={{display:"grid",gap:8,maxHeight:180,overflowY:"auto",marginBottom:16}}>
+            {changes.map(([label,value])=>(
+              <div key={label} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"8px 0",borderBottom:`1px solid ${C.divider}`}}>
+                <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>{label}</span>
+                <span style={{fontFamily:F.body,fontSize:12.5,fontWeight:600,color:C.textPrimary,textAlign:"right",lineHeight:1.4}}>{value}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={onCancel} disabled={loading} style={{flex:1,padding:"11px",background:"transparent",border:`1px solid ${C.borderDefault}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textSecondary,cursor:loading?"not-allowed":"pointer"}}>
+              Cancel
+            </button>
+            <button onClick={onConfirm} disabled={loading} style={{flex:2,padding:"11px",background:loading?"rgba(140,107,42,0.45)":C.gold,border:"none",borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:"#fff",cursor:loading?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+              {loading?<><Spinner/>Saving...</>:"Save Changes"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUpdate, canManage, canAdjust }) {
   const [actionLoading,setActionLoading]=useState(null);
   const [showRejectModal,setShowRejectModal]=useState(false);
   const [showRevertModal,setShowRevertModal]=useState(false);
   const [showApproveModal,setShowApproveModal]=useState(false);
+  const [isEditing,setIsEditing]=useState(false);
+  const [showSaveModal,setShowSaveModal]=useState(false);
+  const [editError,setEditError]=useState("");
+  const [form,setForm]=useState({
+    name: reservation.name || "",
+    email: reservation.email || "",
+    phone: reservation.phone || "",
+    room: reservation.room || "",
+    table_number: reservation.table_number || "",
+    seat_number: reservation.seat_number || reservation.seat || "",
+    guests_count: reservation.guests_count || reservation.guests || 1,
+    event_date: reservation.event_date ? String(reservation.event_date).slice(0,10) : "",
+    event_time: reservation.event_time || "",
+    special_requests: reservation.special_requests || "",
+    type: reservation.type || "whole",
+  });
 
   const fmtDate=(d)=>{
     if(!d)return"—";
@@ -914,6 +1066,73 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, canM
     setActionLoading(null);
     setShowRevertModal(false);
     onClose();
+  };
+
+  const normalizeForm = () => ({
+    name: form.name.trim(),
+    email: form.email.trim(),
+    phone: form.phone.trim(),
+    room: form.room.trim(),
+    table_number: form.type === "standalone" ? "STANDALONE" : form.table_number.trim(),
+    seat_number: form.seat_number.trim(),
+    guests_count: Number(form.guests_count),
+    event_date: form.event_date,
+    event_time: form.event_time,
+    special_requests: form.special_requests.trim(),
+    type: form.type,
+    is_standalone: form.type === "standalone",
+  });
+
+  const getChangedFields = () => {
+    const payload = normalizeForm();
+    const current = {
+      name: reservation.name || "",
+      email: reservation.email || "",
+      phone: reservation.phone || "",
+      room: reservation.room || "",
+      table_number: reservation.table_number || "",
+      seat_number: reservation.seat_number || reservation.seat || "",
+      guests_count: Number(reservation.guests_count || reservation.guests || 1),
+      event_date: reservation.event_date ? String(reservation.event_date).slice(0,10) : "",
+      event_time: reservation.event_time || "",
+      special_requests: reservation.special_requests || "",
+      type: reservation.type || "whole",
+      is_standalone: reservation.type === "standalone" || reservation.is_standalone === true || reservation.is_standalone === 1,
+    };
+
+    return Object.entries(payload).filter(([field,value]) => String(value ?? "") !== String(current[field] ?? ""));
+  };
+
+  const handleReviewSave=()=>{
+    const payload = normalizeForm();
+    if (!payload.name || !payload.email || !payload.phone || !payload.event_date || !payload.event_time || !payload.guests_count || payload.guests_count < 1) {
+      setEditError("Complete the required reservation and guest fields before saving.");
+      return;
+    }
+    if (payload.type !== "standalone" && !payload.table_number) {
+      setEditError("Add a table number, or choose Standalone Seat as the reservation type.");
+      return;
+    }
+    if (getChangedFields().length === 0) {
+      setEditError("No reservation details were changed.");
+      return;
+    }
+    setEditError("");
+    setShowSaveModal(true);
+  };
+
+  const handleSaveConfirm=async()=>{
+    setActionLoading("save");
+    const result = await onUpdate(reservation, normalizeForm());
+    setActionLoading(null);
+    if (result?.success) {
+      setShowSaveModal(false);
+      setIsEditing(false);
+      onClose();
+    } else {
+      setShowSaveModal(false);
+      setEditError(result?.message || "Failed to update reservation details.");
+    }
   };
 
   const isPending=(reservation.status||"").toLowerCase()==="pending";
@@ -1033,6 +1252,34 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, canM
           </div>
 
           <div style={{padding:"18px 22px 24px",overflowY:"auto",flex:1}}>
+            {isEditing ? (
+              <>
+                <SectionLabel>Update Reservation Details</SectionLabel>
+                <ReservationEditForm form={form} setForm={setForm} disabled={!!actionLoading}/>
+                {editError && (
+                  <div style={{marginTop:12,padding:"9px 12px",borderRadius:8,background:C.redFaint,border:`1px solid ${C.redBorder}`,fontFamily:F.body,fontSize:12,color:C.red,lineHeight:1.5}}>
+                    {editError}
+                  </div>
+                )}
+                <div style={{display:"flex",gap:8,marginTop:18}}>
+                  <button
+                    onClick={()=>{setIsEditing(false);setEditError("");}}
+                    disabled={!!actionLoading}
+                    style={{flex:1,padding:"11px",background:"transparent",border:`1px solid ${C.borderDefault}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textSecondary,cursor:actionLoading?"not-allowed":"pointer"}}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleReviewSave}
+                    disabled={!!actionLoading}
+                    style={{flex:2,padding:"11px",background:C.gold,border:"none",borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:"#fff",cursor:actionLoading?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}
+                  >
+                    Review Changes
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
             <SectionLabel>Reservation Details</SectionLabel>
             {resRows.map(([label,value],i,arr)=>(
               <div key={label} style={{
@@ -1090,6 +1337,16 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, canM
               <div style={{fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.5}}>
                 No transaction history recorded yet.
               </div>
+            )}
+
+            {canAdjust && (
+              <button
+                onClick={()=>setIsEditing(true)}
+                disabled={!!actionLoading}
+                style={{width:"100%",marginTop:18,padding:"11px",background:"transparent",border:`1px solid ${C.borderAccent}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.gold,cursor:actionLoading?"not-allowed":"pointer"}}
+              >
+                Modify Reservation Details
+              </button>
             )}
 
             {isPending && canManage ? (
@@ -1162,6 +1419,8 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, canM
                 )}
               </>
             )}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -1188,6 +1447,18 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, canM
           onConfirm={handleRevertConfirm}
           onCancel={()=>setShowRevertModal(false)}
           loading={actionLoading==="revert"}
+        />
+      )}
+      {showSaveModal&&(
+        <SaveChangesConfirmModal
+          reservation={reservation}
+          changes={getChangedFields().map(([field,value])=>[
+            field.replace(/_/g," "),
+            field === "is_standalone" ? (value ? "Yes" : "No") : String(value || "-")
+          ])}
+          onConfirm={handleSaveConfirm}
+          onCancel={()=>setShowSaveModal(false)}
+          loading={actionLoading==="save"}
         />
       )}
     </>
@@ -1327,6 +1598,7 @@ function PaginationControls({ pagination, onPageChange, onRowsChange, filteredCo
 export default function ReservationDashboard() {
   const navigate = useNavigate();
   const canManageReservations = authAPI.hasPermission("manage_reservations");
+  const canAdjustReservations = authAPI.hasPermission("adjust_reservation_details");
   const canDeleteReservations = authAPI.hasPermission("delete_reservations");
   const [reservations,setReservations]=useState([]);
   const [filteredReservations,setFilteredReservations]=useState([]);
@@ -1696,6 +1968,31 @@ export default function ReservationDashboard() {
       }
     } catch {
       setToast({ message: "Error reverting reservation", type: "error" });
+    }
+  };
+
+  const handleUpdateDetails = async (reservation, payload) => {
+    try {
+      const result = await updateReservation(reservation.db_id || reservation.id, payload);
+      if (result.success) {
+        const updated = result.reservation || { ...reservation, ...payload };
+        setReservations(prev =>
+          prev.map(r => r.id === reservation.id ? {
+            ...r,
+            ...updated,
+            id: r.id,
+            db_id: r.db_id || updated.id,
+            transaction_history: result.transaction_history || updated.transaction_history || r.transaction_history,
+          } : r)
+        );
+        setToast({ message: "Reservation details updated.", type: "success" });
+        return { success: true };
+      }
+      setToast({ message: result.message || "Failed to update reservation details", type: "error" });
+      return { success: false, message: result.message };
+    } catch (error) {
+      setToast({ message: "Error updating reservation details", type: "error" });
+      return { success: false, message: error.message };
     }
   };
 
@@ -2082,7 +2379,9 @@ export default function ReservationDashboard() {
             onApprove={handleApprove}
             onReject={handleReject}
             onRevert={handleRevert}
+            onUpdate={handleUpdateDetails}
             canManage={canManageReservations}
+            canAdjust={canAdjustReservations}
           />
         )}
       </div>

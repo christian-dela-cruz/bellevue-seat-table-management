@@ -79,8 +79,8 @@ Route::prefix('admin/reservations')->group(function () {
     Route::get('/', [AdminReservationController::class, 'index'])->middleware(AdminAccess::class . ':view_admin');
     Route::get('/stats', [AdminReservationController::class, 'getStats'])->middleware(AdminAccess::class . ':view_admin');
     Route::post('/', [AdminReservationController::class, 'store'])->middleware(AdminAccess::class . ':manage_reservations');
-    Route::get('/{id}', [AdminReservationController::class, 'show'])->middleware(AdminAccess::class . ':view_admin');
-    Route::put('/{id}', [AdminReservationController::class, 'update'])->middleware(AdminAccess::class . ':adjust_reservation_details');
+    Route::get('/{reservation}', [AdminReservationController::class, 'show'])->middleware(AdminAccess::class . ':view_admin');
+    Route::put('/{reservation}', [AdminReservationController::class, 'update'])->middleware(AdminAccess::class . ':adjust_reservation_details');
     Route::patch('/{id}/approve', [AdminReservationController::class, 'approve'])->middleware(AdminAccess::class . ':manage_reservations');
     Route::patch('/{id}/reject', [AdminReservationController::class, 'reject'])->middleware(AdminAccess::class . ':manage_reservations');
     Route::patch('/{id}/revert', [AdminReservationController::class, 'revert'])->middleware(AdminAccess::class . ':manage_reservations');

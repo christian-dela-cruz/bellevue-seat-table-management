@@ -17,7 +17,7 @@ export const reservationAPI = {
   create: (reservationData) => api.post('/reservations', reservationData),
 
   // Update reservation
-  update: (id, reservationData) => api.put(`/reservations/${id}`, reservationData),
+  update: (id, reservationData) => api.put(`/admin/reservations/${id}`, reservationData),
 
   // Delete reservation
   delete: (id) => api.delete(`/admin/reservations/${id}`),

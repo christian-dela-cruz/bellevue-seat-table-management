@@ -535,4 +535,91 @@ class AdminRejectReservationReasonTest extends TestCase
         $this->getJson('/api/admin/reports/monthly?year=2026', $staffHeaders)
             ->assertForbidden();
     }
+
+    public function test_authorized_admin_can_adjust_reservation_details_with_history(): void
+    {
+        $venue = $this->createVenue();
+        $reservation = $this->createReservation($venue);
+
+        $headers = $this->adminHeaders('outlet_manager', 'assigned', [$venue->id]);
+
+        $this->putJson("/api/admin/reservations/{$reservation->id}", [
+            'name' => 'Updated Guest',
+            'email' => 'updated@example.com',
+            'phone' => '09998887777',
+            'guests_count' => 6,
+            'event_date' => '2026-06-15',
+            'event_time' => '19:30',
+            'room' => 'Updated Room',
+            'table_number' => 'T9',
+            'seat_number' => 'S9',
+            'special_requests' => 'Near the entrance.',
+            'type' => 'individual',
+        ], $headers)
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('reservation.name', 'Updated Guest')
+            ->assertJsonPath('reservation.table_number', 'T9')
+            ->assertJsonPath('reservation.seat_number', 'S9')
+            ->assertJsonPath('reservation.guests_count', 6);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'name' => 'Updated Guest',
+            'table_number' => 'T9',
+            'seat_number' => 'S9',
+        ]);
+
+        $this->assertDatabaseHas('reservation_transactions', [
+            'reservation_id' => $reservation->id,
+            'action' => 'details_updated',
+            'notes' => 'Reservation details updated by admin.',
+        ]);
+    }
+
+    public function test_reservation_detail_adjustment_respects_permission_scope_and_conflicts(): void
+    {
+        $venue = $this->createVenue();
+        $otherVenue = Venue::create([
+            'name' => 'Other Hall',
+            'wing' => 'Tower Wing',
+            'type' => 'function room',
+            'capacity' => 40,
+            'price_per_hour' => 1000,
+            'description' => 'Other venue',
+            'is_active' => true,
+        ]);
+
+        $reservation = $this->createReservation($venue, [
+            'event_date' => '2026-06-15 18:00:00',
+            'event_time' => '18:00',
+        ]);
+        $conflictingReservation = $this->createReservation($venue, [
+            'table_number' => 'T7',
+            'seat_number' => 'S7',
+            'event_date' => '2026-06-15 18:00:00',
+            'event_time' => '18:00',
+        ]);
+
+        $viewerHeaders = $this->adminHeaders('viewer');
+        $this->putJson("/api/admin/reservations/{$reservation->id}", [
+            'name' => 'Viewer Update',
+        ], $viewerHeaders)
+            ->assertForbidden();
+
+        $scopedHeaders = $this->adminHeaders('outlet_manager', 'assigned', [$venue->id]);
+        $this->putJson("/api/admin/reservations/{$reservation->id}", [
+            'venue_id' => $otherVenue->id,
+        ], $scopedHeaders)
+            ->assertForbidden();
+
+        $this->putJson("/api/admin/reservations/{$reservation->id}", [
+            'table_number' => $conflictingReservation->table_number,
+            'seat_number' => $conflictingReservation->seat_number,
+            'event_date' => '2026-06-15',
+            'event_time' => '18:00',
+        ], $scopedHeaders)
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'The selected table or seat is already assigned for that date and time.');
+    }
 }
