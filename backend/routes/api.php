@@ -43,6 +43,8 @@ Route::prefix('admin/accounts')->group(function () {
 
 Route::prefix('admin/reports')->group(function () {
     Route::get('/outlets', [AdminReportController::class, 'outletReports'])->middleware(AdminAccess::class . ':view_outlet_reports');
+    Route::get('/transactions', [AdminReportController::class, 'transactionReports'])->middleware(AdminAccess::class . ':view_transactions');
+    Route::get('/monthly', [AdminReportController::class, 'monthlyReports'])->middleware(AdminAccess::class . ':view_outlet_reports');
 });
 
 // Venue routes

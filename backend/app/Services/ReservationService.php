@@ -321,6 +321,146 @@ class ReservationService
         ];
     }
 
+    public function getTransactionReports(?array $admin = null, ?string $startDate = null, ?string $endDate = null): array
+    {
+        $reservationScope = $this->scopedReservationQuery($admin)->select('id');
+
+        $transactions = ReservationTransaction::query()
+            ->with(['reservation.venue'])
+            ->whereIn('reservation_id', $reservationScope)
+            ->when($startDate, fn ($query) => $query->whereDate('created_at', '>=', $startDate))
+            ->when($endDate, fn ($query) => $query->whereDate('created_at', '<=', $endDate))
+            ->latest()
+            ->get();
+
+        $reservations = $transactions
+            ->pluck('reservation')
+            ->filter()
+            ->unique('id')
+            ->values();
+
+        $venueCount = $reservations
+            ->filter(fn (Reservation $reservation) => filled($reservation->venue_id))
+            ->pluck('venue_id')
+            ->unique()
+            ->count();
+
+        $unassignedRoomCount = $reservations
+            ->filter(fn (Reservation $reservation) => blank($reservation->venue_id))
+            ->pluck('room')
+            ->filter()
+            ->unique()
+            ->count();
+
+        return [
+            'summary' => [
+                'transactions' => $transactions->count(),
+                'reservations' => $reservations->count(),
+                'outlets' => $venueCount + $unassignedRoomCount,
+                'status_changes' => $transactions->where('action', 'status_changed')->count(),
+                'approvals' => $transactions->where('to_status', 'reserved')->count(),
+                'rejections' => $transactions->where('to_status', 'rejected')->count(),
+                'reverts' => $transactions->filter(
+                    fn (ReservationTransaction $transaction) => $transaction->from_status === 'rejected'
+                        && $transaction->to_status === 'pending'
+                )->count(),
+                'latest_at' => optional($transactions->first()?->created_at)->toISOString(),
+            ],
+            'status_breakdown' => [
+                'pending' => $transactions->where('to_status', 'pending')->count(),
+                'reserved' => $transactions->where('to_status', 'reserved')->count(),
+                'rejected' => $transactions->where('to_status', 'rejected')->count(),
+                'cancelled' => $transactions->where('to_status', 'cancelled')->count(),
+            ],
+            'data' => $transactions
+                ->map(fn (ReservationTransaction $transaction) => $this->formatTransactionReportRow($transaction))
+                ->values()
+                ->toArray(),
+        ];
+    }
+
+    public function getMonthlyReports(?array $admin = null, ?int $year = null): array
+    {
+        $year = $year ?: (int) now()->year;
+
+        $reservations = $this->scopedReservationQuery($admin)
+            ->with('venue')
+            ->whereYear('event_date', $year)
+            ->orderBy('event_date')
+            ->get();
+
+        $months = collect(range(1, 12))->map(function (int $month) use ($reservations, $year) {
+            $items = $reservations->filter(
+                fn (Reservation $reservation) => (int) $reservation->event_date->format('n') === $month
+            )->values();
+
+            $venueCount = $items
+                ->filter(fn (Reservation $reservation) => filled($reservation->venue_id))
+                ->pluck('venue_id')
+                ->unique()
+                ->count();
+            $unassignedRoomCount = $items
+                ->filter(fn (Reservation $reservation) => blank($reservation->venue_id))
+                ->pluck('room')
+                ->filter()
+                ->unique()
+                ->count();
+
+            return [
+                'month' => sprintf('%d-%02d', $year, $month),
+                'month_number' => $month,
+                'label' => now()->setDate($year, $month, 1)->format('M'),
+                'reservations' => $items->count(),
+                'guests' => $items->sum('guests_count'),
+                'outlets' => $venueCount + $unassignedRoomCount,
+                'promotion_mentions' => $items->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
+                'dine_in' => $items->filter(fn (Reservation $reservation) => $this->isDineInReservation($reservation))->count(),
+                'room_reservations' => $items->reject(fn (Reservation $reservation) => $this->isDineInReservation($reservation))->count(),
+                'pending' => $items->where('status', 'pending')->count(),
+                'reserved' => $items->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                'rejected' => $items->where('status', 'rejected')->count(),
+                'cancelled' => $items->where('status', 'cancelled')->count(),
+                'status_breakdown' => $this->formatStatusBreakdown($items),
+            ];
+        });
+
+        $outletSummary = $reservations
+            ->groupBy(fn (Reservation $reservation) => $this->roomLabel($reservation))
+            ->map(function ($items, string $outlet) {
+                return [
+                    'outlet' => $outlet,
+                    'reservations' => $items->count(),
+                    'guests' => $items->sum('guests_count'),
+                    'promotion_mentions' => $items->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
+                    'pending' => $items->where('status', 'pending')->count(),
+                    'reserved' => $items->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                    'rejected' => $items->where('status', 'rejected')->count(),
+                    'cancelled' => $items->where('status', 'cancelled')->count(),
+                ];
+            })
+            ->sortByDesc('reservations')
+            ->values();
+
+        $peakMonth = $months->sortByDesc('reservations')->first();
+
+        return [
+            'year' => $year,
+            'summary' => [
+                'reservations' => $reservations->count(),
+                'guests' => $reservations->sum('guests_count'),
+                'outlets' => $outletSummary->count(),
+                'promotion_mentions' => $reservations->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
+                'pending' => $reservations->where('status', 'pending')->count(),
+                'reserved' => $reservations->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                'rejected' => $reservations->where('status', 'rejected')->count(),
+                'cancelled' => $reservations->where('status', 'cancelled')->count(),
+                'peak_month' => $peakMonth['reservations'] > 0 ? $peakMonth['label'] : null,
+            ],
+            'months' => $months->values()->toArray(),
+            'outlets' => $outletSummary->take(8)->values()->toArray(),
+        ];
+    }
+
     /**
      * Delete a reservation and release seats
      */
@@ -336,7 +476,7 @@ class ReservationService
 
     public function canAccessVenue(?array $admin, ?int $venueId, ?string $room = null): bool
     {
-        if (!$admin || ($admin['scope_type'] ?? 'all') !== 'assigned') {
+        if (!$admin || $this->hasGlobalReportAccess($admin) || ($admin['scope_type'] ?? 'all') !== 'assigned') {
             return true;
         }
 
@@ -372,11 +512,43 @@ class ReservationService
             ->toArray();
     }
 
+    private function formatTransactionReportRow(ReservationTransaction $transaction): array
+    {
+        $reservation = $transaction->reservation;
+        $venue = $reservation?->venue;
+
+        return [
+            'id' => $transaction->id,
+            'action' => $transaction->action,
+            'from_status' => $transaction->from_status,
+            'to_status' => $transaction->to_status,
+            'notes' => $transaction->notes,
+            'metadata' => $transaction->metadata,
+            'created_at' => optional($transaction->created_at)->toISOString(),
+            'reservation' => [
+                'id' => $reservation?->id,
+                'reference_code' => $reservation?->reference_code,
+                'name' => $reservation?->name,
+                'email' => $reservation?->email,
+                'status' => $reservation?->status,
+                'room' => $reservation?->room ?: $venue?->name,
+                'event_date' => $reservation?->event_date?->format('Y-m-d'),
+                'event_time' => $reservation?->event_time,
+            ],
+            'venue' => [
+                'id' => $venue?->id,
+                'name' => $venue?->name,
+                'wing' => $venue?->wing,
+                'type' => $venue?->type,
+            ],
+        ];
+    }
+
     private function scopedReservationQuery(?array $admin)
     {
         $query = Reservation::query();
 
-        if (!$admin || ($admin['scope_type'] ?? 'all') !== 'assigned') {
+        if (!$admin || $this->hasGlobalReportAccess($admin) || ($admin['scope_type'] ?? 'all') !== 'assigned') {
             return $query;
         }
 
@@ -409,7 +581,7 @@ class ReservationService
 
     private function applyVenueScope($query, ?array $admin): void
     {
-        if (!$admin || ($admin['scope_type'] ?? 'all') !== 'assigned') {
+        if (!$admin || $this->hasGlobalReportAccess($admin) || ($admin['scope_type'] ?? 'all') !== 'assigned') {
             return;
         }
 
@@ -439,6 +611,11 @@ class ReservationService
                 $scopedQuery->{$method}('name', $venueNames);
             }
         });
+    }
+
+    private function hasGlobalReportAccess(?array $admin): bool
+    {
+        return in_array('view_global_reports', $admin['permissions'] ?? [], true);
     }
 
     private function formatOutletReport(?Venue $venue, $reservations, ?string $fallbackName = null): array

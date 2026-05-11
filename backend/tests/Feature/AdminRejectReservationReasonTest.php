@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Mail\ReservationStatusMail;
 use App\Models\Admin;
 use App\Models\Reservation;
+use App\Models\ReservationTransaction;
 use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -379,7 +380,7 @@ class AdminRejectReservationReasonTest extends TestCase
             'special_requests' => 'Use birthday promo package.',
         ]);
 
-        $directorHeaders = $this->adminHeaders('fb_director');
+        $directorHeaders = $this->adminHeaders('fb_director', 'assigned', [$firstVenue->id]);
 
         $this->getJson('/api/admin/reports/outlets', $directorHeaders)
             ->assertOk()
@@ -405,6 +406,133 @@ class AdminRejectReservationReasonTest extends TestCase
         $staffHeaders = $this->adminHeaders('staff');
 
         $this->getJson('/api/admin/reports/outlets', $staffHeaders)
+            ->assertForbidden();
+    }
+
+    public function test_transaction_reports_allow_global_view_for_fb_director_and_scope_managers(): void
+    {
+        $firstVenue = $this->createVenue();
+        $secondVenue = Venue::create([
+            'name' => 'Dining Room',
+            'wing' => 'Dining',
+            'type' => 'dining',
+            'capacity' => 30,
+            'price_per_hour' => 1200,
+            'description' => 'Dining venue',
+            'is_active' => true,
+        ]);
+
+        $firstReservation = $this->createReservation($firstVenue, ['status' => 'reserved']);
+        $secondReservation = $this->createReservation($secondVenue, ['status' => 'rejected']);
+
+        ReservationTransaction::create([
+            'reservation_id' => $firstReservation->id,
+            'action' => 'status_changed',
+            'from_status' => 'pending',
+            'to_status' => 'reserved',
+            'notes' => 'Reservation approved.',
+        ]);
+        ReservationTransaction::create([
+            'reservation_id' => $secondReservation->id,
+            'action' => 'status_changed',
+            'from_status' => 'pending',
+            'to_status' => 'rejected',
+            'notes' => 'Reservation rejected.',
+        ]);
+
+        $directorHeaders = $this->adminHeaders('fb_director', 'assigned', [$firstVenue->id]);
+
+        $this->getJson('/api/admin/reports/transactions', $directorHeaders)
+            ->assertOk()
+            ->assertJsonPath('summary.transactions', 2)
+            ->assertJsonPath('summary.reservations', 2)
+            ->assertJsonPath('summary.outlets', 2)
+            ->assertJsonPath('summary.approvals', 1)
+            ->assertJsonPath('summary.rejections', 1)
+            ->assertJsonFragment([
+                'reference_code' => $firstReservation->reference_code,
+            ])
+            ->assertJsonFragment([
+                'reference_code' => $secondReservation->reference_code,
+            ]);
+
+        $managerHeaders = $this->adminHeaders('outlet_manager', 'assigned', [$firstVenue->id]);
+
+        $this->getJson('/api/admin/reports/transactions', $managerHeaders)
+            ->assertOk()
+            ->assertJsonPath('summary.transactions', 1)
+            ->assertJsonFragment([
+                'reference_code' => $firstReservation->reference_code,
+            ])
+            ->assertJsonMissing([
+                'reference_code' => $secondReservation->reference_code,
+            ]);
+
+        $staffHeaders = $this->adminHeaders('staff');
+
+        $this->getJson('/api/admin/reports/transactions', $staffHeaders)
+            ->assertForbidden();
+    }
+
+    public function test_monthly_reports_cover_promotions_outlets_and_statuses(): void
+    {
+        $firstVenue = $this->createVenue();
+        $secondVenue = Venue::create([
+            'name' => 'Monthly Dining',
+            'wing' => 'Dining',
+            'type' => 'dining',
+            'capacity' => 25,
+            'price_per_hour' => 1200,
+            'description' => 'Monthly dining venue',
+            'is_active' => true,
+        ]);
+
+        $this->createReservation($firstVenue, [
+            'status' => 'reserved',
+            'event_date' => '2026-01-12 18:00:00',
+        ]);
+        $this->createReservation($secondVenue, [
+            'status' => 'pending',
+            'event_date' => '2026-02-10 18:00:00',
+            'room' => 'Monthly Dining',
+            'special_requests' => 'Promo package inquiry.',
+        ]);
+        $this->createReservation($secondVenue, [
+            'status' => 'rejected',
+            'event_date' => '2026-02-18 18:00:00',
+            'room' => 'Monthly Dining',
+        ]);
+
+        $directorHeaders = $this->adminHeaders('fb_director', 'assigned', [$firstVenue->id]);
+
+        $this->getJson('/api/admin/reports/monthly?year=2026', $directorHeaders)
+            ->assertOk()
+            ->assertJsonPath('summary.reservations', 3)
+            ->assertJsonPath('summary.outlets', 2)
+            ->assertJsonPath('summary.promotion_mentions', 1)
+            ->assertJsonPath('summary.reserved', 1)
+            ->assertJsonPath('summary.pending', 1)
+            ->assertJsonPath('summary.rejected', 1)
+            ->assertJsonPath('months.0.reservations', 1)
+            ->assertJsonPath('months.1.reservations', 2)
+            ->assertJsonPath('months.1.promotion_mentions', 1)
+            ->assertJsonFragment([
+                'outlet' => 'Monthly Dining',
+                'reservations' => 2,
+            ]);
+
+        $managerHeaders = $this->adminHeaders('outlet_manager', 'assigned', [$firstVenue->id]);
+
+        $this->getJson('/api/admin/reports/monthly?year=2026', $managerHeaders)
+            ->assertOk()
+            ->assertJsonPath('summary.reservations', 1)
+            ->assertJsonPath('summary.outlets', 1)
+            ->assertJsonPath('months.0.reservations', 1)
+            ->assertJsonPath('months.1.reservations', 0);
+
+        $staffHeaders = $this->adminHeaders('staff');
+
+        $this->getJson('/api/admin/reports/monthly?year=2026', $staffHeaders)
             ->assertForbidden();
     }
 }

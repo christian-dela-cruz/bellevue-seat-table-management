@@ -28,4 +28,34 @@ class AdminReportController extends Controller
             )
         );
     }
+
+    public function transactionReports(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+        ]);
+
+        return response()->json(
+            $this->reservationService->getTransactionReports(
+                $request->attributes->get('admin'),
+                $validated['start_date'] ?? null,
+                $validated['end_date'] ?? null,
+            )
+        );
+    }
+
+    public function monthlyReports(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+        ]);
+
+        return response()->json(
+            $this->reservationService->getMonthlyReports(
+                $request->attributes->get('admin'),
+                (int) ($validated['year'] ?? now()->year),
+            )
+        );
+    }
 }
