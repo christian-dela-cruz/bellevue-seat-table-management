@@ -171,18 +171,71 @@ class AdminAccountController extends Controller
 
     private function assignableRoles(?array $actor): array
     {
-        return ($actor['role'] ?? '') === 'super_admin'
-            ? self::ROLES
-            : array_values(array_filter(self::ROLES, fn ($role) => $role !== 'super_admin'));
+        return match ($actor['role'] ?? '') {
+            'super_admin' => self::ROLES,
+            'admin' => ['fb_director', 'outlet_manager', 'staff', 'viewer'],
+            default => [],
+        };
     }
 
     private function canModifyTarget(?array $actor, Admin $target): bool
     {
-        if (($actor['role'] ?? '') === 'super_admin') {
-            return true;
+        $actorRole = $actor['role'] ?? '';
+        $targetRole = AdminAccess::normalizeRole($target->role);
+
+        if ($target->id === ($actor['id'] ?? null)) {
+            return false;
         }
 
-        return $target->role !== 'super_admin';
+        if ($actorRole === 'super_admin') {
+            return $targetRole !== 'super_admin';
+        }
+
+        if ($actorRole === 'admin') {
+            return !in_array($targetRole, ['super_admin', 'admin'], true);
+        }
+
+        return false;
+    }
+
+    public function deactivate(Request $request, Admin $admin): JsonResponse
+    {
+        $actor = $this->currentAdmin($request);
+
+        if (!$this->canModifyTarget($actor, $admin)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not authorized to deactivate this account.',
+            ], 403);
+        }
+
+        $admin->update(['is_active' => false]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Account deactivated successfully.',
+            'data' => $this->formatAdmin($admin->fresh()),
+        ]);
+    }
+
+    public function reactivate(Request $request, Admin $admin): JsonResponse
+    {
+        $actor = $this->currentAdmin($request);
+
+        if (!$this->canModifyTarget($actor, $admin)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not authorized to reactivate this account.',
+            ], 403);
+        }
+
+        $admin->update(['is_active' => true]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Account reactivated successfully.',
+            'data' => $this->formatAdmin($admin->fresh()),
+        ]);
     }
 
     private function formatAdmin(Admin $admin): array
@@ -198,6 +251,7 @@ class AdminAccountController extends Controller
             'permissions' => AdminAccess::permissionsForRole($role),
             'scope_type' => $admin->scope_type ?: 'all',
             'outlet_scope' => $admin->scope_type === 'assigned' ? ($admin->outlet_scope ?: []) : [],
+            'is_active' => (bool) $admin->is_active,
             'created_at' => optional($admin->created_at)->toISOString(),
             'updated_at' => optional($admin->updated_at)->toISOString(),
         ];

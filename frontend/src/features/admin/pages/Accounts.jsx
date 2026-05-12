@@ -30,6 +30,7 @@ const ROLE_LABELS = {
   admin: "Admin",
   fb_director: "F&B Director",
   outlet_manager: "Outlet Manager",
+  venue_manager: "Venue Manager",
   staff: "Staff",
   viewer: "Viewer",
 };
@@ -81,7 +82,16 @@ function inputStyle() {
 
 function roleOptionsFor(currentRole) {
   const roles = ["super_admin", "admin", "fb_director", "outlet_manager", "staff", "viewer"];
-  return currentRole === "super_admin" ? roles : roles.filter((role) => role !== "super_admin");
+  if (currentRole === "super_admin") return roles;
+  if (currentRole === "admin") return ["fb_director", "outlet_manager", "staff", "viewer"];
+  return [];
+}
+
+function canManageAccount(currentUser, account) {
+  if (!currentUser || !account || currentUser.id === account.id) return false;
+  if (currentUser.role === "super_admin") return account.role !== "super_admin";
+  if (currentUser.role === "admin") return !["super_admin", "admin"].includes(account.role);
+  return false;
 }
 
 function parseScope(value) {
@@ -105,6 +115,9 @@ export default function Accounts() {
   const [editingId,setEditingId] = useState(null);
   const [loading,setLoading] = useState(false);
   const [toast,setToast] = useState(null);
+  const [roleFilter,setRoleFilter] = useState("all");
+  const [statusFilter,setStatusFilter] = useState("all");
+  const [search,setSearch] = useState("");
 
   const assignableRoles = useMemo(() => roleOptionsFor(currentUser?.role), [currentUser?.role]);
   const visibleAccounts = useMemo(
@@ -113,6 +126,31 @@ export default function Accounts() {
       : accounts.filter((account) => account.role !== "super_admin"),
     [accounts, currentUser?.role]
   );
+  const roleFilterOptions = useMemo(
+    () => Array.from(new Set(visibleAccounts.map((account) => account.role).filter(Boolean))).sort(),
+    [visibleAccounts]
+  );
+  const filteredAccounts = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return visibleAccounts.filter((account) => {
+      const active = account.is_active !== false;
+      const matchesRole = roleFilter === "all" || account.role === roleFilter;
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && active) ||
+        (statusFilter === "inactive" && !active);
+      const matchesSearch =
+        !term ||
+        [account.name, account.username, account.email, account.role]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(term));
+
+      return matchesRole && matchesStatus && matchesSearch;
+    });
+  }, [visibleAccounts, roleFilter, statusFilter, search]);
+  const activeCount = visibleAccounts.filter((account) => account.is_active !== false).length;
+  const inactiveCount = visibleAccounts.length - activeCount;
 
   const loadAccounts = async () => {
     if (!canManage) return;
@@ -165,6 +203,11 @@ export default function Accounts() {
   };
 
   const editAccount = (account) => {
+    if (!canManageAccount(currentUser, account)) {
+      setToast({ type:"error", message:"You cannot modify this account." });
+      return;
+    }
+
     setEditingId(account.id);
     setForm({
       name: account.name || "",
@@ -175,6 +218,31 @@ export default function Accounts() {
       scope_type: account.scope_type || "all",
       outlet_scope: scopeText(account.outlet_scope),
     });
+  };
+
+  const toggleAccountActive = async (account) => {
+    if (!canManageAccount(currentUser, account)) {
+      setToast({ type:"error", message:"You cannot modify this account." });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (account.is_active === false) {
+        await authAPI.reactivateAccount(account.id);
+        setToast({ type:"success", message:"Account reactivated." });
+      } else {
+        await authAPI.deactivateAccount(account.id);
+        setToast({ type:"success", message:"Account deactivated." });
+      }
+
+      if (editingId === account.id) resetForm();
+      await loadAccounts();
+    } catch (error) {
+      setToast({ type:"error", message:error.message || "Failed to update account status." });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -196,7 +264,7 @@ export default function Accounts() {
               Account creation and role management are restricted to authorized administrators. Use the account menu in the header to view or update your personal account.
             </div>
           ) : (
-            <div style={{ display:"grid",gridTemplateColumns:"minmax(0, 0.95fr) minmax(420px, 1.05fr)",gap:18,alignItems:"start",maxWidth:1280 }}>
+            <div style={{ display:"grid",gridTemplateColumns:"minmax(360px, 0.85fr) minmax(620px, 1.15fr)",gap:18,alignItems:"start",maxWidth:1380 }}>
                 <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:18 }}>
                   <SectionTitle eyebrow={editingId ? "Edit Account" : "New Account"} title={editingId ? "Update Role Account" : "Create Role Account"} />
                   <form onSubmit={submitAccount} style={{ display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12 }}>
@@ -238,23 +306,67 @@ export default function Accounts() {
                 </div>
 
                 <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,overflow:"hidden" }}>
-                  <div style={{ padding:"14px 18px",borderBottom:`1px solid ${C.divider}`,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                    <span style={{ fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",color:C.gold }}>Account List</span>
-                    <span style={{ fontSize:12,color:C.muted }}>{visibleAccounts.length} accounts</span>
+                  <div style={{ padding:"14px 18px 12px",borderBottom:`1px solid ${C.divider}`,display:"grid",gap:12 }}>
+                    <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:12 }}>
+                      <div>
+                        <span style={{ display:"block",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",color:C.gold }}>Account Directory</span>
+                        <span style={{ display:"block",marginTop:4,fontSize:12,color:C.muted }}>{filteredAccounts.length} shown from {visibleAccounts.length} accounts</span>
+                      </div>
+                      <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                        <span style={{ padding:"5px 9px",borderRadius:999,background:C.greenFaint,color:C.green,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase" }}>{activeCount} Active</span>
+                        <span style={{ padding:"5px 9px",borderRadius:999,background:C.redFaint,color:C.red,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase" }}>{inactiveCount} Inactive</span>
+                      </div>
+                    </div>
+                    <div style={{ display:"grid",gridTemplateColumns:"minmax(180px,1fr) 150px 128px",gap:10 }}>
+                      <input
+                        value={search}
+                        onChange={(e)=>setSearch(e.target.value)}
+                        placeholder="Search name, username, email..."
+                        style={{...inputStyle(),minHeight:36,padding:"7px 10px"}}
+                      />
+                      <select value={roleFilter} onChange={(e)=>setRoleFilter(e.target.value)} style={{...inputStyle(),minHeight:36,padding:"7px 10px"}}>
+                        <option value="all">All roles</option>
+                        {roleFilterOptions.map((role) => <option key={role} value={role}>{ROLE_LABELS[role] || role}</option>)}
+                      </select>
+                      <select value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)} style={{...inputStyle(),minHeight:36,padding:"7px 10px"}}>
+                        <option value="all">All status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display:"grid",gridTemplateColumns:"minmax(220px,1.3fr) 132px 82px 92px 148px",gap:12,alignItems:"center",padding:"9px 18px",borderBottom:`1px solid ${C.divider}`,background:C.surfaceSoft }}>
+                    {["Account","Role","Scope","Status","Actions"].map((label) => (
+                      <span key={label} style={{ fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.faint }}>{label}</span>
+                    ))}
                   </div>
                   <div style={{ display:"grid" }}>
-                    {visibleAccounts.map((account) => (
-                      <button key={account.id} onClick={()=>editAccount(account)} style={{ display:"grid",gridTemplateColumns:"1fr auto",gap:14,alignItems:"center",padding:"13px 18px",border:"none",borderBottom:`1px solid ${C.divider}`,background:"transparent",textAlign:"left",cursor:"pointer" }}>
+                    {filteredAccounts.length === 0 && (
+                      <div style={{ padding:"28px 18px",color:C.muted,fontSize:13,textAlign:"center" }}>
+                        No accounts match the selected filters.
+                      </div>
+                    )}
+                    {filteredAccounts.map((account) => {
+                      const manageable = canManageAccount(currentUser, account);
+                      const inactive = account.is_active === false;
+
+                      return (
+                      <div key={account.id} style={{ display:"grid",gridTemplateColumns:"minmax(220px,1.3fr) 132px 82px 92px 148px",gap:12,alignItems:"center",padding:"12px 18px",borderBottom:`1px solid ${C.divider}`,background:inactive ? C.surfaceSoft : "transparent",textAlign:"left",opacity:inactive ? 0.72 : 1 }}>
                         <div style={{ minWidth:0 }}>
                           <div style={{ fontSize:13,fontWeight:700,color:C.text,marginBottom:3 }}>{account.name}</div>
-                          <div style={{ fontSize:11.5,color:C.muted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{account.username} - {account.email}</div>
+                          <div style={{ fontSize:11.5,color:C.muted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{account.username}</div>
+                          <div style={{ fontSize:11.5,color:C.faint,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{account.email}</div>
                         </div>
-                        <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-                          <span style={{ padding:"4px 8px",borderRadius:999,background:C.goldFaint,color:C.gold,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em" }}>{ROLE_LABELS[account.role] || account.role}</span>
-                          <span style={{ fontSize:11,color:C.faint }}>{account.scope_type === "assigned" ? "Assigned" : "All"}</span>
+                        <span style={{ justifySelf:"start",padding:"4px 8px",borderRadius:999,background:C.goldFaint,color:C.gold,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",whiteSpace:"nowrap" }}>{ROLE_LABELS[account.role] || account.role}</span>
+                        <span style={{ fontSize:11.5,color:C.muted }}>{account.scope_type === "assigned" ? "Assigned" : "All"}</span>
+                        <span style={{ justifySelf:"start",padding:"4px 8px",borderRadius:999,background:inactive ? C.redFaint : C.greenFaint,color:inactive ? C.red : C.green,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em" }}>{inactive ? "Inactive" : "Active"}</span>
+                        <div style={{ display:"flex",alignItems:"center",gap:7,justifyContent:"flex-end" }}>
+                          <button type="button" disabled={!manageable || loading} onClick={()=>editAccount(account)} style={{ padding:"7px 9px",border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,color:manageable?C.text:C.faint,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",cursor:manageable&&!loading?"pointer":"not-allowed" }}>Edit</button>
+                          <button type="button" disabled={!manageable || loading} onClick={()=>toggleAccountActive(account)} style={{ padding:"7px 9px",border:`1px solid ${inactive ? "rgba(46,122,90,0.20)" : "rgba(160,56,56,0.20)"}`,borderRadius:7,background:inactive?C.greenFaint:C.redFaint,color:inactive?C.green:C.red,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",cursor:manageable&&!loading?"pointer":"not-allowed" }}>{inactive ? "Enable" : "Disable"}</button>
                         </div>
-                      </button>
-                    ))}
+                      </div>
+                    )})}
                   </div>
                 </div>
             </div>

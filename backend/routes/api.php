@@ -39,6 +39,8 @@ Route::prefix('admin/accounts')->group(function () {
     Route::post('/', [AdminAccountController::class, 'store'])->middleware(AdminAccess::class . ':manage_accounts');
     Route::put('/me', [AdminAccountController::class, 'updateProfile'])->middleware(AdminAccess::class . ':view_admin');
     Route::put('/{admin}', [AdminAccountController::class, 'update'])->middleware(AdminAccess::class . ':manage_accounts');
+    Route::patch('/{admin}/deactivate', [AdminAccountController::class, 'deactivate'])->middleware(AdminAccess::class . ':manage_accounts');
+    Route::patch('/{admin}/reactivate', [AdminAccountController::class, 'reactivate'])->middleware(AdminAccess::class . ':manage_accounts');
 });
 
 Route::prefix('admin/reports')->group(function () {

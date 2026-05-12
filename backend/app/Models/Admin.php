@@ -19,6 +19,7 @@ class Admin extends Model
         'role',
         'scope_type',
         'outlet_scope',
+        'is_active',
     ];
 
     protected $hidden = [
@@ -32,5 +33,6 @@ class Admin extends Model
         'role' => 'string',
         'scope_type' => 'string',
         'outlet_scope' => 'array',
+        'is_active' => 'boolean',
     ];
 }

@@ -341,6 +341,16 @@ class AdminRejectReservationReasonTest extends TestCase
         ], $adminHeaders)->assertStatus(422);
 
         $this->postJson('/api/admin/accounts', [
+            'name' => 'Blocked Admin',
+            'email' => 'blocked.admin@example.com',
+            'username' => 'blocked.admin@example.com',
+            'password' => 'password123',
+            'role' => 'admin',
+            'scope_type' => 'all',
+            'outlet_scope' => [],
+        ], $adminHeaders)->assertStatus(422);
+
+        $this->postJson('/api/admin/accounts', [
             'name' => 'Allowed Staff',
             'email' => 'allowed.staff@example.com',
             'username' => 'allowed.staff@example.com',
@@ -359,6 +369,66 @@ class AdminRejectReservationReasonTest extends TestCase
 
         $this->getJson('/api/admin/accounts', $staffHeaders)
             ->assertForbidden();
+    }
+
+    public function test_account_modification_and_deactivation_respect_peer_role_boundaries(): void
+    {
+        $otherSuper = Admin::create([
+            'name' => 'Other Super',
+            'email' => 'other.super@example.com',
+            'username' => 'other.super@example.com',
+            'password' => 'password123',
+            'role' => 'super_admin',
+            'scope_type' => 'all',
+            'outlet_scope' => [],
+        ]);
+        $peerAdmin = Admin::create([
+            'name' => 'Peer Admin',
+            'email' => 'peer.admin@example.com',
+            'username' => 'peer.admin@example.com',
+            'password' => 'password123',
+            'role' => 'admin',
+            'scope_type' => 'all',
+            'outlet_scope' => [],
+        ]);
+        $staff = Admin::create([
+            'name' => 'Target Staff',
+            'email' => 'target.staff@example.com',
+            'username' => 'target.staff@example.com',
+            'password' => 'password123',
+            'role' => 'staff',
+            'scope_type' => 'all',
+            'outlet_scope' => [],
+        ]);
+
+        $superHeaders = $this->adminHeaders('super_admin');
+        $adminHeaders = $this->adminHeaders('admin');
+
+        $this->putJson("/api/admin/accounts/{$otherSuper->id}", [
+            'name' => 'Changed Super',
+        ], $superHeaders)->assertForbidden();
+
+        $this->putJson("/api/admin/accounts/{$peerAdmin->id}", [
+            'name' => 'Changed Admin',
+        ], $adminHeaders)->assertForbidden();
+
+        $this->patchJson("/api/admin/accounts/{$staff->id}/deactivate", [], $adminHeaders)
+            ->assertOk()
+            ->assertJsonPath('data.is_active', false);
+
+        $this->assertDatabaseHas('admins', [
+            'id' => $staff->id,
+            'is_active' => false,
+        ]);
+
+        $this->postJson('/api/auth/login', [
+            'username' => 'target.staff@example.com',
+            'password' => 'password123',
+        ])->assertUnauthorized();
+
+        $this->patchJson("/api/admin/accounts/{$staff->id}/reactivate", [], $adminHeaders)
+            ->assertOk()
+            ->assertJsonPath('data.is_active', true);
     }
 
     public function test_outlet_reports_respect_role_and_outlet_scope(): void

@@ -76,6 +76,10 @@ export const authAPI = {
 
   updateAccount: (id, accountData) => api.put(`/admin/accounts/${id}`, accountData),
 
+  deactivateAccount: (id) => api.patch(`/admin/accounts/${id}/deactivate`),
+
+  reactivateAccount: (id) => api.patch(`/admin/accounts/${id}/reactivate`),
+
   updateProfile: async (profileData) => {
     const response = await api.put('/admin/accounts/me', profileData);
 

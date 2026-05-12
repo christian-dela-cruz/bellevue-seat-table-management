@@ -45,6 +45,11 @@ class AuthService
             return null;
         }
 
+        if (!$admin->is_active) {
+            \Log::warning('Inactive admin login attempt: ' . $username);
+            return null;
+        }
+
         if (!Hash::check($password, $admin->password)) {
             \Log::error('Password mismatch for admin: ' . $username);
             return null;
@@ -128,6 +133,7 @@ class AuthService
             'permissions' => AdminAccess::permissionsForRole($role),
             'scope_type' => $scopeType,
             'outlet_scope' => $scopeType === 'assigned' ? ($admin->outlet_scope ?: []) : [],
+            'is_active' => (bool) $admin->is_active,
         ];
     }
 }
