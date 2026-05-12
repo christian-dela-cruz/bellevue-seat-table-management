@@ -30,6 +30,21 @@ class VenueController extends Controller
         }
     }
 
+    public function availability(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+        ]);
+
+        return response()->json(
+            $this->venueService->getAvailabilityByDateRange(
+                $validated['start_date'] ?? null,
+                $validated['end_date'] ?? null,
+            )
+        );
+    }
+
     /**
      * Get specific venue
      */

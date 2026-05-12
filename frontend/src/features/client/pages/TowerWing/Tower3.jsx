@@ -519,11 +519,15 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
     email: prefill?.email || "", phone: prefill?.phone || "+63",
     eventDate: prefill?.eventDate || today, eventTime: prefill?.eventTime || "19:00",
     specialRequests: prefill?.specialRequests || "",
+    eventArea: prefill?.eventArea || "",
+    setupTables: prefill?.setupTables || "",
+    setupChairs: prefill?.setupChairs || "",
+    setupRequirements: prefill?.setupRequirements || "",
   });
 
   useEffect(() => {
-    if (prefill) setForm({ firstName: prefill.firstName || "", lastName: prefill.lastName || "", email: prefill.email || "", phone: prefill.phone || "+63", eventDate: prefill.eventDate || today, eventTime: prefill.eventTime || "19:00", specialRequests: prefill.specialRequests || "" });
-  }, [prefill?.firstName, prefill?.lastName, prefill?.email, prefill?.phone, prefill?.eventDate, prefill?.eventTime, prefill?.specialRequests, today]);
+    if (prefill) setForm({ firstName: prefill.firstName || "", lastName: prefill.lastName || "", email: prefill.email || "", phone: prefill.phone || "+63", eventDate: prefill.eventDate || today, eventTime: prefill.eventTime || "19:00", specialRequests: prefill.specialRequests || "", eventArea: prefill.eventArea || "", setupTables: prefill.setupTables || "", setupChairs: prefill.setupChairs || "", setupRequirements: prefill.setupRequirements || "" });
+  }, [prefill?.firstName, prefill?.lastName, prefill?.email, prefill?.phone, prefill?.eventDate, prefill?.eventTime, prefill?.specialRequests, prefill?.eventArea, prefill?.setupTables, prefill?.setupChairs, prefill?.setupRequirements, today]);
 
   useEffect(() => {
     if (secondsLeft <= 0) onTimerExpired();
@@ -590,6 +594,12 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
           <Field label="Event Date" value={form.eventDate} onChange={set("eventDate")} type="date" min={today} C={C} isDark={isDark} required />
           <Field label="Event Time" value={form.eventTime} onChange={set("eventTime")} type="time" C={C} isDark={isDark} />
         </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <Field label="Event Area" value={form.eventArea} onChange={set("eventArea")} C={C} isDark={isDark} placeholder="e.g. Ballroom foyer, stage side" />
+          <Field label="Tables Needed" value={form.setupTables} onChange={set("setupTables")} type="number" C={C} isDark={isDark} placeholder="0" />
+          <Field label="Chairs Needed" value={form.setupChairs} onChange={set("setupChairs")} type="number" C={C} isDark={isDark} placeholder="0" />
+        </div>
+        <Field label="Setup Requirements" value={form.setupRequirements} onChange={set("setupRequirements")} type="textarea" C={C} isDark={isDark} placeholder="Stage, AV, registration table, layout instructions..." />
         <Field label="Special Requests" value={form.specialRequests} onChange={set("specialRequests")} type="textarea" C={C} isDark={isDark} placeholder="Dietary needs, accessibility, preferences…" />
         <button
           onClick={() => allFilled && onReview(form)}
@@ -626,6 +636,10 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
     ["Guests", `${guests} guest${guests !== 1 ? "s" : ""}`],
     ["Event Date", form.eventDate || "—"],
     ["Event Time", form.eventTime ? fmt(form.eventTime) : "—"],
+    ...(form.eventArea ? [["Event Area", form.eventArea]] : []),
+    ...(form.setupTables ? [["Tables Needed", form.setupTables]] : []),
+    ...(form.setupChairs ? [["Chairs Needed", form.setupChairs]] : []),
+    ...(form.setupRequirements ? [["Setup Requirements", form.setupRequirements]] : []),
   ];
   const guestRows = [
     ["Full Name", `${form.firstName} ${form.lastName}`],
@@ -1195,6 +1209,10 @@ export default function Tower3Reserve() {
         guests_count: isStandalone ? 1 : guests,
         event_date: formData.eventDate,
         event_time: formData.eventTime ? formData.eventTime.substring(0, 5) : null,
+        event_area: formData.eventArea || null,
+        setup_tables: formData.setupTables ? Number(formData.setupTables) : null,
+        setup_chairs: formData.setupChairs ? Number(formData.setupChairs) : null,
+        setup_requirements: formData.setupRequirements || null,
         special_requests: formData.specialRequests || "",
         type: isStandalone ? "standalone" : mode,
         is_standalone: isStandalone ? 1 : 0,
@@ -1274,8 +1292,8 @@ export default function Tower3Reserve() {
   const displayTable = isStandalone ? "Standalone" : mode === "whole" ? (activeTable ? `Table ${activeTable.id}` : "—") : (selectedTable ? `Table ${selectedTable.id}` : "—");
   const displaySeat  = mode === "individual" ? (selectedSeat ? `Seat ${selectedSeat.num ?? selectedSeat.id}` : "Select a seat") : getWholeSeatLabel(guests, activeTable);
 
-  const rebookPrefill  = rebookFrom ? { firstName: (rebookFrom.name || "").split(/\s+/)[0] || "", lastName: (rebookFrom.name || "").split(/\s+/).slice(1).join(" ") || "", email: rebookFrom.email || "", phone: rebookFrom.phone || "", eventDate: rebookFrom.event_date || "", eventTime: rebookFrom.event_time || "19:00", specialRequests: rebookFrom.special_requests || "" } : null;
-  const detailsPrefill = formData ? { firstName: formData.firstName || "", lastName: formData.lastName || "", email: formData.email || "", phone: formData.phone || "+63", eventDate: formData.eventDate || "", eventTime: formData.eventTime || "19:00", specialRequests: formData.specialRequests || "" } : (rebookPrefill || { firstName: "", lastName: "", email: "", phone: "+63", eventDate: schedule.eventDate || "", eventTime: schedule.eventTime || "19:00", specialRequests: "" });
+  const rebookPrefill  = rebookFrom ? { firstName: (rebookFrom.name || "").split(/\s+/)[0] || "", lastName: (rebookFrom.name || "").split(/\s+/).slice(1).join(" ") || "", email: rebookFrom.email || "", phone: rebookFrom.phone || "", eventDate: rebookFrom.event_date || "", eventTime: rebookFrom.event_time || "19:00", specialRequests: rebookFrom.special_requests || "", eventArea: rebookFrom.event_area || rebookFrom.eventArea || "", setupTables: rebookFrom.setup_tables || rebookFrom.setupTables || "", setupChairs: rebookFrom.setup_chairs || rebookFrom.setupChairs || "", setupRequirements: rebookFrom.setup_requirements || rebookFrom.setupRequirements || "" } : null;
+  const detailsPrefill = formData ? { firstName: formData.firstName || "", lastName: formData.lastName || "", email: formData.email || "", phone: formData.phone || "+63", eventDate: formData.eventDate || "", eventTime: formData.eventTime || "19:00", specialRequests: formData.specialRequests || "", eventArea: formData.eventArea || "", setupTables: formData.setupTables || "", setupChairs: formData.setupChairs || "", setupRequirements: formData.setupRequirements || "" } : (rebookPrefill || { firstName: "", lastName: "", email: "", phone: "+63", eventDate: schedule.eventDate || "", eventTime: schedule.eventTime || "19:00", specialRequests: "" });
 
   const BOTTOM_SHEET_H = 180;
   const NAV_H = 64;

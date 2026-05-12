@@ -531,6 +531,10 @@ function DetailModal({ res, onClose, onApprove, onDecline, approvingIds, declini
     ["Guests", (res.guests_count||res.guests||1)>0?`${res.guests_count||res.guests||1} guest${(res.guests_count||res.guests||1)!==1?"s":""}`:"-"],
     ["Event Date", fmtDate(res.event_date||res.eventDate||res.reservationDate)],
     ["Event Time", fmtTime(res.event_time||res.eventTime||res.reservationTime)],
+    ...((res.event_area || res.eventArea) ? [["Event Area", res.event_area || res.eventArea]] : []),
+    ...((res.setup_tables ?? res.setupTables) ? [["Tables Needed", res.setup_tables ?? res.setupTables]] : []),
+    ...((res.setup_chairs ?? res.setupChairs) ? [["Chairs Needed", res.setup_chairs ?? res.setupChairs]] : []),
+    ...((res.setup_requirements || res.setupRequirements) ? [["Setup Requirements", res.setup_requirements || res.setupRequirements]] : []),
   ];
   const guestRows=[
     ["Full Name", res.guest_name||res.name||"-"],

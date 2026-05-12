@@ -924,6 +924,15 @@ function ReservationEditForm({ form, setForm, disabled }) {
       <EditField label="Event Time">
         <input disabled={disabled} type="time" value={form.event_time} onChange={(e)=>update("event_time",e.target.value)} onFocus={()=>setFocused("event_time")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="event_time")}/>
       </EditField>
+      <EditField label="Event Area">
+        <input disabled={disabled} value={form.event_area} onChange={(e)=>update("event_area",e.target.value)} onFocus={()=>setFocused("event_area")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="event_area")}/>
+      </EditField>
+      <EditField label="Tables Needed">
+        <input disabled={disabled} type="number" min="0" value={form.setup_tables} onChange={(e)=>update("setup_tables",e.target.value)} onFocus={()=>setFocused("setup_tables")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="setup_tables")}/>
+      </EditField>
+      <EditField label="Chairs Needed">
+        <input disabled={disabled} type="number" min="0" value={form.setup_chairs} onChange={(e)=>update("setup_chairs",e.target.value)} onFocus={()=>setFocused("setup_chairs")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="setup_chairs")}/>
+      </EditField>
       <EditField label="Room">
         <input disabled={disabled} value={form.room} onChange={(e)=>update("room",e.target.value)} onFocus={()=>setFocused("room")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="room")}/>
       </EditField>
@@ -940,6 +949,11 @@ function ReservationEditForm({ form, setForm, disabled }) {
       <EditField label="Seat">
         <input disabled={disabled} value={form.seat_number} onChange={(e)=>update("seat_number",e.target.value)} onFocus={()=>setFocused("seat_number")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="seat_number")}/>
       </EditField>
+      <div style={{gridColumn:"1 / -1"}}>
+        <EditField label="Setup Requirements">
+          <textarea disabled={disabled} rows={3} value={form.setup_requirements} onChange={(e)=>update("setup_requirements",e.target.value)} onFocus={()=>setFocused("setup_requirements")} onBlur={()=>setFocused(null)} style={{...editInputStyle(focused==="setup_requirements"),resize:"vertical",minHeight:78}}/>
+        </EditField>
+      </div>
       <div style={{gridColumn:"1 / -1"}}>
         <EditField label="Special Requests">
           <textarea disabled={disabled} rows={3} value={form.special_requests} onChange={(e)=>update("special_requests",e.target.value)} onFocus={()=>setFocused("special_requests")} onBlur={()=>setFocused(null)} style={{...editInputStyle(focused==="special_requests"),resize:"vertical",minHeight:78}}/>
@@ -1024,6 +1038,10 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
     guests_count: reservation.guests_count || reservation.guests || 1,
     event_date: reservation.event_date ? String(reservation.event_date).slice(0,10) : "",
     event_time: reservation.event_time || "",
+    event_area: reservation.event_area || reservation.eventArea || "",
+    setup_tables: reservation.setup_tables ?? reservation.setupTables ?? "",
+    setup_chairs: reservation.setup_chairs ?? reservation.setupChairs ?? "",
+    setup_requirements: reservation.setup_requirements || reservation.setupRequirements || "",
     special_requests: reservation.special_requests || "",
     type: reservation.type || "whole",
   });
@@ -1078,6 +1096,10 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
     guests_count: Number(form.guests_count),
     event_date: form.event_date,
     event_time: form.event_time,
+    event_area: form.event_area.trim(),
+    setup_tables: form.setup_tables === "" ? null : Number(form.setup_tables),
+    setup_chairs: form.setup_chairs === "" ? null : Number(form.setup_chairs),
+    setup_requirements: form.setup_requirements.trim(),
     special_requests: form.special_requests.trim(),
     type: form.type,
     is_standalone: form.type === "standalone",
@@ -1095,6 +1117,10 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
       guests_count: Number(reservation.guests_count || reservation.guests || 1),
       event_date: reservation.event_date ? String(reservation.event_date).slice(0,10) : "",
       event_time: reservation.event_time || "",
+      event_area: reservation.event_area || reservation.eventArea || "",
+      setup_tables: reservation.setup_tables ?? reservation.setupTables ?? null,
+      setup_chairs: reservation.setup_chairs ?? reservation.setupChairs ?? null,
+      setup_requirements: reservation.setup_requirements || reservation.setupRequirements || "",
       special_requests: reservation.special_requests || "",
       type: reservation.type || "whole",
       is_standalone: reservation.type === "standalone" || reservation.is_standalone === true || reservation.is_standalone === 1,
@@ -1154,6 +1180,10 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
     ["Guests",     (reservation.guests_count || reservation.guests) ? `${reservation.guests_count || reservation.guests} guest${(reservation.guests_count || reservation.guests) !== 1 ? "s" : ""}` : "—"],
     ["Event Date", fmtDate(reservation.event_date)],
     ["Event Time", fmtTime(reservation.event_time)],
+    ...((reservation.event_area || reservation.eventArea) ? [["Event Area", reservation.event_area || reservation.eventArea]] : []),
+    ...((reservation.setup_tables ?? reservation.setupTables) ? [["Tables Needed", reservation.setup_tables ?? reservation.setupTables]] : []),
+    ...((reservation.setup_chairs ?? reservation.setupChairs) ? [["Chairs Needed", reservation.setup_chairs ?? reservation.setupChairs]] : []),
+    ...((reservation.setup_requirements || reservation.setupRequirements) ? [["Setup Requirements", reservation.setup_requirements || reservation.setupRequirements]] : []),
   ];
 
   const guestRows=[

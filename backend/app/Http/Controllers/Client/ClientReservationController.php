@@ -65,6 +65,10 @@ class ClientReservationController extends Controller
             'guests_count'     => 'required|integer|min:1',
             'event_date'       => 'required|date',
             'event_time'       => 'required|string|max:50',
+            'event_area'       => 'nullable|string|max:255',
+            'setup_tables'     => 'nullable|integer|min:0|max:999',
+            'setup_chairs'     => 'nullable|integer|min:0|max:9999',
+            'setup_requirements' => 'nullable|string|max:5000',
             'special_requests' => 'nullable|string',
             'type'             => 'required|in:whole,individual,standalone',
             'is_standalone'    => 'nullable|boolean',
@@ -151,6 +155,10 @@ class ClientReservationController extends Controller
             'event_time'       => 'sometimes|required|string|max:50',
             'eventTime'        => 'sometimes|required|string|max:50',
             'time'             => 'sometimes|required|string|max:50',
+            'event_area'       => 'sometimes|nullable|string|max:255',
+            'setup_tables'     => 'sometimes|nullable|integer|min:0|max:999',
+            'setup_chairs'     => 'sometimes|nullable|integer|min:0|max:9999',
+            'setup_requirements' => 'sometimes|nullable|string|max:5000',
             'special_requests' => 'sometimes|nullable|string',
             'status'           => 'sometimes|required|in:pending,approved,rejected,reserved,cancelled',
         ]);
@@ -205,6 +213,12 @@ class ClientReservationController extends Controller
             $updateData['special_requests'] = $validated['special_requests'];
         }
 
+        foreach (['event_area', 'setup_tables', 'setup_chairs', 'setup_requirements'] as $setupField) {
+            if (array_key_exists($setupField, $validated)) {
+                $updateData[$setupField] = $validated[$setupField];
+            }
+        }
+
         // Selected room / sub-room
         if (array_key_exists('room', $validated)) {
             $updateData['room'] = $validated['room'];
@@ -241,6 +255,10 @@ class ClientReservationController extends Controller
                 'guests' => $reservation->guests_count, // Alias
                 'number_of_guests' => $reservation->guests_count, // Alias
                 'special_requests' => $reservation->special_requests,
+                'event_area' => $reservation->event_area,
+                'setup_tables' => $reservation->setup_tables,
+                'setup_chairs' => $reservation->setup_chairs,
+                'setup_requirements' => $reservation->setup_requirements,
                 'status' => $reservation->status,
                 'venue' => $reservation->venue,
                 'room' => $reservation->room ?? $reservation->venue?->name,
@@ -360,6 +378,10 @@ class ClientReservationController extends Controller
                     'event_time' => $reservation->event_time,
                     'guests_count' => $reservation->guests_count,
                     'special_requests' => $reservation->special_requests,
+                    'event_area' => $reservation->event_area,
+                    'setup_tables' => $reservation->setup_tables,
+                    'setup_chairs' => $reservation->setup_chairs,
+                    'setup_requirements' => $reservation->setup_requirements,
                     'cancellation_reason' => $reservation->cancellation_reason,
                     'cancelled_at' => $reservation->cancelled_at,
                     'venue' => $reservation->venue,

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Reservation;
 use App\Models\Venue;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
@@ -103,6 +104,56 @@ class VenueService
     public function getActiveVenues(): array
     {
         return Venue::where('is_active', true)->get()->toArray();
+    }
+
+    public function getAvailabilityByDateRange(?string $startDate = null, ?string $endDate = null): array
+    {
+        $blockingStatuses = ['pending', 'approved', 'reserved'];
+
+        $venues = Venue::query()
+            ->where('is_active', true)
+            ->orderBy('wing')
+            ->orderBy('name')
+            ->get();
+
+        $reservations = Reservation::query()
+            ->with('venue')
+            ->whereIn('status', $blockingStatuses)
+            ->when($startDate, fn ($query) => $query->whereDate('event_date', '>=', $startDate))
+            ->when($endDate, fn ($query) => $query->whereDate('event_date', '<=', $endDate))
+            ->get();
+
+        $items = $venues->map(function (Venue $venue) use ($reservations) {
+            $events = $reservations->where('venue_id', $venue->id)->values();
+            $latest = $events->sortBy('event_date')->first();
+
+            return [
+                'venue_id' => $venue->id,
+                'name' => $venue->name,
+                'wing' => $venue->wing,
+                'type' => $venue->type,
+                'events_count' => $events->count(),
+                'pending_count' => $events->where('status', 'pending')->count(),
+                'reserved_count' => $events->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                'is_available_for_range' => $events->isEmpty(),
+                'next_event_date' => $latest?->event_date?->format('Y-m-d'),
+                'next_event_time' => $latest?->event_time,
+            ];
+        })->values();
+
+        return [
+            'date_range' => [
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ],
+            'summary' => [
+                'outlets' => $items->count(),
+                'available' => $items->where('is_available_for_range', true)->count(),
+                'with_events' => $items->where('events_count', '>', 0)->count(),
+                'events' => $items->sum('events_count'),
+            ],
+            'data' => $items->toArray(),
+        ];
     }
 
     /**

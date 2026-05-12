@@ -52,6 +52,7 @@ Route::prefix('admin/reports')->group(function () {
 // Venue routes
 Route::prefix('venues')->group(function () {
     Route::get('/', [VenueController::class, 'index']);
+    Route::get('/availability', [VenueController::class, 'availability']);
     Route::get('/{id}', [VenueController::class, 'show']);
     Route::post('/', [VenueController::class, 'store'])->middleware(AdminAccess::class . ':manage_venues');
     Route::put('/{id}', [VenueController::class, 'update'])->middleware(AdminAccess::class . ':manage_venues');

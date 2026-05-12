@@ -607,6 +607,44 @@ class AdminRejectReservationReasonTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_venue_availability_filters_events_by_date_range(): void
+    {
+        $firstVenue = $this->createVenue();
+        $secondVenue = Venue::create([
+            'name' => 'Range Hall',
+            'wing' => 'Main Wing',
+            'type' => 'function room',
+            'capacity' => 80,
+            'price_per_hour' => 1400,
+            'description' => 'Range venue',
+            'is_active' => true,
+        ]);
+
+        $this->createReservation($firstVenue, [
+            'status' => 'reserved',
+            'event_date' => '2026-05-15 18:00:00',
+        ]);
+        $this->createReservation($secondVenue, [
+            'status' => 'pending',
+            'event_date' => '2026-06-10 18:00:00',
+        ]);
+
+        $this->getJson('/api/venues/availability?start_date=2026-05-01&end_date=2026-05-31')
+            ->assertOk()
+            ->assertJsonPath('summary.available', 1)
+            ->assertJsonPath('summary.with_events', 1)
+            ->assertJsonFragment([
+                'venue_id' => $firstVenue->id,
+                'events_count' => 1,
+                'is_available_for_range' => false,
+            ])
+            ->assertJsonFragment([
+                'venue_id' => $secondVenue->id,
+                'events_count' => 0,
+                'is_available_for_range' => true,
+            ]);
+    }
+
     public function test_authorized_admin_can_adjust_reservation_details_with_history(): void
     {
         $venue = $this->createVenue();
@@ -780,5 +818,46 @@ class AdminRejectReservationReasonTest extends TestCase
             'email' => 'allowed@example.com',
         ]))
             ->assertCreated();
+    }
+
+    public function test_function_room_reservation_stores_event_setup_details(): void
+    {
+        Mail::fake();
+
+        $venue = $this->createVenue();
+
+        $payload = [
+            'name' => 'Setup Guest',
+            'email' => 'setup@example.com',
+            'phone' => '09175551234',
+            'venue_id' => $venue->id,
+            'room' => $venue->name,
+            'table_number' => 'T5',
+            'seat_number' => 'Seat 1, Seat 2',
+            'guests_count' => 40,
+            'event_date' => '2026-06-20',
+            'event_time' => '18:30',
+            'event_area' => 'Stage side',
+            'setup_tables' => 8,
+            'setup_chairs' => 40,
+            'setup_requirements' => 'Projector, registration table, and stage lighting.',
+            'special_requests' => 'Use promotion package.',
+            'type' => 'whole',
+        ];
+
+        $this->postJson('/api/reservations', $payload)
+            ->assertCreated()
+            ->assertJsonPath('event_area', 'Stage side')
+            ->assertJsonPath('setup_tables', 8)
+            ->assertJsonPath('setup_chairs', 40)
+            ->assertJsonPath('setup_requirements', 'Projector, registration table, and stage lighting.');
+
+        $this->assertDatabaseHas('reservations', [
+            'email' => 'setup@example.com',
+            'event_area' => 'Stage side',
+            'setup_tables' => 8,
+            'setup_chairs' => 40,
+            'setup_requirements' => 'Projector, registration table, and stage lighting.',
+        ]);
     }
 }
