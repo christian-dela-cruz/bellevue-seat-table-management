@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { ArrowUpDown, ChevronLeft, ChevronRight, List as ListIcon, PencilLine, Search, UserPlus } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, ChevronRight, Search, UserPlus } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
+import { ADMIN_OUTLET_GROUPS } from "../../../constants/outletCatalog";
 
 const C = {
   pageBg: "#F7F4EE",
@@ -20,6 +20,8 @@ const C = {
   text: "#18140E",
   muted: "#7A7060",
   faint: "rgba(24,20,14,0.42)",
+  shadow: "0 18px 46px rgba(44,36,24,0.07)",
+  shadowSoft: "0 8px 24px rgba(44,36,24,0.045)",
 };
 
 const F = {
@@ -34,7 +36,6 @@ const ROLE_LABELS = {
   outlet_manager: "Outlet Manager",
   venue_manager: "Venue Manager",
   staff: "Staff",
-  viewer: "Viewer",
 };
 
 const DEFAULT_FORM = {
@@ -42,16 +43,10 @@ const DEFAULT_FORM = {
   email: "",
   username: "",
   password: "",
-  role: "viewer",
+  role: "staff",
   scope_type: "all",
-  outlet_scope: "",
+  outlet_scope: [],
 };
-
-const ACCOUNT_VIEWS = [
-  { id: "list", label: "Account Directory", icon: ListIcon },
-  { id: "create", label: "Create Account", icon: UserPlus },
-  { id: "manage", label: "Manage Accounts", icon: PencilLine },
-];
 
 const SORT_OPTIONS = [
   { value: "name_asc", label: "Name, A to Z" },
@@ -90,21 +85,64 @@ function LoadingOverlay({ label }) {
 
 function SectionTitle({ eyebrow, title }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: 18 }}>
       <div style={{ fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.20em",textTransform:"uppercase",color:C.gold,marginBottom:5 }}>
         {eyebrow}
       </div>
-      <h2 style={{ margin:0,fontFamily:F.body,fontSize:22,lineHeight:1.2,color:C.text }}>{title}</h2>
+      <h2 style={{ margin:0,fontFamily:F.body,fontSize:22,lineHeight:1.18,color:C.text,fontWeight:760 }}>{title}</h2>
     </div>
   );
 }
 
 function Field({ label, children }) {
   return (
-    <label style={{ display:"grid",gap:6 }}>
+    <label style={{ display:"grid",gap:7 }}>
       <span style={{ fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.faint }}>{label}</span>
       {children}
     </label>
+  );
+}
+
+function FormSection({ title, subtitle, children, first = false }) {
+  return (
+    <section style={{ paddingTop:first ? 0 : 18,borderTop:first ? "none" : `1px solid ${C.divider}`,display:"grid",gap:12 }}>
+      <div>
+        <h3 style={{ margin:0,fontSize:13,fontWeight:760,color:C.text,lineHeight:1.3 }}>{title}</h3>
+        {subtitle && <p style={{ margin:"4px 0 0",fontSize:12,lineHeight:1.45,color:C.muted }}>{subtitle}</p>}
+      </div>
+      <div style={{ display:"grid",gap:12 }}>{children}</div>
+    </section>
+  );
+}
+
+function RoleChip({ children }) {
+  return (
+    <span style={{ padding:"5px 8px",borderRadius:999,background:C.goldFaint,border:"1px solid rgba(140,107,42,0.14)",color:C.gold,fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase",whiteSpace:"nowrap" }}>
+      {children}
+    </span>
+  );
+}
+
+function SummaryCard({ eyebrow, title, value, description, children, action }) {
+  return (
+    <div style={{ minHeight:136,background:`linear-gradient(180deg, ${C.surface} 0%, ${C.surfaceSoft} 100%)`,border:`1px solid ${C.border}`,borderRadius:12,padding:"16px 18px",boxShadow:C.shadowSoft,display:"flex",flexDirection:"column",justifyContent:"space-between",gap:12 }}>
+      <div style={{ display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:14 }}>
+        <div style={{ minWidth:0 }}>
+          <div style={{ fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.16em",textTransform:"uppercase",color:C.gold,marginBottom:7 }}>{eyebrow}</div>
+          <div style={{ fontSize:15,fontWeight:760,color:C.text,lineHeight:1.25 }}>{title}</div>
+        </div>
+        {value !== undefined && (
+          <div style={{ minWidth:44,height:38,padding:"0 10px",borderRadius:10,background:C.goldFaint,color:C.gold,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:760,lineHeight:1 }}>
+            {value}
+          </div>
+        )}
+      </div>
+      <div style={{ display:"grid",gap:9 }}>
+        {children}
+        {description && <p style={{ margin:0,fontSize:12,lineHeight:1.45,color:C.muted }}>{description}</p>}
+      </div>
+      {action}
+    </div>
   );
 }
 
@@ -122,10 +160,10 @@ function FilterControl({ label, children }) {
 function inputStyle() {
   return {
     width:"100%",
-    minHeight:40,
+    minHeight:42,
     border:`1px solid ${C.border}`,
-    borderRadius:7,
-    padding:"9px 11px",
+    borderRadius:8,
+    padding:"10px 12px",
     fontFamily:F.body,
     fontSize:13,
     color:C.text,
@@ -157,9 +195,9 @@ function paginationButtonStyle(disabled = false) {
 }
 
 function roleOptionsFor(currentRole) {
-  const roles = ["super_admin", "admin", "fb_director", "outlet_manager", "staff", "viewer"];
+  const roles = ["super_admin", "admin", "fb_director", "outlet_manager", "staff"];
   if (currentRole === "super_admin") return roles;
-  if (currentRole === "admin") return ["fb_director", "outlet_manager", "staff", "viewer"];
+  if (currentRole === "admin") return ["fb_director", "outlet_manager", "staff"];
   return [];
 }
 
@@ -170,7 +208,16 @@ function canManageAccount(currentUser, account) {
   return false;
 }
 
+function roleRequiresAssignedScope(role) {
+  return ["outlet_manager", "staff"].includes(role);
+}
+
+function defaultScopeForRole(role) {
+  return roleRequiresAssignedScope(role) ? "assigned" : "all";
+}
+
 function parseScope(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
   return String(value || "")
     .split(",")
     .map((item) => item.trim())
@@ -179,15 +226,105 @@ function parseScope(value) {
 }
 
 function scopeText(scope) {
-  return Array.isArray(scope) ? scope.join(", ") : "";
+  return Array.isArray(scope) ? scope : [];
+}
+
+function ScopeSelector({ value, disabled, onChange }) {
+  const selected = new Set(Array.isArray(value) ? value : []);
+
+  const toggle = (room) => {
+    if (disabled) return;
+    const next = new Set(selected);
+    if (next.has(room)) next.delete(room);
+    else next.add(room);
+    onChange(Array.from(next));
+  };
+
+  const toggleGroup = (rooms) => {
+    if (disabled) return;
+    const allSelected = rooms.every((room) => selected.has(room));
+    const next = new Set(selected);
+    rooms.forEach((room) => {
+      if (allSelected) next.delete(room);
+      else next.add(room);
+    });
+    onChange(Array.from(next));
+  };
+
+  return (
+    <div style={{ border:`1px solid ${C.border}`,borderRadius:8,background:disabled ? C.surfaceSoft : C.surface,overflow:"hidden" }}>
+      {disabled ? (
+        <div style={{ padding:12,fontSize:12,color:C.muted }}>All outlets are included for this account.</div>
+      ) : (
+        <div style={{ display:"grid",maxHeight:300,overflowY:"auto" }}>
+          {ADMIN_OUTLET_GROUPS.map((group) => (
+            <div key={group.id} style={{ borderBottom:`1px solid ${C.divider}` }}>
+              <button type="button" onClick={()=>toggleGroup(group.rooms)} style={{ width:"100%",border:"none",background:C.surfaceSoft,padding:"9px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer" }}>
+                <span style={{ fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.gold }}>{group.label}</span>
+                <span style={{ fontSize:11,color:C.muted }}>{group.rooms.filter((room)=>selected.has(room)).length}/{group.rooms.length}</span>
+              </button>
+              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:0 }}>
+                {group.rooms.map((room) => (
+                  <label key={room} style={{ display:"flex",alignItems:"center",gap:8,padding:"8px 12px",fontSize:12,color:C.text,cursor:"pointer" }}>
+                    <input type="checkbox" checked={selected.has(room)} onChange={()=>toggle(room)} />
+                    <span>{room}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConfirmStatusModal({ account, loading, onCancel, onConfirm }) {
+  if (!account) return null;
+  const inactive = account.is_active === false;
+  const action = inactive ? "Enable" : "Disable";
+  const tone = inactive ? C.green : C.red;
+  const toneBg = inactive ? C.greenFaint : C.redFaint;
+
+  return (
+    <div style={{ position:"fixed",inset:0,background:"rgba(24,20,14,0.42)",backdropFilter:"blur(2px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20 }}>
+      <div style={{ width:"min(440px,100%)",background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:"0 24px 80px rgba(0,0,0,0.22)",overflow:"hidden" }}>
+        <div style={{ padding:"18px 20px",borderBottom:`1px solid ${C.divider}` }}>
+          <div style={{ fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.18em",textTransform:"uppercase",color:tone,marginBottom:6 }}>
+            Confirm Account Status
+          </div>
+          <h3 style={{ margin:0,fontSize:20,lineHeight:1.2,color:C.text }}>{action} {account.name}?</h3>
+        </div>
+        <div style={{ padding:20,display:"grid",gap:14 }}>
+          <div style={{ padding:12,border:`1px solid ${inactive ? "rgba(46,122,90,0.18)" : "rgba(160,56,56,0.18)"}`,borderRadius:9,background:toneBg,color:C.muted,fontSize:13,lineHeight:1.55 }}>
+            {inactive
+              ? "This account will regain access based on its assigned role and outlet scope."
+              : "This account will be marked inactive and will not be able to access the admin panel until enabled again."}
+          </div>
+          <div style={{ display:"grid",gridTemplateColumns:"120px 1fr",gap:8,fontSize:12 }}>
+            <span style={{ fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.faint }}>Role</span>
+            <strong style={{ color:C.text }}>{ROLE_LABELS[account.role] || account.role}</strong>
+            <span style={{ fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.faint }}>Username</span>
+            <span style={{ color:C.muted,overflow:"hidden",textOverflow:"ellipsis" }}>{account.username}</span>
+          </div>
+          <div style={{ display:"flex",gap:10,justifyContent:"flex-end",paddingTop:4 }}>
+            <button type="button" onClick={onCancel} disabled={loading} style={{ minWidth:110,padding:"10px 14px",border:`1px solid ${C.border}`,borderRadius:8,background:C.surface,color:C.muted,fontFamily:F.label,fontSize:10,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",cursor:loading?"not-allowed":"pointer" }}>
+              Cancel
+            </button>
+            <button type="button" onClick={onConfirm} disabled={loading} style={{ minWidth:150,padding:"10px 14px",border:"none",borderRadius:8,background:tone,color:"#fff",fontFamily:F.label,fontSize:10,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",cursor:loading?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8 }}>
+              {loading ? <Spinner color="#FFFFFF" size={12} /> : null}
+              {action} Account
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function Accounts() {
   const currentUser = authAPI.getCurrentUser();
   const canManage = authAPI.hasPermission("manage_accounts");
-  const [searchParams,setSearchParams] = useSearchParams();
-  const requestedView = searchParams.get("view");
-  const accountView = ACCOUNT_VIEWS.some((view) => view.id === requestedView) ? requestedView : "list";
   const [sidebarOpen,setSidebarOpen] = useState(true);
   const [accounts,setAccounts] = useState([]);
   const [form,setForm] = useState(DEFAULT_FORM);
@@ -202,14 +339,21 @@ export default function Accounts() {
   const [sortBy,setSortBy] = useState("name_asc");
   const [pageSize,setPageSize] = useState("5");
   const [page,setPage] = useState(1);
+  const [statusTarget,setStatusTarget] = useState(null);
 
   const assignableRoles = useMemo(() => roleOptionsFor(currentUser?.role), [currentUser?.role]);
-  const visibleAccounts = useMemo(
-    () => currentUser?.role === "super_admin"
+  const newAccountForm = useMemo(() => ({
+    ...DEFAULT_FORM,
+    role: assignableRoles.includes("staff") ? "staff" : (assignableRoles[0] || "staff"),
+    scope_type: defaultScopeForRole(assignableRoles.includes("staff") ? "staff" : (assignableRoles[0] || "staff")),
+  }), [assignableRoles]);
+  const visibleAccounts = useMemo(() => {
+    const scopedAccounts = currentUser?.role === "super_admin"
       ? accounts
-      : accounts.filter((account) => account.role !== "super_admin"),
-    [accounts, currentUser?.role]
-  );
+      : accounts.filter((account) => account.role !== "super_admin");
+
+    return scopedAccounts.filter((account) => account.role !== "viewer");
+  }, [accounts, currentUser?.role]);
   const roleFilterOptions = useMemo(
     () => Array.from(new Set(visibleAccounts.map((account) => account.role).filter(Boolean))).sort(),
     [visibleAccounts]
@@ -291,22 +435,19 @@ export default function Accounts() {
 
   const resetForm = () => {
     setEditingId(null);
-    setForm(DEFAULT_FORM);
-  };
-
-  const changeView = (view) => {
-    const next = new URLSearchParams(searchParams);
-    next.set("view", view);
-    setSearchParams(next);
-    if (view === "create" || view === "list") resetForm();
+    setForm(newAccountForm);
   };
 
   useEffect(() => {
-    if (accountView === "create" || accountView === "list") resetForm();
-  }, [accountView]);
+    if (!editingId) setForm(newAccountForm);
+  }, [newAccountForm, editingId]);
 
   const submitAccount = async (event) => {
     event.preventDefault();
+    if (form.scope_type === "assigned" && parseScope(form.outlet_scope).length === 0) {
+      setToast({ type:"error", message:"Select at least one outlet for assigned-scope accounts." });
+      return;
+    }
     setLoading(true);
     setActionLabel(editingId ? "Updating account..." : "Creating account...");
 
@@ -344,27 +485,30 @@ export default function Accounts() {
       return;
     }
 
-    const next = new URLSearchParams(searchParams);
-    next.set("view", "manage");
-    setSearchParams(next);
     setEditingId(account.id);
+    const role = assignableRoles.includes(account.role) ? account.role : (assignableRoles[0] || "staff");
     setForm({
       name: account.name || "",
       email: account.email || "",
       username: account.username || "",
       password: "",
-      role: account.role || "viewer",
-      scope_type: account.scope_type || "all",
+      role,
+      scope_type: roleRequiresAssignedScope(role) ? "assigned" : (account.scope_type || "all"),
       outlet_scope: scopeText(account.outlet_scope),
     });
   };
 
-  const toggleAccountActive = async (account) => {
+  const requestStatusToggle = (account) => {
     if (!canManageAccount(currentUser, account)) {
       setToast({ type:"error", message:"You cannot modify this account." });
       return;
     }
+    setStatusTarget(account);
+  };
 
+  const confirmStatusToggle = async () => {
+    const account = statusTarget;
+    if (!account) return;
     setLoading(true);
     setActionLabel(account.is_active === false ? "Reactivating account..." : "Disabling account...");
     try {
@@ -383,55 +527,81 @@ export default function Accounts() {
     } finally {
       setLoading(false);
       setActionLabel("");
+      setStatusTarget(null);
     }
   };
 
-  const showEditor = canManage && (accountView === "create" || editingId);
-  const directoryTitle = accountView === "manage" ? "Manage Accounts" : "Account Directory";
-  const directoryEyebrow = accountView === "manage" ? "Edit and Status Control" : "Account List";
+  const showEditor = canManage;
+  const directoryTitle = "Account Directory";
+  const directoryEyebrow = "Account List";
 
   return (
     <div style={{ minHeight:"100vh",background:C.pageBg,fontFamily:F.body }}>
-      <style>{`@keyframes accountSpin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes accountSpin { to { transform: rotate(360deg); } }
+        @media (max-width: 1120px) {
+          .account-summary-grid { grid-template-columns: 1fr !important; }
+          .account-manager-grid { grid-template-columns: 1fr !important; }
+          .account-filter-grid { grid-template-columns: 1fr 1fr !important; }
+          .account-editor-card { position: relative !important; top: auto !important; }
+        }
+        @media (max-width: 720px) {
+          .account-filter-grid { grid-template-columns: 1fr !important; }
+          .account-form-two-col { grid-template-columns: 1fr !important; }
+          .account-pagination { align-items: flex-start !important; flex-direction: column !important; }
+          .account-pagination-controls { flex-wrap: wrap !important; }
+        }
+      `}</style>
       <AdminNavbar />
       <div style={{ display:"flex" }}>
         <Sidebar activeNav="accounts" isOpen={sidebarOpen} onToggle={()=>setSidebarOpen(!sidebarOpen)} />
-        <main style={{ flex:1,padding:"28px 32px",overflow:"auto",height:"calc(100vh - 60px)" }}>
-          <SectionTitle eyebrow="Access Control" title="Account Manager" />
+        <main style={{ flex:1,padding:"30px 32px 42px",overflow:"auto",height:"calc(100vh - 60px)" }}>
+          <div style={{ maxWidth:1440,display:"grid",gap:18 }}>
+          <div style={{ display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:18 }}>
+            <div>
+              <SectionTitle eyebrow="Access Control" title="Account Manager" />
+              <p style={{ margin:"-8px 0 0",maxWidth:660,fontSize:13,lineHeight:1.55,color:C.muted }}>
+                Manage administrative access, role permissions, and outlet scope assignments from one controlled workspace.
+              </p>
+            </div>
+            {canManage && (
+              <button type="button" onClick={resetForm} style={{ height:40,padding:"0 14px",border:`1px solid rgba(140,107,42,0.20)`,borderRadius:9,background:C.gold,color:"#fff",fontFamily:F.label,fontSize:10,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer",display:"inline-flex",alignItems:"center",gap:8,boxShadow:"0 10px 24px rgba(140,107,42,0.18)",whiteSpace:"nowrap" }}>
+                <UserPlus size={14} />
+                New Account
+              </button>
+            )}
+          </div>
 
           {canManage && (
-            <div style={{ display:"flex",gap:8,flexWrap:"wrap",margin:"-4px 0 16px" }}>
-              {ACCOUNT_VIEWS.map((view) => {
-                const Icon = view.icon;
-                const selected = accountView === view.id;
-                return (
-                  <button
-                    key={view.id}
-                    type="button"
-                    onClick={()=>changeView(view.id)}
-                    style={{
-                      display:"inline-flex",
-                      alignItems:"center",
-                      gap:8,
-                      minHeight:36,
-                      padding:"8px 12px",
-                      border:`1px solid ${selected ? "rgba(140,107,42,0.30)" : C.border}`,
-                      borderRadius:8,
-                      background:selected ? C.goldFaint : C.surface,
-                      color:selected ? C.gold : C.muted,
-                      fontFamily:F.label,
-                      fontSize:10,
-                      fontWeight:800,
-                      letterSpacing:"0.12em",
-                      textTransform:"uppercase",
-                      cursor:"pointer",
-                    }}
-                  >
-                    <Icon size={14} strokeWidth={2.2} />
-                    {view.label}
+            <div className="account-summary-grid" style={{ display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:14 }}>
+              <SummaryCard
+                eyebrow="Directory"
+                title="Visible Accounts"
+                value={visibleAccounts.length}
+                description={`${activeCount} active and ${inactiveCount} inactive accounts are visible under your permission level.`}
+              />
+              <SummaryCard
+                eyebrow="Permission Level"
+                title="Roles You Can Manage"
+                description="Available account roles are based on your current permission level."
+              >
+                <div style={{ display:"flex",flexWrap:"wrap",gap:7 }}>
+                  {assignableRoles.length
+                    ? assignableRoles.map((role) => <RoleChip key={role}>{ROLE_LABELS[role]}</RoleChip>)
+                    : <span style={{ fontSize:12,color:C.muted }}>No assignable roles</span>}
+                </div>
+              </SummaryCard>
+              <SummaryCard
+                eyebrow="Workspace"
+                title="Current Action"
+                description={editingId ? "Review changes carefully before updating the selected account." : "Ready to create a new operational account."}
+                action={
+                  <button type="button" onClick={resetForm} style={{ alignSelf:"flex-start",height:32,padding:"0 10px",border:`1px solid rgba(140,107,42,0.18)`,borderRadius:8,background:C.goldFaint,color:C.gold,fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.10em",textTransform:"uppercase",cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6 }}>
+                    <UserPlus size={13} />
+                    Start New
                   </button>
-                );
-              })}
+                }
+              />
             </div>
           )}
 
@@ -446,41 +616,64 @@ export default function Accounts() {
               Account creation and role management are restricted to authorized administrators. Use the account menu in the header to view or update your personal account.
             </div>
           ) : (
-            <div style={{ display:"grid",gridTemplateColumns:showEditor ? "minmax(360px, 0.85fr) minmax(620px, 1.15fr)" : "minmax(720px, 1fr)",gap:18,alignItems:"start",maxWidth:1380 }}>
+            <div className="account-manager-grid" style={{ display:"grid",gridTemplateColumns:showEditor ? "minmax(0, 1.42fr) minmax(390px, 0.78fr)" : "minmax(0, 1fr)",gap:18,alignItems:"start" }}>
               {showEditor && (
-                <div style={{ position:"relative",background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:18,overflow:"hidden" }}>
+                <div id="create" className="account-editor-card" style={{ position:"sticky",top:18,background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:20,overflow:"hidden",order:2,boxShadow:C.shadow }}>
                   <LoadingOverlay label={actionLabel && showEditor ? actionLabel : ""} />
                   <SectionTitle eyebrow={editingId ? "Edit Account" : "New Account"} title={editingId ? "Update Account" : "Create Account"} />
-                  <form onSubmit={submitAccount} style={{ display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12 }}>
-                    <Field label="Name">
-                      <input value={form.name} onChange={(e)=>setForm({...form,name:e.target.value})} required style={inputStyle()} />
-                    </Field>
-                    <Field label="Email">
-                      <input type="email" value={form.email} onChange={(e)=>setForm({...form,email:e.target.value})} required style={inputStyle()} />
-                    </Field>
-                    <Field label="Username">
-                      <input value={form.username} onChange={(e)=>setForm({...form,username:e.target.value})} required style={inputStyle()} />
-                    </Field>
-                    <Field label={editingId ? "New Password" : "Password"}>
-                      <input type="password" value={form.password} onChange={(e)=>setForm({...form,password:e.target.value})} required={!editingId} minLength={8} placeholder={editingId ? "Leave blank to keep current" : ""} style={inputStyle()} />
-                    </Field>
-                    <Field label="Role">
-                      <select value={form.role} onChange={(e)=>setForm({...form,role:e.target.value})} style={inputStyle()}>
-                        {assignableRoles.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Scope">
-                      <select value={form.scope_type} onChange={(e)=>setForm({...form,scope_type:e.target.value})} style={inputStyle()}>
-                        <option value="all">All outlets</option>
-                        <option value="assigned">Assigned outlets</option>
-                      </select>
-                    </Field>
-                    <div style={{ gridColumn:"1 / -1" }}>
-                      <Field label="Outlet Scope">
-                        <input value={form.outlet_scope} onChange={(e)=>setForm({...form,outlet_scope:e.target.value})} disabled={form.scope_type==="all"} placeholder="Example: 1, 2, Business Center" style={{ ...inputStyle(),background:form.scope_type==="all"?C.surfaceSoft:C.surface }} />
+                  <p style={{ margin:"-10px 0 18px",fontSize:12.5,lineHeight:1.55,color:C.muted }}>
+                    Create operational accounts with a role first, then limit outlet access only when the role requires an assigned scope.
+                  </p>
+                  <form onSubmit={submitAccount} style={{ display:"grid",gap:18 }}>
+                    <FormSection title="Account Information" subtitle="Use a clear staff name and a unique login identity." first>
+                      <div className="account-form-two-col" style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12 }}>
+                        <Field label="Name">
+                          <input value={form.name} onChange={(e)=>setForm({...form,name:e.target.value})} required style={inputStyle()} />
+                        </Field>
+                        <Field label="Email">
+                          <input type="email" value={form.email} onChange={(e)=>setForm({...form,email:e.target.value})} required style={inputStyle()} />
+                        </Field>
+                      </div>
+                      <Field label="Username">
+                        <input value={form.username} onChange={(e)=>setForm({...form,username:e.target.value})} required style={inputStyle()} />
                       </Field>
-                    </div>
-                    <div style={{ gridColumn:"1 / -1",display:"flex",gap:8,justifyContent:"flex-end" }}>
+                      <Field label={editingId ? "New Password" : "Password"}>
+                        <input type="password" value={form.password} onChange={(e)=>setForm({...form,password:e.target.value})} required={!editingId} minLength={8} placeholder={editingId ? "Leave blank to keep current" : ""} style={inputStyle()} />
+                        <span style={{ fontSize:11.5,color:C.muted }}>{editingId ? "Leave blank if the password should not change." : "Use at least 8 characters."}</span>
+                      </Field>
+                    </FormSection>
+
+                    <FormSection title="Role & Permissions" subtitle="Role selection controls account capabilities and visible admin modules.">
+                      <Field label="Role">
+                        <select value={form.role} onChange={(e)=>{
+                          const role = e.target.value;
+                          setForm({...form,role,scope_type:defaultScopeForRole(role),outlet_scope:defaultScopeForRole(role)==="all"?[]:form.outlet_scope});
+                        }} style={inputStyle()}>
+                          {assignableRoles.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Scope">
+                        <select value={form.scope_type} disabled={roleRequiresAssignedScope(form.role)} onChange={(e)=>setForm({...form,scope_type:e.target.value,outlet_scope:e.target.value==="all"?[]:form.outlet_scope})} style={{...inputStyle(),background:roleRequiresAssignedScope(form.role)?C.surfaceSoft:C.surface}}>
+                          <option value="all">All outlets</option>
+                          <option value="assigned">Assigned outlets</option>
+                        </select>
+                        <span style={{ fontSize:11.5,color:C.muted }}>
+                          Outlet Manager and Staff accounts must be assigned to specific outlets.
+                        </span>
+                      </Field>
+                    </FormSection>
+
+                    <FormSection title="Outlet Scope" subtitle="Choose the specific outlets this account can work with when assigned scope is required.">
+                      <Field label="Assigned Outlet(s)">
+                        <ScopeSelector
+                          value={form.outlet_scope}
+                          disabled={form.scope_type==="all"}
+                          onChange={(outlet_scope)=>setForm({...form,outlet_scope})}
+                        />
+                      </Field>
+                    </FormSection>
+
+                    <div style={{ display:"flex",gap:9,justifyContent:"flex-end",paddingTop:2 }}>
                       {editingId && <button type="button" onClick={resetForm} style={{ padding:"10px 14px",border:`1px solid ${C.border}`,borderRadius:8,background:"transparent",color:C.muted,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer" }}>Cancel</button>}
                       <button disabled={loading} style={{ padding:"10px 16px",border:"none",borderRadius:8,background:C.green,color:"#fff",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",cursor:loading?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8 }}>
                         {loading && showEditor ? <Spinner color="#FFFFFF" size={12} /> : null}
@@ -491,20 +684,21 @@ export default function Accounts() {
                 </div>
               )}
 
-                <div style={{ position:"relative",background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,overflow:"hidden" }}>
+                <div id="directory" style={{ position:"relative",background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden",order:1,boxShadow:C.shadow }}>
                   <LoadingOverlay label={loadingAccounts ? "Loading accounts..." : (!showEditor ? actionLabel : "")} />
-                  <div style={{ padding:"14px 18px 12px",borderBottom:`1px solid ${C.divider}`,display:"grid",gap:12 }}>
+                  <div style={{ padding:"18px 20px 16px",borderBottom:`1px solid ${C.divider}`,display:"grid",gap:16,background:`linear-gradient(180deg, ${C.surface} 0%, ${C.surfaceSoft} 100%)` }}>
                     <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:12 }}>
                       <div>
-                        <span style={{ display:"block",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",color:C.gold }}>{directoryEyebrow}</span>
-                        <span style={{ display:"block",marginTop:4,fontSize:12,color:C.muted }}>{directoryTitle} - {sortedAccounts.length} matched from {visibleAccounts.length} accounts</span>
+                        <span style={{ display:"block",fontFamily:F.label,fontSize:10,fontWeight:800,letterSpacing:"0.16em",textTransform:"uppercase",color:C.gold }}>{directoryEyebrow}</span>
+                        <h3 style={{ margin:"5px 0 3px",fontSize:18,lineHeight:1.25,color:C.text,fontWeight:760 }}>{directoryTitle}</h3>
+                        <span style={{ display:"block",fontSize:12.5,color:C.muted }}>{sortedAccounts.length} matched from {visibleAccounts.length} visible accounts</span>
                       </div>
                       <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-                        <span style={{ padding:"5px 9px",borderRadius:999,background:C.greenFaint,color:C.green,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase" }}>{activeCount} Active</span>
-                        <span style={{ padding:"5px 9px",borderRadius:999,background:C.redFaint,color:C.red,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase" }}>{inactiveCount} Inactive</span>
+                        <span style={{ minHeight:26,padding:"6px 10px",borderRadius:999,background:C.greenFaint,color:C.green,fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.10em",textTransform:"uppercase",display:"inline-flex",alignItems:"center" }}>{activeCount} Active</span>
+                        <span style={{ minHeight:26,padding:"6px 10px",borderRadius:999,background:C.redFaint,color:C.red,fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.10em",textTransform:"uppercase",display:"inline-flex",alignItems:"center" }}>{inactiveCount} Inactive</span>
                       </div>
                     </div>
-                    <div style={{ display:"grid",gridTemplateColumns:"minmax(210px,1.4fr) repeat(3,minmax(120px,0.85fr))",gap:10,alignItems:"end" }}>
+                    <div className="account-filter-grid" style={{ display:"grid",gridTemplateColumns:"minmax(210px,1.4fr) repeat(3,minmax(120px,0.85fr))",gap:10,alignItems:"end" }}>
                       <FilterControl label="Search">
                         <div style={{ position:"relative" }}>
                           <Search size={14} style={{ position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:C.faint,pointerEvents:"none" }} />
@@ -540,47 +734,49 @@ export default function Accounts() {
                     </div>
                   </div>
 
-                  <div style={{ display:"grid",gridTemplateColumns:"minmax(220px,1.3fr) 132px 82px 92px 148px",gap:12,alignItems:"center",padding:"9px 18px",borderBottom:`1px solid ${C.divider}`,background:C.surfaceSoft }}>
-                    {["Account","Role","Scope","Status","Actions"].map((label) => (
-                      <span key={label} style={{ fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.faint }}>{label}</span>
-                    ))}
-                  </div>
-                  <div style={{ display:"grid" }}>
-                    {sortedAccounts.length === 0 && (
-                      <div style={{ padding:"28px 18px",color:C.muted,fontSize:13,textAlign:"center" }}>
-                        No accounts match the selected filters.
-                      </div>
-                    )}
-                    {paginatedAccounts.map((account) => {
-                      const manageable = canManageAccount(currentUser, account);
-                      const inactive = account.is_active === false;
+                  <div style={{ overflowX:"auto" }}>
+                    <div style={{ display:"grid",gridTemplateColumns:"minmax(220px,1.3fr) 132px 82px 92px 148px",gap:12,alignItems:"center",padding:"10px 20px",borderBottom:`1px solid ${C.divider}`,background:C.surfaceSoft,minWidth:720 }}>
+                      {["Account","Role","Scope","Status","Actions"].map((label) => (
+                        <span key={label} style={{ fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.faint }}>{label}</span>
+                      ))}
+                    </div>
+                    <div style={{ display:"grid",minWidth:720 }}>
+                      {sortedAccounts.length === 0 && (
+                        <div style={{ padding:"28px 18px",color:C.muted,fontSize:13,textAlign:"center" }}>
+                          No accounts match the selected filters.
+                        </div>
+                      )}
+                      {paginatedAccounts.map((account) => {
+                        const manageable = canManageAccount(currentUser, account);
+                        const inactive = account.is_active === false;
 
-                      return (
-                      <div key={account.id} style={{ display:"grid",gridTemplateColumns:"minmax(220px,1.3fr) 132px 82px 92px 148px",gap:12,alignItems:"center",padding:"12px 18px",borderBottom:`1px solid ${C.divider}`,background:inactive ? C.surfaceSoft : "transparent",textAlign:"left",opacity:inactive ? 0.72 : 1 }}>
-                        <div style={{ minWidth:0 }}>
-                          <div style={{ fontSize:13,fontWeight:700,color:C.text,marginBottom:3 }}>{account.name}</div>
-                          <div style={{ fontSize:11.5,color:C.muted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{account.username}</div>
-                          <div style={{ fontSize:11.5,color:C.faint,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{account.email}</div>
+                        return (
+                        <div key={account.id} style={{ display:"grid",gridTemplateColumns:"minmax(220px,1.3fr) 132px 82px 92px 148px",gap:12,alignItems:"center",padding:"14px 20px",borderBottom:`1px solid ${C.divider}`,background:inactive ? C.surfaceSoft : "transparent",textAlign:"left",opacity:inactive ? 0.72 : 1,transition:"background 0.15s" }}>
+                          <div style={{ minWidth:0 }}>
+                            <div style={{ fontSize:13,fontWeight:700,color:C.text,marginBottom:3 }}>{account.name}</div>
+                            <div style={{ fontSize:11.5,color:C.muted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{account.username}</div>
+                            <div style={{ fontSize:11.5,color:C.faint,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{account.email}</div>
+                          </div>
+                          <span style={{ justifySelf:"start",padding:"4px 8px",borderRadius:999,background:C.goldFaint,color:C.gold,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",whiteSpace:"nowrap" }}>{ROLE_LABELS[account.role] || account.role}</span>
+                          <span style={{ fontSize:11.5,color:C.muted }}>{account.scope_type === "assigned" ? `${Array.isArray(account.outlet_scope) ? account.outlet_scope.length : 0} outlets` : "All"}</span>
+                          <span style={{ justifySelf:"start",padding:"4px 8px",borderRadius:999,background:inactive ? C.redFaint : C.greenFaint,color:inactive ? C.red : C.green,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em" }}>{inactive ? "Inactive" : "Active"}</span>
+                          <div style={{ display:"flex",alignItems:"center",gap:7,justifyContent:"flex-end" }}>
+                            <button type="button" title={manageable ? "Edit account" : "Not allowed for your role"} disabled={!manageable || loading} onClick={()=>editAccount(account)} style={{ padding:"7px 9px",border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,color:manageable?C.text:C.faint,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",cursor:manageable&&!loading?"pointer":"not-allowed" }}>Edit</button>
+                            <button type="button" title={manageable ? (inactive ? "Enable account" : "Disable account") : "Not allowed for your role"} disabled={!manageable || loading} onClick={()=>requestStatusToggle(account)} style={{ padding:"7px 9px",border:`1px solid ${inactive ? "rgba(46,122,90,0.20)" : "rgba(160,56,56,0.20)"}`,borderRadius:7,background:inactive?C.greenFaint:C.redFaint,color:inactive?C.green:C.red,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",cursor:manageable&&!loading?"pointer":"not-allowed",display:"inline-flex",alignItems:"center",gap:6 }}>
+                              {loading && actionLabel && !showEditor ? <Spinner color={inactive ? C.green : C.red} size={11} /> : null}
+                              {inactive ? "Enable" : "Disable"}
+                            </button>
+                          </div>
                         </div>
-                        <span style={{ justifySelf:"start",padding:"4px 8px",borderRadius:999,background:C.goldFaint,color:C.gold,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",whiteSpace:"nowrap" }}>{ROLE_LABELS[account.role] || account.role}</span>
-                        <span style={{ fontSize:11.5,color:C.muted }}>{account.scope_type === "assigned" ? "Assigned" : "All"}</span>
-                        <span style={{ justifySelf:"start",padding:"4px 8px",borderRadius:999,background:inactive ? C.redFaint : C.greenFaint,color:inactive ? C.red : C.green,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em" }}>{inactive ? "Inactive" : "Active"}</span>
-                        <div style={{ display:"flex",alignItems:"center",gap:7,justifyContent:"flex-end" }}>
-                          <button type="button" disabled={!manageable || loading} onClick={()=>editAccount(account)} style={{ padding:"7px 9px",border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,color:manageable?C.text:C.faint,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",cursor:manageable&&!loading?"pointer":"not-allowed" }}>Edit</button>
-                          <button type="button" disabled={!manageable || loading} onClick={()=>toggleAccountActive(account)} style={{ padding:"7px 9px",border:`1px solid ${inactive ? "rgba(46,122,90,0.20)" : "rgba(160,56,56,0.20)"}`,borderRadius:7,background:inactive?C.greenFaint:C.redFaint,color:inactive?C.green:C.red,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",cursor:manageable&&!loading?"pointer":"not-allowed",display:"inline-flex",alignItems:"center",gap:6 }}>
-                            {loading && actionLabel && !showEditor ? <Spinner color={inactive ? C.green : C.red} size={11} /> : null}
-                            {inactive ? "Enable" : "Disable"}
-                          </button>
-                        </div>
-                      </div>
-                    )})}
+                      )})}
+                    </div>
                   </div>
                   {sortedAccounts.length > 0 && (
-                    <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"12px 18px",borderTop:`1px solid ${C.divider}`,background:C.surfaceSoft }}>
+                    <div className="account-pagination" style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"14px 20px",borderTop:`1px solid ${C.divider}`,background:C.surfaceSoft }}>
                       <span style={{ fontSize:12,color:C.muted }}>
                         Showing {pageStart}-{pageEnd} of {sortedAccounts.length}
                       </span>
-                      <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+                      <div className="account-pagination-controls" style={{ display:"flex",alignItems:"center",gap:10 }}>
                         <label style={{ display:"inline-flex",alignItems:"center",gap:7,fontSize:12,color:C.muted }}>
                           Rows
                           <select value={pageSize} onChange={(e)=>setPageSize(e.target.value)} style={{...inputStyle(),width:96,minHeight:32,padding:"5px 8px",fontSize:12}}>
@@ -618,6 +814,13 @@ export default function Accounts() {
                 </div>
             </div>
           )}
+          </div>
+          <ConfirmStatusModal
+            account={statusTarget}
+            loading={loading}
+            onCancel={()=>setStatusTarget(null)}
+            onConfirm={confirmStatusToggle}
+          />
         </main>
       </div>
     </div>

@@ -1,7 +1,7 @@
 // src/components/admin/Sidebar.jsx
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { X, ClipboardList, Map, UserCog, BarChart3, List, UserPlus, PencilLine } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { X, ClipboardList, Map, UserCog, BarChart3 } from "lucide-react";
 import { authAPI } from "../../services/authAPI";
 
 const F = { body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" };
@@ -16,11 +16,6 @@ const NAV_ITEMS = [
     icon: UserCog,
     iconStyle: "lucide",
     permission: "manage_accounts",
-    subItems: [
-      { id: "account-directory", label: "Account Directory", path: "/admin/accounts?view=list", icon: List },
-      { id: "create-account", label: "Create Account", path: "/admin/accounts?view=create", icon: UserPlus },
-      { id: "manage-accounts", label: "Manage Accounts", path: "/admin/accounts?view=manage", icon: PencilLine },
-    ],
   },
   { id: "seat-map", label: "Seat Map", icon: Map, iconStyle: "lucide" },
 ];
@@ -61,7 +56,6 @@ function HamburgerBtn({ onClick, isOpen }) {
 function NavItem({ item, isActive, isOpen, onClick }) {
   const [hovered, setHovered] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
 
   const isCancelled = item.id === "cancelled";
 
@@ -76,7 +70,7 @@ function NavItem({ item, isActive, isOpen, onClick }) {
       "reservations": "/admin/reservations",
       "cancelled":    "/admin/cancelled",
       "reports":      "/admin/reports",
-      "accounts":     "/admin/accounts?view=list",
+      "accounts":     "/admin/accounts",
       "seat-map":     "/admin/seatmap",
     };
     navigate(routes[item.id] || "/admin/dashboard");
@@ -92,9 +86,6 @@ function NavItem({ item, isActive, isOpen, onClick }) {
       style={{ flexShrink: 0, transition: "color 0.15s" }}
     />
   );
-
-  const showSubItems = isOpen && item.subItems?.length && (hovered || isActive);
-  const currentPath = `${location.pathname}${location.search}`;
 
   return (
     <div
@@ -132,48 +123,6 @@ function NavItem({ item, isActive, isOpen, onClick }) {
         )}
       </div>
 
-      {showSubItems && (
-        <div style={{ margin:"4px 10px 8px 28px",padding:"5px",borderLeft:"1px solid rgba(140,107,42,0.16)",display:"grid",gap:3 }}>
-          {item.subItems.map((subItem) => {
-            const SubIcon = subItem.icon;
-            const subActive = currentPath === subItem.path;
-            return (
-              <button
-                key={subItem.id}
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  navigate(subItem.path);
-                  onClick?.(item.id);
-                }}
-                style={{
-                  minHeight:30,
-                  border:"none",
-                  borderRadius:6,
-                  padding:"7px 9px",
-                  display:"flex",
-                  alignItems:"center",
-                  gap:8,
-                  background:subActive ? "rgba(140,107,42,0.10)" : "transparent",
-                  color:subActive ? "#8C6B2A" : "#6D6252",
-                  fontFamily:F.body,
-                  fontSize:11.5,
-                  fontWeight:subActive ? 700 : 500,
-                  cursor:"pointer",
-                  textAlign:"left",
-                }}
-              >
-                {SubIcon ? (
-                  <SubIcon size={13} strokeWidth={2.2} />
-                ) : (
-                  <span style={{ width:13,height:13,display:"inline-block",flexShrink:0 }} />
-                )}
-                <span>{subItem.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

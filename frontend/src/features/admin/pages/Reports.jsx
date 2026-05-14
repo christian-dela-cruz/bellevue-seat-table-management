@@ -3,6 +3,7 @@ import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { reportAPI } from "../../../services/reportAPI";
+import { Building2, Layers, Utensils } from "lucide-react";
 
 const C = {
   page: "#F7F4EE",
@@ -84,13 +85,13 @@ function MetricCard({ label, value, detail, tone = "gold" }) {
   const [color, bg] = toneColor(tone);
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "15px 16px", minWidth: 0 }}>
+    <ReportCard style={{ padding: "16px 17px", minWidth: 0 }}>
       <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.faint, marginBottom: 10 }}>{label}</div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <span style={{ color, background: bg, borderRadius: 8, padding: "5px 10px", minWidth: 48, textAlign: "center", fontSize: 22, fontWeight: 650, lineHeight: 1 }}>{value}</span>
         {detail && <span style={{ color: C.muted, fontSize: 12 }}>{detail}</span>}
       </div>
-    </div>
+    </ReportCard>
   );
 }
 
@@ -141,12 +142,144 @@ function actionLabel(value) {
   return String(value || "-").replace(/_/g, " ");
 }
 
-function SummaryPanel({ title, children }) {
+function outletGroup(outlet) {
+  const wing = String(outlet?.wing || "").toLowerCase();
+  const type = String(outlet?.type || "").toLowerCase();
+  const name = String(outlet?.name || "").toLowerCase();
+
+  if (wing.includes("dining") || type.includes("dining") || type.includes("restaurant") || name.includes("restaurant")) {
+    return "dining";
+  }
+
+  return "rooms";
+}
+
+function compareValues(a, b, key) {
+  const av = a?.[key];
+  const bv = b?.[key];
+  const an = Number(av);
+  const bn = Number(bv);
+
+  if (!Number.isNaN(an) && !Number.isNaN(bn)) return an - bn;
+  return String(av ?? "").localeCompare(String(bv ?? ""), undefined, { numeric: true, sensitivity: "base" });
+}
+
+function sortRows(rows, sort) {
+  if (!sort?.key) return rows;
+  const direction = sort.direction === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => compareValues(a, b, sort.key) * direction);
+}
+
+const SORT_OPTIONS = {
+  outlets: [
+    { value: "total_reservations:desc", label: "Reservations: high to low" },
+    { value: "total_reservations:asc", label: "Reservations: low to high" },
+    { value: "guests:desc", label: "Guests: high to low" },
+    { value: "acceptance_rate:desc", label: "Acceptance rate: high to low" },
+    { value: "name:asc", label: "Name: A to Z" },
+  ],
+  rooms: [
+    { value: "reservations:desc", label: "Reservations: high to low" },
+    { value: "guests:desc", label: "Guests: high to low" },
+    { value: "latest_event_date:desc", label: "Latest event first" },
+    { value: "room:asc", label: "Room: A to Z" },
+  ],
+  audit: [
+    { value: "created_at:desc", label: "Newest first" },
+    { value: "created_at:asc", label: "Oldest first" },
+    { value: "action:asc", label: "Action: A to Z" },
+    { value: "to_status:asc", label: "Status: A to Z" },
+  ],
+};
+
+function sortValue(sort) {
+  return `${sort?.key || ""}:${sort?.direction || "desc"}`;
+}
+
+function sortFromValue(value) {
+  const [key, direction = "desc"] = value.split(":");
+  return { key, direction };
+}
+
+function SortButton({ label, active, direction, onClick }) {
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, minWidth: 0 }}>
-      <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, marginBottom: 14 }}>{title}</div>
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: `1px solid ${active ? "rgba(140,107,42,0.28)" : C.border}`,
+        background: active ? C.goldFaint : C.surface,
+        color: active ? C.gold : C.muted,
+        borderRadius: 999,
+        padding: "7px 10px",
+        fontFamily: F.label,
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}{active ? ` ${direction === "asc" ? "↑" : "↓"}` : ""}
+    </button>
+  );
+}
+
+function SortSelect({ label = "Sort", value, options, onChange }) {
+  return (
+    <FilterField label={label}>
+      <select value={sortValue(value)} onChange={(event) => onChange(sortFromValue(event.target.value))} style={{ ...filterStyle(), minWidth: 210 }}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </FilterField>
+  );
+}
+
+function FilterChip({ icon: Icon, label, count, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: `1px solid ${active ? "rgba(140,107,42,0.30)" : C.border}`,
+        background: active ? C.goldFaint : C.surface,
+        color: active ? C.gold : C.muted,
+        borderRadius: 10,
+        padding: "10px 12px",
+        display: "flex",
+        alignItems: "center",
+        gap: 9,
+        cursor: "pointer",
+        minWidth: 0,
+      }}
+    >
+      <Icon size={15} />
+      <span style={{ fontSize: 12, fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      <span style={{ marginLeft: "auto", borderRadius: 999, background: active ? C.surface : C.soft, color: active ? C.gold : C.faint, padding: "2px 7px", fontSize: 10, fontWeight: 700 }}>{count}</span>
+    </button>
+  );
+}
+
+function ReportCard({ children, style }) {
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 10px 30px rgba(24,20,14,0.04)", ...style }}>
       {children}
     </div>
+  );
+}
+
+function SummaryPanel({ title, children }) {
+  return (
+    <ReportCard style={{ padding: 16, minWidth: 0 }}>
+      <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, marginBottom: 14 }}>{title}</div>
+      {children}
+    </ReportCard>
   );
 }
 
@@ -160,7 +293,7 @@ function OutletCard({ outlet }) {
           <div title={outlet.name} style={{ fontSize: 15, fontWeight: 650, color: C.text, marginBottom: 4, lineHeight: 1.25, overflowWrap: "anywhere" }}>{outlet.name}</div>
           <div style={{ fontSize: 11.5, color: C.muted }}>{outlet.wing || "No wing"} - {outlet.type || "outlet"}</div>
         </div>
-        <span style={{ padding: "4px 8px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>{outlet.acceptance_rate}% accepted</span>
+        <span style={{ padding: "4px 8px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>{outlet.acceptance_rate}% approved</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(82px,1fr))", gap: 8 }}>
         <MiniStat label="Total" value={total} />
@@ -177,9 +310,9 @@ function OutletCard({ outlet }) {
   );
 }
 
-function TransactionMonitor({ transactionReport, isGlobal }) {
+function TransactionMonitor({ transactionReport, isGlobal, sort, onSort }) {
   const summary = transactionReport.summary || {};
-  const rows = transactionReport.data || [];
+  const rows = sortRows(transactionReport.data || [], sort);
 
   return (
     <SummaryPanel title="Transaction Monitor">
@@ -198,6 +331,10 @@ function TransactionMonitor({ transactionReport, isGlobal }) {
           <MiniStat label="Approvals" value={summary.approvals || 0} />
           <MiniStat label="Rejections" value={summary.rejections || 0} />
           <MiniStat label="Reverts" value={summary.reverts || 0} />
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <SortSelect value={sort} options={SORT_OPTIONS.audit} onChange={onSort} />
         </div>
 
         <div style={{ overflowX: "auto" }}>
@@ -225,9 +362,18 @@ function TransactionMonitor({ transactionReport, isGlobal }) {
                     <td style={cellStyle()}>{venue.name || reservation.room || "-"}</td>
                     <td style={cellStyle()}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                        <StatusPill value={row.from_status} />
-                        <span style={{ color: C.faint }}>to</span>
-                        <StatusPill value={row.to_status} />
+                        {row.from_status && row.to_status && row.from_status !== row.to_status ? (
+                          <>
+                            <StatusPill value={row.from_status} />
+                            <span style={{ color: C.faint }}>to</span>
+                            <StatusPill value={row.to_status} />
+                          </>
+                        ) : (
+                          <>
+                            <StatusPill value={row.to_status || row.from_status || reservation.status} />
+                            <span style={{ color: C.faint }}>current</span>
+                          </>
+                        )}
                       </div>
                     </td>
                     <td style={cellStyle()}>{actionLabel(row.action)}</td>
@@ -256,6 +402,7 @@ function MonthlyLineChart({ months }) {
   const pointsFor = (key) => months.map((month, index) => `${xFor(index)},${yFor(month[key] || 0)}`).join(" ");
   const reservationPoints = pointsFor("reservations");
   const promoPoints = pointsFor("promotion_mentions");
+  const reservationArea = `${padding.left},${height - padding.bottom} ${reservationPoints} ${width - padding.right},${height - padding.bottom}`;
   const yTicks = [0, Math.ceil(maxValue / 2), maxValue];
   const activeMonth = hoveredIndex !== null ? months[hoveredIndex] : null;
   const tooltipX = hoveredIndex !== null ? xFor(hoveredIndex) : 0;
@@ -279,7 +426,21 @@ function MonthlyLineChart({ months }) {
 
       <div style={{ width: "100%", overflowX: "auto" }}>
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Monthly reservation trend line chart" style={{ width: "100%", minWidth: 560, display: "block" }}>
-          <rect x="0" y="0" width={width} height={height} fill={C.soft} rx="10" />
+          <defs>
+            <linearGradient id="reportsChartBg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#FFFFFF" />
+              <stop offset="55%" stopColor="#FAF8F4" />
+              <stop offset="100%" stopColor="#F1ECE1" />
+            </linearGradient>
+            <linearGradient id="reservationAreaFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={C.blue} stopOpacity="0.18" />
+              <stop offset="100%" stopColor={C.blue} stopOpacity="0.015" />
+            </linearGradient>
+            <filter id="chartShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="8" stdDeviation="8" floodColor="#18140E" floodOpacity="0.10" />
+            </filter>
+          </defs>
+          <rect x="0" y="0" width={width} height={height} fill="url(#reportsChartBg)" rx="12" />
 
           {yTicks.map((tick) => {
             const y = yFor(tick);
@@ -300,7 +461,8 @@ function MonthlyLineChart({ months }) {
             );
           })}
 
-          <polyline points={reservationPoints} fill="none" stroke={C.blue} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+          <polygon points={reservationArea} fill="url(#reservationAreaFill)" />
+          <polyline points={reservationPoints} fill="none" stroke={C.blue} strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" filter="url(#chartShadow)" />
           <polyline points={promoPoints} fill="none" stroke={C.gold} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="6 6" />
 
           {months.map((month, index) => (
@@ -389,10 +551,13 @@ function MonthlyReports({ monthlyReport }) {
   );
 }
 
-function TableCard({ title, headers, rows, renderRow }) {
+function TableCard({ title, headers, rows, renderRow, actions }) {
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", minWidth: 0 }}>
-      <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.divider}`, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>{title}</div>
+    <ReportCard style={{ overflow: "hidden", minWidth: 0 }}>
+      <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>{title}</div>
+        {actions}
+      </div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
           <thead>
@@ -407,7 +572,7 @@ function TableCard({ title, headers, rows, renderRow }) {
           </tbody>
         </table>
       </div>
-    </div>
+    </ReportCard>
   );
 }
 
@@ -450,6 +615,10 @@ export default function Reports() {
   const [startDate, setStartDate] = useState(monthStart());
   const [endDate, setEndDate] = useState(today());
   const [selectedOutlet, setSelectedOutlet] = useState("ALL");
+  const [selectedOutletGroup, setSelectedOutletGroup] = useState("all");
+  const [outletSort, setOutletSort] = useState({ key: "total_reservations", direction: "desc" });
+  const [roomSort, setRoomSort] = useState({ key: "reservations", direction: "desc" });
+  const [auditSort, setAuditSort] = useState({ key: "created_at", direction: "desc" });
   const [report, setReport] = useState({ summary: {}, data: [] });
   const [transactionReport, setTransactionReport] = useState({ summary: {}, data: [] });
   const [monthlyReport, setMonthlyReport] = useState({ summary: {}, months: [], outlets: [] });
@@ -489,13 +658,32 @@ export default function Reports() {
 
   const filteredOutlets = useMemo(() => {
     const rows = report.data || [];
-    return selectedOutlet === "ALL" ? rows : rows.filter((row) => String(row.venue_id || row.name) === selectedOutlet);
-  }, [report.data, selectedOutlet]);
+    const outletFiltered = selectedOutlet === "ALL"
+      ? rows
+      : rows.filter((row) => String(row.name) === selectedOutlet);
+    const groupFiltered = selectedOutletGroup === "all"
+      ? outletFiltered
+      : outletFiltered.filter((row) => outletGroup(row) === selectedOutletGroup);
+    return sortRows(groupFiltered, outletSort);
+  }, [report.data, selectedOutlet, selectedOutletGroup, outletSort]);
 
   const summary = report.summary || {};
   const category = report.category_breakdown || {};
   const statuses = report.status_breakdown || {};
-  const roomDetails = report.room_details || [];
+  const roomDetails = useMemo(() => sortRows(report.room_details || [], roomSort), [report.room_details, roomSort]);
+  const allOutlets = report.data || [];
+  const roomOutletCount = allOutlets.filter((outlet) => outletGroup(outlet) === "rooms").length;
+  const diningOutletCount = allOutlets.filter((outlet) => outletGroup(outlet) === "dining").length;
+  const outletSections = useMemo(() => {
+    const order = ["Main Wing", "Tower Wing", "Dining"];
+    const sections = order.map((wing) => ({
+      wing,
+      rows: filteredOutlets.filter((outlet) => (outlet.wing || "Main Wing") === wing),
+    }));
+    const known = new Set(order);
+    const extras = filteredOutlets.filter((outlet) => !known.has(outlet.wing || "Main Wing"));
+    return [...sections, ...(extras.length ? [{ wing: "Other", rows: extras }] : [])].filter((section) => section.rows.length > 0);
+  }, [filteredOutlets]);
   const transactionSummary = transactionReport.summary || {};
   const dateRangeLabel = `${readableDate(startDate)} to ${readableDate(endDate)}`;
   const reservedCount = (statuses.reserved || 0) + (statuses.approved || 0);
@@ -505,7 +693,6 @@ export default function Reports() {
     { id: "monthly", label: "Monthly" },
     { id: "outlets", label: "Outlets" },
     ...(canViewTransactions ? [{ id: "audit", label: "Audit Trail" }] : []),
-    { id: "details", label: "Details" },
   ];
 
   return (
@@ -518,7 +705,7 @@ export default function Reports() {
             <div>
               <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>Reports</div>
               <h1 style={{ margin: 0, fontSize: 32, lineHeight: 1.1, color: C.text, fontWeight: 650 }}>Outlet Performance</h1>
-              {canViewReports && <div style={{ marginTop: 6, fontSize: 12.5, color: C.muted }}>Reservations and transaction activity from {dateRangeLabel}</div>}
+              {canViewReports && <div style={{ marginTop: 6, fontSize: 12.5, color: C.muted }}>Reservation submissions and transaction activity from {dateRangeLabel}</div>}
             </div>
 
             {canViewReports && (
@@ -532,7 +719,7 @@ export default function Reports() {
                 <FilterField label="Outlet">
                   <select value={selectedOutlet} onChange={(e) => setSelectedOutlet(e.target.value)} style={{ ...filterStyle(), minWidth: 190 }}>
                     <option value="ALL">All outlets</option>
-                    {(report.data || []).map((outlet) => <option key={outlet.venue_id || outlet.name} value={String(outlet.venue_id || outlet.name)}>{outlet.name}</option>)}
+                    {(report.data || []).map((outlet) => <option key={outlet.name || outlet.venue_id} value={String(outlet.name)}>{outlet.name}</option>)}
                   </select>
                 </FilterField>
                 <button onClick={loadReport} disabled={loading} style={{ height: 38, padding: "0 14px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", cursor: loading ? "not-allowed" : "pointer" }}>
@@ -556,7 +743,7 @@ export default function Reports() {
 
               {activeTab === "summary" && (
                 <>
-                  <Section title="Overview" subtitle="High-level activity for the selected date range.">
+                  <Section title="Overview" subtitle="High-level submission activity for the selected date range.">
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
                       <MetricCard label="Reservations" value={summary.reservations || 0} tone="blue" />
                       <MetricCard label="Guests" value={summary.guests || 0} tone="green" />
@@ -587,30 +774,47 @@ export default function Reports() {
               )}
 
               {activeTab === "monthly" && (
-                <Section title="Monthly Reporting" subtitle="Year-to-date monthly view covering reservation volume, promotions, outlet activity, and statuses.">
+                <Section title="Monthly Reporting" subtitle="Year-to-date monthly view based on scheduled event dates, with promotions, outlet activity, and statuses.">
                   <MonthlyReports monthlyReport={monthlyReport} />
                 </Section>
               )}
 
               {activeTab === "outlets" && (
-                <Section title="Outlet Performance" subtitle="Cards are sorted by reservation volume. Use the outlet filter above to narrow the list.">
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%, 320px),1fr))", gap: 12 }}>
-                    {filteredOutlets.map((outlet) => <OutletCard key={outlet.venue_id || outlet.name} outlet={outlet} />)}
-                  </div>
-                </Section>
-              )}
+                <Section title="Outlet Performance" subtitle="Grouped by outlet type. Use the filters and sort dropdowns to inspect rooms, dining outlets, and exact room totals.">
+                  <div style={{ display: "grid", gap: 14 }}>
+                    <ReportCard style={{ padding: 12 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,0.8fr) minmax(280px,1.2fr)", gap: 12, alignItems: "center" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+                          <FilterChip icon={Layers} label="All" count={allOutlets.length} active={selectedOutletGroup === "all"} onClick={() => setSelectedOutletGroup("all")} />
+                          <FilterChip icon={Building2} label="Rooms" count={roomOutletCount} active={selectedOutletGroup === "rooms"} onClick={() => setSelectedOutletGroup("rooms")} />
+                          <FilterChip icon={Utensils} label="Dining" count={diningOutletCount} active={selectedOutletGroup === "dining"} onClick={() => setSelectedOutletGroup("dining")} />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                          <SortSelect value={outletSort} options={SORT_OPTIONS.outlets} onChange={setOutletSort} />
+                        </div>
+                      </div>
+                    </ReportCard>
 
-              {activeTab === "audit" && canViewTransactions && (
-                <Section title="Audit Trail" subtitle="Read-only status changes for operational review.">
-                  <TransactionMonitor transactionReport={transactionReport} isGlobal={canViewGlobalReports} />
-                </Section>
-              )}
+                    <div style={{ display: "grid", gap: 16 }}>
+                      {outletSections.map((section) => (
+                        <div key={section.wing} style={{ display: "grid", gap: 10 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 750, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>{section.wing}</div>
+                            <div style={{ height: 1, background: C.divider, flex: 1 }} />
+                            <div style={{ color: C.faint, fontSize: 11, fontWeight: 650 }}>{section.rows.length} outlet{section.rows.length === 1 ? "" : "s"}</div>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%, 300px),1fr))", gap: 12 }}>
+                            {section.rows.map((outlet) => <OutletCard key={outlet.name || outlet.venue_id} outlet={outlet} />)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
 
-              {activeTab === "details" && (
-                <Section title="Detailed Records" subtitle="Use these tables when you need exact room or outlet totals.">
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%, 520px),1fr))", gap: 14 }}>
                     <TableCard
-                      title="Room Reservation Details"
+                      title="Room Totals"
+                      actions={
+                        <SortSelect value={roomSort} options={SORT_OPTIONS.rooms} onChange={setRoomSort} />
+                      }
                       headers={["Room / Outlet", "Reservations", "Guests", "Pending", "Reserved", "Rejected", "Cancelled", "Dine-In", "Promo", "Latest Event"]}
                       rows={roomDetails}
                       renderRow={(room) => (
@@ -628,28 +832,13 @@ export default function Reports() {
                         </tr>
                       )}
                     />
-
-                    <TableCard
-                      title="Outlet Detail"
-                      headers={["Outlet", "Wing", "Total", "Guests", "Dine-In", "Promo", "Reserved", "Pending", "Rejected", "Cancelled", "Latest Event"]}
-                      rows={filteredOutlets}
-                      renderRow={(outlet) => (
-                        <tr key={outlet.venue_id || outlet.name}>
-                          <td style={cellStyle(true)}>{outlet.name}</td>
-                          <td style={cellStyle()}>{outlet.wing || "-"}</td>
-                          <td style={cellStyle()}>{outlet.total_reservations}</td>
-                          <td style={cellStyle()}>{outlet.guests}</td>
-                          <td style={cellStyle()}>{outlet.dine_in}</td>
-                          <td style={cellStyle()}>{outlet.promotion_mentions}</td>
-                          <td style={cellStyle()}>{outlet.reserved}</td>
-                          <td style={cellStyle()}>{outlet.pending}</td>
-                          <td style={cellStyle()}>{outlet.rejected}</td>
-                          <td style={cellStyle()}>{outlet.cancelled}</td>
-                          <td style={cellStyle()}>{outlet.latest_event_date || "-"}</td>
-                        </tr>
-                      )}
-                    />
                   </div>
+                </Section>
+              )}
+
+              {activeTab === "audit" && canViewTransactions && (
+                <Section title="Audit Trail" subtitle="Read-only status changes for operational review.">
+                  <TransactionMonitor transactionReport={transactionReport} isGlobal={canViewGlobalReports} sort={auditSort} onSort={setAuditSort} />
                 </Section>
               )}
             </div>
@@ -688,7 +877,8 @@ function tableHeadStyle() {
     textAlign: "left",
     padding: "10px 12px",
     borderBottom: `1px solid ${C.divider}`,
-    fontWeight: 700,
+    color: C.faint,
+    fontWeight: 750,
     whiteSpace: "nowrap",
   };
 }
@@ -698,7 +888,7 @@ function cellStyle(strong = false) {
     padding: "11px 12px",
     borderBottom: `1px solid ${C.divider}`,
     color: strong ? C.text : C.muted,
-    fontWeight: strong ? 650 : 450,
+    fontWeight: strong ? 650 : 550,
     whiteSpace: "nowrap",
   };
 }

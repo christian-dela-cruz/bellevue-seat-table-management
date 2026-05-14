@@ -19,7 +19,6 @@ class AdminAccountController extends Controller
         'fb_director',
         'outlet_manager',
         'staff',
-        'viewer',
     ];
 
     public function __construct(private AuthService $authService)
@@ -60,6 +59,14 @@ class AdminAccountController extends Controller
             'outlet_scope' => ['nullable', 'array'],
             'outlet_scope.*' => ['nullable'],
         ]);
+        $scopeType = $this->scopeTypeForRole($validated['role'], $validated['scope_type']);
+
+        if ($scopeType === 'assigned' && empty(array_filter($validated['outlet_scope'] ?? []))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Assigned-scope accounts require at least one outlet.',
+            ], 422);
+        }
 
         $admin = Admin::create([
             'name' => $validated['name'],
@@ -67,8 +74,8 @@ class AdminAccountController extends Controller
             'username' => $validated['username'],
             'password' => $validated['password'],
             'role' => AdminAccess::normalizeRole($validated['role']),
-            'scope_type' => $validated['scope_type'],
-            'outlet_scope' => $validated['scope_type'] === 'assigned'
+            'scope_type' => $scopeType,
+            'outlet_scope' => $scopeType === 'assigned'
                 ? array_values($validated['outlet_scope'] ?? [])
                 : [],
         ]);
@@ -104,6 +111,16 @@ class AdminAccountController extends Controller
         ]);
 
         $updates = collect($validated)->only(['name', 'email', 'username', 'scope_type'])->toArray();
+        $targetRole = $validated['role'] ?? $admin->role;
+        $targetScopeType = $this->scopeTypeForRole($targetRole, $validated['scope_type'] ?? $admin->scope_type ?? 'all');
+        $targetOutletScope = $validated['outlet_scope'] ?? $admin->outlet_scope ?? [];
+
+        if ($targetScopeType === 'assigned' && empty(array_filter($targetOutletScope))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Assigned-scope accounts require at least one outlet.',
+            ], 422);
+        }
 
         if (array_key_exists('role', $validated)) {
             $updates['role'] = AdminAccess::normalizeRole($validated['role']);
@@ -113,8 +130,10 @@ class AdminAccountController extends Controller
             $updates['password'] = $validated['password'];
         }
 
-        if (array_key_exists('outlet_scope', $validated) || array_key_exists('scope_type', $validated)) {
-            $scopeType = $updates['scope_type'] ?? $admin->scope_type ?? 'all';
+        if (array_key_exists('outlet_scope', $validated) || array_key_exists('scope_type', $validated) || array_key_exists('role', $validated)) {
+            $targetRole = $updates['role'] ?? $admin->role;
+            $scopeType = $this->scopeTypeForRole($targetRole, $updates['scope_type'] ?? $admin->scope_type ?? 'all');
+            $updates['scope_type'] = $scopeType;
             $updates['outlet_scope'] = $scopeType === 'assigned'
                 ? array_values($validated['outlet_scope'] ?? $admin->outlet_scope ?? [])
                 : [];
@@ -173,7 +192,7 @@ class AdminAccountController extends Controller
     {
         return match ($actor['role'] ?? '') {
             'super_admin' => self::ROLES,
-            'admin' => ['fb_director', 'outlet_manager', 'staff', 'viewer'],
+            'admin' => ['fb_director', 'outlet_manager', 'staff'],
             default => [],
         };
     }
@@ -196,6 +215,13 @@ class AdminAccountController extends Controller
         }
 
         return false;
+    }
+
+    private function scopeTypeForRole(string $role, string $requestedScope): string
+    {
+        return in_array(AdminAccess::normalizeRole($role), ['outlet_manager', 'staff'], true)
+            ? 'assigned'
+            : $requestedScope;
     }
 
     public function deactivate(Request $request, Admin $admin): JsonResponse

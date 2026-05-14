@@ -369,26 +369,41 @@ class ReservationService
     {
         $reservations = $this->scopedReservationQuery($admin)
             ->with('venue')
-            ->when($startDate, fn ($query) => $query->whereDate('event_date', '>=', $startDate))
-            ->when($endDate, fn ($query) => $query->whereDate('event_date', '<=', $endDate))
-            ->orderByDesc('event_date')
+            ->when($startDate || $endDate, fn ($query) => $this->applyReportActivityDateRange($query, $startDate, $endDate))
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('created_at')
             ->get();
 
         $venueQuery = Venue::query()->orderBy('wing')->orderBy('name');
         $this->applyVenueScope($venueQuery, $admin);
         $venues = $venueQuery->get();
 
-        $reports = $venues->map(function (Venue $venue) use ($reservations) {
-            $items = $reservations->where('venue_id', $venue->id)->values();
-            return $this->formatOutletReport($venue, $items);
-        });
+        $reservationsByRoom = $reservations->groupBy(fn (Reservation $reservation) => $this->roomLabel($reservation));
 
-        $unmatched = $reservations
-            ->filter(fn (Reservation $reservation) => !$reservation->venue_id)
-            ->groupBy(fn (Reservation $reservation) => $reservation->room ?: 'Unassigned Outlet')
-            ->map(fn ($items, $name) => $this->formatOutletReport(null, $items->values(), $name));
+        $roomReports = collect($this->adminOutletCatalog())
+            ->map(function (array $outlet) use ($reservationsByRoom, $venues) {
+                $items = $reservationsByRoom->get($outlet['name'], collect())->values();
+                $firstReservation = $items->first();
+                $venue = $firstReservation?->venue ?: $this->catalogVenueFallback($outlet['name'], $venues);
 
-        $allReports = $reports->concat($unmatched)->values();
+                return $this->formatOutletReport($venue, $items, $outlet['name'], $outlet);
+            })
+            ->values();
+
+        $reportedNames = $roomReports
+            ->pluck('name')
+            ->map(fn ($name) => strtolower((string) $name))
+            ->all();
+
+        $extraRoomReports = $reservationsByRoom
+            ->reject(fn ($items, $name) => in_array(strtolower((string) $name), $reportedNames, true))
+            ->map(function ($items, $name) {
+                $firstReservation = $items->first();
+                return $this->formatOutletReport($firstReservation?->venue, $items->values(), $name);
+            })
+            ->values();
+
+        $allReports = $roomReports->concat($extraRoomReports)->values();
 
         return [
             'summary' => [
@@ -404,7 +419,7 @@ class ReservationService
             ],
             'status_breakdown' => $this->formatStatusBreakdown($reservations),
             'category_breakdown' => $this->formatCategoryBreakdown($reservations),
-            'room_details' => $this->formatRoomDetails($reservations),
+            'room_details' => $this->formatRoomDetails($reservations, $allReports),
             'data' => $allReports->sortByDesc('total_reservations')->values()->toArray(),
         ];
     }
@@ -418,7 +433,8 @@ class ReservationService
             ->whereIn('reservation_id', $reservationScope)
             ->when($startDate, fn ($query) => $query->whereDate('created_at', '>=', $startDate))
             ->when($endDate, fn ($query) => $query->whereDate('created_at', '<=', $endDate))
-            ->latest()
+            ->orderByDesc('created_at')
+            ->orderBy('id')
             ->get();
 
         $reservations = $transactions
@@ -426,6 +442,7 @@ class ReservationService
             ->filter()
             ->unique('id')
             ->values();
+        $statusTransactions = $transactions->where('action', 'status_changed');
 
         $venueCount = $reservations
             ->filter(fn (Reservation $reservation) => filled($reservation->venue_id))
@@ -445,20 +462,20 @@ class ReservationService
                 'transactions' => $transactions->count(),
                 'reservations' => $reservations->count(),
                 'outlets' => $venueCount + $unassignedRoomCount,
-                'status_changes' => $transactions->where('action', 'status_changed')->count(),
-                'approvals' => $transactions->where('to_status', 'reserved')->count(),
-                'rejections' => $transactions->where('to_status', 'rejected')->count(),
-                'reverts' => $transactions->filter(
+                'status_changes' => $statusTransactions->count(),
+                'approvals' => $statusTransactions->where('to_status', 'reserved')->count(),
+                'rejections' => $statusTransactions->where('to_status', 'rejected')->count(),
+                'reverts' => $statusTransactions->filter(
                     fn (ReservationTransaction $transaction) => $transaction->from_status === 'rejected'
                         && $transaction->to_status === 'pending'
                 )->count(),
                 'latest_at' => optional($transactions->first()?->created_at)->toISOString(),
             ],
             'status_breakdown' => [
-                'pending' => $transactions->where('to_status', 'pending')->count(),
-                'reserved' => $transactions->where('to_status', 'reserved')->count(),
-                'rejected' => $transactions->where('to_status', 'rejected')->count(),
-                'cancelled' => $transactions->where('to_status', 'cancelled')->count(),
+                'pending' => $statusTransactions->where('to_status', 'pending')->count(),
+                'reserved' => $statusTransactions->where('to_status', 'reserved')->count(),
+                'rejected' => $statusTransactions->where('to_status', 'rejected')->count(),
+                'cancelled' => $statusTransactions->where('to_status', 'cancelled')->count(),
             ],
             'data' => $transactions
                 ->map(fn (ReservationTransaction $transaction) => $this->formatTransactionReportRow($transaction))
@@ -475,11 +492,12 @@ class ReservationService
             ->with('venue')
             ->whereYear('event_date', $year)
             ->orderBy('event_date')
+            ->orderBy('event_time')
             ->get();
 
         $months = collect(range(1, 12))->map(function (int $month) use ($reservations, $year) {
             $items = $reservations->filter(
-                fn (Reservation $reservation) => (int) $reservation->event_date->format('n') === $month
+                fn (Reservation $reservation) => (int) $reservation->event_date?->format('n') === $month
             )->values();
 
             $venueCount = $items
@@ -706,7 +724,105 @@ class ReservationService
         return in_array('view_global_reports', $admin['permissions'] ?? [], true);
     }
 
-    private function formatOutletReport(?Venue $venue, $reservations, ?string $fallbackName = null): array
+    private function applyReportActivityDateRange($query, ?string $startDate, ?string $endDate): void
+    {
+        if ($startDate) {
+            $query->where(function ($dateQuery) use ($startDate) {
+                $dateQuery->whereDate('submitted_at', '>=', $startDate)
+                    ->orWhere(function ($fallbackQuery) use ($startDate) {
+                        $fallbackQuery->whereNull('submitted_at')
+                            ->whereDate('created_at', '>=', $startDate);
+                    });
+            });
+        }
+
+        if ($endDate) {
+            $query->where(function ($dateQuery) use ($endDate) {
+                $dateQuery->whereDate('submitted_at', '<=', $endDate)
+                    ->orWhere(function ($fallbackQuery) use ($endDate) {
+                        $fallbackQuery->whereNull('submitted_at')
+                            ->whereDate('created_at', '<=', $endDate);
+                    });
+            });
+        }
+    }
+
+    private function adminOutletCatalog(): array
+    {
+        return [
+            ['name' => 'Alabang Function Room', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 100],
+            ['name' => 'Laguna Ballroom 1', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 100],
+            ['name' => 'Laguna Ballroom 2', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 100],
+            ['name' => '20/20 Function Room A', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 50],
+            ['name' => '20/20 Function Room B', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 50],
+            ['name' => '20/20 Function Room C', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 50],
+            ['name' => 'Business Center', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 30],
+            ['name' => 'Tower 1', 'wing' => 'Tower Wing', 'type' => 'function_room', 'capacity' => 100],
+            ['name' => 'Tower 2', 'wing' => 'Tower Wing', 'type' => 'function_room', 'capacity' => 100],
+            ['name' => 'Tower 3', 'wing' => 'Tower Wing', 'type' => 'function_room', 'capacity' => 100],
+            ['name' => 'Grand Ballroom A', 'wing' => 'Tower Wing', 'type' => 'function_room', 'capacity' => 140],
+            ['name' => 'Grand Ballroom B', 'wing' => 'Tower Wing', 'type' => 'function_room', 'capacity' => 140],
+            ['name' => 'Grand Ballroom C', 'wing' => 'Tower Wing', 'type' => 'function_room', 'capacity' => 140],
+            ['name' => 'Qsina Restaurant', 'wing' => 'Dining', 'type' => 'dining', 'capacity' => 80],
+            ['name' => 'Hanakazu Japanese Restaurant', 'wing' => 'Dining', 'type' => 'dining', 'capacity' => 60],
+            ['name' => 'Phoenix Court', 'wing' => 'Dining', 'type' => 'dining', 'capacity' => 80],
+        ];
+    }
+
+    private function catalogVenueFallback(string $outletName, $venues): ?Venue
+    {
+        $name = strtolower($outletName);
+
+        if (str_contains($name, 'laguna ballroom')) {
+            return $venues->firstWhere('name', 'Laguna Ballroom');
+        }
+
+        if (str_contains($name, '20/20 function room')) {
+            return $venues->firstWhere('name', '20/20 Function Room');
+        }
+
+        if (str_contains($name, 'tower') || str_contains($name, 'grand ballroom')) {
+            return $venues->firstWhere('name', 'Tower Ballroom');
+        }
+
+        if (str_contains($name, 'qsina')) {
+            return $venues->firstWhere('name', 'Qsina Restaurant');
+        }
+
+        if (str_contains($name, 'hanakazu')) {
+            return $venues->firstWhere('name', 'Hanakazu Japanese Restaurant');
+        }
+
+        return $venues->firstWhere('name', $outletName);
+    }
+
+    private function reportWingForRoom(?string $room, ?string $venueWing): ?string
+    {
+        $name = strtolower((string) $room);
+
+        if (str_contains($name, 'grand ballroom') || str_contains($name, 'tower')) {
+            return 'Tower Wing';
+        }
+
+        if (str_contains($name, 'qsina') || str_contains($name, 'hanakazu') || str_contains($name, 'phoenix') || str_contains($name, 'restaurant')) {
+            return 'Dining';
+        }
+
+        return $venueWing;
+    }
+
+    private function reportTypeForRoom(?string $room, ?string $venueType): ?string
+    {
+        $name = strtolower((string) $room);
+
+        if (str_contains($name, 'qsina') || str_contains($name, 'hanakazu') || str_contains($name, 'phoenix') || str_contains($name, 'restaurant')) {
+            return 'dining';
+        }
+
+        return $venueType ?? 'function_room';
+    }
+
+    private function formatOutletReport(?Venue $venue, $reservations, ?string $fallbackName = null, array $metadata = []): array
     {
         $total = $reservations->count();
         $reserved = $reservations->filter(fn ($reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count();
@@ -721,10 +837,10 @@ class ReservationService
 
         return [
             'venue_id' => $venue?->id,
-            'name' => $venue?->name ?? $fallbackName ?? 'Unassigned Outlet',
-            'wing' => $venue?->wing ?? null,
-            'type' => $venue?->type ?? null,
-            'capacity' => $venue?->capacity ?? 0,
+            'name' => $metadata['name'] ?? $fallbackName ?? $venue?->name ?? 'Unassigned Outlet',
+            'wing' => $metadata['wing'] ?? $this->reportWingForRoom($fallbackName, $venue?->wing),
+            'type' => $metadata['type'] ?? $this->reportTypeForRoom($fallbackName, $venue?->type),
+            'capacity' => $metadata['capacity'] ?? $venue?->capacity ?? 0,
             'total_reservations' => $total,
             'pending' => $pending,
             'reserved' => $reserved,
@@ -776,9 +892,9 @@ class ReservationService
         ];
     }
 
-    private function formatRoomDetails($reservations): array
+    private function formatRoomDetails($reservations, $catalogReports = null): array
     {
-        return $reservations
+        $rows = $reservations
             ->groupBy(fn (Reservation $reservation) => $this->roomLabel($reservation))
             ->map(function ($items, string $room) {
                 $latest = $items->sortByDesc('event_date')->first();
@@ -797,6 +913,34 @@ class ReservationService
                     'latest_event_time' => $latest?->event_time,
                 ];
             })
+            ->values();
+
+        if ($catalogReports) {
+            $existingRooms = $rows
+                ->pluck('room')
+                ->map(fn ($room) => strtolower((string) $room))
+                ->all();
+
+            $emptyRows = collect($catalogReports)
+                ->filter(fn ($outlet) => !in_array(strtolower((string) ($outlet['name'] ?? '')), $existingRooms, true))
+                ->map(fn ($outlet) => [
+                    'room' => $outlet['name'],
+                    'reservations' => 0,
+                    'guests' => 0,
+                    'pending' => 0,
+                    'reserved' => 0,
+                    'rejected' => 0,
+                    'cancelled' => 0,
+                    'dine_in' => 0,
+                    'promotion_mentions' => 0,
+                    'latest_event_date' => null,
+                    'latest_event_time' => null,
+                ]);
+
+            $rows = $rows->concat($emptyRows);
+        }
+
+        return $rows
             ->sortByDesc('reservations')
             ->values()
             ->toArray();
@@ -806,10 +950,15 @@ class ReservationService
     {
         $venueType = strtolower((string) ($reservation->venue?->type ?? ''));
         $wing = strtolower((string) ($reservation->venue?->wing ?? ''));
+        $room = strtolower((string) $reservation->room);
 
         return str_contains($venueType, 'dining')
             || str_contains($venueType, 'restaurant')
-            || str_contains($wing, 'dining');
+            || str_contains($wing, 'dining')
+            || str_contains($room, 'qsina')
+            || str_contains($room, 'hanakazu')
+            || str_contains($room, 'phoenix')
+            || str_contains($room, 'restaurant');
     }
 
     private function hasPromotionMention(Reservation $reservation): bool
@@ -825,9 +974,20 @@ class ReservationService
 
     private function roomLabel(Reservation $reservation): string
     {
-        return $reservation->room
+        return $this->canonicalRoomLabel($reservation->room
             ?: $reservation->venue?->name
-            ?: 'Unassigned Room';
+            ?: 'Unassigned Room');
+    }
+
+    private function canonicalRoomLabel(string $room): string
+    {
+        $normalized = strtolower(trim($room));
+
+        return match ($normalized) {
+            'qsina' => 'Qsina Restaurant',
+            'hanakazu' => 'Hanakazu Japanese Restaurant',
+            default => $room,
+        };
     }
 
     /**

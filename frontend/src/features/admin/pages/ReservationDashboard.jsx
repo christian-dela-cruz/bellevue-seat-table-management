@@ -6,6 +6,7 @@ import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
 import { fetchReservations, approveReservation, rejectReservation, revertReservation, updateReservation, getReservationStats } from "../../../utils/api";
 import { authAPI } from "../../../services/authAPI";
+import { ADMIN_OUTLET_GROUPS, ADMIN_OUTLET_ROOMS, canonicalOutletName } from "../../../constants/outletCatalog";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -292,6 +293,14 @@ function RoomFilterDropdown({ rooms, selectedRoom, onSelect, isMobile }) {
 
   const label = selectedRoom === "ALL" ? "All Rooms" : selectedRoom;
   const hasFilter = selectedRoom !== "ALL";
+  const groupedRooms = [
+    ...ADMIN_OUTLET_GROUPS,
+    {
+      id: "other",
+      label: "Other",
+      rooms: rooms.filter(room => !ADMIN_OUTLET_ROOMS.includes(room)),
+    },
+  ].filter(group => group.rooms.length > 0);
 
   return (
     <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
@@ -404,41 +413,49 @@ function RoomFilterDropdown({ rooms, selectedRoom, onSelect, isMobile }) {
             <div style={{ height: 1, background: C.divider, margin: "4px 10px" }} />
           )}
 
-          {rooms.map((room) => (
-            <button
-              key={room}
-              onClick={() => { onSelect(room); setOpen(false); }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                width: "100%",
-                padding: "8px 14px",
-                background: selectedRoom === room ? C.goldFaint : "transparent",
-                border: "none",
-                textAlign: "left",
-                fontFamily: F.body,
-                fontSize: 12,
-                fontWeight: selectedRoom === room ? 600 : 400,
-                color: selectedRoom === room ? C.gold : C.textPrimary,
-                cursor: "pointer",
-                transition: "background 0.12s",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-              onMouseEnter={(e) => { if (selectedRoom !== room) e.currentTarget.style.background = "rgba(0,0,0,0.03)"; }}
-              onMouseLeave={(e) => { if (selectedRoom !== room) e.currentTarget.style.background = "transparent"; }}
-            >
-              {selectedRoom === room ? (
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              ) : (
-                <span style={{ width: 9 }} />
-              )}
-              {room}
-            </button>
+          {groupedRooms.map((group) => (
+            <div key={group.id}>
+              <div style={{ padding: "9px 14px 5px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>{group.label}</span>
+                <span style={{ fontFamily: F.label, fontSize: 10, color: C.textTertiary }}>{group.rooms.length}</span>
+              </div>
+              {group.rooms.map((room) => (
+                <button
+                  key={room}
+                  onClick={() => { onSelect(room); setOpen(false); }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    width: "100%",
+                    padding: "8px 14px 8px 22px",
+                    background: selectedRoom === room ? C.goldFaint : "transparent",
+                    border: "none",
+                    textAlign: "left",
+                    fontFamily: F.body,
+                    fontSize: 12,
+                    fontWeight: selectedRoom === room ? 600 : 400,
+                    color: selectedRoom === room ? C.gold : C.textPrimary,
+                    cursor: "pointer",
+                    transition: "background 0.12s",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                  onMouseEnter={(e) => { if (selectedRoom !== room) e.currentTarget.style.background = "rgba(0,0,0,0.03)"; }}
+                  onMouseLeave={(e) => { if (selectedRoom !== room) e.currentTarget.style.background = "transparent"; }}
+                >
+                  {selectedRoom === room ? (
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  ) : (
+                    <span style={{ width: 9 }} />
+                  )}
+                  {room}
+                </button>
+              ))}
+            </div>
           ))}
 
           {rooms.length === 0 && (
@@ -1659,37 +1676,15 @@ export default function ReservationDashboard() {
 
   // ─── Master room list + any extra rooms found in reservations ───────────────
   const roomOptions = useMemo(() => {
-    const PINNED = ["Alabang Function Room"];
-    const REST = [
-      "Grand Ballroom A",
-      "Grand Ballroom B",
-      "Grand Ballroom C",
-      "Laguna Ballroom 1",
-      "Laguna Ballroom 2",
-      "Tower Ballroom 1",
-      "Tower Ballroom 2",
-      "Tower Ballroom 3",
-      "Tower 1",
-      "Tower 2",
-      "Tower 3",
-      "20/20 Function Room A",
-      "20/20 Function Room B",
-      "20/20 Function Room C",
-      "Business Center",
-      "Qsina",
-      "Hanakazu",
-      "Phoenix Court",
-    ];
     const fromReservations = reservations
-      .map(r => r.room?.trim())
+      .map(r => canonicalOutletName(r.room))
       .filter(Boolean);
-    const pinnedSet = new Set(PINNED);
-    const masterSet = new Set([...PINNED, ...REST]);
+    const masterSet = new Set(ADMIN_OUTLET_ROOMS);
     // Only add rooms from DB that aren't already in the master list
     const extras = Array.from(new Set(fromReservations))
       .filter(r => !masterSet.has(r))
       .sort((a, b) => a.localeCompare(b));
-    return [...PINNED, ...REST, ...extras];
+    return [...ADMIN_OUTLET_ROOMS, ...extras];
   }, [reservations]);
 
   const refreshDashboardData = useCallback(async (silent = true) => {
@@ -1824,7 +1819,7 @@ export default function ReservationDashboard() {
     // ← NEW: room filter
     if(filterRoom!=="ALL"){
       filtered=filtered.filter((r)=>
-        (r.room||"").trim()===filterRoom
+        canonicalOutletName(r.room)===filterRoom
       );
     }
 

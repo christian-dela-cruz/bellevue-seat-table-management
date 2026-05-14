@@ -107,9 +107,9 @@ class ClientReservationController extends Controller
             'seat_id'          => 'nullable|string|max:50',
         ]);
 
-        // Fix: Find venue by room name to ensure correct venue_id
+        // Keep sub-room reservations tied to their parent venue for backend scope checks.
         if (!empty($validated['room'])) {
-            $venue = Venue::where('name', $validated['room'])->first();
+            $venue = Venue::where('name', $this->parentVenueNameForRoom($validated['room']))->first();
             if ($venue) {
                 $validated['venue_id'] = $venue->id;
             }
@@ -161,6 +161,33 @@ class ClientReservationController extends Controller
         }
 
         return response()->json($reservation, 201);
+    }
+
+    private function parentVenueNameForRoom(string $room): string
+    {
+        $normalized = strtolower(trim($room));
+
+        if (str_starts_with($normalized, 'laguna ballroom')) {
+            return 'Laguna Ballroom';
+        }
+
+        if (str_starts_with($normalized, '20/20 function room')) {
+            return '20/20 Function Room';
+        }
+
+        if (str_starts_with($normalized, 'tower ') || str_starts_with($normalized, 'grand ballroom')) {
+            return 'Tower Ballroom';
+        }
+
+        if (str_contains($normalized, 'qsina')) {
+            return 'Qsina Restaurant';
+        }
+
+        if (str_contains($normalized, 'hanakazu')) {
+            return 'Hanakazu Japanese Restaurant';
+        }
+
+        return $room;
     }
 
     public function show(Reservation $reservation): JsonResponse

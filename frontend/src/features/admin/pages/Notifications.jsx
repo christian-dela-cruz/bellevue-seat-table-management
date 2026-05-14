@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import { reservationAPI } from "../../../services/reservationAPI";
 import { authAPI } from "../../../services/authAPI";
+import { ADMIN_OUTLET_ROOMS, canonicalOutletName } from "../../../constants/outletCatalog";
 
 function getTokens() {
   return {
@@ -237,7 +238,7 @@ function isPending(r) {
   return s === "pending" || s === "awaiting" || s === "under review";
 }
 function getOutletName(res) {
-  return String(res.room || res.venue?.name || res.venue || "Unassigned Outlet").trim();
+  return canonicalOutletName(res.room || res.venue?.name || res.venue || "Unassigned Outlet");
 }
 function parseEventDate(d, t) {
   if (!d) return null;
@@ -1196,7 +1197,13 @@ function NotificationDashboard() {
   },[syncReservations,upsertReservation]);
 
   const outletSummaries=useMemo(()=>outletCountsFor(allCards),[allCards]);
-  const outletOptions=useMemo(()=>["ALL",...outletSummaries.map(item=>item.outlet)],[outletSummaries]);
+  const completeOutletSummaries=useMemo(()=>{
+    const byName=new Map(outletSummaries.map(item=>[item.outlet,item]));
+    const catalogRows=ADMIN_OUTLET_ROOMS.map(outlet=>byName.get(outlet)||{outlet,total:0,pending:0,upcoming:0,accepted:0,declined:0});
+    const extras=outletSummaries.filter(item=>!ADMIN_OUTLET_ROOMS.includes(item.outlet));
+    return [...catalogRows,...extras];
+  },[outletSummaries]);
+  const outletOptions=useMemo(()=>["ALL",...completeOutletSummaries.map(item=>item.outlet)],[completeOutletSummaries]);
 
   useEffect(()=>{
     if(outletFilter==="ALL")return;
@@ -1307,7 +1314,7 @@ function NotificationDashboard() {
               <div style={{ display:"grid",gridTemplateColumns:"minmax(0,3fr) minmax(0,1.4fr)",gap:14,flex:1,minHeight:0 }} className="nd-grid">
                 <div style={{ gridColumn:"1 / -1" }}>
                   <OutletMonitorBar
-                    outlets={outletSummaries}
+                    outlets={completeOutletSummaries}
                     selectedOutlet={outletFilter}
                     onSelect={(outlet)=>{setOutletFilter(outlet);setPendingPage(1);setDonePage(1);}}
                     currentUser={currentUser}
