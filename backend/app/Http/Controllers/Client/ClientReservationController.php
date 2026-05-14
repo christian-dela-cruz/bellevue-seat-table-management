@@ -14,12 +14,40 @@ use App\Mail\ReservationStatusMail;
 use App\Services\ReservationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 class ClientReservationController extends Controller
 {
     public function __construct(private ReservationService $reservationService)
     {
+    }
+
+    /**
+     * SQLite databases created before standalone support still enforce
+     * a two-value CHECK constraint on reservations.type. Keep the explicit
+     * standalone markers, but store a SQLite-safe fallback type until the
+     * corrective migration is applied.
+     */
+    private function normalizeStandaloneReservation(array $data): array
+    {
+        $isStandalone = ($data['type'] ?? null) === 'standalone'
+            || ($data['is_standalone'] ?? false);
+
+        if (!$isStandalone) {
+            return $data;
+        }
+
+        $data['is_standalone'] = true;
+        $data['table_number'] = 'STANDALONE';
+
+        if (DB::getDriverName() === 'sqlite') {
+            $data['type'] = 'individual';
+        } else {
+            $data['type'] = 'standalone';
+        }
+
+        return $data;
     }
 
     public function index(Request $request): JsonResponse
@@ -42,7 +70,11 @@ class ClientReservationController extends Controller
                 $query->whereDate('event_date', $request->query('event_date'));
             })
             ->when($request->filled('event_time'), function ($query) use ($request) {
-                $query->where('event_time', substr((string) $request->query('event_time'), 0, 5));
+                $time = substr((string) $request->query('event_time'), 0, 5);
+                $query->where(function ($timeQuery) use ($time) {
+                    $timeQuery->where('event_time', $time)
+                        ->orWhere('event_time', $time . ':00');
+                });
             })
             ->orderBy('event_date', 'asc')
             ->get();
@@ -84,6 +116,8 @@ class ClientReservationController extends Controller
         } else {
             $validated['room'] = Venue::find($validated['venue_id'])?->name;
         }
+
+        $validated = $this->normalizeStandaloneReservation($validated);
 
         if ($this->reservationService->hasScheduleConflict($validated)) {
             return response()->json([

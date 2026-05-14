@@ -12,6 +12,7 @@ function LoginScreen({ onLogin }) {
   const [loading, setLoading] = useState(false);
 
   const handle = async () => {
+    if (loading) return;
     setLoading(true);
     setError("");
     
@@ -45,6 +46,7 @@ function LoginScreen({ onLogin }) {
       justifyContent:"center", 
       fontFamily:"Montserrat, sans-serif" 
     }}>
+      <style>{`@keyframes loginSpin { to { transform: rotate(360deg); } }`}</style>
       {/* Background overlay with blur and gold tint */}
       <div style={{
         position:"absolute",
@@ -121,6 +123,7 @@ function LoginScreen({ onLogin }) {
                 transition:"all 0.2s ease"
               }} 
               type="text" 
+              disabled={loading}
               value={user} 
               onChange={e=>{setUser(e.target.value);setError("");}} 
               onKeyDown={e=>e.key==="Enter"&&handle()} 
@@ -145,6 +148,7 @@ function LoginScreen({ onLogin }) {
                 transition:"all 0.2s ease"
               }} 
               type="password" 
+              disabled={loading}
               value={pass} 
               onChange={e=>{setPass(e.target.value);setError("");}} 
               onKeyDown={e=>e.key==="Enter"&&handle()} 
@@ -168,14 +172,35 @@ function LoginScreen({ onLogin }) {
             cursor:"pointer", 
             opacity:loading?0.7:1,
             transition:"all 0.2s ease",
-            boxShadow:"0 4px 15px rgba(201, 168, 76, 0.4)"
+            boxShadow:"0 4px 15px rgba(201, 168, 76, 0.4)",
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"center",
+            gap:10
           }} 
+          disabled={loading}
           onClick={handle}
           onMouseEnter={e=>!loading && (e.target.style.background="#B8943D")}
           onMouseLeave={e=>!loading && (e.target.style.background="#C9A84C")}
         >
+          {loading && (
+            <span style={{
+              width:16,
+              height:16,
+              borderRadius:"50%",
+              border:"2px solid rgba(255,255,255,0.45)",
+              borderTopColor:"#fff",
+              display:"inline-block",
+              animation:"loginSpin 0.75s linear infinite"
+            }} />
+          )}
           {loading ? "Signing in..." : "Sign In"}
         </button>
+        {loading && (
+          <div style={{ marginTop:12,fontSize:12,color:"#718096",textAlign:"center",fontWeight:600 }}>
+            Verifying account access
+          </div>
+        )}
       </div>
     </div>
   );

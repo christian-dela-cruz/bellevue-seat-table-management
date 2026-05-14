@@ -66,7 +66,8 @@ Route::prefix('venues')->group(function () {
 
 // Seatmap routes
 Route::prefix('seatmap')->group(function () {
-    Route::get('/{wing}/{room}', [SeatMapController::class, 'getSeatmap']);
+    Route::get('/{wing}/{room}', [SeatMapController::class, 'getSeatmap'])
+        ->where('room', '.*');
 });
 
 // Room seats routes (alias for seatmap to match frontend expectations)

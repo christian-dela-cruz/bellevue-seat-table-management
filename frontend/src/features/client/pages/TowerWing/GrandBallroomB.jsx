@@ -5,6 +5,7 @@ import SharedNavbar from "../../../../components/SharedNavbar.jsx";
 
 import SeatMap, { STATUS_COLORS } from "../../../../components/seatmap/SeatMap";
 import ScheduleGate, { normalizeSchedule, withSeatmapSchedule } from "../../../../components/seatmap/ScheduleGate";
+import { mergeReservationStatusIntoLayout } from "../../../../utils/seatmapAvailability";
 import Echo from "../../../../utils/websocket.js";
 
 // ─── API base ─────────────────────────────────────────────────────────────────
@@ -121,7 +122,7 @@ const F = {
   label:   "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
-const LEGEND_STATUSES = ["available", "pending", "reserved"];
+const LEGEND_STATUSES = ["available", "unavailable"];
 
 // ─── Persistence helpers ──────────────────────────────────────────────────────
 function layoutKey(wing, room) {
@@ -138,43 +139,7 @@ function normaliseApiStatus(raw) {
 }
 
 function mergeApiStatusIntoLayout(localLayout, apiData) {
-  if (!localLayout || !apiData) return localLayout;
-  const apiStatusMap = {};
-  const apiTables = apiData.tables || (Array.isArray(apiData) ? apiData : []);
-
-  apiTables.forEach(t => {
-    if (Array.isArray(t?.seats)) {
-      (t.seats || []).forEach(s => {
-        apiStatusMap[s.id] = normaliseApiStatus(s.status);
-      });
-      return;
-    }
-    const tableKey = String(t.table ?? t.table_number ?? t.tableNo ?? t.tableId ?? t.table_id ?? "").trim();
-    const seatKey  = String(t.seat  ?? t.seat_number  ?? t.seatNo  ?? t.seat_id  ?? t.seatId  ?? "").trim();
-    const compositeKey = `${tableKey}|${seatKey}`;
-    if (tableKey || seatKey) {
-      apiStatusMap[compositeKey] = normaliseApiStatus(t.status);
-    }
-  });
-
-  const mergedTables = (localLayout.tables || []).map(t => ({
-    ...t,
-    seats: (t.seats || []).map(s => {
-      const apiStatus =
-        apiStatusMap[s.id] ??
-        apiStatusMap[`${String(t.id ?? t.label ?? "").trim()}|${String(s.num ?? s.label ?? s.id ?? "").trim()}`];
-      return { ...s, status: apiStatus ?? "available" };
-    }),
-  }));
-
-  const mergedStandaloneSeats = (localLayout.standaloneSeats || []).map(s => {
-    const apiStatus =
-      apiStatusMap[s.id] ??
-      apiStatusMap[`STANDALONE|${String(s.num ?? s.label ?? s.id ?? "").trim()}`];
-    return { ...s, status: apiStatus ?? "available" };
-  });
-
-  return { ...localLayout, tables: mergedTables, standaloneSeats: mergedStandaloneSeats };
+  return mergeReservationStatusIntoLayout(localLayout, apiData);
 }
 
 function loadLayoutForClient(wing, room) {
@@ -525,7 +490,7 @@ function ModalGuestCount({ seatData, tableData, mode, isStandalone, onContinue, 
               <div style={{ fontFamily: F.body, fontSize: 12, color: C.textSecondary, lineHeight: 1.6 }}>
                 Table <strong style={{ color: C.textPrimary }}>{tableData?.id}</strong> has{" "}
                 <strong style={{ color: C.textPrimary }}>{capacity} available seat{capacity !== 1 ? "s" : ""}</strong>
-                {pendingSeats.length > 0 && <span style={{ color: C.gold }}>{" "}({pendingSeats.length} pending approval)</span>}
+                {pendingSeats.length > 0 && <span style={{ color: C.gold }}>{" "}({pendingSeats.length} temporarily unavailable)</span>}
               </div>
               {atMax && (
                 <div style={{ marginTop: 10, padding: "8px 12px", borderRadius: 7, background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, fontFamily: F.body, fontSize: 11.5, color: C.gold, lineHeight: 1.5 }}>
@@ -714,7 +679,7 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
         <SectionLabel C={C} style={{ marginTop: 18 }}>Guest Information</SectionLabel>
         {guestRows.map(([k, v]) => <Row key={k} label={k} value={v} />)}
         <div style={{ padding: "10px 14px", borderRadius: 8, margin: "18px 0 20px", background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, fontSize: 11.5, color: C.textSecondary, lineHeight: 1.65 }}>
-          Your booking will be <strong style={{ color: C.textPrimary }}>pending admin review</strong> upon submission.
+          Your booking will be <strong style={{ color: C.textPrimary }}>reviewed by our team</strong> upon submission.
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={onEdit} disabled={submitting}
@@ -849,7 +814,7 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
             <div style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.22em", color: isRebook ? C.gold : C.green, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>
               {isRebook ? "Seat Moved" : "Reservation Submitted"}
             </div>
-            <div style={{ fontFamily: F.display, fontSize: 22, fontWeight: 600, color: C.textPrimary, lineHeight: 1.2 }}>Pending Approval</div>
+            <div style={{ fontFamily: F.display, fontSize: 22, fontWeight: 600, color: C.textPrimary, lineHeight: 1.2 }}>Request Submitted</div>
           </div>
         </div>
 
@@ -864,7 +829,7 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
               { label: "Room",    value: ROOM },
               { label: "Date",    value: fmtDate(bookingDetails?.date) },
               { label: "Guests",  value: String(guests) },
-              { label: "Status",  value: "Pending Review", gold: true },
+              { label: "Status",  value: "Awaiting Confirmation", gold: true },
             ].map(({ label, value, gold }, i, arr) => (
               <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < arr.length - 1 ? `1px solid ${C.divider}` : "none" }}>
                 <span style={{ fontFamily: F.label, fontSize: 8, fontWeight: 700, letterSpacing: "0.14em", color: C.textTertiary, textTransform: "uppercase" }}>{label}</span>
@@ -1053,14 +1018,14 @@ export default function GrandBallroomBReserve() {
   const fetchAndMerge = useCallback(async () => {
     try {
       const res = await fetch(
-        `${API_BASE_URL}/reservations?room=${encodeURIComponent(ROOM)}&wing=${encodeURIComponent(API_WING)}&venue_id=3&per_page=9999`,
+        withSeatmapSchedule(`${API_BASE_URL}/reservations?room=${encodeURIComponent(ROOM)}&wing=${encodeURIComponent(API_WING)}&venue_id=3&per_page=9999`),
         { headers: { Accept: "application/json" } }
       );
 
       if (!res.ok) {
         try {
           const fallback = await fetch(
-            withSeatmapSchedule(`${API_BASE_URL}/seatmap/${encodeURIComponent(API_WING)}/${encodeURIComponent(ROOM)}`),
+            withSeatmapSchedule(`${API_BASE_URL}/reservations?room=${encodeURIComponent(ROOM)}&per_page=9999`),
             { headers: { Accept: "application/json" } }
           );
           if (!fallback.ok) return;
@@ -1126,7 +1091,7 @@ export default function GrandBallroomBReserve() {
                 seatStatusMap[`${tId}|${sNum}`]      ??
                 seatStatusMap[`T${tIdNorm}|${sNum}`] ??
                 seatStatusMap[`${tIdNorm}|${sNum}`];
-              return resolved !== undefined ? { ...s, status: resolved } : s;
+              return { ...s, status: resolved ?? (s.status === "maintenance" ? "maintenance" : "available") };
             }),
           };
         });
@@ -1136,7 +1101,7 @@ export default function GrandBallroomBReserve() {
           const resolved =
             seatStatusMap[`STANDALONE|${sNum}`] ??
             seatStatusMap[`standalone|${sNum}`];
-          return resolved !== undefined ? { ...s, status: resolved } : s;
+          return { ...s, status: resolved ?? (s.status === "maintenance" ? "maintenance" : "available") };
         });
 
         const updated = { ...base, tables: updatedTables, standaloneSeats: updatedStandalone };
@@ -1238,7 +1203,7 @@ export default function GrandBallroomBReserve() {
   // ─── Event handlers ─────────────────────────────────────────────────────────
   const handleTableClick    = table => { setSelectedTable(table); setModal("guestCount"); };
   const handleSeatClick     = seat  => {
-    if (seat.status === "reserved") { alert("This seat is already reserved and cannot be booked."); return; }
+    if (seat.status !== "available") { alert("This seat is unavailable for the selected schedule."); return; }
     setSelectedSeat(seat);
     setSelectedTable(resolveTableForSeat(seat));
   };
@@ -1347,7 +1312,7 @@ export default function GrandBallroomBReserve() {
   const isTablet     = windowSize.width < 1024;
   const activeTable  = getActiveTable();
   const isStandalone = isStandaloneSelected();
-  const canProceed   = mode === "individual" && selectedSeat && selectedSeat.status !== "reserved";
+  const canProceed   = mode === "individual" && selectedSeat && selectedSeat.status === "available";
   const seatRatio    = activeTable ? getSeatRatio(activeTable) : null;
 
   const displayTable = isStandalone

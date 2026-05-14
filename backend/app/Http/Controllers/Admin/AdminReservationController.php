@@ -13,6 +13,7 @@ use App\Events\ReservationDeleted;
 use App\Mail\ReservationStatusMail;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
@@ -23,6 +24,32 @@ class AdminReservationController extends Controller
     public function __construct(ReservationService $reservationService)
     {
         $this->reservationService = $reservationService;
+    }
+
+    /**
+     * Older SQLite databases still reject reservations.type = standalone.
+     * Preserve the standalone flags while using an enum-safe fallback until
+     * the schema correction migration has been applied.
+     */
+    private function normalizeStandaloneReservation(array $data): array
+    {
+        $isStandalone = ($data['type'] ?? null) === 'standalone'
+            || ($data['is_standalone'] ?? false);
+
+        if (!$isStandalone) {
+            return $data;
+        }
+
+        $data['is_standalone'] = true;
+        $data['table_number'] = 'STANDALONE';
+
+        if (DB::getDriverName() === 'sqlite') {
+            $data['type'] = 'individual';
+        } else {
+            $data['type'] = 'standalone';
+        }
+
+        return $data;
     }
 
     public function index(Request $request): JsonResponse
@@ -91,6 +118,7 @@ class AdminReservationController extends Controller
         $validated['reference_code'] = date('Y') . '-' . str_pad(mt_rand(1, 9999), 4, '0', STR_PAD_LEFT);
         $validated['status']         = 'pending';
         $validated['submitted_at']   = now();
+        $validated = $this->normalizeStandaloneReservation($validated);
 
         if (!$this->reservationService->canAccessVenue($this->currentAdmin($request), (int) $validated['venue_id'], $validated['room'] ?? null)) {
             return $this->scopeDeniedResponse();
@@ -185,11 +213,7 @@ class AdminReservationController extends Controller
             ], 422);
         }
 
-        if (($validated['type'] ?? null) === 'standalone' || ($validated['is_standalone'] ?? false)) {
-            $validated['is_standalone'] = true;
-            $validated['type'] = 'standalone';
-            $validated['table_number'] = 'STANDALONE';
-        }
+        $validated = $this->normalizeStandaloneReservation($validated);
 
         $original = $reservation->only(array_keys($validated));
         $reservation->update($validated);

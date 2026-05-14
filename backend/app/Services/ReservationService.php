@@ -116,6 +116,23 @@ class ReservationService
         ]);
     }
 
+    private function tableNumberCandidates(string $tableNumber): array
+    {
+        $plain = trim(preg_replace('/^table\s+/i', '', $tableNumber));
+        $candidates = [$tableNumber, $plain];
+
+        if ($plain !== '') {
+            $candidates[] = 'Table ' . $plain;
+
+            if (!preg_match('/^t/i', $plain) && ctype_digit($plain)) {
+                $candidates[] = 'T' . $plain;
+                $candidates[] = 'Table T' . $plain;
+            }
+        }
+
+        return array_values(array_unique(array_filter(array_map('trim', $candidates))));
+    }
+
     /**
      * Assign seats to a reservation
      */
@@ -164,7 +181,10 @@ class ReservationService
         $query = Reservation::query()
             ->where('venue_id', (int) $data['venue_id'])
             ->whereDate('event_date', $eventDate)
-            ->where('event_time', $eventTime)
+            ->where(function ($timeQuery) use ($eventTime) {
+                $timeQuery->where('event_time', $eventTime)
+                    ->orWhere('event_time', $eventTime . ':00');
+            })
             ->whereIn('status', ['pending', 'approved', 'reserved']);
 
         if ($ignoreReservationId) {
@@ -195,9 +215,10 @@ class ReservationService
         }
 
         $requestedSeats = array_filter(array_map('trim', explode(',', $seatNumber)));
+        $tableNumbers = $this->tableNumberCandidates($tableNumber);
 
         return $query
-            ->where('table_number', $tableNumber)
+            ->whereIn('table_number', $tableNumbers)
             ->where(function ($conflictQuery) use ($type, $requestedSeats) {
                 if ($type === 'whole' || empty($requestedSeats)) {
                     $conflictQuery->whereNotNull('table_number');

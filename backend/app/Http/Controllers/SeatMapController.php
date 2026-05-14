@@ -208,12 +208,19 @@ class SeatMapController extends Controller
     private function scheduledReservations(Request $request, int $venueId)
     {
         return Reservation::where('venue_id', $venueId)
+            ->when($request->filled('room'), function ($query) use ($request) {
+                $query->where('room', $request->query('room'));
+            })
             ->whereIn('status', ['pending', 'approved', 'reserved'])
             ->when($request->filled('event_date'), function ($query) use ($request) {
                 $query->whereDate('event_date', $request->query('event_date'));
             })
             ->when($request->filled('event_time'), function ($query) use ($request) {
-                $query->where('event_time', substr((string) $request->query('event_time'), 0, 5));
+                $time = substr((string) $request->query('event_time'), 0, 5);
+                $query->where(function ($timeQuery) use ($time) {
+                    $timeQuery->where('event_time', $time)
+                        ->orWhere('event_time', $time . ':00');
+                });
             })
             ->get();
     }

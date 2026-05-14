@@ -157,7 +157,7 @@ function clientFilter(list, surname, phone) {
 function StatusBadge({ status, C }) {
   const s = (status || "").toLowerCase();
   const cfg =
-    s === "pending"  ? { ...C.badgePending,  label: "Pending"   } :
+    s === "pending"  ? { ...C.badgePending,  label: "Awaiting Confirmation" } :
     s === "reserved" ? { ...C.badgeApproved, label: "Confirmed" } :
     s === "approved" ? { ...C.badgeApproved, label: "Confirmed" } :
     s === "rejected" ? { ...C.badgeRejected, label: "Cancelled" } :

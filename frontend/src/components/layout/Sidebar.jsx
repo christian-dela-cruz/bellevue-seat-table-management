@@ -174,7 +174,11 @@ function NavItem({ item, isActive, isOpen, onClick }) {
                   textAlign:"left",
                 }}
               >
-                <SubIcon size={13} strokeWidth={2.2} />
+                {SubIcon ? (
+                  <SubIcon size={13} strokeWidth={2.2} />
+                ) : (
+                  <span style={{ width:13,height:13,display:"inline-block",flexShrink:0 }} />
+                )}
                 <span>{subItem.label}</span>
               </button>
             );

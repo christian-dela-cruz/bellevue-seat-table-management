@@ -54,12 +54,39 @@ const ACCOUNT_VIEWS = [
 ];
 
 const SORT_OPTIONS = [
-  { value: "name_asc", label: "Name A-Z" },
-  { value: "name_desc", label: "Name Z-A" },
-  { value: "role_asc", label: "Role A-Z" },
-  { value: "status_active", label: "Active first" },
-  { value: "status_inactive", label: "Inactive first" },
+  { value: "name_asc", label: "Name, A to Z" },
+  { value: "name_desc", label: "Name, Z to A" },
+  { value: "email_asc", label: "Email, A to Z" },
+  { value: "username_asc", label: "Username, A to Z" },
 ];
+
+function Spinner({ color = C.gold, size = 14 }) {
+  return (
+    <span
+      style={{
+        width:size,
+        height:size,
+        borderRadius:"50%",
+        border:`2px solid ${color}33`,
+        borderTopColor:color,
+        display:"inline-block",
+        animation:"accountSpin 0.75s linear infinite",
+      }}
+    />
+  );
+}
+
+function LoadingOverlay({ label }) {
+  if (!label) return null;
+  return (
+    <div style={{ position:"absolute",inset:0,background:"rgba(255,255,255,0.72)",backdropFilter:"blur(1px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:5 }}>
+      <div style={{ display:"inline-flex",alignItems:"center",gap:10,padding:"10px 14px",border:`1px solid ${C.border}`,borderRadius:999,background:C.surface,boxShadow:"0 10px 30px rgba(0,0,0,0.08)",fontSize:12,color:C.muted,fontWeight:700 }}>
+        <Spinner />
+        {label}
+      </div>
+    </div>
+  );
+}
 
 function SectionTitle({ eyebrow, title }) {
   return (
@@ -107,6 +134,28 @@ function inputStyle() {
   };
 }
 
+function paginationButtonStyle(disabled = false) {
+  return {
+    minWidth:42,
+    height:34,
+    padding:"0 11px",
+    border:`1px solid ${disabled ? "rgba(0,0,0,0.06)" : "rgba(140,107,42,0.22)"}`,
+    borderRadius:8,
+    background:disabled ? "rgba(0,0,0,0.025)" : C.surface,
+    color:disabled ? C.faint : C.gold,
+    cursor:disabled ? "not-allowed" : "pointer",
+    display:"inline-flex",
+    alignItems:"center",
+    justifyContent:"center",
+    gap:5,
+    fontFamily:F.label,
+    fontSize:10,
+    fontWeight:800,
+    letterSpacing:"0.10em",
+    textTransform:"uppercase",
+  };
+}
+
 function roleOptionsFor(currentRole) {
   const roles = ["super_admin", "admin", "fb_director", "outlet_manager", "staff", "viewer"];
   if (currentRole === "super_admin") return roles;
@@ -144,6 +193,8 @@ export default function Accounts() {
   const [form,setForm] = useState(DEFAULT_FORM);
   const [editingId,setEditingId] = useState(null);
   const [loading,setLoading] = useState(false);
+  const [loadingAccounts,setLoadingAccounts] = useState(false);
+  const [actionLabel,setActionLabel] = useState("");
   const [toast,setToast] = useState(null);
   const [roleFilter,setRoleFilter] = useState("all");
   const [statusFilter,setStatusFilter] = useState("all");
@@ -183,7 +234,6 @@ export default function Accounts() {
     });
   }, [visibleAccounts, roleFilter, statusFilter, search]);
   const sortedAccounts = useMemo(() => {
-    const activeValue = (account) => (account.is_active === false ? 0 : 1);
     const textValue = (value) => String(value || "").toLowerCase();
     const sorted = [...filteredAccounts];
 
@@ -191,12 +241,10 @@ export default function Accounts() {
       switch (sortBy) {
         case "name_desc":
           return textValue(b.name).localeCompare(textValue(a.name));
-        case "role_asc":
-          return textValue(ROLE_LABELS[a.role] || a.role).localeCompare(textValue(ROLE_LABELS[b.role] || b.role));
-        case "status_active":
-          return activeValue(b) - activeValue(a) || textValue(a.name).localeCompare(textValue(b.name));
-        case "status_inactive":
-          return activeValue(a) - activeValue(b) || textValue(a.name).localeCompare(textValue(b.name));
+        case "email_asc":
+          return textValue(a.email).localeCompare(textValue(b.email));
+        case "username_asc":
+          return textValue(a.username).localeCompare(textValue(b.username));
         case "name_asc":
         default:
           return textValue(a.name).localeCompare(textValue(b.name));
@@ -218,11 +266,14 @@ export default function Accounts() {
 
   const loadAccounts = async () => {
     if (!canManage) return;
+    setLoadingAccounts(true);
     try {
       const response = await authAPI.getAccounts();
       setAccounts(response.data || []);
     } catch (error) {
       setToast({ type:"error", message:error.message || "Failed to load accounts." });
+    } finally {
+      setLoadingAccounts(false);
     }
   };
 
@@ -257,6 +308,7 @@ export default function Accounts() {
   const submitAccount = async (event) => {
     event.preventDefault();
     setLoading(true);
+    setActionLabel(editingId ? "Updating account..." : "Creating account...");
 
     const payload = {
       name: form.name,
@@ -282,6 +334,7 @@ export default function Accounts() {
       setToast({ type:"error", message:error.message || "Failed to save account." });
     } finally {
       setLoading(false);
+      setActionLabel("");
     }
   };
 
@@ -313,6 +366,7 @@ export default function Accounts() {
     }
 
     setLoading(true);
+    setActionLabel(account.is_active === false ? "Reactivating account..." : "Disabling account...");
     try {
       if (account.is_active === false) {
         await authAPI.reactivateAccount(account.id);
@@ -328,6 +382,7 @@ export default function Accounts() {
       setToast({ type:"error", message:error.message || "Failed to update account status." });
     } finally {
       setLoading(false);
+      setActionLabel("");
     }
   };
 
@@ -337,6 +392,7 @@ export default function Accounts() {
 
   return (
     <div style={{ minHeight:"100vh",background:C.pageBg,fontFamily:F.body }}>
+      <style>{`@keyframes accountSpin { to { transform: rotate(360deg); } }`}</style>
       <AdminNavbar />
       <div style={{ display:"flex" }}>
         <Sidebar activeNav="accounts" isOpen={sidebarOpen} onToggle={()=>setSidebarOpen(!sidebarOpen)} />
@@ -392,7 +448,8 @@ export default function Accounts() {
           ) : (
             <div style={{ display:"grid",gridTemplateColumns:showEditor ? "minmax(360px, 0.85fr) minmax(620px, 1.15fr)" : "minmax(720px, 1fr)",gap:18,alignItems:"start",maxWidth:1380 }}>
               {showEditor && (
-                <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:18 }}>
+                <div style={{ position:"relative",background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:18,overflow:"hidden" }}>
+                  <LoadingOverlay label={actionLabel && showEditor ? actionLabel : ""} />
                   <SectionTitle eyebrow={editingId ? "Edit Account" : "New Account"} title={editingId ? "Update Account" : "Create Account"} />
                   <form onSubmit={submitAccount} style={{ display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12 }}>
                     <Field label="Name">
@@ -425,7 +482,8 @@ export default function Accounts() {
                     </div>
                     <div style={{ gridColumn:"1 / -1",display:"flex",gap:8,justifyContent:"flex-end" }}>
                       {editingId && <button type="button" onClick={resetForm} style={{ padding:"10px 14px",border:`1px solid ${C.border}`,borderRadius:8,background:"transparent",color:C.muted,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer" }}>Cancel</button>}
-                      <button disabled={loading} style={{ padding:"10px 16px",border:"none",borderRadius:8,background:C.green,color:"#fff",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",cursor:loading?"not-allowed":"pointer" }}>
+                      <button disabled={loading} style={{ padding:"10px 16px",border:"none",borderRadius:8,background:C.green,color:"#fff",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",cursor:loading?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8 }}>
+                        {loading && showEditor ? <Spinner color="#FFFFFF" size={12} /> : null}
                         {loading ? "Saving..." : editingId ? "Update Account" : "Create Account"}
                       </button>
                     </div>
@@ -433,7 +491,8 @@ export default function Accounts() {
                 </div>
               )}
 
-                <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,overflow:"hidden" }}>
+                <div style={{ position:"relative",background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,overflow:"hidden" }}>
+                  <LoadingOverlay label={loadingAccounts ? "Loading accounts..." : (!showEditor ? actionLabel : "")} />
                   <div style={{ padding:"14px 18px 12px",borderBottom:`1px solid ${C.divider}`,display:"grid",gap:12 }}>
                     <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:12 }}>
                       <div>
@@ -445,7 +504,7 @@ export default function Accounts() {
                         <span style={{ padding:"5px 9px",borderRadius:999,background:C.redFaint,color:C.red,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase" }}>{inactiveCount} Inactive</span>
                       </div>
                     </div>
-                    <div style={{ display:"grid",gridTemplateColumns:"minmax(210px,1.35fr) repeat(4,minmax(120px,0.8fr))",gap:10,alignItems:"end" }}>
+                    <div style={{ display:"grid",gridTemplateColumns:"minmax(210px,1.4fr) repeat(3,minmax(120px,0.85fr))",gap:10,alignItems:"end" }}>
                       <FilterControl label="Search">
                         <div style={{ position:"relative" }}>
                           <Search size={14} style={{ position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:C.faint,pointerEvents:"none" }} />
@@ -478,13 +537,6 @@ export default function Accounts() {
                           </select>
                         </div>
                       </FilterControl>
-                      <FilterControl label="Per Page">
-                        <select value={pageSize} onChange={(e)=>setPageSize(e.target.value)} style={{...inputStyle(),minHeight:36,padding:"7px 10px"}}>
-                          <option value="5">5 accounts</option>
-                          <option value="10">10 accounts</option>
-                          <option value="all">All</option>
-                        </select>
-                      </FilterControl>
                     </div>
                   </div>
 
@@ -515,7 +567,10 @@ export default function Accounts() {
                         <span style={{ justifySelf:"start",padding:"4px 8px",borderRadius:999,background:inactive ? C.redFaint : C.greenFaint,color:inactive ? C.red : C.green,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em" }}>{inactive ? "Inactive" : "Active"}</span>
                         <div style={{ display:"flex",alignItems:"center",gap:7,justifyContent:"flex-end" }}>
                           <button type="button" disabled={!manageable || loading} onClick={()=>editAccount(account)} style={{ padding:"7px 9px",border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,color:manageable?C.text:C.faint,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",cursor:manageable&&!loading?"pointer":"not-allowed" }}>Edit</button>
-                          <button type="button" disabled={!manageable || loading} onClick={()=>toggleAccountActive(account)} style={{ padding:"7px 9px",border:`1px solid ${inactive ? "rgba(46,122,90,0.20)" : "rgba(160,56,56,0.20)"}`,borderRadius:7,background:inactive?C.greenFaint:C.redFaint,color:inactive?C.green:C.red,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",cursor:manageable&&!loading?"pointer":"not-allowed" }}>{inactive ? "Enable" : "Disable"}</button>
+                          <button type="button" disabled={!manageable || loading} onClick={()=>toggleAccountActive(account)} style={{ padding:"7px 9px",border:`1px solid ${inactive ? "rgba(46,122,90,0.20)" : "rgba(160,56,56,0.20)"}`,borderRadius:7,background:inactive?C.greenFaint:C.redFaint,color:inactive?C.green:C.red,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",cursor:manageable&&!loading?"pointer":"not-allowed",display:"inline-flex",alignItems:"center",gap:6 }}>
+                            {loading && actionLabel && !showEditor ? <Spinner color={inactive ? C.green : C.red} size={11} /> : null}
+                            {inactive ? "Enable" : "Disable"}
+                          </button>
                         </div>
                       </div>
                     )})}
@@ -525,15 +580,24 @@ export default function Accounts() {
                       <span style={{ fontSize:12,color:C.muted }}>
                         Showing {pageStart}-{pageEnd} of {sortedAccounts.length}
                       </span>
-                      <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                      <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+                        <label style={{ display:"inline-flex",alignItems:"center",gap:7,fontSize:12,color:C.muted }}>
+                          Rows
+                          <select value={pageSize} onChange={(e)=>setPageSize(e.target.value)} style={{...inputStyle(),width:96,minHeight:32,padding:"5px 8px",fontSize:12}}>
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="all">All</option>
+                          </select>
+                        </label>
                         <button
                           type="button"
                           disabled={currentPage <= 1 || pageSize === "all"}
                           onClick={()=>setPage((value)=>Math.max(1, value - 1))}
-                          style={{ width:32,height:32,border:`1px solid ${C.border}`,borderRadius:8,background:C.surface,color:currentPage <= 1 || pageSize === "all" ? C.faint : C.text,cursor:currentPage <= 1 || pageSize === "all" ? "not-allowed" : "pointer",display:"inline-flex",alignItems:"center",justifyContent:"center" }}
+                          style={paginationButtonStyle(currentPage <= 1 || pageSize === "all")}
                           title="Previous page"
                         >
                           <ChevronLeft size={15} />
+                          Prev
                         </button>
                         <span style={{ minWidth:82,textAlign:"center",fontSize:12,color:C.muted }}>
                           Page {currentPage} of {totalPages}
@@ -542,9 +606,10 @@ export default function Accounts() {
                           type="button"
                           disabled={currentPage >= totalPages || pageSize === "all"}
                           onClick={()=>setPage((value)=>Math.min(totalPages, value + 1))}
-                          style={{ width:32,height:32,border:`1px solid ${C.border}`,borderRadius:8,background:C.surface,color:currentPage >= totalPages || pageSize === "all" ? C.faint : C.text,cursor:currentPage >= totalPages || pageSize === "all" ? "not-allowed" : "pointer",display:"inline-flex",alignItems:"center",justifyContent:"center" }}
+                          style={paginationButtonStyle(currentPage >= totalPages || pageSize === "all")}
                           title="Next page"
                         >
+                          Next
                           <ChevronRight size={15} />
                         </button>
                       </div>

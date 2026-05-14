@@ -12,6 +12,7 @@ function AdminNavbar({ onLogout, pendingCount: pendingProp, leftContent = null }
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [profileMessage, setProfileMessage] = useState(null);
   const menuRef = useRef(null);
   const currentUser = authAPI.getCurrentUser() || {};
@@ -61,13 +62,20 @@ function AdminNavbar({ onLogout, pendingCount: pendingProp, leftContent = null }
     .toUpperCase();
 
   const handleLogout = async () => {
-    if (onLogout) {
-      await onLogout();
-      return;
-    }
+    if (loggingOut) return;
+    setLoggingOut(true);
 
-    await authAPI.logout();
-    navigate("/login", { replace: true });
+    try {
+      if (onLogout) {
+        await onLogout();
+        return;
+      }
+
+      await authAPI.logout();
+      navigate("/login", { replace: true });
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   const submitProfile = async (event) => {
@@ -279,9 +287,9 @@ function AdminNavbar({ onLogout, pendingCount: pendingProp, leftContent = null }
                   <UserIcon />
                   Account settings
                 </button>
-                <button onClick={handleLogout} style={{ ...menuButtonStyle(), color: "#A03838" }}>
+                <button onClick={handleLogout} disabled={loggingOut} style={{ ...menuButtonStyle(), color: "#A03838", opacity:loggingOut?0.70:1, cursor:loggingOut?"not-allowed":"pointer" }}>
                   <LogoutIcon />
-                  Logout
+                  {loggingOut ? "Logging out..." : "Logout"}
                 </button>
               </div>
             </div>

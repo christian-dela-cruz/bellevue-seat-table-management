@@ -6,12 +6,14 @@ import { cleanupReservationsForDeletedTable, cleanupReservationsForDeletedSeat, 
 // Status Colors
 export const STATUS_COLORS = {
   available: "#4A9E7E",
+  unavailable: "#B85C5C",
   pending:   "#C4A35A",
   reserved:  "#B85C5C",
   rejected:  "#4A9E7E",
 };
 export const STATUS_LABELS = {
   available: "AVAILABLE",
+  unavailable: "UNAVAILABLE",
   pending:   "PENDING",
   reserved:  "RESERVED",
   approved:  "APPROVED",
@@ -304,8 +306,8 @@ function DraggableLabel({ item, onDragStart, isDragging }) {
 
 function StandaloneSeat({ seat, editMode, isSelected, isDragging, onDragStart, onSelect, onSeatClick, onDeleteClick, isMultiSelected, T }) {
   const [hov, setHov] = useState(false);
-  const color = STATUS_COLORS[seat.status] || STATUS_COLORS.available;
-  const blocked = !editMode && (seat.status === "reserved" || seat.status === "pending");
+  const blocked = !editMode && seat.status !== "available";
+  const color = blocked ? STATUS_COLORS.unavailable : (STATUS_COLORS[seat.status] || STATUS_COLORS.available);
   const SIZE = 38;
   const tokens = T || { gold: C.gold, cardShadow: C.cardShadow };
   return (
@@ -313,8 +315,19 @@ function StandaloneSeat({ seat, editMode, isSelected, isDragging, onDragStart, o
       style={{ position: "absolute", left: (seat.x || 0), top: (seat.y || 0), width: SIZE, height: SIZE, zIndex: isSelected ? 15 : 6 }}
       onMouseEnter={() => !blocked && setHov(true)} onMouseLeave={() => setHov(false)}
       onMouseDown={editMode ? e => { e.stopPropagation(); onDragStart(e, seat.id); } : undefined}
-      onClick={e => { e.stopPropagation(); if (editMode) { if (onDeleteClick) { onDeleteClick(seat); } else { onSelect(seat); } return; } if (!blocked) onSeatClick?.(seat, null); }}
-      title={blocked ? (seat.status === "reserved" ? "Already reserved" : "Pending") : `Seat ${seat.num}`}
+      onClick={e => {
+        e.stopPropagation();
+        if (editMode) {
+          if (onDeleteClick) { onDeleteClick(seat); } else { onSelect(seat); }
+          return;
+        }
+        if (blocked) {
+          alert("This seat is unavailable for the selected schedule.");
+          return;
+        }
+        onSeatClick?.(seat, null);
+      }}
+      title={blocked ? "Unavailable for selected schedule" : `Seat ${seat.num}`}
     >
       <div style={{
         width: SIZE, height: SIZE, borderRadius: "50%",
@@ -339,13 +352,21 @@ function StandaloneSeat({ seat, editMode, isSelected, isDragging, onDragStart, o
 
 function SeatNode({ seat, isSelected, editMode, isDragging, onSeatClick, onSeatDragStart, T }) {
   const [hov, setHov] = useState(false);
-  const color = STATUS_COLORS[seat.status] || STATUS_COLORS.available;
-  const blocked = !editMode && (seat.status === "reserved" || seat.status === "pending");
+  const blocked = !editMode && seat.status !== "available";
+  const color = blocked ? STATUS_COLORS.unavailable : (STATUS_COLORS[seat.status] || STATUS_COLORS.available);
   const SIZE = 38;
   const tokens = T || { gold: C.gold, cardShadow: C.cardShadow };
   return (
     <div
-      onClick={e => { e.stopPropagation(); if (!isDragging && !blocked) onSeatClick?.(seat); }}
+      onClick={e => {
+        e.stopPropagation();
+        if (isDragging) return;
+        if (blocked) {
+          alert("This seat is unavailable for the selected schedule.");
+          return;
+        }
+        onSeatClick?.(seat);
+      }}
       onMouseDown={editMode ? e => { e.stopPropagation(); onSeatDragStart?.(e, seat.id); } : undefined}
       onMouseEnter={() => !blocked && !editMode && setHov(true)} onMouseLeave={() => setHov(false)}
       style={{
@@ -366,7 +387,7 @@ function SeatNode({ seat, isSelected, editMode, isDragging, onSeatClick, onSeatD
   );
 }
 
-function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectTable, onDragStart, onResizeStart, onSeatClick, onLabelEdit, isDragging, onSeatMove, T, wing, room }) {
+function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectTable, onDragStart, onResizeStart, onSeatClick, onLabelEdit, isDragging, onSeatMove, T, wing, room, mode }) {
   const [hov, setHov] = useState(false);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelVal, setLabelVal] = useState(table.label || table.id);
@@ -380,6 +401,7 @@ function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectT
     borderDefault: C.borderDefault, borderAccent: C.borderAccent,
     textPrimary: C.textPrimary, textTertiary: C.textTertiary, divider: C.divider,
   };
+  const tableBlocked = !editMode && mode === "whole" && (table.seats || []).some(seat => seat.status !== "available");
   useEffect(() => setLabelVal(table.label || table.id), [table.label, table.id]);
   const SEAT_D = 38, SEAT_GAP = 6, SEAT_OFF = 8;
   const tableW = Math.max(table.width || 110, 80);
@@ -474,10 +496,18 @@ function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectT
             border: isTableSelected ? `1.5px solid ${tokens.gold}` : hov ? `1.5px solid ${tokens.borderAccent}` : `1px solid ${tokens.borderDefault}`,
             boxShadow: isTableSelected ? `0 0 0 3px ${tokens.gold}10, 0 4px 16px rgba(0,0,0,0.12)` : hov ? "0 4px 12px rgba(0,0,0,0.12)" : tokens.cardShadow,
             transition: "border 0.15s, box-shadow 0.15s, background 0.18s",
-            cursor: editMode ? (isDragging ? "grabbing" : "grab") : "pointer", zIndex: 2, overflow: "visible",
+            cursor: editMode ? (isDragging ? "grabbing" : "grab") : tableBlocked ? "not-allowed" : "pointer", zIndex: 2, overflow: "visible",
+            opacity: tableBlocked ? 0.72 : 1,
           }}
           onMouseDown={editMode ? e => { if (!draggingSeatId) { e.stopPropagation(); onDragStart(e, table.id); } } : undefined}
-          onClick={e => { e.stopPropagation(); onSelectTable(table); }}
+          onClick={e => {
+            e.stopPropagation();
+            if (tableBlocked) {
+              alert("This table is unavailable for the selected schedule.");
+              return;
+            }
+            onSelectTable(table);
+          }}
           onDoubleClick={editMode ? e => { e.stopPropagation(); setEditingLabel(true); } : undefined}
         >
           {editingLabel
@@ -1304,7 +1334,7 @@ export default function SeatMap({
                 editMode={false} isTableSelected={highlightedTable ? highlightedTable.id === t.id : false}
                 selectedSeatId={selectedSeat ? selectedSeat.id : null}
                 onSelectTable={handleTableSelect} onDragStart={() => {}} onResizeStart={() => {}}
-                onSeatClick={handleSeatClick} isDragging={false} T={T} wing={wing} room={room} />
+                onSeatClick={handleSeatClick} isDragging={false} T={T} wing={wing} room={room} mode={mode} />
             ))}
           </div>
         </ScaledCanvas>

@@ -597,7 +597,7 @@ export default function ManageBooking() {
   // ── Cancel booking ─────────────────────────────────────────────────────────
   const handleCancelConfirm = async (reason) => {
     if (!isCancelableStatus(booking?.status)) {
-      setError("Only pending or approved reservations can be cancelled.");
+      setError("Only reservations awaiting confirmation or confirmed reservations can be cancelled.");
       setShowCancelModal(false);
       return;
     }
@@ -637,7 +637,7 @@ export default function ManageBooking() {
   // ── Sub-components ─────────────────────────────────────────────────────────
   function StatusBadge({ status }) {
     const cfg =
-      status === "pending"  ? { ...C.badgePending,  label: "Pending"   } :
+      status === "pending"  ? { ...C.badgePending,  label: "Awaiting Confirmation" } :
       status === "reserved" ? { ...C.badgeApproved, label: "Confirmed" } :
       status === "approved" ? { ...C.badgeApproved, label: "Approved"  } :
       status === "rejected" ? { ...C.badgeRejected, label: "Cancelled" } :
@@ -1028,7 +1028,7 @@ export default function ManageBooking() {
                         <button
                           onClick={() => {
                             if (!isCancelableStatus(booking?.status)) {
-                              setError("Only pending or approved reservations can be cancelled.");
+                              setError("Only reservations awaiting confirmation or confirmed reservations can be cancelled.");
                               return;
                             }
                             setError("");

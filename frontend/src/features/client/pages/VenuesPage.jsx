@@ -465,11 +465,9 @@ function VenueCard({ venue, onClick, C, isDark, hideSpacer }) {
                 <span style={{ fontFamily: FONT, fontSize: 11, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
                   {availability.events_count} event{availability.events_count === 1 ? "" : "s"} in range
                 </span>
-                {(availability.pending_count > 0 || availability.reserved_count > 0) && (
-                  <span style={{ fontFamily: FONT, fontSize: 11, color: C.textMuted }}>
-                    {[availability.pending_count > 0 ? `${availability.pending_count} pending` : null, availability.reserved_count > 0 ? `${availability.reserved_count} reserved` : null].filter(Boolean).join(" / ")}
-                  </span>
-                )}
+                <span style={{ fontFamily: FONT, fontSize: 11, color: C.textMuted }}>
+                  Schedule activity found
+                </span>
               </div>
               {availability.next_event_date && (
                 <div style={{ fontFamily: FONT, fontSize: 11, color: C.textMuted }}>
