@@ -1,7 +1,7 @@
 // src/components/admin/Sidebar.jsx
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { X, ClipboardList, Map, UserCog, BarChart3 } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { X, ClipboardList, Map, UserCog, BarChart3, List, UserPlus, PencilLine } from "lucide-react";
 import { authAPI } from "../../services/authAPI";
 
 const F = { body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" };
@@ -10,7 +10,18 @@ const NAV_ITEMS = [
   { id: "reservations", label: "Reservations", icon: ClipboardList, iconStyle: "lucide" },
   { id: "cancelled",    label: "Cancelled",    icon: X,           iconStyle: "lucide" },
   { id: "reports",      label: "Reports",      icon: BarChart3,   iconStyle: "lucide", permission: "view_outlet_reports" },
-  { id: "accounts",     label: "Accounts",     icon: UserCog,     iconStyle: "lucide", permission: "manage_accounts" },
+  {
+    id: "accounts",
+    label: "Account Manager",
+    icon: UserCog,
+    iconStyle: "lucide",
+    permission: "manage_accounts",
+    subItems: [
+      { id: "account-directory", label: "Account Directory", path: "/admin/accounts?view=list", icon: List },
+      { id: "create-account", label: "Create Account", path: "/admin/accounts?view=create", icon: UserPlus },
+      { id: "manage-accounts", label: "Manage Accounts", path: "/admin/accounts?view=manage", icon: PencilLine },
+    ],
+  },
   { 
     id: "seat-map", 
     label: "Seat Map", 
@@ -61,6 +72,7 @@ function HamburgerBtn({ onClick, isOpen }) {
 function NavItem({ item, isActive, isOpen, onClick }) {
   const [hovered, setHovered] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const isCancelled = item.id === "cancelled";
 
@@ -75,7 +87,7 @@ function NavItem({ item, isActive, isOpen, onClick }) {
       "reservations": "/admin/reservations",
       "cancelled":    "/admin/cancelled",
       "reports":      "/admin/reports",
-      "accounts":     "/admin/accounts",
+      "accounts":     "/admin/accounts?view=list",
       "seat-map":     "/admin/seatmap",
     };
     navigate(routes[item.id] || "/admin/dashboard");
@@ -92,37 +104,82 @@ function NavItem({ item, isActive, isOpen, onClick }) {
     />
   );
 
+  const showSubItems = isOpen && item.subItems?.length && (hovered || isActive);
+  const currentPath = `${location.pathname}${location.search}`;
+
   return (
     <div
-      onClick={handleClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title={!isOpen ? item.label : undefined}
-      style={{
-        display: "flex", alignItems: "center", gap: 10,
-        padding: isOpen ? "11px 20px" : "11px 0",
-        justifyContent: isOpen ? "flex-start" : "center",
-        fontFamily: F.body, fontSize: 12,
-        color: isActive ? activeColor : hovered ? hoverColor : "#555",
-        background: isActive ? activeBg : hovered ? hoverBg : "transparent",
-        borderLeft: isActive
-          ? `3px solid ${borderColor}`
-          : "3px solid transparent",
-        cursor: "pointer",
-        fontWeight: isActive ? 700 : 400,
-        transition: "all 0.15s",
-        userSelect: "none",
-        borderRadius: isOpen ? "0 6px 6px 0" : 0,
-      }}
     >
-      {item.iconStyle === "lucide"
-        ? <LucideIcon icon={item.icon} />
-        : <span style={{ fontSize: 15, flexShrink: 0 }}>{item.icon}</span>
-      }
-      {isOpen && (
-        <span style={{ whiteSpace: "nowrap", overflow: "hidden" }}>
-          {item.label}
-        </span>
+      <div
+        onClick={handleClick}
+        style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: isOpen ? "11px 20px" : "11px 0",
+          justifyContent: isOpen ? "flex-start" : "center",
+          fontFamily: F.body, fontSize: 12,
+          color: isActive ? activeColor : hovered ? hoverColor : "#555",
+          background: isActive ? activeBg : hovered ? hoverBg : "transparent",
+          borderLeft: isActive
+            ? `3px solid ${borderColor}`
+            : "3px solid transparent",
+          cursor: "pointer",
+          fontWeight: isActive ? 700 : 400,
+          transition: "all 0.15s",
+          userSelect: "none",
+          borderRadius: isOpen ? "0 6px 6px 0" : 0,
+        }}
+      >
+        {item.iconStyle === "lucide"
+          ? <LucideIcon icon={item.icon} />
+          : <span style={{ fontSize: 15, flexShrink: 0 }}>{item.icon}</span>
+        }
+        {isOpen && (
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden" }}>
+            {item.label}
+          </span>
+        )}
+      </div>
+
+      {showSubItems && (
+        <div style={{ margin:"4px 10px 8px 28px",padding:"5px",borderLeft:"1px solid rgba(140,107,42,0.16)",display:"grid",gap:3 }}>
+          {item.subItems.map((subItem) => {
+            const SubIcon = subItem.icon;
+            const subActive = currentPath === subItem.path;
+            return (
+              <button
+                key={subItem.id}
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  navigate(subItem.path);
+                  onClick?.(item.id);
+                }}
+                style={{
+                  minHeight:30,
+                  border:"none",
+                  borderRadius:6,
+                  padding:"7px 9px",
+                  display:"flex",
+                  alignItems:"center",
+                  gap:8,
+                  background:subActive ? "rgba(140,107,42,0.10)" : "transparent",
+                  color:subActive ? "#8C6B2A" : "#6D6252",
+                  fontFamily:F.body,
+                  fontSize:11.5,
+                  fontWeight:subActive ? 700 : 500,
+                  cursor:"pointer",
+                  textAlign:"left",
+                }}
+              >
+                <SubIcon size={13} strokeWidth={2.2} />
+                <span>{subItem.label}</span>
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );

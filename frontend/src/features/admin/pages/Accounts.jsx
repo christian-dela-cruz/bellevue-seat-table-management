@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { ArrowUpDown, ChevronLeft, ChevronRight, List as ListIcon, PencilLine, Search, UserPlus } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
@@ -45,6 +47,20 @@ const DEFAULT_FORM = {
   outlet_scope: "",
 };
 
+const ACCOUNT_VIEWS = [
+  { id: "list", label: "Account Directory", icon: ListIcon },
+  { id: "create", label: "Create Account", icon: UserPlus },
+  { id: "manage", label: "Manage Accounts", icon: PencilLine },
+];
+
+const SORT_OPTIONS = [
+  { value: "name_asc", label: "Name A-Z" },
+  { value: "name_desc", label: "Name Z-A" },
+  { value: "role_asc", label: "Role A-Z" },
+  { value: "status_active", label: "Active first" },
+  { value: "status_inactive", label: "Inactive first" },
+];
+
 function SectionTitle({ eyebrow, title }) {
   return (
     <div style={{ marginBottom: 16 }}>
@@ -60,6 +76,17 @@ function Field({ label, children }) {
   return (
     <label style={{ display:"grid",gap:6 }}>
       <span style={{ fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.faint }}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function FilterControl({ label, children }) {
+  return (
+    <label style={{ display:"grid",gap:5,minWidth:0 }}>
+      <span style={{ fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.faint }}>
+        {label}
+      </span>
       {children}
     </label>
   );
@@ -109,6 +136,9 @@ function scopeText(scope) {
 export default function Accounts() {
   const currentUser = authAPI.getCurrentUser();
   const canManage = authAPI.hasPermission("manage_accounts");
+  const [searchParams,setSearchParams] = useSearchParams();
+  const requestedView = searchParams.get("view");
+  const accountView = ACCOUNT_VIEWS.some((view) => view.id === requestedView) ? requestedView : "list";
   const [sidebarOpen,setSidebarOpen] = useState(true);
   const [accounts,setAccounts] = useState([]);
   const [form,setForm] = useState(DEFAULT_FORM);
@@ -118,6 +148,9 @@ export default function Accounts() {
   const [roleFilter,setRoleFilter] = useState("all");
   const [statusFilter,setStatusFilter] = useState("all");
   const [search,setSearch] = useState("");
+  const [sortBy,setSortBy] = useState("name_asc");
+  const [pageSize,setPageSize] = useState("5");
+  const [page,setPage] = useState(1);
 
   const assignableRoles = useMemo(() => roleOptionsFor(currentUser?.role), [currentUser?.role]);
   const visibleAccounts = useMemo(
@@ -149,6 +182,37 @@ export default function Accounts() {
       return matchesRole && matchesStatus && matchesSearch;
     });
   }, [visibleAccounts, roleFilter, statusFilter, search]);
+  const sortedAccounts = useMemo(() => {
+    const activeValue = (account) => (account.is_active === false ? 0 : 1);
+    const textValue = (value) => String(value || "").toLowerCase();
+    const sorted = [...filteredAccounts];
+
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case "name_desc":
+          return textValue(b.name).localeCompare(textValue(a.name));
+        case "role_asc":
+          return textValue(ROLE_LABELS[a.role] || a.role).localeCompare(textValue(ROLE_LABELS[b.role] || b.role));
+        case "status_active":
+          return activeValue(b) - activeValue(a) || textValue(a.name).localeCompare(textValue(b.name));
+        case "status_inactive":
+          return activeValue(a) - activeValue(b) || textValue(a.name).localeCompare(textValue(b.name));
+        case "name_asc":
+        default:
+          return textValue(a.name).localeCompare(textValue(b.name));
+      }
+    });
+
+    return sorted;
+  }, [filteredAccounts, sortBy]);
+  const pageSizeNumber = pageSize === "all" ? Math.max(sortedAccounts.length, 1) : Number(pageSize);
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(sortedAccounts.length / pageSizeNumber));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = sortedAccounts.length ? (currentPage - 1) * pageSizeNumber + 1 : 0;
+  const pageEnd = pageSize === "all" ? sortedAccounts.length : Math.min(sortedAccounts.length, currentPage * pageSizeNumber);
+  const paginatedAccounts = pageSize === "all"
+    ? sortedAccounts
+    : sortedAccounts.slice((currentPage - 1) * pageSizeNumber, currentPage * pageSizeNumber);
   const activeCount = visibleAccounts.filter((account) => account.is_active !== false).length;
   const inactiveCount = visibleAccounts.length - activeCount;
 
@@ -166,10 +230,29 @@ export default function Accounts() {
     loadAccounts();
   }, []);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, roleFilter, statusFilter, sortBy, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
   const resetForm = () => {
     setEditingId(null);
     setForm(DEFAULT_FORM);
   };
+
+  const changeView = (view) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("view", view);
+    setSearchParams(next);
+    if (view === "create" || view === "list") resetForm();
+  };
+
+  useEffect(() => {
+    if (accountView === "create" || accountView === "list") resetForm();
+  }, [accountView]);
 
   const submitAccount = async (event) => {
     event.preventDefault();
@@ -208,6 +291,9 @@ export default function Accounts() {
       return;
     }
 
+    const next = new URLSearchParams(searchParams);
+    next.set("view", "manage");
+    setSearchParams(next);
     setEditingId(account.id);
     setForm({
       name: account.name || "",
@@ -245,13 +331,53 @@ export default function Accounts() {
     }
   };
 
+  const showEditor = canManage && (accountView === "create" || editingId);
+  const directoryTitle = accountView === "manage" ? "Manage Accounts" : "Account Directory";
+  const directoryEyebrow = accountView === "manage" ? "Edit and Status Control" : "Account List";
+
   return (
     <div style={{ minHeight:"100vh",background:C.pageBg,fontFamily:F.body }}>
       <AdminNavbar />
       <div style={{ display:"flex" }}>
         <Sidebar activeNav="accounts" isOpen={sidebarOpen} onToggle={()=>setSidebarOpen(!sidebarOpen)} />
         <main style={{ flex:1,padding:"28px 32px",overflow:"auto",height:"calc(100vh - 60px)" }}>
-          <SectionTitle eyebrow="Access Control" title="Accounts" />
+          <SectionTitle eyebrow="Access Control" title="Account Manager" />
+
+          {canManage && (
+            <div style={{ display:"flex",gap:8,flexWrap:"wrap",margin:"-4px 0 16px" }}>
+              {ACCOUNT_VIEWS.map((view) => {
+                const Icon = view.icon;
+                const selected = accountView === view.id;
+                return (
+                  <button
+                    key={view.id}
+                    type="button"
+                    onClick={()=>changeView(view.id)}
+                    style={{
+                      display:"inline-flex",
+                      alignItems:"center",
+                      gap:8,
+                      minHeight:36,
+                      padding:"8px 12px",
+                      border:`1px solid ${selected ? "rgba(140,107,42,0.30)" : C.border}`,
+                      borderRadius:8,
+                      background:selected ? C.goldFaint : C.surface,
+                      color:selected ? C.gold : C.muted,
+                      fontFamily:F.label,
+                      fontSize:10,
+                      fontWeight:800,
+                      letterSpacing:"0.12em",
+                      textTransform:"uppercase",
+                      cursor:"pointer",
+                    }}
+                  >
+                    <Icon size={14} strokeWidth={2.2} />
+                    {view.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {toast && (
             <div style={{ marginBottom:14,padding:"10px 13px",borderRadius:8,background:toast.type==="error"?C.redFaint:C.greenFaint,color:toast.type==="error"?C.red:C.green,border:`1px solid ${toast.type==="error"?"rgba(160,56,56,0.18)":"rgba(46,122,90,0.18)"}`,fontSize:13 }}>
@@ -264,9 +390,10 @@ export default function Accounts() {
               Account creation and role management are restricted to authorized administrators. Use the account menu in the header to view or update your personal account.
             </div>
           ) : (
-            <div style={{ display:"grid",gridTemplateColumns:"minmax(360px, 0.85fr) minmax(620px, 1.15fr)",gap:18,alignItems:"start",maxWidth:1380 }}>
+            <div style={{ display:"grid",gridTemplateColumns:showEditor ? "minmax(360px, 0.85fr) minmax(620px, 1.15fr)" : "minmax(720px, 1fr)",gap:18,alignItems:"start",maxWidth:1380 }}>
+              {showEditor && (
                 <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:18 }}>
-                  <SectionTitle eyebrow={editingId ? "Edit Account" : "New Account"} title={editingId ? "Update Role Account" : "Create Role Account"} />
+                  <SectionTitle eyebrow={editingId ? "Edit Account" : "New Account"} title={editingId ? "Update Account" : "Create Account"} />
                   <form onSubmit={submitAccount} style={{ display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12 }}>
                     <Field label="Name">
                       <input value={form.name} onChange={(e)=>setForm({...form,name:e.target.value})} required style={inputStyle()} />
@@ -304,35 +431,60 @@ export default function Accounts() {
                     </div>
                   </form>
                 </div>
+              )}
 
                 <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,overflow:"hidden" }}>
                   <div style={{ padding:"14px 18px 12px",borderBottom:`1px solid ${C.divider}`,display:"grid",gap:12 }}>
                     <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:12 }}>
                       <div>
-                        <span style={{ display:"block",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",color:C.gold }}>Account Directory</span>
-                        <span style={{ display:"block",marginTop:4,fontSize:12,color:C.muted }}>{filteredAccounts.length} shown from {visibleAccounts.length} accounts</span>
+                        <span style={{ display:"block",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",color:C.gold }}>{directoryEyebrow}</span>
+                        <span style={{ display:"block",marginTop:4,fontSize:12,color:C.muted }}>{directoryTitle} - {sortedAccounts.length} matched from {visibleAccounts.length} accounts</span>
                       </div>
                       <div style={{ display:"flex",alignItems:"center",gap:8 }}>
                         <span style={{ padding:"5px 9px",borderRadius:999,background:C.greenFaint,color:C.green,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase" }}>{activeCount} Active</span>
                         <span style={{ padding:"5px 9px",borderRadius:999,background:C.redFaint,color:C.red,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase" }}>{inactiveCount} Inactive</span>
                       </div>
                     </div>
-                    <div style={{ display:"grid",gridTemplateColumns:"minmax(180px,1fr) 150px 128px",gap:10 }}>
-                      <input
-                        value={search}
-                        onChange={(e)=>setSearch(e.target.value)}
-                        placeholder="Search name, username, email..."
-                        style={{...inputStyle(),minHeight:36,padding:"7px 10px"}}
-                      />
-                      <select value={roleFilter} onChange={(e)=>setRoleFilter(e.target.value)} style={{...inputStyle(),minHeight:36,padding:"7px 10px"}}>
-                        <option value="all">All roles</option>
-                        {roleFilterOptions.map((role) => <option key={role} value={role}>{ROLE_LABELS[role] || role}</option>)}
-                      </select>
-                      <select value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)} style={{...inputStyle(),minHeight:36,padding:"7px 10px"}}>
-                        <option value="all">All status</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
+                    <div style={{ display:"grid",gridTemplateColumns:"minmax(210px,1.35fr) repeat(4,minmax(120px,0.8fr))",gap:10,alignItems:"end" }}>
+                      <FilterControl label="Search">
+                        <div style={{ position:"relative" }}>
+                          <Search size={14} style={{ position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:C.faint,pointerEvents:"none" }} />
+                          <input
+                            value={search}
+                            onChange={(e)=>setSearch(e.target.value)}
+                            placeholder="Name, username, email"
+                            style={{...inputStyle(),minHeight:36,padding:"7px 10px 7px 31px"}}
+                          />
+                        </div>
+                      </FilterControl>
+                      <FilterControl label="Role">
+                        <select value={roleFilter} onChange={(e)=>setRoleFilter(e.target.value)} style={{...inputStyle(),minHeight:36,padding:"7px 10px"}}>
+                          <option value="all">All roles</option>
+                          {roleFilterOptions.map((role) => <option key={role} value={role}>{ROLE_LABELS[role] || role}</option>)}
+                        </select>
+                      </FilterControl>
+                      <FilterControl label="Status">
+                        <select value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)} style={{...inputStyle(),minHeight:36,padding:"7px 10px"}}>
+                          <option value="all">All status</option>
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                      </FilterControl>
+                      <FilterControl label="Sort">
+                        <div style={{ position:"relative" }}>
+                          <ArrowUpDown size={14} style={{ position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:C.faint,pointerEvents:"none" }} />
+                          <select value={sortBy} onChange={(e)=>setSortBy(e.target.value)} style={{...inputStyle(),minHeight:36,padding:"7px 10px 7px 31px"}}>
+                            {SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                          </select>
+                        </div>
+                      </FilterControl>
+                      <FilterControl label="Per Page">
+                        <select value={pageSize} onChange={(e)=>setPageSize(e.target.value)} style={{...inputStyle(),minHeight:36,padding:"7px 10px"}}>
+                          <option value="5">5 accounts</option>
+                          <option value="10">10 accounts</option>
+                          <option value="all">All</option>
+                        </select>
+                      </FilterControl>
                     </div>
                   </div>
 
@@ -342,12 +494,12 @@ export default function Accounts() {
                     ))}
                   </div>
                   <div style={{ display:"grid" }}>
-                    {filteredAccounts.length === 0 && (
+                    {sortedAccounts.length === 0 && (
                       <div style={{ padding:"28px 18px",color:C.muted,fontSize:13,textAlign:"center" }}>
                         No accounts match the selected filters.
                       </div>
                     )}
-                    {filteredAccounts.map((account) => {
+                    {paginatedAccounts.map((account) => {
                       const manageable = canManageAccount(currentUser, account);
                       const inactive = account.is_active === false;
 
@@ -368,6 +520,36 @@ export default function Accounts() {
                       </div>
                     )})}
                   </div>
+                  {sortedAccounts.length > 0 && (
+                    <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"12px 18px",borderTop:`1px solid ${C.divider}`,background:C.surfaceSoft }}>
+                      <span style={{ fontSize:12,color:C.muted }}>
+                        Showing {pageStart}-{pageEnd} of {sortedAccounts.length}
+                      </span>
+                      <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                        <button
+                          type="button"
+                          disabled={currentPage <= 1 || pageSize === "all"}
+                          onClick={()=>setPage((value)=>Math.max(1, value - 1))}
+                          style={{ width:32,height:32,border:`1px solid ${C.border}`,borderRadius:8,background:C.surface,color:currentPage <= 1 || pageSize === "all" ? C.faint : C.text,cursor:currentPage <= 1 || pageSize === "all" ? "not-allowed" : "pointer",display:"inline-flex",alignItems:"center",justifyContent:"center" }}
+                          title="Previous page"
+                        >
+                          <ChevronLeft size={15} />
+                        </button>
+                        <span style={{ minWidth:82,textAlign:"center",fontSize:12,color:C.muted }}>
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={currentPage >= totalPages || pageSize === "all"}
+                          onClick={()=>setPage((value)=>Math.min(totalPages, value + 1))}
+                          style={{ width:32,height:32,border:`1px solid ${C.border}`,borderRadius:8,background:C.surface,color:currentPage >= totalPages || pageSize === "all" ? C.faint : C.text,cursor:currentPage >= totalPages || pageSize === "all" ? "not-allowed" : "pointer",display:"inline-flex",alignItems:"center",justifyContent:"center" }}
+                          title="Next page"
+                        >
+                          <ChevronRight size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
             </div>
           )}
