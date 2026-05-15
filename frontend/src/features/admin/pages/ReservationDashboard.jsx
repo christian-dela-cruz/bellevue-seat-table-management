@@ -102,7 +102,7 @@ function SectionLabel({ children, style={} }) {
 
 function StatusBadge({ status }) {
   const s=(status||"pending").toLowerCase();
-  const map={pending:C.badgePending,approved:C.badgeApproved,rejected:C.badgeRejected,cancelled:C.badgeRejected};
+  const map={pending:C.badgePending,approved:C.badgeApproved,reserved:C.badgeApproved,rejected:C.badgeRejected,cancelled:C.badgeRejected};
   const badge=map[s]||C.badgePending;
   return (
     <span style={{
@@ -1435,16 +1435,18 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
               </div>
             ) : (
               <>
-                <div style={{
-                  marginTop:18,padding:"10px 14px",borderRadius:8,
-                  background:C.statusNote[(reservation.status||"pending").toLowerCase()]||C.goldFaintest,
-                  border:`1px solid ${C.statusNoteBorder[(reservation.status||"pending").toLowerCase()]||C.borderAccent}`,
-                  fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.6,
-                }}>
-                  {canManage
-                    ? <>This reservation has been <strong style={{color:C.textPrimary}}>{(reservation.status||"").toLowerCase()}</strong>{isRejected ? " and can be reverted to pending review." : " and cannot be modified."}</>
-                    : <>Your account can view this reservation, but cannot modify it.</>}
-                </div>
+                {(!canManage || isRejected) && (
+                  <div style={{
+                    marginTop:18,padding:"10px 14px",borderRadius:8,
+                    background:C.statusNote[(reservation.status||"pending").toLowerCase()]||C.goldFaintest,
+                    border:`1px solid ${C.statusNoteBorder[(reservation.status||"pending").toLowerCase()]||C.borderAccent}`,
+                    fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.6,
+                  }}>
+                    {canManage
+                      ? <>This reservation has been <strong style={{color:C.textPrimary}}>{(reservation.status||"").toLowerCase()}</strong> and can be reverted to pending review.</>
+                      : <>Your account can view this reservation, but cannot modify it.</>}
+                  </div>
+                )}
                 {isRejected&&canManage&&(
                   <button
                     onClick={()=>setShowRevertModal(true)}
@@ -2026,7 +2028,7 @@ export default function ReservationDashboard() {
     {label:"Active",   count:stats.active,   filter:"ACTIVE",   color:C.green,              bg:C.greenFaint,          border:C.greenBorder               },
     {label:"Inactive", count:stats.inactive, filter:"INACTIVE", color:C.textSecondary,      bg:"rgba(0,0,0,0.04)",    border:C.borderDefault             },
     {label:"Pending",  count:stats.pending,  filter:"PENDING",  color:C.badgePending.color,  bg:C.statusNote.pending,  border:C.statusNoteBorder.pending  },
-    {label:"Approved", count:stats.approved, filter:"APPROVED", color:C.badgeApproved.color, bg:C.statusNote.approved, border:C.statusNoteBorder.approved },
+    {label:"Reserved", count:stats.approved, filter:"APPROVED", color:C.badgeApproved.color, bg:C.greenFaint, border:C.greenBorder },
     {label:"Rejected", count:stats.rejected, filter:"REJECTED", color:C.badgeRejected.color, bg:C.statusNote.rejected, border:C.statusNoteBorder.rejected },
   ];
 

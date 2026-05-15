@@ -134,7 +134,7 @@ function normaliseApiStatus(raw) {
   const s = (raw || "available").toLowerCase();
   if (s === "approved" || s === "reserved") return "reserved";
   if (s === "rejected") return "rejected";
-  if (s === "pending")  return "pending";
+  if (s === "pending")  return "available";
   return "available";
 }
 
@@ -1265,7 +1265,7 @@ export default function GrandBallroomBReserve() {
         if (!prev) return prev;
         if (isStandalone && selectedSeat) {
           const updatedStandaloneSeats = (prev.standaloneSeats || []).map(s =>
-            s.id === selectedSeat.id ? { ...s, status: "pending" } : s
+            s.id === selectedSeat.id ? { ...s, status: "available" } : s
           );
           const updated = { ...prev, standaloneSeats: updatedStandaloneSeats };
           try { localStorage.setItem(layoutKey(WING, ROOM), JSON.stringify(updated)); } catch {}
@@ -1275,13 +1275,13 @@ export default function GrandBallroomBReserve() {
           const tables = (prev.tables || []).map(t => {
             if (t.id !== activeTable.id) return t;
             if (mode === "individual") {
-              return { ...t, seats: t.seats.map(s => s.id === selectedSeat?.id ? { ...s, status: "pending" } : s) };
+              return { ...t, seats: t.seats.map(s => s.id === selectedSeat?.id ? { ...s, status: "available" } : s) };
             }
             let marked = 0;
             return {
               ...t,
               seats: t.seats.map(s => {
-                if (marked < guests && s.status === "available") { marked++; return { ...s, status: "pending" }; }
+                if (marked < guests && s.status === "available") { marked++; return { ...s, status: "available" }; }
                 return s;
               }),
             };
@@ -1639,3 +1639,4 @@ export default function GrandBallroomBReserve() {
     </ThemeContext.Provider>
   );
 }
+

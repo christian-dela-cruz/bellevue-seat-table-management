@@ -88,17 +88,7 @@ const FONT    = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 const DISPLAY = "'Playfair Display', 'Times New Roman', serif";
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
-function dateInputValue(date) {
-  const value = new Date(date);
-  value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
-  return value.toISOString().slice(0, 10);
-}
 
-function dateAfter(days) {
-  const value = new Date();
-  value.setDate(value.getDate() + days);
-  return dateInputValue(value);
-}
 
 const SECTION_IDS = {
   "Main Wing":  "section-main-wing",
@@ -106,7 +96,6 @@ const SECTION_IDS = {
   "Dining":     "section-dining",
 };
 
-const EVENT_WINGS = ["Main Wing", "Tower Wing"];
 
 const WING_FOR_ROOM = {};
 Object.entries({
@@ -282,52 +271,7 @@ async function fetchVenueStats() {
   } catch { return {}; }
 }
 
-async function fetchVenueAvailability(startDate, endDate) {
-  try {
-    const params = new URLSearchParams();
-    if (startDate) params.set("start_date", startDate);
-    if (endDate) params.set("end_date", endDate);
 
-    const res = await fetch(`${API_BASE}/venues/availability?${params.toString()}`, { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("Unable to load venue availability.");
-    return await res.json();
-  } catch (error) {
-    throw error;
-  }
-}
-
-function availabilityByName(rows = []) {
-  const map = new Map();
-  rows.forEach(item => {
-    if (item?.name) map.set(String(item.name).toLowerCase(), item);
-  });
-  return map;
-}
-
-function combineVenueAvailability(venue, lookup) {
-  const keys = Array.from(new Set([venue.name, ...(venue.seatMapKeys || [])]));
-  const items = keys.map(key => lookup.get(String(key).toLowerCase())).filter(Boolean);
-
-  if (!items.length) return null;
-
-  const nextEvents = items
-    .filter(item => item.next_event_date)
-    .sort((a, b) => String(a.next_event_date).localeCompare(String(b.next_event_date)));
-
-  return {
-    ...items[0],
-    events_count: items.reduce((sum, item) => sum + (item.events_count || 0), 0),
-    pending_count: items.reduce((sum, item) => sum + (item.pending_count || 0), 0),
-    reserved_count: items.reduce((sum, item) => sum + (item.reserved_count || 0), 0),
-    is_available_for_range: items.every(item => item.is_available_for_range),
-    next_event_date: nextEvents[0]?.next_event_date || null,
-    next_event_time: nextEvents[0]?.next_event_time || null,
-  };
-}
-
-function venueHasEventsInRange(venue) {
-  return (venue._availability?.events_count || 0) > 0;
-}
 
 // ── RESPONSIVE ───────────────────────────────────────────────────────────────
 function useIsMobile(bp = 768) {
@@ -402,8 +346,6 @@ function VenueCard({ venue, onClick, C, isDark, hideSpacer }) {
   const live    = aggregateCounts(venue);
   const dSeats  = live?.seats  ?? venue.seats;
   const dTables = live?.tables ?? venue.tables;
-  const availability = venue._availability;
-  const hasEventsInRange = (availability?.events_count || 0) > 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
@@ -459,23 +401,6 @@ function VenueCard({ venue, onClick, C, isDark, hideSpacer }) {
             )}
           </div>
 
-          {hasEventsInRange && (
-            <div style={{ display: "grid", gap: 7, padding: "10px 12px", background: "rgba(154,110,28,0.08)", border: `1px solid ${C.goldBorder}` }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                <span style={{ fontFamily: FONT, fontSize: 11, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>
-                  {availability.events_count} event{availability.events_count === 1 ? "" : "s"} in range
-                </span>
-                <span style={{ fontFamily: FONT, fontSize: 11, color: C.textMuted }}>
-                  Schedule activity found
-                </span>
-              </div>
-              {availability.next_event_date && (
-                <div style={{ fontFamily: FONT, fontSize: 11, color: C.textMuted }}>
-                  Next event: {availability.next_event_date}{availability.next_event_time ? ` at ${availability.next_event_time}` : ""}
-                </div>
-              )}
-            </div>
-          )}
 
           <div style={{ height: 1, background: C.divider }} />
 
@@ -513,30 +438,75 @@ function SectionHeader({ title, subtitle, index, C }) {
 function EmptyVenueState({ C }) {
   return (
     <div style={{ gridColumn: "1 / -1", padding: "18px 20px", border: `1px solid ${C.border}`, background: C.surface, color: C.textMuted, fontFamily: FONT, fontSize: 13 }}>
-      No outlets match the selected date range and filter.
+      No outlets are available in this section right now.
     </div>
   );
 }
 
-function SegmentButton({ active, children, onClick, C }) {
+function SegmentButton({ active, children, count, onClick, C }) {
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        border: `1px solid ${active ? C.gold : C.border}`,
-        background: active ? C.goldFaint : C.surfaceEl,
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 9,
+        minHeight: 42,
+        border: `1px solid ${active ? C.goldBorder : "transparent"}`,
+        background: active ? C.surface : "transparent",
         color: active ? C.gold : C.textMuted,
-        padding: "9px 12px",
+        boxShadow: active ? "0 10px 24px rgba(120,90,32,0.10)" : "none",
+        padding: "0 14px",
         fontFamily: FONT,
         fontSize: 10,
         fontWeight: 700,
         letterSpacing: "0.10em",
         textTransform: "uppercase",
         cursor: "pointer",
+        transition: "background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s",
+        outline: "none",
+      }}
+      onMouseEnter={e => {
+        if (!active) {
+          e.currentTarget.style.background = C.goldFaint;
+          e.currentTarget.style.color = C.gold;
+        }
+      }}
+      onMouseLeave={e => {
+        if (!active) {
+          e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.color = C.textMuted;
+        }
+      }}
+      onFocus={e => {
+        e.currentTarget.style.borderColor = C.gold;
+      }}
+      onBlur={e => {
+        e.currentTarget.style.borderColor = active ? C.goldBorder : "transparent";
       }}
     >
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: active ? C.gold : C.border, flexShrink: 0 }} />
       {children}
+      <span style={{
+        minWidth: 22,
+        height: 22,
+        padding: "0 7px",
+        borderRadius: 999,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: active ? C.goldFaint : C.surfaceEl,
+        border: `1px solid ${active ? C.goldBorder : C.border}`,
+        color: active ? C.gold : C.textMuted,
+        fontSize: 10,
+        letterSpacing: 0,
+        fontWeight: 700,
+      }}>
+        {count}
+      </span>
     </button>
   );
 }
@@ -551,11 +521,6 @@ export default function VenuesPage() {
 
   const [subcategories, setSubcategories] = useState(STATIC_VENUES);
   const [venueGroup, setVenueGroup] = useState("events");
-  const [eventStartDate, setEventStartDate] = useState(() => dateInputValue(new Date()));
-  const [eventEndDate, setEventEndDate] = useState(() => dateAfter(6));
-  const [availabilityMode, setAvailabilityMode] = useState("all");
-  const [availabilityLoading, setAvailabilityLoading] = useState(false);
-  const [availabilityError, setAvailabilityError] = useState("");
 
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -607,66 +572,24 @@ export default function VenuesPage() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!eventStartDate || !eventEndDate || eventEndDate < eventStartDate) {
-      setAvailabilityError("End date must be the same as or later than the start date.");
-      setAvailabilityLoading(false);
-      return;
-    }
 
-    let cancelled = false;
-    setAvailabilityLoading(true);
-    setAvailabilityError("");
+  const filteredSubcategories = useMemo(() => subcategories, [subcategories]);
 
-    fetchVenueAvailability(eventStartDate, eventEndDate)
-      .then(report => {
-        if (cancelled) return;
-        const lookup = availabilityByName(report.data || []);
-        setSubcategories(prev => {
-          const next = {};
-          for (const [wing, venues] of Object.entries(prev)) {
-            next[wing] = venues.map(v => ({
-              ...v,
-              _availability: combineVenueAvailability(v, lookup),
-            }));
-          }
-          return next;
-        });
-      })
-      .catch(error => {
-        if (!cancelled) setAvailabilityError(error.message || "Unable to load venue availability.");
-      })
-      .finally(() => {
-        if (!cancelled) setAvailabilityLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [eventStartDate, eventEndDate]);
-
-  const filteredSubcategories = useMemo(() => {
-    const next = {};
-    for (const [wing, venues] of Object.entries(subcategories)) {
-      next[wing] = venues.filter(venue => {
-        if (wing === "Dining") return true;
-        const availability = venue._availability;
-        if (availabilityMode === "available") return availability?.is_available_for_range !== false;
-        if (availabilityMode === "events") return (availability?.events_count || 0) > 0;
-        return true;
-      });
-    }
-    return next;
-  }, [subcategories, availabilityMode]);
-
-  const eventVenueCount = EVENT_WINGS.reduce((sum, wing) => sum + (filteredSubcategories[wing]?.length || 0), 0);
+  const eventVenueCount = (subcategories["Main Wing"]?.length || 0) + (subcategories["Tower Wing"]?.length || 0);
   const diningVenueCount = subcategories.Dining?.length || 0;
-  const eventAvailabilityItems = EVENT_WINGS.flatMap(wing => subcategories[wing] || [])
-    .map(venue => venue._availability)
-    .filter(Boolean);
-  const eventAvailabilitySummary = {
-    available: eventAvailabilityItems.filter(item => item.is_available_for_range).length,
-    with_events: eventAvailabilityItems.filter(item => (item.events_count || 0) > 0).length,
-    events: eventAvailabilityItems.reduce((sum, item) => sum + (item.events_count || 0), 0),
-  };
+  const selectedCategoryMeta = venueGroup === "events"
+    ? {
+        label: "Function Rooms",
+        count: eventVenueCount,
+        unit: eventVenueCount === 1 ? "outlet" : "outlets",
+        description: "Browse function rooms and ballrooms, then open a venue to check its schedule and reserve a table or seat.",
+      }
+    : {
+        label: "Dining Outlets",
+        count: diningVenueCount,
+        unit: diningVenueCount === 1 ? "outlet" : "outlets",
+        description: "Dining outlets use table-level availability after you open a restaurant and select the schedule.",
+      };
 
   useEffect(() => {
     const params  = new URLSearchParams(location.search);
@@ -807,58 +730,44 @@ export default function VenuesPage() {
             </p>
           </div>
 
-          <div className="page-anim" style={{ background: C.surface, border: `1px solid ${C.border}`, boxShadow: C.shadow, padding: isMobile ? 14 : 16, display: "grid", gap: 14, opacity: 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <SegmentButton C={C} active={venueGroup === "events"} onClick={() => setVenueGroup("events")}>Function Rooms</SegmentButton>
-                <SegmentButton C={C} active={venueGroup === "dining"} onClick={() => setVenueGroup("dining")}>Dining</SegmentButton>
+          <div className="page-anim" style={{ background: C.surface, border: `1px solid ${C.border}`, boxShadow: C.shadow, padding: isMobile ? 14 : 18, display: "grid", gap: 16, opacity: 0 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1fr) auto", gap: 16, alignItems: "center" }}>
+              <div style={{ display: "grid", gap: 10 }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 18, height: 1, background: C.gold }} />
+                  <span style={{ fontFamily: FONT, fontSize: 10, fontWeight: 700, color: C.gold, letterSpacing: "0.18em", textTransform: "uppercase" }}>Outlet Category</span>
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontFamily: FONT, fontSize: isMobile ? 20 : 24, fontWeight: 700, color: C.text, letterSpacing: "-0.2px", lineHeight: 1.15 }}>
+                    {selectedCategoryMeta.label}
+                  </h2>
+                  <p style={{ margin: "5px 0 0", fontFamily: FONT, fontSize: 12, color: C.textMuted, lineHeight: 1.65, maxWidth: 620 }}>
+                    {selectedCategoryMeta.description}
+                  </p>
+                </div>
               </div>
-              <div style={{ fontFamily: FONT, fontSize: 12, color: C.textMuted }}>
-                {venueGroup === "events" ? `${eventVenueCount} event outlet${eventVenueCount === 1 ? "" : "s"}` : `${diningVenueCount} dining outlet${diningVenueCount === 1 ? "" : "s"}`}
+
+              <div style={{ display: "grid", justifyItems: isMobile ? "stretch" : "end", gap: 9 }}>
+                <div style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: 4,
+                  border: `1px solid ${C.border}`,
+                  background: C.surfaceEl,
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                  width: isMobile ? "100%" : "auto",
+                }}>
+                  <SegmentButton C={C} active={venueGroup === "events"} count={eventVenueCount} onClick={() => setVenueGroup("events")}>Function Rooms</SegmentButton>
+                  <SegmentButton C={C} active={venueGroup === "dining"} count={diningVenueCount} onClick={() => setVenueGroup("dining")}>Dining</SegmentButton>
+                </div>
+                <div style={{ justifySelf: isMobile ? "start" : "end", display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 10px", border: `1px solid ${C.goldBorder}`, background: C.goldFaint, color: C.textSub, fontFamily: FONT, fontSize: 11 }}>
+                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: C.gold, flexShrink: 0 }} />
+                  <strong style={{ color: C.gold, fontWeight: 700 }}>{selectedCategoryMeta.count}</strong>
+                  {selectedCategoryMeta.unit} available
+                </div>
               </div>
             </div>
-
-            {venueGroup === "events" ? (
-              <>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-end", flexWrap: "wrap" }}>
-                  <div>
-                    <div style={{ fontFamily: FONT, fontSize: 10, fontWeight: 700, color: C.gold, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Event Date Range</div>
-                    <p style={{ margin: 0, fontFamily: FONT, fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>
-                      Check Main Wing and Tower Wing schedules before choosing a function room.
-                    </p>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <SegmentButton C={C} active={availabilityMode === "all"} onClick={() => setAvailabilityMode("all")}>All</SegmentButton>
-                    <SegmentButton C={C} active={availabilityMode === "available"} onClick={() => setAvailabilityMode("available")}>Available</SegmentButton>
-                    <SegmentButton C={C} active={availabilityMode === "events"} onClick={() => setAvailabilityMode("events")}>With Events</SegmentButton>
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(150px,180px) minmax(150px,180px) minmax(0,1fr)", gap: 10, alignItems: "end" }}>
-                  <label style={{ display: "grid", gap: 5 }}>
-                    <span style={{ fontFamily: FONT, fontSize: 9, color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 700 }}>Start Date</span>
-                    <input type="date" value={eventStartDate} onChange={e => setEventStartDate(e.target.value)} style={{ height: 38, border: `1px solid ${C.border}`, background: C.surfaceEl, color: C.text, padding: "0 10px", fontFamily: FONT, fontSize: 12, outline: "none" }} />
-                  </label>
-                  <label style={{ display: "grid", gap: 5 }}>
-                    <span style={{ fontFamily: FONT, fontSize: 9, color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 700 }}>End Date</span>
-                    <input type="date" value={eventEndDate} onChange={e => setEventEndDate(e.target.value)} style={{ height: 38, border: `1px solid ${C.border}`, background: C.surfaceEl, color: C.text, padding: "0 10px", fontFamily: FONT, fontSize: 12, outline: "none" }} />
-                  </label>
-                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: isMobile ? "flex-start" : "flex-end", color: C.textMuted, fontFamily: FONT, fontSize: 12 }}>
-                    <span>{availabilityLoading ? "Checking schedule..." : `${eventAvailabilitySummary.available || 0} available`}</span>
-                    <span>{eventAvailabilitySummary.with_events || 0} with events</span>
-                    <span>{eventAvailabilitySummary.events || 0} scheduled events</span>
-                  </div>
-                </div>
-
-                {availabilityError && (
-                  <div style={{ color: "#A03838", fontFamily: FONT, fontSize: 12 }}>{availabilityError}</div>
-                )}
-              </>
-            ) : (
-              <p style={{ margin: 0, fontFamily: FONT, fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>
-                Dining outlets use table-level availability after you open a restaurant and select the schedule.
-              </p>
-            )}
           </div>
 
           <div className="page-anim" style={{ height: 1, background: `linear-gradient(90deg,${C.gold}0%,${C.divider}60%,transparent 100%)`, opacity: 0.55 }} />
@@ -914,3 +823,5 @@ export default function VenuesPage() {
     </>
   );
 }
+
+

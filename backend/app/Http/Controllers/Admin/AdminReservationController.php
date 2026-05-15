@@ -317,6 +317,23 @@ class AdminReservationController extends Controller
             if (!$this->reservationService->canAccessReservation($this->currentAdmin(request()), $reservation)) {
                 return $this->scopeDeniedResponse();
             }
+
+            if ($this->reservationService->hasScheduleConflict([
+                'venue_id' => $reservation->venue_id,
+                'room' => $reservation->room,
+                'table_number' => $reservation->table_number,
+                'seat_number' => $reservation->seat_number,
+                'seat_id' => $reservation->seat_id,
+                'event_date' => optional($reservation->event_date)->format('Y-m-d'),
+                'event_time' => (string) $reservation->event_time,
+                'type' => $reservation->type,
+                'is_standalone' => $reservation->is_standalone,
+            ], $reservation->id)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This reservation can no longer be approved because the selected seat or table is already reserved for that date and time.',
+                ], 422);
+            }
             
             $reservation = $this->reservationService->approveReservation($reservation);
             \Log::info('Reservation approved, sending email to: ' . $reservation->email);

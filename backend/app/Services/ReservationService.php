@@ -185,7 +185,7 @@ class ReservationService
                 $timeQuery->where('event_time', $eventTime)
                     ->orWhere('event_time', $eventTime . ':00');
             })
-            ->whereIn('status', ['pending', 'approved', 'reserved']);
+            ->whereIn('status', ['approved', 'reserved']);
 
         if ($ignoreReservationId) {
             $query->whereKeyNot($ignoreReservationId);

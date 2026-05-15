@@ -211,7 +211,7 @@ class SeatMapController extends Controller
             ->when($request->filled('room'), function ($query) use ($request) {
                 $query->where('room', $request->query('room'));
             })
-            ->whereIn('status', ['pending', 'approved', 'reserved'])
+            ->whereIn('status', ['approved', 'reserved'])
             ->when($request->filled('event_date'), function ($query) use ($request) {
                 $query->whereDate('event_date', $request->query('event_date'));
             })

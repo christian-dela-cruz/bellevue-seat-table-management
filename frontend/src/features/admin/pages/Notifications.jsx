@@ -4,13 +4,13 @@ import {
   Bell, BellDot, Clock, X, CalendarDays,
   MapPin, Users, Phone, Mail, FileText, Hash, CheckCircle,
   Wifi, WifiOff, ThumbsUp, ChevronLeft, ChevronRight,
-  XCircle,
+  XCircle, Search,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import { reservationAPI } from "../../../services/reservationAPI";
 import { authAPI } from "../../../services/authAPI";
-import { ADMIN_OUTLET_ROOMS, canonicalOutletName } from "../../../constants/outletCatalog";
+import { ADMIN_OUTLET_GROUPS, ADMIN_OUTLET_ROOMS, canonicalOutletName } from "../../../constants/outletCatalog";
 
 function getTokens() {
   return {
@@ -794,80 +794,197 @@ function EmptyState({ msg, C }) {
 }
 
 function OutletMonitorBar({ outlets, selectedOutlet, onSelect, currentUser, C }) {
+  const [query,setQuery]=useState("");
+  const [groupFilter,setGroupFilter]=useState("ALL");
   const visibleLabel = currentUser?.scope_type === "assigned"
     ? "Assigned outlet view"
     : "All outlet view";
   const totalPending = outlets.reduce((sum, outlet) => sum + outlet.pending, 0);
   const totalUpcoming = outlets.reduce((sum, outlet) => sum + outlet.upcoming, 0);
+  const totalReservations = outlets.reduce((sum, outlet) => sum + outlet.total, 0);
+  const selectedSummary = selectedOutlet === "ALL"
+    ? { outlet:"All Outlets", total:totalReservations, pending:totalPending, upcoming:totalUpcoming }
+    : outlets.find(outlet => outlet.outlet === selectedOutlet) || { outlet:selectedOutlet, total:0, pending:0, upcoming:0 };
+  const outletByName = new Map(outlets.map(outlet => [outlet.outlet, outlet]));
+  const groupedNames = new Set(ADMIN_OUTLET_GROUPS.flatMap(group => group.rooms));
+  const groupedOutlets = ADMIN_OUTLET_GROUPS.map(group => ({
+    ...group,
+    items: group.rooms
+      .map(room => outletByName.get(room))
+      .filter(Boolean),
+  })).filter(group => group.items.length > 0);
+  const otherOutlets = outlets.filter(outlet => !groupedNames.has(outlet.outlet));
+  const browseGroups = [...groupedOutlets, ...(otherOutlets.length ? [{ id:"other",label:"Other Outlets",items:otherOutlets }] : [])];
+  const visibleBrowseGroups = groupFilter === "ALL" ? browseGroups : browseGroups.filter(group => group.id === groupFilter);
+  const searchablePool = visibleBrowseGroups.flatMap(group => group.items);
+  const searchValue = query.trim().toLowerCase();
+  const searchResults = searchValue
+    ? searchablePool.filter(outlet => outlet.outlet.toLowerCase().includes(searchValue)).slice(0, 10)
+    : [];
 
   return (
     <Panel C={C} accentColor={totalPending ? C.gold : C.green} style={{ flexShrink:0 }}>
-      <div style={{ padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",borderBottom:`1px solid ${C.divider}` }}>
-        <div>
-          <div style={{ fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:C.gold,marginBottom:4 }}>Inter-Outlet Routing</div>
-          <div style={{ fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.45 }}>
-            {visibleLabel} · {outlets.length} outlet{outlets.length === 1 ? "" : "s"} visible
+      <div style={{ padding:"10px 14px",display:"grid",gap:10 }}>
+        <div style={{ display:"grid",gridTemplateColumns:"minmax(220px, 1fr) minmax(320px, 1.7fr) auto",gap:10,alignItems:"center" }} className="nd-routing-toolbar">
+          <div style={{ minWidth:0 }}>
+            <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:3 }}>
+              <span style={{ width:16,height:1,background:C.gold,flexShrink:0 }} />
+              <span style={{ fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.17em",textTransform:"uppercase",color:C.gold }}>Inter-Outlet Routing</span>
+            </div>
+            <div style={{ fontFamily:F.body,fontSize:12,color:C.textSecondary,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+              {visibleLabel} - {selectedSummary.outlet}
+            </div>
+          </div>
+
+          <div style={{ display:"grid",gridTemplateColumns:"minmax(160px, 0.9fr) minmax(180px, 1fr)",gap:8,minWidth:0 }}>
+            <select
+              value={selectedOutlet}
+              onChange={e=>onSelect(e.target.value)}
+              style={{ height:36,minWidth:0,padding:"0 10px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceBase,fontFamily:F.body,fontSize:12,color:C.textPrimary,outline:"none" }}
+            >
+              <option value="ALL">All Outlets</option>
+              {groupedOutlets.map(group=>(
+                <optgroup key={group.id} label={`${group.label} (${group.items.length})`}>
+                  {group.items.map(outlet=><option key={outlet.outlet} value={outlet.outlet}>{outlet.outlet}</option>)}
+                </optgroup>
+              ))}
+              {otherOutlets.length>0&&(
+                <optgroup label={`Other Outlets (${otherOutlets.length})`}>
+                  {otherOutlets.map(outlet=><option key={outlet.outlet} value={outlet.outlet}>{outlet.outlet}</option>)}
+                </optgroup>
+              )}
+            </select>
+            <label style={{ height:36,display:"flex",alignItems:"center",gap:8,padding:"0 10px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,minWidth:0 }}>
+              <Search size={13} color={C.textTertiary}/>
+              <input
+                value={query}
+                onChange={e=>setQuery(e.target.value)}
+                placeholder="Search outlets"
+                style={{ flex:1,minWidth:0,border:"none",outline:"none",background:"transparent",fontFamily:F.body,fontSize:12,color:C.textPrimary }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display:"flex",justifyContent:"flex-end",gap:6,flexWrap:"wrap" }}>
+            <RoutingMetric label="Pending" value={selectedSummary.pending} color={C.gold} bg={C.goldFaint} border={C.borderAccent} C={C}/>
+            <RoutingMetric label="Upcoming" value={selectedSummary.upcoming} color={C.blue} bg={C.blueFaint} border={C.blueBorder} C={C}/>
+            <RoutingMetric label="Total" value={selectedSummary.total} color={C.textSecondary} bg="rgba(0,0,0,0.03)" border={C.borderDefault} C={C}/>
           </div>
         </div>
-        <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
-          <span style={{ background:C.goldFaint,border:`1px solid ${C.borderAccent}`,borderRadius:4,padding:"4px 8px",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.gold }}>{totalPending} Pending</span>
-          <span style={{ background:C.blueFaint,border:`1px solid ${C.blueBorder}`,borderRadius:4,padding:"4px 8px",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.blue }}>{totalUpcoming} Upcoming</span>
+
+        <div style={{ display:"flex",alignItems:"center",gap:6,flexWrap:"wrap" }}>
+          <GroupFilterButton active={groupFilter==="ALL"} label="All Groups" count={outlets.length} onClick={()=>setGroupFilter("ALL")} C={C}/>
+          {browseGroups.map(group=>(
+            <GroupFilterButton
+              key={group.id}
+              active={groupFilter===group.id}
+              label={group.label}
+              count={group.items.length}
+              onClick={()=>setGroupFilter(group.id)}
+              C={C}
+            />
+          ))}
         </div>
-      </div>
-      <div style={{ padding:"10px 12px",display:"flex",gap:8,overflowX:"auto" }}>
-        <OutletChip
-          label="All Outlets"
-          active={selectedOutlet === "ALL"}
-          pending={totalPending}
-          total={outlets.reduce((sum, outlet) => sum + outlet.total, 0)}
-          onClick={() => onSelect("ALL")}
-          C={C}
-        />
-        {outlets.map((outlet) => (
-          <OutletChip
-            key={outlet.outlet}
-            label={outlet.outlet}
-            active={selectedOutlet === outlet.outlet}
-            pending={outlet.pending}
-            total={outlet.total}
-            onClick={() => onSelect(outlet.outlet)}
-            C={C}
-          />
-        ))}
+
+        {searchValue&&(
+          <div style={{ border:`1px solid ${C.borderDefault}`,borderRadius:8,background:"rgba(255,255,255,0.74)",overflow:"hidden" }}>
+            {searchResults.length===0 ? (
+              <div style={{ padding:"10px 12px",fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary }}>No outlets match your search</div>
+            ) : (
+              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(190px, 1fr))",gap:0,maxHeight:126,overflowY:"auto" }}>
+                {searchResults.map(outlet=>(
+                  <CompactOutletButton
+                    key={outlet.outlet}
+                    outlet={outlet}
+                    active={selectedOutlet === outlet.outlet}
+                    onClick={()=>onSelect(outlet.outlet)}
+                    C={C}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <details style={{ border:`1px solid ${C.divider}`,borderRadius:8,background:"rgba(255,255,255,0.42)",overflow:"hidden" }}>
+          <summary style={{ listStyle:"none",cursor:"pointer",padding:"8px 10px",fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textSecondary,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10 }}>
+            <span>Browse Grouped Outlets</span>
+            <span style={{ fontFamily:F.mono,fontSize:10,color:C.textTertiary }}>{visibleBrowseGroups.reduce((sum, group)=>sum+group.items.length,0)} visible</span>
+          </summary>
+          <div style={{ padding:"0 10px 10px",display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))",gap:8 }}>
+            {visibleBrowseGroups.map(group=>(
+              <div key={group.id} style={{ border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceBase,overflow:"hidden" }}>
+                <div style={{ padding:"7px 9px",borderBottom:`1px solid ${C.divider}`,fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.13em",textTransform:"uppercase",color:C.gold,display:"flex",justifyContent:"space-between" }}>
+                  <span>{group.label}</span><span>{group.items.length}</span>
+                </div>
+                <div style={{ display:"grid" }}>
+                  {group.items.map(outlet=>(
+                    <CompactOutletButton key={outlet.outlet} outlet={outlet} active={selectedOutlet===outlet.outlet} onClick={()=>onSelect(outlet.outlet)} C={C}/>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
       </div>
     </Panel>
   );
 }
 
-function OutletChip({ label, active, pending, total, onClick, C }) {
+function RoutingMetric({ label, value, color, bg, border, C }) {
+  return (
+    <div style={{ minWidth:76,padding:"5px 8px",border:`1px solid ${border}`,borderRadius:8,background:bg,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8 }}>
+      <div style={{ fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",color:C.textTertiary }}>{label}</div>
+      <div style={{ fontFamily:F.display,fontSize:15,fontWeight:700,color,lineHeight:1 }}>{value}</div>
+    </div>
+  );
+}
+
+function GroupFilterButton({ active, label, count, onClick, C }) {
   return (
     <button
       onClick={onClick}
-      style={{
-        flex:"0 0 auto",
-        display:"flex",
-        alignItems:"center",
-        gap:8,
-        padding:"8px 10px",
-        minWidth:150,
-        maxWidth:230,
-        border:`1px solid ${active ? C.borderAccent : C.borderDefault}`,
-        borderRadius:8,
-        background:active ? C.goldFaintest : C.surfaceBase,
-        color:active ? C.gold : C.textSecondary,
-        cursor:"pointer",
-        transition:"all 0.18s",
-      }}
+      style={{ height:28,display:"inline-flex",alignItems:"center",gap:7,padding:"0 9px",border:`1px solid ${active?C.borderAccent:C.borderDefault}`,borderRadius:999,background:active?C.goldFaint:C.surfaceBase,color:active?C.gold:C.textSecondary,fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.09em",textTransform:"uppercase",cursor:"pointer",transition:"all 0.18s" }}
     >
-      <MapPin size={12} style={{ flexShrink:0 }} />
-      <span style={{ flex:1,minWidth:0,textAlign:"left",fontFamily:F.body,fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{label}</span>
-      <span style={{ flex:"0 0 auto",fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.08em",border:`1px solid ${pending ? C.borderAccent : C.borderDefault}`,borderRadius:12,padding:"2px 7px",background:pending ? C.goldFaint : "rgba(0,0,0,0.03)",color:pending ? C.gold : C.textTertiary }}>
-        {pending}/{total}
-      </span>
+      <span>{label}</span>
+      <span style={{ minWidth:18,height:18,padding:"0 5px",borderRadius:999,display:"inline-flex",alignItems:"center",justifyContent:"center",background:active?"rgba(140,107,42,0.12)":"rgba(0,0,0,0.035)",fontFamily:F.mono,fontSize:10,letterSpacing:0 }}>{count}</span>
     </button>
   );
 }
 
+function CompactOutletButton({ outlet, active, onClick, C }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width:"100%",
+        display:"flex",
+        alignItems:"center",
+        justifyContent:"space-between",
+        gap:10,
+        minHeight:34,
+        padding:"7px 9px",
+        border:"none",
+        borderBottom:`1px solid ${C.divider}`,
+        background:active ? C.goldFaintest : "transparent",
+        color:active ? C.gold : C.textPrimary,
+        cursor:"pointer",
+        textAlign:"left",
+        transition:"all 0.18s",
+      }}
+      onMouseEnter={e=>{if(!active)e.currentTarget.style.background="rgba(140,107,42,0.045)";}}
+      onMouseLeave={e=>{if(!active)e.currentTarget.style.background="transparent";}}
+    >
+      <span style={{ minWidth:0,display:"flex",alignItems:"center",gap:7 }}>
+        <MapPin size={11} color={active?C.gold:C.textTertiary} style={{ flexShrink:0 }}/>
+        <span style={{ minWidth:0,fontFamily:F.body,fontSize:11.5,fontWeight:active?700:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{outlet.outlet}</span>
+      </span>
+      <span style={{ flexShrink:0,fontFamily:F.mono,fontSize:10,color:outlet.pending?C.gold:C.textTertiary }}>
+        {outlet.pending}/{outlet.total}
+      </span>
+    </button>
+  );
+}
 function Toast({ toasts, C }) {
   return (
     <div style={{ position:"fixed",bottom:24,right:24,zIndex:20000,display:"flex",flexDirection:"column",gap:8,pointerEvents:"none" }}>
@@ -1266,6 +1383,9 @@ function NotificationDashboard() {
         @media (max-width: 768px) {
           .nd-grid { grid-template-columns: 1fr !important; }
         }
+        @media (max-width: 1100px) {
+          .nd-routing-toolbar { grid-template-columns: 1fr !important; }
+        }
         ::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.10);border-radius:4px;}
       `}</style>
 
@@ -1299,15 +1419,18 @@ function NotificationDashboard() {
 
           {!loading&&(
             <div style={{ flex:1,display:"flex",flexDirection:"column",padding:"clamp(32px,5vh,52px) clamp(20px,5vw,64px) clamp(24px,4vh,40px)",gap:20,animation:"fadeUp 0.32s ease" }}>
-              <div>
-                <h1 style={{ fontFamily:F.display,fontSize:"clamp(24px,4vw,40px)",fontWeight:700,color:C.textPrimary,lineHeight:1.12,margin:"0 0 8px",letterSpacing:"0.01em" }}>
-                  Notification Monitor
-                </h1>
-                <select value={outletFilter} onChange={e=>{setOutletFilter(e.target.value);setPendingPage(1);setDonePage(1);}} style={{ marginBottom:8,padding:"6px 10px",border:`1px solid ${C.borderDefault}`,borderRadius:6,background:C.surfaceBase,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.textSecondary,outline:"none" }}>
-                  {outletOptions.map(outlet=><option key={outlet} value={outlet}>{outlet==="ALL"?"All Outlets":outlet}</option>)}
-                </select>
-                <div style={{ fontFamily:F.label,fontSize:11,fontWeight:500,color:C.textSecondary,letterSpacing:"0.02em",textTransform:"uppercase" }}>
-                  {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })} • {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(240px, 1fr))",gap:16,alignItems:"end" }}>
+                <div style={{ minWidth:0 }}>
+                  <h1 style={{ fontFamily:F.display,fontSize:"clamp(24px,4vw,40px)",fontWeight:700,color:C.textPrimary,lineHeight:1.12,margin:"0 0 8px",letterSpacing:"0.01em" }}>
+                    Notification Monitor
+                  </h1>
+                  <div style={{ fontFamily:F.label,fontSize:11,fontWeight:500,color:C.textSecondary,letterSpacing:"0.02em",textTransform:"uppercase" }}>
+                    {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })} • {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                  </div>
+                </div>
+                <div style={{ justifySelf:"end",maxWidth:360,minWidth:0,display:"inline-flex",alignItems:"center",gap:8,padding:"8px 12px",border:`1px solid ${C.borderDefault}`,borderRadius:10,background:"rgba(255,255,255,0.76)",boxShadow:"0 8px 24px rgba(36,31,24,0.05)",fontFamily:F.label,fontSize:10,fontWeight:800,letterSpacing:"0.10em",textTransform:"uppercase",color:C.textSecondary }}>
+                  <MapPin size={13} color={C.gold} style={{ flexShrink:0 }}/>
+                  <span style={{ overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{outletFilter==="ALL"?"All Outlets":outletFilter}</span>
                 </div>
               </div>
 
@@ -1398,3 +1521,4 @@ function NotificationDashboard() {
 }
 
 export default NotificationDashboard;
+
