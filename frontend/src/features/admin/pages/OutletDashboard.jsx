@@ -7,7 +7,6 @@ import {
   CheckCircle,
   ChevronDown,
   Clock,
-  Filter,
   Layers,
   Search,
   TrendingUp,
@@ -199,6 +198,39 @@ function compareEventDate(a, b) {
   const av = `${a.event_date || ""} ${a.event_time || ""}`;
   const bv = `${b.event_date || ""} ${b.event_time || ""}`;
   return av.localeCompare(bv);
+}
+
+function parseDateTime(value) {
+  if (!value) return null;
+  const date = new Date(String(value).replace(" ", "T"));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function reservationSubmittedAt(reservation) {
+  return parseDateTime(reservation?.submitted_at || reservation?.created_at || reservation?.status_last_changed_at);
+}
+
+function pendingAgeMinutes(reservation) {
+  const submittedAt = reservationSubmittedAt(reservation);
+  if (!submittedAt) return 0;
+  return Math.max(0, Math.floor((Date.now() - submittedAt.getTime()) / 60000));
+}
+
+function formatAge(minutes) {
+  if (!minutes) return "Just now";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+  if (hours < 24) return remaining ? `${hours}h ${remaining}m` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ${hours % 24}h`;
+}
+
+function responsePriority(reservation) {
+  const minutes = pendingAgeMinutes(reservation);
+  if (minutes >= 120) return { label: "Overdue", color: C.red, bg: C.redFaint, minutes };
+  if (minutes >= 45) return { label: "Review soon", color: C.gold, bg: C.goldFaint, minutes };
+  return { label: "On track", color: C.green, bg: C.greenFaint, minutes };
 }
 
 function tone(status) {
@@ -579,16 +611,26 @@ function BarChart({ rows }) {
   );
 }
 
-function ReservationRow({ reservation }) {
+function PriorityBadge({ reservation }) {
+  const priority = responsePriority(reservation);
+  return (
+    <span style={{ justifySelf: "start", borderRadius: 999, padding: "4px 8px", background: priority.bg, color: priority.color, fontSize: 9, fontWeight: 850, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+      {priority.label} · {formatAge(priority.minutes)}
+    </span>
+  );
+}
+
+function ReservationRow({ reservation, showPriority = false }) {
   const outlet = outletNameForReservation(reservation);
   return (
-    <div style={{ padding: "11px 12px", borderBottom: `1px solid ${C.divider}`, display: "grid", gridTemplateColumns: "minmax(180px,1fr) 120px 88px 92px", gap: 12, alignItems: "center" }} className="od-row">
+    <div style={{ padding: "11px 12px", borderBottom: `1px solid ${C.divider}`, display: "grid", gridTemplateColumns: showPriority ? "minmax(180px,1fr) 120px 88px 116px 92px" : "minmax(180px,1fr) 120px 88px 92px", gap: 12, alignItems: "center" }} className="od-row">
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reservation.name || reservation.guest_name || "Guest"}</div>
         <div style={{ marginTop: 3, fontSize: 11.5, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reservation.reference_code || reservation.reference || "-"} - {outlet}</div>
       </div>
       <div style={{ fontSize: 12, color: C.muted }}>{readableDate(reservation.event_date)}<br /><span style={{ color: C.faint }}>{readableTime(reservation.event_time)}</span></div>
       <div style={{ fontSize: 12, color: C.muted }}>{reservation.guests_count || reservation.guests || 0} guests</div>
+      {showPriority && <PriorityBadge reservation={reservation} />}
       <StatusPill status={reservation.status} />
     </div>
   );
@@ -707,6 +749,13 @@ function OutletDashboard() {
   const reserved = outletReservations.filter((reservation) => normalizeStatus(reservation.status) === "reserved");
   const nextReservation = [...outletReservations].filter((reservation) => normalizeStatus(reservation.status) !== "declined").sort(compareEventDate)[0];
   const acceptanceRate = total ? Math.round((reserved.length / total) * 100) : 0;
+  const todayCount = outletReservations.filter((reservation) => reservation.event_date === today()).length;
+  const pendingByPriority = useMemo(() => {
+    return [...pending].sort((a, b) => pendingAgeMinutes(b) - pendingAgeMinutes(a) || compareEventDate(a, b));
+  }, [pending]);
+  const urgentPending = pendingByPriority.filter((reservation) => responsePriority(reservation).label === "Overdue");
+  const reviewSoon = pendingByPriority.filter((reservation) => responsePriority(reservation).label === "Review soon");
+  const oldestPending = pendingByPriority[0];
 
   const trendRows = useMemo(() => {
     if (analyticsPeriod === "yearly") {
@@ -861,8 +910,9 @@ function OutletDashboard() {
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
                 <MetricCard icon={CalendarDays} label="Reservations" value={total} detail="in range" color={C.blue} bg={C.blueFaint} />
-                <MetricCard icon={Clock} label="Pending Actions" value={pending.length} detail="awaiting review" color={C.gold} bg={C.goldFaint} />
+                <MetricCard icon={Clock} label="Pending Actions" value={pending.length} detail={urgentPending.length ? `${urgentPending.length} overdue` : "awaiting review"} color={urgentPending.length ? C.red : C.gold} bg={urgentPending.length ? C.redFaint : C.goldFaint} />
                 <MetricCard icon={CheckCircle} label="Approved" value={reserved.length} detail={`${acceptanceRate}% rate`} color={C.green} bg={C.greenFaint} />
+                <MetricCard icon={Activity} label="Today" value={todayCount} detail="scheduled" color={C.blue} bg={C.blueFaint} />
                 <MetricCard icon={Users} label="Guests" value={guests} detail="expected" color={C.slate} bg={C.slateFaint} />
               </div>
 
@@ -884,7 +934,7 @@ function OutletDashboard() {
                   <div style={{ padding: 16, display: "grid", gap: 12 }}>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10 }}>
                       <MetricCard icon={TrendingUp} label="Acceptance" value={`${acceptanceRate}%`} detail="approved" color={C.green} bg={C.greenFaint} />
-                      <MetricCard icon={Activity} label="Today" value={outletReservations.filter((reservation) => reservation.event_date === today()).length} detail="scheduled" color={C.blue} bg={C.blueFaint} />
+                      <MetricCard icon={AlertCircle} label="Response Watch" value={urgentPending.length + reviewSoon.length} detail="needs attention" color={urgentPending.length ? C.red : C.gold} bg={urgentPending.length ? C.redFaint : C.goldFaint} />
                     </div>
                     <div style={{ padding: 13, borderRadius: 10, background: C.soft, border: `1px solid ${C.border}` }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.gold, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 8 }}><AlertCircle size={14} />Next Activity</div>
@@ -895,6 +945,17 @@ function OutletDashboard() {
                         </div>
                       ) : (
                         <div style={{ fontSize: 12, color: C.muted }}>No upcoming activity in the selected range.</div>
+                      )}
+                    </div>
+                    <div style={{ padding: 13, borderRadius: 10, background: oldestPending ? responsePriority(oldestPending).bg : C.soft, border: `1px solid ${oldestPending ? `${responsePriority(oldestPending).color}30` : C.border}` }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, color: oldestPending ? responsePriority(oldestPending).color : C.muted, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 8 }}><Clock size={14} />Oldest Pending Request</div>
+                      {oldestPending ? (
+                        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>
+                          <strong>{oldestPending.name || "Guest"}</strong> has waited {formatAge(responsePriority(oldestPending).minutes)}.
+                          <div style={{ color: C.muted }}>{oldestPending.reference_code || "-"} · {readableDate(oldestPending.event_date)} at {readableTime(oldestPending.event_time)}</div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: C.muted }}>No pending requests need review.</div>
                       )}
                     </div>
                   </div>
@@ -911,16 +972,16 @@ function OutletDashboard() {
                   right={<button onClick={() => navigate("/admin/reservations")} style={{ height: 30, border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, color: C.gold, padding: "0 10px", fontSize: 10, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", cursor: "pointer" }}>Open Queue</button>}
                 >
                   <div style={{ maxHeight: 310, overflow: "auto" }}>
-                    {pending.length ? pending.slice(0, 8).map((reservation) => <ReservationRow key={reservation.id || reservation.reference_code} reservation={reservation} />) : (
+                    {pendingByPriority.length ? pendingByPriority.slice(0, 8).map((reservation) => <ReservationRow key={reservation.id || reservation.reference_code} reservation={reservation} showPriority />) : (
                       <div style={{ padding: 18, color: C.muted, fontSize: 12 }}>No pending approvals for this outlet.</div>
                     )}
                   </div>
                 </Panel>
                 <Panel title="Notifications & Alerts" subtitle="Operational signals based on current filters.">
                   <div style={{ padding: 16, display: "grid", gap: 10 }}>
-                    <AlertRow icon={Clock} label="Pending review" value={pending.length} detail="Requests awaiting approval or decline" color={C.gold} />
+                    <AlertRow icon={AlertCircle} label="Overdue review" value={urgentPending.length} detail="Pending requests older than 2 hours" color={urgentPending.length ? C.red : C.slate} />
+                    <AlertRow icon={Clock} label="Review soon" value={reviewSoon.length} detail="Pending requests approaching review threshold" color={reviewSoon.length ? C.gold : C.slate} />
                     <AlertRow icon={CheckCircle} label="Approved reservations" value={reserved.length} detail="Confirmed outlet activity" color={C.green} />
-                    <AlertRow icon={Filter} label="Filtered records" value={total} detail="Visible after filters and search" color={C.blue} />
                     <AlertRow icon={Layers} label="Outlet scope" value={selectedOutlet.aggregate ? selectedOutlet.children.length : 1} detail={selectedOutlet.aggregate ? "Sub-rooms included in grouped monitoring" : "Current operational outlet"} color={C.slate} />
                   </div>
                 </Panel>

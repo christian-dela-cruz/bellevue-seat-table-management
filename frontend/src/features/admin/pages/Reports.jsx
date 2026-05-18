@@ -3,7 +3,7 @@ import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { reportAPI } from "../../../services/reportAPI";
-import { Building2, Layers, Utensils } from "lucide-react";
+import { Building2, Download, Layers, Printer, Utensils } from "lucide-react";
 
 const C = {
   page: "#F7F4EE",
@@ -168,6 +168,53 @@ function sortRows(rows, sort) {
   if (!sort?.key) return rows;
   const direction = sort.direction === "asc" ? 1 : -1;
   return [...rows].sort((a, b) => compareValues(a, b, sort.key) * direction);
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function ActionButton({ icon: Icon, label, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        height: 38,
+        border: `1px solid ${C.border}`,
+        borderRadius: 8,
+        background: C.surface,
+        color: C.gold,
+        padding: "0 11px",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 7,
+        fontFamily: F.label,
+        fontSize: 10,
+        fontWeight: 750,
+        letterSpacing: "0.12em",
+        textTransform: "uppercase",
+        cursor: "pointer",
+      }}
+    >
+      <Icon size={14} />
+      {label}
+    </button>
+  );
 }
 
 const SORT_OPTIONS = {
@@ -559,6 +606,92 @@ function MonthlyReports({ monthlyReport }) {
   );
 }
 
+function YearlyReports({ monthlyReport, transactionSummary }) {
+  const months = monthlyReport.months || [];
+  const outlets = monthlyReport.outlets || [];
+  const summary = monthlyReport.summary || {};
+  const reservations = summary.reservations || 0;
+  const reserved = summary.reserved || summary.approved || 0;
+  const approvalRate = reservations ? Math.round((reserved / reservations) * 100) : 0;
+  const peakMonth = summary.peak_month || months.reduce((best, month) => ((month.reservations || 0) > (best.reservations || 0) ? month : best), {}).label || "-";
+  const topOutlet = outlets[0];
+  const activeMonths = months.filter((month) => (month.reservations || 0) > 0).length;
+  const quarters = [
+    ["Q1", months.slice(0, 3)],
+    ["Q2", months.slice(3, 6)],
+    ["Q3", months.slice(6, 9)],
+    ["Q4", months.slice(9, 12)],
+  ].map(([label, rows]) => ({
+    label,
+    reservations: rows.reduce((sum, month) => sum + Number(month.reservations || 0), 0),
+    promotions: rows.reduce((sum, month) => sum + Number(month.promotion_mentions || 0), 0),
+  }));
+
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+        <MetricCard label="Year Total" value={reservations} detail={`${activeMonths} active months`} tone="blue" />
+        <MetricCard label="Approval Rate" value={`${approvalRate}%`} detail={`${reserved} approved`} tone="green" />
+        <MetricCard label="Peak Month" value={peakMonth} tone="gold" />
+        <MetricCard label="Transactions" value={transactionSummary.transactions || 0} detail="audit records" tone="slate" />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(320px,1.15fr) minmax(280px,0.85fr)", gap: 14 }}>
+        <SummaryPanel title={`Annual Activity ${monthlyReport.year || ""}`}>
+          <div style={{ display: "grid", gap: 12 }}>
+            <MonthlyLineChart months={months} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10 }}>
+              {quarters.map((quarter) => (
+                <div key={quarter.label} style={{ border: `1px solid ${C.divider}`, borderRadius: 9, background: C.soft, padding: 10 }}>
+                  <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold }}>{quarter.label}</div>
+                  <div style={{ marginTop: 8, fontSize: 20, fontWeight: 650, color: C.text }}>{quarter.reservations}</div>
+                  <div style={{ marginTop: 2, fontSize: 11.5, color: C.muted }}>{quarter.promotions} promo mention{quarter.promotions === 1 ? "" : "s"}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </SummaryPanel>
+
+        <SummaryPanel title="Management Highlights">
+          <div style={{ display: "grid", gap: 12 }}>
+            <InsightRow label="Busiest month" value={peakMonth} detail="Highest reservation volume in the selected year." tone="gold" />
+            <InsightRow label="Top outlet" value={topOutlet?.outlet || "-"} detail={topOutlet ? `${topOutlet.reservations || 0} reservations recorded.` : "No outlet activity yet."} tone="blue" />
+            <InsightRow label="Reservation health" value={`${approvalRate}% approved`} detail="Useful for management-level performance review." tone="green" />
+            <InsightRow label="Promotion activity" value={summary.promotion_mentions || 0} detail="Total promotion mentions across the year." tone="slate" />
+          </div>
+        </SummaryPanel>
+      </div>
+
+      <TableCard
+        title="Yearly Outlet Ranking"
+        headers={["Outlet", "Reservations"]}
+        rows={outlets.slice(0, 10)}
+        renderRow={(outlet) => (
+          <tr key={outlet.outlet}>
+            <td style={cellStyle(true)}>{outlet.outlet}</td>
+            <td style={cellStyle()}>{outlet.reservations}</td>
+          </tr>
+        )}
+      />
+    </div>
+  );
+}
+
+function InsightRow({ label, value, detail, tone = "gold" }) {
+  const [color, bg] = toneColor(tone);
+
+  return (
+    <div style={{ border: `1px solid ${C.divider}`, borderRadius: 10, padding: 12, background: C.soft, display: "grid", gap: 5 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+        <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.faint }}>{label}</span>
+        <span style={{ width: 9, height: 9, borderRadius: 999, background: color, boxShadow: `0 0 0 4px ${bg}` }} />
+      </div>
+      <div style={{ color: C.text, fontSize: 15, fontWeight: 650, overflowWrap: "anywhere" }}>{value}</div>
+      <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.45 }}>{detail}</div>
+    </div>
+  );
+}
+
 function TableCard({ title, headers, rows, renderRow, actions }) {
   return (
     <ReportCard style={{ overflow: "hidden", minWidth: 0 }}>
@@ -696,20 +829,67 @@ export default function Reports() {
   const dateRangeLabel = `${readableDate(startDate)} to ${readableDate(endDate)}`;
   const reservedCount = (statuses.reserved || 0) + (statuses.approved || 0);
   const totalReservations = summary.reservations || 0;
+  const handleExportCsv = () => {
+    const rows = [
+      ["Report", "Outlet Performance"],
+      ["Date Range", dateRangeLabel],
+      [],
+      ["Summary"],
+      ["Reservations", summary.reservations || 0],
+      ["Guests", summary.guests || 0],
+      ["Outlets", summary.outlets || 0],
+      ["Transactions", transactionSummary.transactions || 0],
+      [],
+      ["Status", "Count"],
+      ["Reserved", reservedCount],
+      ["Pending", statuses.pending || 0],
+      ["Rejected", statuses.rejected || 0],
+      ["Cancelled", statuses.cancelled || 0],
+      [],
+      ["Monthly", "Reservations", "Promotion Mentions"],
+      ...(monthlyReport.months || []).map((month) => [month.label, month.reservations || 0, month.promotion_mentions || 0]),
+      [],
+      ["Outlet", "Reservations", "Guests", "Reserved", "Pending", "Rejected", "Cancelled", "Dine-In", "Promo"],
+      ...filteredOutlets.map((outlet) => [
+        outlet.name,
+        outlet.total_reservations || 0,
+        outlet.guests || 0,
+        outlet.reserved || 0,
+        outlet.pending || 0,
+        outlet.rejected || 0,
+        outlet.cancelled || 0,
+        outlet.dine_in || 0,
+        outlet.promotion_mentions || 0,
+      ]),
+    ];
+    downloadCsv(`outlet-report-${startDate}-to-${endDate}.csv`, rows);
+  };
   const tabs = [
     { id: "summary", label: "Summary" },
     { id: "monthly", label: "Monthly" },
+    { id: "yearly", label: "Yearly" },
     { id: "outlets", label: "Outlets" },
     ...(canViewTransactions ? [{ id: "audit", label: "Audit Trail" }] : []),
   ];
 
   return (
     <div style={{ minHeight: "100vh", background: C.page, fontFamily: F.body }}>
+      <style>{`
+        @media print {
+          body { background: #fff !important; }
+          aside, nav, header { display: none !important; }
+          main { height: auto !important; overflow: visible !important; padding: 18px !important; }
+          button, select, input { box-shadow: none !important; }
+        }
+        @media (max-width: 980px) {
+          .reports-top, .reports-grid, .reports-toolbar { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
       <AdminNavbar />
       <div style={{ display: "flex" }}>
         <Sidebar activeNav="reports" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
         <main style={{ flex: 1, height: "calc(100vh - 60px)", overflow: "auto", padding: "28px 32px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(260px,1fr) auto", gap: 18, alignItems: "end", marginBottom: 18 }}>
+          <div className="reports-top" style={{ display: "grid", gridTemplateColumns: "minmax(260px,1fr) auto", gap: 18, alignItems: "end", marginBottom: 18 }}>
             <div>
               <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>Reports</div>
               <h1 style={{ margin: 0, fontSize: 32, lineHeight: 1.1, color: C.text, fontWeight: 650 }}>Outlet Performance</h1>
@@ -733,6 +913,8 @@ export default function Reports() {
                 <button onClick={loadReport} disabled={loading} style={{ height: 38, padding: "0 14px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", cursor: loading ? "not-allowed" : "pointer" }}>
                   {loading ? "Loading" : "Apply"}
                 </button>
+                <ActionButton icon={Download} label="CSV" onClick={handleExportCsv} />
+                <ActionButton icon={Printer} label="Print" onClick={() => window.print()} />
               </div>
             )}
           </div>
@@ -784,6 +966,12 @@ export default function Reports() {
               {activeTab === "monthly" && (
                 <Section title="Monthly Reporting" subtitle="Year-to-date monthly view based on scheduled event dates, with promotions, outlet activity, and statuses.">
                   <MonthlyReports monthlyReport={monthlyReport} />
+                </Section>
+              )}
+
+              {activeTab === "yearly" && (
+                <Section title="Yearly Management Report" subtitle="Annual view for performance review, presentation reporting, and management-level decisions.">
+                  <YearlyReports monthlyReport={monthlyReport} transactionSummary={transactionSummary} />
                 </Section>
               )}
 
