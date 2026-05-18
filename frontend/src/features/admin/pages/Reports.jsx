@@ -4,6 +4,17 @@ import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { reportAPI } from "../../../services/reportAPI";
 import { Building2, Download, Layers, Printer, Utensils } from "lucide-react";
+import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 const C = {
   page: "#F7F4EE",
@@ -330,6 +341,27 @@ function SummaryPanel({ title, children }) {
   );
 }
 
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div style={{ background: C.surface, border: "1px solid rgba(140,107,42,0.18)", borderRadius: 10, boxShadow: "0 12px 26px rgba(24,20,14,0.12)", padding: "10px 11px", minWidth: 160 }}>
+      <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>{label}</div>
+      <div style={{ display: "grid", gap: 6 }}>
+        {payload.map((item) => (
+          <div key={item.dataKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, fontSize: 12, color: C.muted }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+              <span style={{ width: 7, height: 7, borderRadius: 999, background: item.color }} />
+              {item.name}
+            </span>
+            <strong style={{ color: C.text, fontWeight: 700 }}>{item.value || 0}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function OutletCard({ outlet }) {
   const total = outlet.total_reservations || 0;
 
@@ -359,7 +391,19 @@ function OutletCard({ outlet }) {
 
 function TransactionMonitor({ transactionReport, isGlobal, sort, onSort }) {
   const summary = transactionReport.summary || {};
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [page, setPage] = useState(1);
   const rows = sortRows(transactionReport.data || [], sort);
+  const totalPages = Math.max(1, Math.ceil(rows.length / rowsPerPage));
+  const visibleRows = rows.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+
+  useEffect(() => {
+    setPage(1);
+  }, [rowsPerPage, sort?.key, sort?.direction, transactionReport.data]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
 
   return (
     <SummaryPanel title="Transaction Monitor">
@@ -380,11 +424,23 @@ function TransactionMonitor({ transactionReport, isGlobal, sort, onSort }) {
           <MiniStat label="Reverts" value={summary.reverts || 0} />
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <SortSelect value={sort} options={SORT_OPTIONS.audit} onChange={onSort} />
-        </div>
+        <div style={{ border: `1px solid ${C.divider}`, borderRadius: 12, overflow: "hidden", background: C.surface }}>
+          <div style={{ padding: "12px 14px", background: C.soft, borderBottom: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Audit Records</div>
+              <div style={{ marginTop: 3, fontSize: 11.5, color: C.muted }}>{rows.length} transaction{rows.length === 1 ? "" : "s"} found for the selected range.</div>
+            </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+              <FilterField label="Rows">
+                <select value={rowsPerPage} onChange={(event) => setRowsPerPage(Number(event.target.value))} style={{ ...filterStyle(), minWidth: 118 }}>
+                  {[10, 25, 50, 100].map((value) => <option key={value} value={value}>{value} entries</option>)}
+                </select>
+              </FilterField>
+              <SortSelect value={sort} options={SORT_OPTIONS.audit} onChange={onSort} />
+            </div>
+          </div>
 
-        <div style={{ overflowX: "auto" }}>
+          <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
             <thead>
               <tr style={{ background: C.soft, color: C.faint, textTransform: "uppercase", letterSpacing: "0.10em", fontSize: 10 }}>
@@ -398,11 +454,11 @@ function TransactionMonitor({ transactionReport, isGlobal, sort, onSort }) {
                 <tr>
                   <td colSpan={7} style={{ padding: "16px 12px", color: C.muted }}>No transactions found for this date range.</td>
                 </tr>
-              ) : rows.slice(0, 12).map((row) => {
+              ) : visibleRows.map((row) => {
                 const reservation = row.reservation || {};
                 const venue = row.venue || {};
                 return (
-                  <tr key={row.id}>
+                  <tr key={row.id} className="reports-table-row">
                     <td style={cellStyle()}>{readableDateTime(row.created_at)}</td>
                     <td style={cellStyle(true)}>{reservation.reference_code || "-"}</td>
                     <td style={cellStyle()}>{reservation.name || "-"}</td>
@@ -430,6 +486,32 @@ function TransactionMonitor({ transactionReport, isGlobal, sort, onSort }) {
               })}
             </tbody>
           </table>
+          </div>
+
+          <div style={{ padding: "11px 14px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", color: C.muted, fontSize: 12 }}>
+            <span>
+              Showing {rows.length === 0 ? 0 : (page - 1) * rowsPerPage + 1}-{Math.min(page * rowsPerPage, rows.length)} of {rows.length}
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1}
+                style={{ ...pagerButtonStyle(), opacity: page === 1 ? 0.45 : 1, cursor: page === 1 ? "not-allowed" : "pointer" }}
+              >
+                Previous
+              </button>
+              <span style={{ color: C.muted }}>Page {page} of {totalPages}</span>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page === totalPages}
+                style={{ ...pagerButtonStyle(), opacity: page === totalPages ? 0.45 : 1, cursor: page === totalPages ? "not-allowed" : "pointer" }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </SummaryPanel>
@@ -437,126 +519,98 @@ function TransactionMonitor({ transactionReport, isGlobal, sort, onSort }) {
 }
 
 function MonthlyLineChart({ months }) {
-  const [hoveredIndex, setHoveredIndex] = useState(null);
-  const width = 720;
-  const height = 250;
-  const padding = { top: 18, right: 24, bottom: 34, left: 36 };
-  const innerWidth = width - padding.left - padding.right;
-  const innerHeight = height - padding.top - padding.bottom;
-  const maxValue = Math.max(1, ...months.map((month) => Math.max(month.reservations || 0, month.promotion_mentions || 0)));
-  const xFor = (index) => padding.left + (months.length <= 1 ? 0 : (index / (months.length - 1)) * innerWidth);
-  const yFor = (value) => padding.top + innerHeight - ((value || 0) / maxValue) * innerHeight;
-  const pointsFor = (key) => months.map((month, index) => `${xFor(index)},${yFor(month[key] || 0)}`).join(" ");
-  const reservationPoints = pointsFor("reservations");
-  const promoPoints = pointsFor("promotion_mentions");
-  const reservationArea = `${padding.left},${height - padding.bottom} ${reservationPoints} ${width - padding.right},${height - padding.bottom}`;
-  const yTicks = [0, Math.ceil(maxValue / 2), maxValue];
-  const activeMonth = hoveredIndex !== null ? months[hoveredIndex] : null;
-  const tooltipX = hoveredIndex !== null ? xFor(hoveredIndex) : 0;
-  const tooltipY = activeMonth
-    ? Math.min(yFor(activeMonth.reservations || 0), yFor(activeMonth.promotion_mentions || 0))
-    : 0;
-  const tooltipWidth = 150;
-  const tooltipHeight = 58;
-  const tooltipLeft = Math.min(Math.max(tooltipX - tooltipWidth / 2, padding.left), width - padding.right - tooltipWidth);
-  const tooltipTop = Math.max(tooltipY - tooltipHeight - 14, padding.top + 2);
+  const data = (months || []).map((month) => ({
+    ...month,
+    label: month.label || month.month,
+    reservations: Number(month.reservations || 0),
+    promotion_mentions: Number(month.promotion_mentions || 0),
+  }));
+  const labelInterval = data.length > 16 ? Math.ceil(data.length / 8) - 1 : 0;
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ fontSize: 12.5, color: C.muted }}>Reservation volume by month, with promotion mentions shown as a comparison line.</div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <LegendDot color={C.blue} label="Reservations" />
-          <LegendDot color={C.gold} label="Promotion mentions" dashed />
-        </div>
       </div>
 
-      <div style={{ width: "100%", overflowX: "auto" }}>
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Monthly reservation trend line chart" style={{ width: "100%", minWidth: 560, display: "block" }}>
-          <style>{`
-            @keyframes reportLineDraw { from { stroke-dashoffset: 900; } to { stroke-dashoffset: 0; } }
-            @keyframes reportAreaIn { from { opacity: 0; } to { opacity: 1; } }
-            .report-line { stroke-dasharray: 900; stroke-dashoffset: 900; animation: reportLineDraw 0.85s ease forwards; }
-            .report-promo-line { opacity: 0; animation: reportAreaIn 0.55s ease 0.22s forwards; }
-            .report-area { opacity: 0; animation: reportAreaIn 0.65s ease 0.14s forwards; }
-            .report-point { transition: r 0.16s ease, fill 0.16s ease, stroke-width 0.16s ease; }
-          `}</style>
-          <defs>
-            <linearGradient id="reportsChartBg" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#FFFFFF" />
-              <stop offset="55%" stopColor="#FAF8F4" />
-              <stop offset="100%" stopColor="#F1ECE1" />
-            </linearGradient>
-            <linearGradient id="reservationAreaFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={C.blue} stopOpacity="0.18" />
-              <stop offset="100%" stopColor={C.blue} stopOpacity="0.015" />
-            </linearGradient>
-            <filter id="chartShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="8" stdDeviation="8" floodColor="#18140E" floodOpacity="0.10" />
-            </filter>
-          </defs>
-          <rect x="0" y="0" width={width} height={height} fill="url(#reportsChartBg)" rx="12" />
-
-          {yTicks.map((tick) => {
-            const y = yFor(tick);
-            return (
-              <g key={tick}>
-                <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="rgba(0,0,0,0.06)" />
-                <text x={padding.left - 10} y={y + 4} textAnchor="end" fontSize="10" fill={C.faint}>{tick}</text>
-              </g>
-            );
-          })}
-
-          {months.map((month, index) => {
-            const x = xFor(index);
-            return (
-              <text key={month.month} x={x} y={height - 12} textAnchor="middle" fontSize="10" fill={C.muted}>
-                {month.label}
-              </text>
-            );
-          })}
-
-          <polygon className="report-area" points={reservationArea} fill="url(#reservationAreaFill)" />
-          <polyline className="report-line" points={reservationPoints} fill="none" stroke={C.blue} strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" filter="url(#chartShadow)" />
-          <polyline className="report-promo-line" points={promoPoints} fill="none" stroke={C.gold} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="6 6" />
-
-          {months.map((month, index) => (
-            <g key={`${month.month}-points`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)} style={{ cursor: "default" }}>
-              <rect
-                x={xFor(index) - innerWidth / Math.max(months.length - 1, 1) / 2}
-                y={padding.top}
-                width={innerWidth / Math.max(months.length - 1, 1)}
-                height={innerHeight}
-                fill="transparent"
-              />
-              <circle className="report-point" cx={xFor(index)} cy={yFor(month.reservations || 0)} r={hoveredIndex === index ? 6 : 4} fill={hoveredIndex === index ? C.blue : C.surface} stroke={C.blue} strokeWidth={hoveredIndex === index ? 3 : 2} />
-              <circle className="report-point" cx={xFor(index)} cy={yFor(month.promotion_mentions || 0)} r={hoveredIndex === index ? 5 : 3.5} fill={hoveredIndex === index ? C.gold : C.surface} stroke={C.gold} strokeWidth={hoveredIndex === index ? 3 : 2} />
-            </g>
-          ))}
-
-          {activeMonth && (
-            <g pointerEvents="none">
-              <line x1={tooltipX} x2={tooltipX} y1={padding.top} y2={height - padding.bottom} stroke="rgba(24,20,14,0.16)" strokeDasharray="4 4" />
-              <rect x={tooltipLeft} y={tooltipTop} width={tooltipWidth} height={tooltipHeight} rx="10" fill="#FFFFFF" stroke="rgba(140,107,42,0.18)" filter="url(#chartShadow)" />
-              <text x={tooltipLeft + 10} y={tooltipTop + 17} fontSize="10" fontWeight="800" letterSpacing="0.08em" textTransform="uppercase" fill={C.gold}>{activeMonth.label}</text>
-              <circle cx={tooltipLeft + 12} cy={tooltipTop + 33} r="3" fill={C.blue} />
-              <text x={tooltipLeft + 22} y={tooltipTop + 37} fontSize="11" fill={C.muted}>{activeMonth.reservations || 0} reservations</text>
-              <circle cx={tooltipLeft + 12} cy={tooltipTop + 48} r="3" fill={C.gold} />
-              <text x={tooltipLeft + 22} y={tooltipTop + 52} fontSize="11" fill={C.muted}>{activeMonth.promotion_mentions || 0} promo mentions</text>
-            </g>
-          )}
-        </svg>
+      <div style={{ width: "100%", minHeight: 320, borderRadius: 14, background: "linear-gradient(135deg,#FFFFFF 0%,#FAF8F4 58%,#F1ECE1 100%)", border: `1px solid ${C.divider}`, padding: "16px 12px 8px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)" }}>
+        <ResponsiveContainer width="100%" height={290}>
+          <ComposedChart data={data} margin={{ top: 12, right: 28, bottom: 8, left: -8 }}>
+            <defs>
+              <linearGradient id="reportsReservationFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor={C.blue} stopOpacity="0.22" />
+                <stop offset="52%" stopColor={C.blue} stopOpacity="0.08" />
+                <stop offset="100%" stopColor={C.blue} stopOpacity="0.01" />
+              </linearGradient>
+              <filter id="reportsLineShadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#3B6FA8" floodOpacity="0.16" />
+              </filter>
+            </defs>
+            <CartesianGrid stroke="rgba(24,20,14,0.07)" vertical={false} />
+            <XAxis
+              dataKey="label"
+              interval={labelInterval}
+              tick={{ fill: C.muted, fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              minTickGap={12}
+              padding={{ left: 12, right: 16 }}
+            />
+            <YAxis
+              allowDecimals={false}
+              tick={{ fill: C.faint, fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              width={34}
+            />
+            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "rgba(140,107,42,0.22)", strokeDasharray: "4 4" }} wrapperStyle={{ outline: "none" }} />
+            <Legend
+              verticalAlign="top"
+              align="right"
+              iconType="plainline"
+              wrapperStyle={{ fontSize: 11, color: C.muted, paddingBottom: 12 }}
+            />
+            <Area
+              type="monotone"
+              dataKey="reservations"
+              fill="url(#reportsReservationFill)"
+              stroke="none"
+              dot={false}
+              activeDot={false}
+              connectNulls
+              isAnimationActive
+              animationDuration={760}
+            />
+            <Line
+              type="monotone"
+              dataKey="reservations"
+              name="Reservations"
+              stroke={C.blue}
+              strokeWidth={3.35}
+              dot={false}
+              activeDot={{ r: 5.5, strokeWidth: 3, stroke: C.surface, fill: C.blue }}
+              connectNulls
+              isAnimationActive
+              animationDuration={720}
+              filter="url(#reportsLineShadow)"
+            />
+            <Line
+              type="monotone"
+              dataKey="promotion_mentions"
+              name="Promotion mentions"
+              stroke={C.gold}
+              strokeWidth={2.45}
+              strokeDasharray="6 6"
+              dot={false}
+              activeDot={{ r: 5, strokeWidth: 3, stroke: C.surface, fill: C.gold }}
+              connectNulls
+              isAnimationActive
+              animationDuration={760}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
       </div>
     </div>
-  );
-}
-
-function LegendDot({ color, label, dashed = false }) {
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: C.muted, fontSize: 11.5 }}>
-      <span style={{ width: 22, borderTop: `2px ${dashed ? "dashed" : "solid"} ${color}`, display: "inline-block" }} />
-      {label}
-    </span>
   );
 }
 
@@ -564,44 +618,62 @@ function MonthlyReports({ monthlyReport }) {
   const months = monthlyReport.months || [];
   const outlets = monthlyReport.outlets || [];
   const summary = monthlyReport.summary || {};
+  const reservations = summary.reservations || 0;
+  const reserved = summary.reserved || summary.approved || 0;
+  const approvalRate = reservations ? Math.round((reserved / reservations) * 100) : 0;
+  const peakMonth = summary.peak_month || months.reduce((best, month) => ((month.reservations || 0) > (best.reservations || 0) ? month : best), {}).label || "-";
+  const promoMonth = months.reduce((best, month) => ((month.promotion_mentions || 0) > (best.promotion_mentions || 0) ? month : best), {}).label || "-";
+  const activeMonths = months.filter((month) => (month.reservations || 0) > 0).length;
+  const topOutlet = outlets[0];
 
   return (
-    <div className="reports-grid" style={{ display: "grid", gridTemplateColumns: "minmax(320px,1.2fr) minmax(260px,0.8fr)", gap: 14 }}>
-      <SummaryPanel title={`Monthly Trend ${monthlyReport.year || ""}`}>
-        <div style={{ display: "grid", gap: 12 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 10 }}>
-            <MiniStat label="Year Total" value={summary.reservations || 0} />
-            <MiniStat label="Promotions" value={summary.promotion_mentions || 0} />
-            <MiniStat label="Outlets" value={summary.outlets || 0} />
-            <MiniStat label="Peak Month" value={summary.peak_month || "-"} />
-          </div>
+    <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+        <MetricCard label="Year Total" value={reservations} detail={`${activeMonths} active months`} tone="blue" />
+        <MetricCard label="Approval Rate" value={`${approvalRate}%`} detail={`${reserved} approved`} tone="green" />
+        <MetricCard label="Peak Month" value={peakMonth} tone="gold" />
+        <MetricCard label="Promotions" value={summary.promotion_mentions || 0} detail="mentions" tone="slate" />
+      </div>
 
-          <MonthlyLineChart months={months} />
-        </div>
-      </SummaryPanel>
-
-      <SummaryPanel title="Monthly Status & Outlets">
-        <div style={{ display: "grid", gap: 14 }}>
-          <div style={{ display: "grid", gap: 10 }}>
-            <ProgressRow label="Reserved" value={summary.reserved || 0} total={summary.reservations || 0} tone="green" />
-            <ProgressRow label="Pending" value={summary.pending || 0} total={summary.reservations || 0} tone="gold" />
-            <ProgressRow label="Rejected" value={summary.rejected || 0} total={summary.reservations || 0} tone="red" />
-            <ProgressRow label="Cancelled" value={summary.cancelled || 0} total={summary.reservations || 0} tone="slate" />
+      <div className="reports-grid" style={{ display: "grid", gridTemplateColumns: "minmax(320px,1.2fr) minmax(280px,0.8fr)", gap: 14 }}>
+        <SummaryPanel title={`Monthly Trend ${monthlyReport.year || ""}`}>
+          <div style={{ display: "grid", gap: 12 }}>
+            <MonthlyLineChart months={months} />
           </div>
+        </SummaryPanel>
 
-          <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 12, display: "grid", gap: 8 }}>
-            <div style={{ fontSize: 10, color: C.faint, textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700 }}>Top outlets this year</div>
-            {outlets.length === 0 ? (
-              <div style={{ color: C.muted, fontSize: 12 }}>No outlet activity yet.</div>
-            ) : outlets.slice(0, 5).map((outlet) => (
-              <div key={outlet.outlet} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "center", color: C.muted, fontSize: 12 }}>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outlet.outlet}</span>
-                <span style={{ color: C.text, fontWeight: 650 }}>{outlet.reservations}</span>
-              </div>
-            ))}
+        <SummaryPanel title="Monthly Management Highlights">
+          <div style={{ display: "grid", gap: 12 }}>
+            <InsightRow label="Busiest month" value={peakMonth} detail="Highest reservation volume in the selected year." tone="gold" />
+            <InsightRow label="Top outlet" value={topOutlet?.outlet || "-"} detail={topOutlet ? `${topOutlet.reservations || 0} reservations recorded.` : "No outlet activity yet."} tone="blue" />
+            <InsightRow label="Promotion activity" value={promoMonth} detail={`${summary.promotion_mentions || 0} total promotion mentions.`} tone="slate" />
+            <InsightRow label="Reservation health" value={`${approvalRate}% approved`} detail="Quick read for monthly operations review." tone="green" />
           </div>
-        </div>
-      </SummaryPanel>
+        </SummaryPanel>
+      </div>
+
+      <div className="reports-grid" style={{ display: "grid", gridTemplateColumns: "minmax(280px,0.85fr) minmax(320px,1.15fr)", gap: 14 }}>
+        <SummaryPanel title="Status Distribution">
+          <div style={{ display: "grid", gap: 11 }}>
+            <ProgressRow label="Reserved" value={summary.reserved || 0} total={reservations} tone="green" />
+            <ProgressRow label="Pending" value={summary.pending || 0} total={reservations} tone="gold" />
+            <ProgressRow label="Rejected" value={summary.rejected || 0} total={reservations} tone="red" />
+            <ProgressRow label="Cancelled" value={summary.cancelled || 0} total={reservations} tone="slate" />
+          </div>
+        </SummaryPanel>
+
+        <TableCard
+          title="Top Outlets This Year"
+          headers={["Outlet", "Reservations"]}
+          rows={outlets.slice(0, 6)}
+          renderRow={(outlet) => (
+            <tr key={outlet.outlet}>
+              <td style={cellStyle(true)}>{outlet.outlet}</td>
+              <td style={cellStyle()}>{outlet.reservations}</td>
+            </tr>
+          )}
+        />
+      </div>
     </div>
   );
 }
@@ -925,6 +997,12 @@ export default function Reports() {
         .reports-section {
           animation: reportsFadeIn 0.22s ease both;
         }
+        .reports-table-row {
+          transition: background 0.14s ease;
+        }
+        .reports-table-row:hover {
+          background: rgba(140,107,42,0.035);
+        }
         @media (max-width: 980px) {
           .reports-top, .reports-grid, .reports-toolbar, .reports-nav-grid { grid-template-columns: 1fr !important; }
           .reports-filter-panel { min-width: 0 !important; }
@@ -1135,6 +1213,22 @@ function filterStyle() {
     fontFamily: F.body,
     fontSize: 12,
     outline: "none",
+  };
+}
+
+function pagerButtonStyle() {
+  return {
+    height: 34,
+    border: `1px solid ${C.border}`,
+    borderRadius: 8,
+    background: C.surface,
+    color: C.gold,
+    padding: "0 11px",
+    fontFamily: F.label,
+    fontSize: 10,
+    fontWeight: 750,
+    letterSpacing: "0.10em",
+    textTransform: "uppercase",
   };
 }
 
