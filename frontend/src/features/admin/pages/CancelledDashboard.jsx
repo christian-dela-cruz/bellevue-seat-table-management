@@ -98,6 +98,83 @@ function CancelledBadge() {
   );
 }
 
+function metricTone(tone) {
+  if (tone === "slate") return { color: C.accent, bg: C.accentFaint, border: C.accentBorder };
+  if (tone === "green") return { color: C.green, bg: C.greenFaint, border: C.greenBorder };
+  return { color: C.gold, bg: C.goldFaint, border: C.borderAccent };
+}
+
+function ReviewMetric({ label, value, helper, tone = "slate", active = false, onClick, isMobile }) {
+  const palette = metricTone(tone);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: `1px solid ${active ? palette.border : C.cardBorder}`,
+        borderRadius: 10,
+        background: active ? palette.bg : C.surfaceBase,
+        padding: isMobile ? "10px 11px" : "12px 14px",
+        minHeight: isMobile ? 66 : 74,
+        display: "grid",
+        gap: 5,
+        alignContent: "center",
+        textAlign: "left",
+        cursor: onClick ? "pointer" : "default",
+        boxShadow: active ? `0 8px 20px ${palette.color}14` : "0 1px 5px rgba(0,0,0,0.04)",
+        transition: "border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = palette.border;
+        e.currentTarget.style.transform = "translateY(-1px)";
+        e.currentTarget.style.boxShadow = `0 8px 20px ${palette.color}12`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = active ? palette.border : C.cardBorder;
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = active ? `0 8px 20px ${palette.color}14` : "0 1px 5px rgba(0,0,0,0.04)";
+      }}
+    >
+      <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: active ? palette.color : C.textTertiary }}>
+        {label}
+      </span>
+      <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <span style={{ fontFamily: F.display, fontSize: isMobile ? 24 : 28, fontWeight: 760, lineHeight: 1, color: palette.color }}>
+          {value}
+        </span>
+        <span style={{ fontSize: 11.5, color: C.textSecondary, lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {helper}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function InlineMetric({ label, value, tone = "slate" }) {
+  const palette = metricTone(tone);
+  return (
+    <span style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "5px 9px",
+      borderRadius: 999,
+      background: palette.bg,
+      border: `1px solid ${palette.border}`,
+      color: palette.color,
+      fontFamily: F.label,
+      fontSize: 9,
+      fontWeight: 800,
+      letterSpacing: "0.10em",
+      textTransform: "uppercase",
+      whiteSpace: "nowrap",
+    }}>
+      <span style={{ color: palette.color, fontSize: 11, fontWeight: 800, letterSpacing: 0 }}>{value}</span>
+      {label}
+    </span>
+  );
+}
+
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 function DetailModal({ reservation, onClose }) {
   const fmtDate = (d) => {
@@ -316,7 +393,9 @@ export default function CancelledDashboard() {
   const [pagination, setPagination] = useState({ currentPage: 1, lastPage: 1, totalItems: 0 });
   const [loading, setLoading] = useState(true);
   const [searchFocused, setSearchFocused] = useState(false);
-  const [stats, setStats] = useState({ total: 0, today: 0, thisWeek: 0 });
+  const [stats, setStats] = useState({ total: 0, today: 0, thisWeek: 0, missingReason: 0, upcoming: 0 });
+  const [reasonFilter, setReasonFilter] = useState("ALL");
+  const [sortBy, setSortBy] = useState("cancelled_desc");
 
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   useEffect(() => {
@@ -358,7 +437,12 @@ export default function CancelledDashboard() {
         if (!r.cancelled_at) return false;
         return new Date(r.cancelled_at) >= weekAgo;
       }).length;
-      setStats({ total: cancelled.length, today: todayCount, thisWeek: weekCount });
+      const missingReason = cancelled.filter(r => !r.cancellation_reason).length;
+      const upcoming = cancelled.filter(r => {
+        if (!r.event_date) return false;
+        return new Date(`${r.event_date}T00:00:00`) >= new Date(now.toISOString().split("T")[0] + "T00:00:00");
+      }).length;
+      setStats({ total: cancelled.length, today: todayCount, thisWeek: weekCount, missingReason, upcoming });
     } catch (e) {
       console.error("[CancelledDashboard] Failed to load:", e);
     } finally {
@@ -440,19 +524,37 @@ export default function CancelledDashboard() {
 
   // Filter
   useEffect(() => {
-    let filtered = reservations;
+    let filtered = [...reservations];
+    if (reasonFilter === "WITH_REASON") {
+      filtered = filtered.filter(r => Boolean(r.cancellation_reason));
+    }
+    if (reasonFilter === "NO_REASON") {
+      filtered = filtered.filter(r => !r.cancellation_reason);
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       filtered = filtered.filter(r =>
         r.name?.toLowerCase().includes(q) ||
         r.email?.toLowerCase().includes(q) ||
+        r.phone?.toLowerCase().includes(q) ||
+        r.room?.toLowerCase().includes(q) ||
         r.reference_code?.toLowerCase().includes(q) ||
         r.cancellation_reason?.toLowerCase().includes(q)
       );
     }
+
+    filtered.sort((a, b) => {
+      const cancelledTime = (r) => r.cancelled_at ? new Date(r.cancelled_at).getTime() : 0;
+      const eventTime = (r) => r.event_date ? new Date(`${r.event_date}T00:00:00`).getTime() : 0;
+      if (sortBy === "cancelled_asc") return cancelledTime(a) - cancelledTime(b);
+      if (sortBy === "event_asc") return eventTime(a) - eventTime(b);
+      if (sortBy === "event_desc") return eventTime(b) - eventTime(a);
+      if (sortBy === "guest_az") return String(a.name || "").localeCompare(String(b.name || ""));
+      return cancelledTime(b) - cancelledTime(a);
+    });
     setFilteredReservations(filtered);
     setPagination(p => ({ ...p, lastPage: Math.ceil(filtered.length / 10) || 1, totalItems: filtered.length, currentPage: 1 }));
-  }, [reservations, search]);
+  }, [reservations, search, reasonFilter, sortBy]);
 
   const handlePageChange = (page) => {
     if (page < 1 || page > pagination.lastPage) return;
@@ -490,12 +592,6 @@ export default function CancelledDashboard() {
     (pagination.currentPage - 1) * 10,
     pagination.currentPage * 10
   );
-
-  const statCards = [
-    { label: "Total Cancelled", count: stats.total },
-    { label: "Cancelled Today", count: stats.today },
-    { label: "This Week",       count: stats.thisWeek },
-  ];
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
@@ -569,7 +665,7 @@ export default function CancelledDashboard() {
                   }
                 </button>
 
-                <div style={{ position: "relative" }}>
+                <div style={{ position: "relative", display: "none" }}>
                   <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
                     width="12" height="12" viewBox="0 0 24 24" fill="none"
                     stroke={searchFocused ? C.accent : C.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -613,14 +709,46 @@ export default function CancelledDashboard() {
                 </p>
               </div>
 
-              {/* Stat cards */}
+              {/* Review summary */}
               <div style={{
+                background: C.cardBg,
+                border: `1px solid ${C.cardBorder}`,
+                borderRadius: 12,
+                padding: isMobile ? "12px" : "14px 16px",
+                marginBottom: isMobile ? 16 : 18,
+                boxShadow: "0 2px 10px rgba(0,0,0,0.045)",
                 display: "grid",
+                gap: 12,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>
+                      Cancellation Review
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textSecondary }}>
+                      Track guest-cancelled reservations and review cancellation reasons.
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                    <InlineMetric label="This Week" value={loading ? "--" : stats.thisWeek} tone="slate" />
+                    <InlineMetric label="Upcoming" value={loading ? "--" : stats.upcoming} tone="gold" />
+                    <InlineMetric label="No Reason" value={loading ? "--" : stats.missingReason} tone="slate" />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : isTablet ? "repeat(2,1fr)" : "repeat(3,minmax(0,1fr))", gap: 10 }}>
+                  <ReviewMetric label="Total Cancelled" value={loading ? "--" : stats.total} helper="guest cancellations" tone="slate" active={reasonFilter === "ALL"} onClick={() => setReasonFilter("ALL")} isMobile={isMobile} />
+                  <ReviewMetric label="Cancelled Today" value={loading ? "--" : stats.today} helper="new reviews" tone="gold" isMobile={isMobile} />
+                  <ReviewMetric label="Missing Reason" value={loading ? "--" : stats.missingReason} helper="needs follow-up" tone="slate" active={reasonFilter === "NO_REASON"} onClick={() => setReasonFilter("NO_REASON")} isMobile={isMobile} />
+                </div>
+              </div>
+
+              <div style={{
+                display: "none",
                 gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(3,1fr)",
                 gap: isMobile ? 10 : 12,
                 marginBottom: isMobile ? 18 : 22,
               }}>
-                {statCards.map(({ label, count }) => (
+                {[].map(({ label, count }) => (
                   <div key={label} style={{
                     background: C.cardBg,
                     border: `1px solid ${C.cardBorder}`,
@@ -696,6 +824,88 @@ export default function CancelledDashboard() {
                       >›</button>
                     </div>
                   )}
+                </div>
+
+                <div style={{ padding: isMobile ? "12px 14px" : "14px 22px", borderBottom: `1px solid ${C.divider}`, background: C.surfaceBase, display: "grid", gap: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    {[
+                      ["ALL", "All"],
+                      ["WITH_REASON", "With Reason"],
+                      ["NO_REASON", "No Reason"],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setReasonFilter(value)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          border: `1px solid ${reasonFilter === value ? C.accentBorder : C.borderDefault}`,
+                          background: reasonFilter === value ? C.accentFaint : C.surfaceBase,
+                          color: reasonFilter === value ? C.accent : C.textSecondary,
+                          fontFamily: F.label,
+                          fontSize: 9,
+                          fontWeight: 800,
+                          letterSpacing: "0.11em",
+                          textTransform: "uppercase",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+
+                    <div style={{ position: "relative", marginLeft: isMobile ? 0 : "auto", flex: isMobile ? "1 1 100%" : "1 1 280px", maxWidth: isMobile ? "100%" : 380 }}>
+                      <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+                        width="12" height="12" viewBox="0 0 24 24" fill="none"
+                        stroke={searchFocused ? C.accent : C.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      <input
+                        style={{
+                          padding: "8px 12px 8px 30px",
+                          background: C.surfaceInput,
+                          border: `1px solid ${searchFocused ? C.accentBorder : C.borderDefault}`,
+                          borderRadius: 8,
+                          color: C.textPrimary,
+                          fontFamily: F.body,
+                          fontSize: 12,
+                          width: "100%",
+                          outline: "none",
+                          transition: "border-color 0.18s,box-shadow 0.18s",
+                          boxShadow: searchFocused ? C.inputFocusShadow : "none",
+                        }}
+                        placeholder="Search guest, contact, room, reference, or reason"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        onFocus={() => setSearchFocused(true)}
+                        onBlur={() => setSearchFocused(false)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(180px,240px) minmax(160px,220px) auto", gap: 10, alignItems: "end" }}>
+                    <label style={{ display: "grid", gap: 5 }}>
+                      <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Sort</span>
+                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ padding: "9px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: C.surfaceInput, color: C.textPrimary, fontSize: 12 }}>
+                        <option value="cancelled_desc">Latest cancelled</option>
+                        <option value="cancelled_asc">Oldest cancelled</option>
+                        <option value="event_asc">Event soonest</option>
+                        <option value="event_desc">Event latest</option>
+                        <option value="guest_az">Guest A-Z</option>
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setReasonFilter("ALL"); setSearch(""); setSortBy("cancelled_desc"); }}
+                      style={{ minHeight: 37, border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: C.surfaceBase, color: C.textSecondary, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+                    >
+                      Reset Review
+                    </button>
+                    <div style={{ fontFamily: F.body, fontSize: 11.5, color: C.textSecondary, lineHeight: 1.5 }}>
+                      Cancelled records are read-only and kept for customer-service review.
+                    </div>
+                  </div>
                 </div>
 
                 {/* List */}
