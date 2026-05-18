@@ -566,7 +566,7 @@ function MonthlyReports({ monthlyReport }) {
   const summary = monthlyReport.summary || {};
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(320px,1.2fr) minmax(260px,0.8fr)", gap: 14 }}>
+    <div className="reports-grid" style={{ display: "grid", gridTemplateColumns: "minmax(320px,1.2fr) minmax(260px,0.8fr)", gap: 14 }}>
       <SummaryPanel title={`Monthly Trend ${monthlyReport.year || ""}`}>
         <div style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 10 }}>
@@ -636,7 +636,7 @@ function YearlyReports({ monthlyReport, transactionSummary }) {
         <MetricCard label="Transactions" value={transactionSummary.transactions || 0} detail="audit records" tone="slate" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(320px,1.15fr) minmax(280px,0.85fr)", gap: 14 }}>
+      <div className="reports-grid" style={{ display: "grid", gridTemplateColumns: "minmax(320px,1.15fr) minmax(280px,0.85fr)", gap: 14 }}>
         <SummaryPanel title={`Annual Activity ${monthlyReport.year || ""}`}>
           <div style={{ display: "grid", gap: 12 }}>
             <MonthlyLineChart months={months} />
@@ -717,35 +717,47 @@ function TableCard({ title, headers, rows, renderRow, actions }) {
   );
 }
 
-function ReportTabs({ tabs, activeTab, onChange }) {
+function ReportTabs({ groups, activeTab, onChange }) {
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 6, display: "flex", gap: 4, overflowX: "auto" }}>
-      {tabs.map((tab) => {
-        const active = activeTab === tab.id;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onChange(tab.id)}
-            style={{
-              border: "none",
-              borderRadius: 8,
-              background: active ? C.goldFaint : "transparent",
-              color: active ? C.gold : C.muted,
-              padding: "10px 12px",
-              fontFamily: F.label,
-              fontSize: 11,
-              fontWeight: active ? 700 : 500,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              whiteSpace: "nowrap",
-              cursor: "pointer",
-            }}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
+    <div className="reports-nav-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: 10 }}>
+      {groups.map((group) => (
+        <div key={group.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 10, display: "grid", gap: 9, minWidth: 0 }}>
+          <div style={{ display: "grid", gap: 3 }}>
+            <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>{group.label}</div>
+            <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.35 }}>{group.description}</div>
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {group.tabs.map((tab) => {
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => onChange(tab.id)}
+                  style={{
+                    border: `1px solid ${active ? "rgba(140,107,42,0.30)" : C.divider}`,
+                    borderRadius: 9,
+                    background: active ? C.goldFaint : C.soft,
+                    color: active ? C.gold : C.muted,
+                    padding: "8px 10px",
+                    fontFamily: F.label,
+                    fontSize: 10.5,
+                    fontWeight: active ? 800 : 650,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    whiteSpace: "nowrap",
+                    cursor: "pointer",
+                    transition: "background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease",
+                    boxShadow: active ? "0 8px 18px rgba(140,107,42,0.08)" : "none",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -755,6 +767,7 @@ export default function Reports() {
   const [activeTab, setActiveTab] = useState("summary");
   const [startDate, setStartDate] = useState(monthStart());
   const [endDate, setEndDate] = useState(today());
+  const [reportYear, setReportYear] = useState(today().slice(0, 4));
   const [selectedOutlet, setSelectedOutlet] = useState("ALL");
   const [selectedOutletGroup, setSelectedOutletGroup] = useState("all");
   const [outletSort, setOutletSort] = useState({ key: "total_reservations", direction: "desc" });
@@ -775,13 +788,13 @@ export default function Reports() {
     setError("");
 
     try {
-      const reportYear = Number(startDate?.slice(0, 4)) || new Date().getFullYear();
+      const selectedYear = Number(reportYear) || Number(today().slice(0, 4));
       const [outletData, transactionData, monthlyData] = await Promise.all([
         reportAPI.getOutletReports({ start_date: startDate, end_date: endDate }),
         canViewTransactions
           ? reportAPI.getTransactionReports({ start_date: startDate, end_date: endDate })
           : Promise.resolve(null),
-        reportAPI.getMonthlyReports({ year: reportYear }),
+        reportAPI.getMonthlyReports({ year: selectedYear }),
       ]);
       setReport(outletData);
       if (transactionData) setTransactionReport(transactionData);
@@ -827,6 +840,10 @@ export default function Reports() {
   }, [filteredOutlets]);
   const transactionSummary = transactionReport.summary || {};
   const dateRangeLabel = `${readableDate(startDate)} to ${readableDate(endDate)}`;
+  const isTrendTab = activeTab === "monthly" || activeTab === "yearly";
+  const showOutletFilter = activeTab === "summary" || activeTab === "outlets";
+  const currentYear = Number(today().slice(0, 4));
+  const yearOptions = Array.from({ length: 6 }, (_, index) => currentYear - 3 + index);
   const reservedCount = (statuses.reserved || 0) + (statuses.approved || 0);
   const totalReservations = summary.reservations || 0;
   const handleExportCsv = () => {
@@ -862,15 +879,35 @@ export default function Reports() {
         outlet.promotion_mentions || 0,
       ]),
     ];
-    downloadCsv(`outlet-report-${startDate}-to-${endDate}.csv`, rows);
+    downloadCsv(isTrendTab ? `outlet-report-${reportYear}.csv` : `outlet-report-${startDate}-to-${endDate}.csv`, rows);
   };
-  const tabs = [
-    { id: "summary", label: "Summary" },
-    { id: "monthly", label: "Monthly" },
-    { id: "yearly", label: "Yearly" },
-    { id: "outlets", label: "Outlets" },
-    ...(canViewTransactions ? [{ id: "audit", label: "Audit Trail" }] : []),
+  const reportGroups = [
+    {
+      label: "Overview Analytics",
+      description: "Date-range reports for operational review.",
+      tabs: [
+        { id: "summary", label: "Summary" },
+        { id: "outlets", label: "Outlets" },
+      ],
+    },
+    {
+      label: "Trend Analytics",
+      description: "Year-based reporting for monthly and annual trends.",
+      tabs: [
+        { id: "monthly", label: "Monthly" },
+        { id: "yearly", label: "Yearly" },
+      ],
+    },
+    ...(canViewTransactions
+      ? [{
+        label: "System Monitoring",
+        description: "Date-range audit records and status activity.",
+        tabs: [{ id: "audit", label: "Audit Trail" }],
+      }]
+      : []),
   ];
+  const activeReport = reportGroups.flatMap((group) => group.tabs).find((tab) => tab.id === activeTab);
+  const filterModeLabel = isTrendTab ? `${reportYear} trend reporting` : `${dateRangeLabel} date range`;
 
   return (
     <div style={{ minHeight: "100vh", background: C.page, fontFamily: F.body }}>
@@ -881,8 +918,16 @@ export default function Reports() {
           main { height: auto !important; overflow: visible !important; padding: 18px !important; }
           button, select, input { box-shadow: none !important; }
         }
+        @keyframes reportsFadeIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .reports-section {
+          animation: reportsFadeIn 0.22s ease both;
+        }
         @media (max-width: 980px) {
-          .reports-top, .reports-grid, .reports-toolbar { grid-template-columns: 1fr !important; }
+          .reports-top, .reports-grid, .reports-toolbar, .reports-nav-grid { grid-template-columns: 1fr !important; }
+          .reports-filter-panel { min-width: 0 !important; }
         }
       `}</style>
       <AdminNavbar />
@@ -893,28 +938,51 @@ export default function Reports() {
             <div>
               <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>Reports</div>
               <h1 style={{ margin: 0, fontSize: 32, lineHeight: 1.1, color: C.text, fontWeight: 650 }}>Outlet Performance</h1>
-              {canViewReports && <div style={{ marginTop: 6, fontSize: 12.5, color: C.muted }}>Reservation submissions and transaction activity from {dateRangeLabel}</div>}
+              {canViewReports && <div style={{ marginTop: 6, fontSize: 12.5, color: C.muted }}>{activeReport?.label || "Reports"} uses {filterModeLabel}.</div>}
             </div>
 
             {canViewReports && (
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                <FilterField label="Start">
-                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={filterStyle()} />
-                </FilterField>
-                <FilterField label="End">
-                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={filterStyle()} />
-                </FilterField>
-                <FilterField label="Outlet">
-                  <select value={selectedOutlet} onChange={(e) => setSelectedOutlet(e.target.value)} style={{ ...filterStyle(), minWidth: 190 }}>
-                    <option value="ALL">All outlets</option>
-                    {(report.data || []).map((outlet) => <option key={outlet.name || outlet.venue_id} value={String(outlet.name)}>{outlet.name}</option>)}
-                  </select>
-                </FilterField>
+              <div className="reports-filter-panel" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, display: "grid", gap: 10, minWidth: 320 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>{isTrendTab ? "Trend Filter" : "Date Range Filter"}</div>
+                    <div style={{ marginTop: 2, fontSize: 11.5, color: C.muted }}>{isTrendTab ? "Monthly and yearly reports use the selected year only." : "Summary, outlets, and audit trail use this date range."}</div>
+                  </div>
+                  <span style={{ borderRadius: 999, background: isTrendTab ? C.blueFaint : C.goldFaint, color: isTrendTab ? C.blue : C.gold, padding: "5px 8px", fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                    {isTrendTab ? "Year" : "Range"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                  {isTrendTab ? (
+                    <FilterField label="Report Year">
+                      <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} style={{ ...filterStyle(), minWidth: 150 }}>
+                        {yearOptions.map((year) => <option key={year} value={String(year)}>{year}</option>)}
+                      </select>
+                    </FilterField>
+                  ) : (
+                    <>
+                      <FilterField label="Start">
+                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={filterStyle()} />
+                      </FilterField>
+                      <FilterField label="End">
+                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={filterStyle()} />
+                      </FilterField>
+                      {showOutletFilter && (
+                        <FilterField label="Outlet">
+                          <select value={selectedOutlet} onChange={(e) => setSelectedOutlet(e.target.value)} style={{ ...filterStyle(), minWidth: 190 }}>
+                            <option value="ALL">All outlets</option>
+                            {(report.data || []).map((outlet) => <option key={outlet.name || outlet.venue_id} value={String(outlet.name)}>{outlet.name}</option>)}
+                          </select>
+                        </FilterField>
+                      )}
+                    </>
+                  )}
                 <button onClick={loadReport} disabled={loading} style={{ height: 38, padding: "0 14px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", cursor: loading ? "not-allowed" : "pointer" }}>
                   {loading ? "Loading" : "Apply"}
                 </button>
                 <ActionButton icon={Download} label="CSV" onClick={handleExportCsv} />
                 <ActionButton icon={Printer} label="Print" onClick={() => window.print()} />
+                </div>
               </div>
             )}
           </div>
@@ -929,8 +997,9 @@ export default function Reports() {
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 28, color: C.muted }}>Loading reports...</div>
           ) : (
             <div style={{ display: "grid", gap: 22 }}>
-              <ReportTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+              <ReportTabs groups={reportGroups} activeTab={activeTab} onChange={setActiveTab} />
 
+              <div key={activeTab} className="reports-section" style={{ display: "grid", gap: 22 }}>
               {activeTab === "summary" && (
                 <>
                   <Section title="Overview" subtitle="High-level submission activity for the selected date range.">
@@ -942,7 +1011,7 @@ export default function Reports() {
                     </div>
                   </Section>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "minmax(280px,1.05fr) minmax(280px,0.95fr)", gap: 14 }}>
+                  <div className="reports-grid" style={{ display: "grid", gridTemplateColumns: "minmax(280px,1.05fr) minmax(280px,0.95fr)", gap: 14 }}>
                     <SummaryPanel title="Reservation Status">
                       <div style={{ display: "grid", gap: 12 }}>
                         <ProgressRow label="Reserved" value={reservedCount} total={totalReservations} tone="green" />
@@ -1037,6 +1106,7 @@ export default function Reports() {
                   <TransactionMonitor transactionReport={transactionReport} isGlobal={canViewGlobalReports} sort={auditSort} onSort={setAuditSort} />
                 </Section>
               )}
+              </div>
             </div>
           )}
         </main>
