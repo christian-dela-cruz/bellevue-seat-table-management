@@ -1,7 +1,7 @@
 // src/components/admin/Sidebar.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, ClipboardList, Map, UserCog, BarChart3 } from "lucide-react";
+import { X, ClipboardList, Map, UserCog, BarChart3, LayoutDashboard } from "lucide-react";
 import { authAPI } from "../../services/authAPI";
 
 const F = { body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" };
@@ -9,6 +9,7 @@ const F = { body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-
 const NAV_ITEMS = [
   { id: "reservations", label: "Reservations", icon: ClipboardList, iconStyle: "lucide" },
   { id: "cancelled",    label: "Cancelled",    icon: X,           iconStyle: "lucide" },
+  { id: "outlets",      label: "Outlet Dashboard", icon: LayoutDashboard, iconStyle: "lucide", permission: "view_outlet_reports" },
   { id: "reports",      label: "Reports",      icon: BarChart3,   iconStyle: "lucide", permission: "view_outlet_reports" },
   {
     id: "accounts",
@@ -69,6 +70,7 @@ function NavItem({ item, isActive, isOpen, onClick }) {
     const routes = {
       "reservations": "/admin/reservations",
       "cancelled":    "/admin/cancelled",
+      "outlets":      "/admin/outlets",
       "reports":      "/admin/reports",
       "accounts":     "/admin/accounts",
       "seat-map":     "/admin/seatmap",

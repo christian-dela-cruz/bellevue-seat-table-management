@@ -426,6 +426,14 @@ function MonthlyLineChart({ months }) {
 
       <div style={{ width: "100%", overflowX: "auto" }}>
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Monthly reservation trend line chart" style={{ width: "100%", minWidth: 560, display: "block" }}>
+          <style>{`
+            @keyframes reportLineDraw { from { stroke-dashoffset: 900; } to { stroke-dashoffset: 0; } }
+            @keyframes reportAreaIn { from { opacity: 0; } to { opacity: 1; } }
+            .report-line { stroke-dasharray: 900; stroke-dashoffset: 900; animation: reportLineDraw 0.85s ease forwards; }
+            .report-promo-line { opacity: 0; animation: reportAreaIn 0.55s ease 0.22s forwards; }
+            .report-area { opacity: 0; animation: reportAreaIn 0.65s ease 0.14s forwards; }
+            .report-point { transition: r 0.16s ease, fill 0.16s ease, stroke-width 0.16s ease; }
+          `}</style>
           <defs>
             <linearGradient id="reportsChartBg" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor="#FFFFFF" />
@@ -461,9 +469,9 @@ function MonthlyLineChart({ months }) {
             );
           })}
 
-          <polygon points={reservationArea} fill="url(#reservationAreaFill)" />
-          <polyline points={reservationPoints} fill="none" stroke={C.blue} strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" filter="url(#chartShadow)" />
-          <polyline points={promoPoints} fill="none" stroke={C.gold} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="6 6" />
+          <polygon className="report-area" points={reservationArea} fill="url(#reservationAreaFill)" />
+          <polyline className="report-line" points={reservationPoints} fill="none" stroke={C.blue} strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" filter="url(#chartShadow)" />
+          <polyline className="report-promo-line" points={promoPoints} fill="none" stroke={C.gold} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="6 6" />
 
           {months.map((month, index) => (
             <g key={`${month.month}-points`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)} style={{ cursor: "default" }}>
@@ -474,16 +482,16 @@ function MonthlyLineChart({ months }) {
                 height={innerHeight}
                 fill="transparent"
               />
-              <circle cx={xFor(index)} cy={yFor(month.reservations || 0)} r="4" fill={C.surface} stroke={C.blue} strokeWidth="2" />
-              <circle cx={xFor(index)} cy={yFor(month.promotion_mentions || 0)} r="3.5" fill={C.surface} stroke={C.gold} strokeWidth="2" />
+              <circle className="report-point" cx={xFor(index)} cy={yFor(month.reservations || 0)} r={hoveredIndex === index ? 6 : 4} fill={hoveredIndex === index ? C.blue : C.surface} stroke={C.blue} strokeWidth={hoveredIndex === index ? 3 : 2} />
+              <circle className="report-point" cx={xFor(index)} cy={yFor(month.promotion_mentions || 0)} r={hoveredIndex === index ? 5 : 3.5} fill={hoveredIndex === index ? C.gold : C.surface} stroke={C.gold} strokeWidth={hoveredIndex === index ? 3 : 2} />
             </g>
           ))}
 
           {activeMonth && (
             <g pointerEvents="none">
               <line x1={tooltipX} x2={tooltipX} y1={padding.top} y2={height - padding.bottom} stroke="rgba(24,20,14,0.16)" strokeDasharray="4 4" />
-              <rect x={tooltipLeft} y={tooltipTop} width={tooltipWidth} height={tooltipHeight} rx="8" fill="#FFFFFF" stroke="rgba(0,0,0,0.12)" />
-              <text x={tooltipLeft + 10} y={tooltipTop + 17} fontSize="11" fontWeight="700" fill={C.text}>{activeMonth.label}</text>
+              <rect x={tooltipLeft} y={tooltipTop} width={tooltipWidth} height={tooltipHeight} rx="10" fill="#FFFFFF" stroke="rgba(140,107,42,0.18)" filter="url(#chartShadow)" />
+              <text x={tooltipLeft + 10} y={tooltipTop + 17} fontSize="10" fontWeight="800" letterSpacing="0.08em" textTransform="uppercase" fill={C.gold}>{activeMonth.label}</text>
               <circle cx={tooltipLeft + 12} cy={tooltipTop + 33} r="3" fill={C.blue} />
               <text x={tooltipLeft + 22} y={tooltipTop + 37} fontSize="11" fill={C.muted}>{activeMonth.reservations || 0} reservations</text>
               <circle cx={tooltipLeft + 12} cy={tooltipTop + 48} r="3" fill={C.gold} />
