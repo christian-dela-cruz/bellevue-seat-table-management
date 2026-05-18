@@ -764,7 +764,7 @@ class AdminRejectReservationReasonTest extends TestCase
             'seat_number' => 'S7',
             'event_date' => '2026-06-15 18:00:00',
             'event_time' => '18:00',
-            'status' => 'reserved',
+            'status' => 'pending',
         ]);
 
         $viewerHeaders = $this->adminHeaders('viewer');
@@ -786,7 +786,7 @@ class AdminRejectReservationReasonTest extends TestCase
             'event_time' => '18:00',
         ], $scopedHeaders)
             ->assertStatus(422)
-            ->assertJsonPath('message', 'The selected seat or table is already reserved for that date and time.');
+            ->assertJsonPath('message', 'The selected seat or table is already held or reserved for that date and time.');
     }
 
     public function test_seatmap_availability_is_scoped_by_selected_date_and_time(): void
@@ -815,7 +815,7 @@ class AdminRejectReservationReasonTest extends TestCase
             'seat_number' => 'S1',
             'event_date' => '2026-06-15',
             'event_time' => '18:00',
-            'status' => 'reserved',
+            'status' => 'pending',
             'type' => 'individual',
         ]);
 
@@ -826,7 +826,7 @@ class AdminRejectReservationReasonTest extends TestCase
             ->assertJsonFragment([
                 'id' => 'S1',
                 'num' => 'S1',
-                'status' => 'reserved',
+                'status' => 'unavailable',
             ]);
 
         $this->getJson($path . '?event_date=2026-06-15&event_time=19:00')
@@ -847,7 +847,7 @@ class AdminRejectReservationReasonTest extends TestCase
             'seat_number' => 'S1',
             'event_date' => '2026-06-15',
             'event_time' => '18:00',
-            'status' => 'reserved',
+            'status' => 'pending',
             'type' => 'individual',
         ]);
 
@@ -868,7 +868,7 @@ class AdminRejectReservationReasonTest extends TestCase
 
         $this->postJson('/api/reservations', $payload)
             ->assertStatus(422)
-            ->assertJsonPath('message', 'The selected seat or table is already reserved for that date and time.');
+            ->assertJsonPath('message', 'The selected seat or table is already held or reserved for that date and time.');
 
         $this->postJson('/api/reservations', array_merge($payload, [
             'event_time' => '19:00',

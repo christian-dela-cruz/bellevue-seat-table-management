@@ -55,7 +55,7 @@ class SeatMapController extends Controller
                 // Check if seat is reserved
                 $reservation = $this->reservationForSeat($reservations, $seat->table_number, $seat->seat_number);
                 $status = $reservation
-                    ? ($reservation->status === 'approved' ? 'reserved' : $reservation->status)
+                    ? $this->publicSeatStatus($reservation->status)
                     : ($request->filled('event_date') ? ($seat->status === 'maintenance' ? 'maintenance' : 'available') : ($seat->status ?? 'available'));
                 
                 // Add seat to table
@@ -82,7 +82,7 @@ class SeatMapController extends Controller
                     'id' => $reservation->seat_id ?? 'STANDALONE-' . $reservation->seat_number,
                     'num' => $reservation->seat_number,
                     'label' => $reservation->seat_number,
-                    'status' => $reservation->status === 'approved' ? 'reserved' : $reservation->status,
+                    'status' => $this->publicSeatStatus($reservation->status),
                     'x' => 50 + (count($standaloneSeats) * 100), // Position dynamically
                     'y' => 300,
                 ];
@@ -147,7 +147,7 @@ class SeatMapController extends Controller
                 // Check if seat is reserved
                 $reservation = $this->reservationForSeat($reservations, $seat->table_number, $seat->seat_number);
                 $status = $reservation
-                    ? ($reservation->status === 'approved' ? 'reserved' : $reservation->status)
+                    ? $this->publicSeatStatus($reservation->status)
                     : ($request->filled('event_date') ? ($seat->status === 'maintenance' ? 'maintenance' : 'available') : ($seat->status ?? 'available'));
                 
                 // Add seat to table
@@ -174,7 +174,7 @@ class SeatMapController extends Controller
                     'id' => $reservation->seat_id ?? 'STANDALONE-' . $reservation->seat_number,
                     'num' => $reservation->seat_number,
                     'label' => $reservation->seat_number,
-                    'status' => $reservation->status === 'approved' ? 'reserved' : $reservation->status,
+                    'status' => $this->publicSeatStatus($reservation->status),
                     'x' => 50 + (count($standaloneSeats) * 100), // Position dynamically
                     'y' => 300,
                 ];
@@ -211,7 +211,7 @@ class SeatMapController extends Controller
             ->when($request->filled('room'), function ($query) use ($request) {
                 $query->where('room', $request->query('room'));
             })
-            ->whereIn('status', ['approved', 'reserved'])
+            ->whereIn('status', ['pending', 'approved', 'reserved'])
             ->when($request->filled('event_date'), function ($query) use ($request) {
                 $query->whereDate('event_date', $request->query('event_date'));
             })
@@ -247,5 +247,14 @@ class SeatMapController extends Controller
 
             return in_array($seat, $reservedSeats, true);
         });
+    }
+
+    private function publicSeatStatus(?string $status): string
+    {
+        return match ($status) {
+            'pending' => 'unavailable',
+            'approved', 'reserved' => 'reserved',
+            default => $status ?: 'available',
+        };
     }
 }

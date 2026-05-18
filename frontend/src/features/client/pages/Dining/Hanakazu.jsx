@@ -82,7 +82,7 @@ function normaliseApiStatus(raw) {
   const s = (raw || "available").toLowerCase().trim();
   if (s === "approved" || s === "reserved") return "reserved";
   if (s === "rejected") return "rejected";
-  if (s === "pending")  return "available";
+  if (s === "pending") return "unavailable";
   return "available";
 }
 

@@ -101,7 +101,7 @@ function normaliseApiStatus(raw) {
   const s = (raw || "available").toLowerCase();
   if (s === "approved" || s === "reserved") return "reserved";
   if (s === "rejected") return "rejected";
-  if (s === "pending")  return "available";
+  if (s === "pending") return "unavailable";
   return "available";
 }
 
@@ -921,7 +921,7 @@ export default function Tower2() {
       );
 
       // Priority: reserved > pending > available
-      const priority = { available: 0, pending: 1, reserved: 2 };
+      const priority = { available: 0, pending: 1, unavailable: 1, reserved: 2 };
       const seatStatusMap = {};
 
       reservations.forEach(r => {

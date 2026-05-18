@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowUpDown, ChevronLeft, ChevronRight, Search, UserPlus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronRight as ChevronRightIcon, Search, UserPlus } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
-import { ADMIN_OUTLET_GROUPS } from "../../../constants/outletCatalog";
 
 const C = {
   pageBg: "#F7F4EE",
@@ -230,50 +229,225 @@ function scopeText(scope) {
   return Array.isArray(scope) ? scope : [];
 }
 
-function ScopeSelector({ value, disabled, onChange }) {
-  const selected = new Set(Array.isArray(value) ? value : []);
+const OUTLET_SCOPE_TREE = [
+  {
+    id: "main-wing",
+    label: "Main Wing",
+    children: [
+      { id: "alabang-function-room", label: "Alabang Function Room", value: "Alabang Function Room" },
+      { id: "business-center", label: "Business Center", value: "Business Center" },
+      {
+        id: "laguna-ballroom",
+        label: "Laguna Ballroom",
+        children: [
+          { id: "laguna-ballroom-1", label: "Laguna Ballroom 1", value: "Laguna Ballroom 1" },
+          { id: "laguna-ballroom-2", label: "Laguna Ballroom 2", value: "Laguna Ballroom 2" },
+        ],
+      },
+      {
+        id: "twenty-twenty-function-room",
+        label: "20/20 Function Room",
+        children: [
+          { id: "twenty-twenty-a", label: "20/20 Function Room A", value: "20/20 Function Room A" },
+          { id: "twenty-twenty-b", label: "20/20 Function Room B", value: "20/20 Function Room B" },
+          { id: "twenty-twenty-c", label: "20/20 Function Room C", value: "20/20 Function Room C" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "tower-wing",
+    label: "Tower Wing",
+    children: [
+      {
+        id: "tower-ballroom",
+        label: "Tower Ballroom",
+        children: [
+          { id: "tower-1", label: "Tower 1", value: "Tower 1" },
+          { id: "tower-2", label: "Tower 2", value: "Tower 2" },
+          { id: "tower-3", label: "Tower 3", value: "Tower 3" },
+        ],
+      },
+      {
+        id: "grand-ballroom",
+        label: "Grand Ballroom",
+        children: [
+          { id: "grand-ballroom-a", label: "Grand Ballroom A", value: "Grand Ballroom A" },
+          { id: "grand-ballroom-b", label: "Grand Ballroom B", value: "Grand Ballroom B" },
+          { id: "grand-ballroom-c", label: "Grand Ballroom C", value: "Grand Ballroom C" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "dining",
+    label: "Dining",
+    children: [
+      { id: "hanakazu", label: "Hanakazu Japanese Restaurant", value: "Hanakazu Japanese Restaurant" },
+      { id: "qsina", label: "Qsina Restaurant", value: "Qsina Restaurant" },
+      { id: "phoenix-court", label: "Phoenix Court", value: "Phoenix Court" },
+    ],
+  },
+];
 
-  const toggle = (room) => {
-    if (disabled) return;
-    const next = new Set(selected);
-    if (next.has(room)) next.delete(room);
-    else next.add(room);
-    onChange(Array.from(next));
+function leafValues(node) {
+  if (node.value) return [node.value];
+  return (node.children || []).flatMap(leafValues);
+}
+
+function ScopeCheckbox({ checked, indeterminate, disabled, onChange }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = Boolean(indeterminate);
+  }, [indeterminate]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      disabled={disabled}
+      onChange={onChange}
+      style={{ width:15,height:15,accentColor:C.gold,cursor:disabled ? "not-allowed" : "pointer" }}
+    />
+  );
+}
+
+function ScopeTreeNode({ node, selected, disabled, depth, expanded, setExpanded, onToggle }) {
+  const leaves = leafValues(node);
+  const selectedCount = leaves.filter((room) => selected.has(room)).length;
+  const checked = selectedCount === leaves.length && leaves.length > 0;
+  const indeterminate = selectedCount > 0 && selectedCount < leaves.length;
+  const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+  const isExpanded = expanded[node.id] !== false;
+  const isParent = hasChildren;
+
+  const toggleExpand = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setExpanded((current) => ({ ...current, [node.id]: !isExpanded }));
   };
 
-  const toggleGroup = (rooms) => {
+  return (
+    <div>
+      <label
+        style={{
+          display:"grid",
+          gridTemplateColumns:"22px 18px minmax(0,1fr) auto",
+          alignItems:"center",
+          gap:8,
+          minHeight:isParent ? 38 : 34,
+          padding:`7px 12px 7px ${12 + depth * 18}px`,
+          borderTop:depth === 0 ? `1px solid ${C.divider}` : "none",
+          background:checked || indeterminate ? C.goldFaint : (isParent ? C.surfaceSoft : C.surface),
+          color:C.text,
+          cursor:disabled ? "not-allowed" : "pointer",
+          transition:"background 160ms ease, border-color 160ms ease",
+        }}
+      >
+        <ScopeCheckbox
+          checked={checked}
+          indeterminate={indeterminate}
+          disabled={disabled}
+          onChange={() => onToggle(leaves, checked)}
+        />
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={toggleExpand}
+            disabled={disabled}
+            aria-label={`${isExpanded ? "Collapse" : "Expand"} ${node.label}`}
+            style={{ width:18,height:18,border:"none",background:"transparent",padding:0,color:C.muted,cursor:disabled ? "not-allowed" : "pointer",display:"inline-flex",alignItems:"center",justifyContent:"center" }}
+          >
+            {isExpanded ? <ChevronDown size={14} /> : <ChevronRightIcon size={14} />}
+          </button>
+        ) : (
+          <span />
+        )}
+        <span style={{ minWidth:0,fontSize:isParent ? 12.5 : 12,fontWeight:isParent ? 760 : 520,color:isParent ? C.text : C.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+          {node.label}
+        </span>
+        {isParent && (
+          <span style={{ padding:"3px 7px",borderRadius:999,background:C.surface,border:`1px solid ${C.border}`,fontSize:10.5,color:checked ? C.gold : C.muted,fontWeight:760 }}>
+            {selectedCount}/{leaves.length}
+          </span>
+        )}
+      </label>
+      {hasChildren && isExpanded && (
+        <div>
+          {node.children.map((child) => (
+            <ScopeTreeNode
+              key={child.id}
+              node={child}
+              selected={selected}
+              disabled={disabled}
+              depth={depth + 1}
+              expanded={expanded}
+              setExpanded={setExpanded}
+              onToggle={onToggle}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScopeSelector({ value, disabled, onChange }) {
+  const selected = new Set(Array.isArray(value) ? value : []);
+  const [expanded, setExpanded] = useState({
+    "main-wing": true,
+    "laguna-ballroom": true,
+    "twenty-twenty-function-room": true,
+    "tower-wing": true,
+    "tower-ballroom": true,
+    "grand-ballroom": true,
+    dining: true,
+  });
+
+  const toggleValues = (rooms, allSelected) => {
     if (disabled) return;
-    const allSelected = rooms.every((room) => selected.has(room));
     const next = new Set(selected);
     rooms.forEach((room) => {
       if (allSelected) next.delete(room);
       else next.add(room);
     });
-    onChange(Array.from(next));
+    onChange(Array.from(next).sort((a, b) => String(a).localeCompare(String(b))));
   };
 
+  const selectedCount = selected.size;
+  const totalCount = OUTLET_SCOPE_TREE.flatMap(leafValues).length;
+
   return (
-    <div style={{ border:`1px solid ${C.border}`,borderRadius:8,background:disabled ? C.surfaceSoft : C.surface,overflow:"hidden" }}>
+    <div style={{ border:`1px solid ${C.border}`,borderRadius:10,background:disabled ? C.surfaceSoft : C.surface,overflow:"hidden",boxShadow:"inset 0 1px 0 rgba(255,255,255,0.65)" }}>
       {disabled ? (
         <div style={{ padding:12,fontSize:12,color:C.muted }}>All outlets are included for this account.</div>
       ) : (
-        <div style={{ display:"grid",maxHeight:300,overflowY:"auto" }}>
-          {ADMIN_OUTLET_GROUPS.map((group) => (
-            <div key={group.id} style={{ borderBottom:`1px solid ${C.divider}` }}>
-              <button type="button" onClick={()=>toggleGroup(group.rooms)} style={{ width:"100%",border:"none",background:C.surfaceSoft,padding:"9px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer" }}>
-                <span style={{ fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.gold }}>{group.label}</span>
-                <span style={{ fontSize:11,color:C.muted }}>{group.rooms.filter((room)=>selected.has(room)).length}/{group.rooms.length}</span>
-              </button>
-              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:0 }}>
-                {group.rooms.map((room) => (
-                  <label key={room} style={{ display:"flex",alignItems:"center",gap:8,padding:"8px 12px",fontSize:12,color:C.text,cursor:"pointer" }}>
-                    <input type="checkbox" checked={selected.has(room)} onChange={()=>toggle(room)} />
-                    <span>{room}</span>
-                  </label>
-                ))}
-              </div>
+        <div>
+          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"10px 12px",background:C.surfaceSoft,borderBottom:`1px solid ${C.divider}` }}>
+            <div>
+              <div style={{ fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.gold }}>Outlet Assignment</div>
+              <div style={{ marginTop:3,fontSize:11.5,color:C.muted }}>Select groups or individual rooms. Parent groups update automatically.</div>
             </div>
-          ))}
+            <span style={{ flexShrink:0,padding:"5px 8px",borderRadius:999,background:C.surface,border:`1px solid ${C.border}`,fontSize:11,color:C.muted,fontWeight:760 }}>
+              {selectedCount}/{totalCount} selected
+            </span>
+          </div>
+          <div style={{ display:"grid",maxHeight:330,overflowY:"auto" }}>
+            {OUTLET_SCOPE_TREE.map((node) => (
+              <ScopeTreeNode
+                key={node.id}
+                node={node}
+                selected={selected}
+                disabled={disabled}
+                depth={0}
+                expanded={expanded}
+                setExpanded={setExpanded}
+                onToggle={toggleValues}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
