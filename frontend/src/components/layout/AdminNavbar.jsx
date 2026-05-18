@@ -366,6 +366,7 @@ const roleLabels = {
   admin: "Admin",
   fb_director: "F&B Director",
   outlet_manager: "Outlet Manager",
+  supervisor: "Supervisor",
   manager: "Outlet Manager",
   staff: "Staff",
   viewer: "Viewer",

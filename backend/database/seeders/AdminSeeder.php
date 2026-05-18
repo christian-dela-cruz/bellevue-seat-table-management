@@ -46,6 +46,14 @@ class AdminSeeder extends Seeder
                 'outlet_scope' => [1],
             ],
             [
+                'name' => 'Supervisor User',
+                'email' => 'supervisor@example.com',
+                'username' => 'supervisor@example.com',
+                'role' => 'supervisor',
+                'scope_type' => 'assigned',
+                'outlet_scope' => [1],
+            ],
+            [
                 'name' => 'Staff User',
                 'email' => 'staff@example.com',
                 'username' => 'staff@example.com',

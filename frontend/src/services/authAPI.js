@@ -67,6 +67,7 @@ export const authAPI = {
       admin: ['view_admin', 'manage_reservations', 'adjust_reservation_details', 'delete_reservations', 'acknowledge_notifications', 'manage_seat_maps', 'manage_venues', 'view_outlet_reports', 'view_transactions', 'manage_accounts'],
       fb_director: ['view_admin', 'view_outlet_reports', 'view_global_reports', 'view_transactions'],
       outlet_manager: ['view_admin', 'manage_reservations', 'adjust_reservation_details', 'acknowledge_notifications', 'view_outlet_reports', 'view_transactions'],
+      supervisor: ['view_admin', 'manage_reservations', 'adjust_reservation_details', 'acknowledge_notifications', 'view_outlet_reports', 'view_transactions'],
       manager: ['view_admin', 'manage_reservations', 'adjust_reservation_details', 'acknowledge_notifications', 'view_outlet_reports', 'view_transactions'],
       staff: ['view_admin', 'acknowledge_notifications'],
       viewer: ['view_admin'],

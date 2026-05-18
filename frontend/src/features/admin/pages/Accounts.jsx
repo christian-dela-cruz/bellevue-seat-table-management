@@ -34,6 +34,7 @@ const ROLE_LABELS = {
   admin: "Admin",
   fb_director: "F&B Director",
   outlet_manager: "Outlet Manager",
+  supervisor: "Supervisor",
   venue_manager: "Venue Manager",
   staff: "Staff",
 };
@@ -195,9 +196,9 @@ function paginationButtonStyle(disabled = false) {
 }
 
 function roleOptionsFor(currentRole) {
-  const roles = ["super_admin", "admin", "fb_director", "outlet_manager", "staff"];
+  const roles = ["super_admin", "admin", "fb_director", "outlet_manager", "supervisor", "staff"];
   if (currentRole === "super_admin") return roles;
-  if (currentRole === "admin") return ["fb_director", "outlet_manager", "staff"];
+  if (currentRole === "admin") return ["fb_director", "outlet_manager", "supervisor", "staff"];
   return [];
 }
 
@@ -209,7 +210,7 @@ function canManageAccount(currentUser, account) {
 }
 
 function roleRequiresAssignedScope(role) {
-  return ["outlet_manager", "staff"].includes(role);
+  return ["outlet_manager", "supervisor", "staff"].includes(role);
 }
 
 function defaultScopeForRole(role) {

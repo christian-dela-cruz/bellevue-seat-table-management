@@ -351,6 +351,22 @@ class AdminRejectReservationReasonTest extends TestCase
         ], $adminHeaders)->assertStatus(422);
 
         $this->postJson('/api/admin/accounts', [
+            'name' => 'Allowed Supervisor',
+            'email' => 'allowed.supervisor@example.com',
+            'username' => 'allowed.supervisor@example.com',
+            'password' => 'password123',
+            'role' => 'supervisor',
+            'scope_type' => 'assigned',
+            'outlet_scope' => [1],
+        ], $adminHeaders)
+            ->assertCreated()
+            ->assertJsonFragment([
+                'message' => 'Admin account created successfully.',
+                'role' => 'supervisor',
+                'scope_type' => 'assigned',
+            ]);
+
+        $this->postJson('/api/admin/accounts', [
             'name' => 'Allowed Staff',
             'email' => 'allowed.staff@example.com',
             'username' => 'allowed.staff@example.com',
@@ -472,6 +488,21 @@ class AdminRejectReservationReasonTest extends TestCase
             ->assertJsonPath('summary.reservations', 1)
             ->assertJsonFragment([
                 'venue_id' => $firstVenue->id,
+            ])
+            ->assertJsonMissing([
+                'name' => 'Second Hall',
+            ]);
+
+        $supervisorHeaders = $this->adminHeaders('supervisor', 'assigned', [$firstVenue->id]);
+
+        $this->getJson('/api/admin/reports/outlets', $supervisorHeaders)
+            ->assertOk()
+            ->assertJsonPath('summary.reservations', 1)
+            ->assertJsonFragment([
+                'venue_id' => $firstVenue->id,
+            ])
+            ->assertJsonMissing([
+                'name' => 'Second Hall',
             ]);
 
         $staffHeaders = $this->adminHeaders('staff');
@@ -482,6 +513,8 @@ class AdminRejectReservationReasonTest extends TestCase
 
     public function test_transaction_reports_allow_global_view_for_fb_director_and_scope_managers(): void
     {
+        Mail::fake();
+
         $firstVenue = $this->createVenue();
         $secondVenue = Venue::create([
             'name' => 'Dining Room',
@@ -537,6 +570,29 @@ class AdminRejectReservationReasonTest extends TestCase
             ])
             ->assertJsonMissing([
                 'reference_code' => $secondReservation->reference_code,
+            ]);
+
+        $supervisorHeaders = $this->adminHeaders('supervisor', 'assigned', [$firstVenue->id]);
+
+        $this->getJson('/api/admin/reports/transactions', $supervisorHeaders)
+            ->assertOk()
+            ->assertJsonPath('summary.transactions', 1)
+            ->assertJsonFragment([
+                'reference_code' => $firstReservation->reference_code,
+            ])
+            ->assertJsonMissing([
+                'reference_code' => $secondReservation->reference_code,
+            ]);
+
+        $pendingSupervisorReservation = $this->createReservation($firstVenue);
+
+        $this->patchJson("/api/admin/reservations/{$pendingSupervisorReservation->id}/approve", [], $supervisorHeaders)
+            ->assertOk();
+
+        $this->patchJson("/api/admin/reservations/{$secondReservation->id}/approve", [], $supervisorHeaders)
+            ->assertForbidden()
+            ->assertJsonFragment([
+                'message' => 'You are not authorized to access this outlet.',
             ]);
 
         $staffHeaders = $this->adminHeaders('staff');
@@ -708,6 +764,7 @@ class AdminRejectReservationReasonTest extends TestCase
             'seat_number' => 'S7',
             'event_date' => '2026-06-15 18:00:00',
             'event_time' => '18:00',
+            'status' => 'reserved',
         ]);
 
         $viewerHeaders = $this->adminHeaders('viewer');
@@ -758,7 +815,7 @@ class AdminRejectReservationReasonTest extends TestCase
             'seat_number' => 'S1',
             'event_date' => '2026-06-15',
             'event_time' => '18:00',
-            'status' => 'pending',
+            'status' => 'reserved',
             'type' => 'individual',
         ]);
 
@@ -769,7 +826,7 @@ class AdminRejectReservationReasonTest extends TestCase
             ->assertJsonFragment([
                 'id' => 'S1',
                 'num' => 'S1',
-                'status' => 'pending',
+                'status' => 'reserved',
             ]);
 
         $this->getJson($path . '?event_date=2026-06-15&event_time=19:00')

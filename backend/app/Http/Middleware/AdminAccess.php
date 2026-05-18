@@ -50,6 +50,14 @@ class AdminAccess
             'view_outlet_reports',
             'view_transactions',
         ],
+        'supervisor' => [
+            'view_admin',
+            'manage_reservations',
+            'adjust_reservation_details',
+            'acknowledge_notifications',
+            'view_outlet_reports',
+            'view_transactions',
+        ],
         'staff' => [
             'view_admin',
             'acknowledge_notifications',

@@ -18,6 +18,7 @@ class AdminAccountController extends Controller
         'admin',
         'fb_director',
         'outlet_manager',
+        'supervisor',
         'staff',
     ];
 
@@ -192,7 +193,7 @@ class AdminAccountController extends Controller
     {
         return match ($actor['role'] ?? '') {
             'super_admin' => self::ROLES,
-            'admin' => ['fb_director', 'outlet_manager', 'staff'],
+            'admin' => ['fb_director', 'outlet_manager', 'supervisor', 'staff'],
             default => [],
         };
     }
@@ -219,7 +220,7 @@ class AdminAccountController extends Controller
 
     private function scopeTypeForRole(string $role, string $requestedScope): string
     {
-        return in_array(AdminAccess::normalizeRole($role), ['outlet_manager', 'staff'], true)
+        return in_array(AdminAccess::normalizeRole($role), ['outlet_manager', 'supervisor', 'staff'], true)
             ? 'assigned'
             : $requestedScope;
     }

@@ -380,7 +380,15 @@ class ReservationService
 
         $reservationsByRoom = $reservations->groupBy(fn (Reservation $reservation) => $this->roomLabel($reservation));
 
-        $roomReports = collect($this->adminOutletCatalog())
+        $catalog = collect($this->adminOutletCatalog())
+            ->filter(function (array $outlet) use ($admin, $venues) {
+                $venue = $this->catalogVenueFallback($outlet['name'], $venues);
+
+                return $this->canAccessVenue($admin, $venue?->id, $outlet['name']);
+            })
+            ->values();
+
+        $roomReports = $catalog
             ->map(function (array $outlet) use ($reservationsByRoom, $venues) {
                 $items = $reservationsByRoom->get($outlet['name'], collect())->values();
                 $firstReservation = $items->first();
