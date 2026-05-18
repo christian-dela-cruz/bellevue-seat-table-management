@@ -154,6 +154,253 @@ function StateBadge({ state }) {
   );
 }
 
+function parseDateTime(value) {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function normalizeTimeValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "00:00:00";
+  const pmMatch = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (pmMatch) {
+    let hour = Number(pmMatch[1]);
+    const minute = pmMatch[2];
+    const meridiem = pmMatch[3].toUpperCase();
+    if (meridiem === "PM" && hour < 12) hour += 12;
+    if (meridiem === "AM" && hour === 12) hour = 0;
+    return `${String(hour).padStart(2, "0")}:${minute}:00`;
+  }
+  if (/^\d{1,2}:\d{2}$/.test(raw)) return `${raw.padStart(5, "0")}:00`;
+  if (/^\d{1,2}:\d{2}:\d{2}$/.test(raw)) return raw;
+  return "00:00:00";
+}
+
+function reservationEventDate(reservation) {
+  const datePart = String(reservation?.event_date || "").slice(0, 10);
+  if (!datePart) return null;
+  return parseDateTime(`${datePart}T${normalizeTimeValue(reservation?.event_time)}`);
+}
+
+function reservationSubmittedDate(reservation) {
+  if (reservation?.submittedTimestamp) return parseDateTime(Number(reservation.submittedTimestamp) * 1000);
+  return parseDateTime(reservation?.submitted_at || reservation?.submittedAt || reservation?.created_at);
+}
+
+function startOfDay(date) {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function daysBetween(from, to) {
+  return Math.floor((startOfDay(to) - startOfDay(from)) / 86400000);
+}
+
+function formatDuration(ms) {
+  if (!Number.isFinite(ms)) return "—";
+  const minutes = Math.max(0, Math.floor(ms / 60000));
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${minutes % 60}m`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ${hours % 24}h`;
+}
+
+function formatTimeUntil(eventAt, now = new Date()) {
+  if (!eventAt) return "No schedule";
+  const diff = eventAt - now;
+  if (diff < -86400000) return `${formatDuration(Math.abs(diff))} past`;
+  if (diff < 0) return "Started";
+  return formatDuration(diff);
+}
+
+function transactionLabel(action) {
+  const normalized = String(action || "activity").replace(/_/g, " ");
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function latestTransaction(reservation) {
+  const history = Array.isArray(reservation?.transaction_history) ? reservation.transaction_history : [];
+  return history[0] || null;
+}
+
+function notificationStatus(reservation) {
+  const history = Array.isArray(reservation?.transaction_history) ? reservation.transaction_history : [];
+  const notification = history.find((item) => String(item?.action || "").startsWith("notification_"));
+  if (!notification) return "Not sent";
+  if (notification.action === "notification_failed") return "Failed";
+  return "Sent";
+}
+
+function priorityForReservation(reservation, now = new Date()) {
+  const status = String(reservation?.status || "").toLowerCase();
+  const eventAt = reservationEventDate(reservation);
+  const submittedAt = reservationSubmittedDate(reservation);
+  const isPending = status === "pending";
+  const requestAgeMs = submittedAt ? now - submittedAt : 0;
+  const hoursToEvent = eventAt ? (eventAt - now) / 3600000 : Infinity;
+
+  if (isPending && requestAgeMs >= 24 * 3600000) {
+    return { key: "overdue", label: "Overdue", rank: 0, color: C.red, bg: C.redFaint, border: C.redBorder };
+  }
+  if (eventAt && hoursToEvent <= 24) {
+    return { key: "urgent", label: "Urgent", rank: 1, color: C.red, bg: C.redFaint, border: C.redBorder };
+  }
+  if (eventAt && hoursToEvent <= 72) {
+    return { key: "soon", label: "Soon", rank: 2, color: C.gold, bg: C.goldFaint, border: C.borderAccent };
+  }
+  return { key: "normal", label: "Normal", rank: 3, color: C.green, bg: C.greenFaint, border: C.greenBorder };
+}
+
+function enrichReservation(reservation, now = new Date()) {
+  const eventAt = reservationEventDate(reservation);
+  const submittedAt = reservationSubmittedDate(reservation);
+  const latest = latestTransaction(reservation);
+  const lastActionAt = parseDateTime(latest?.created_at || latest?.createdAt || reservation?.status_last_changed_at || reservation?.updated_at);
+  const priority = priorityForReservation(reservation, now);
+  const responseMs = lastActionAt && submittedAt ? lastActionAt - submittedAt : null;
+
+  return {
+    ...reservation,
+    _eventAt: eventAt,
+    _submittedAt: submittedAt,
+    _lastAction: latest,
+    _lastActionAt: lastActionAt,
+    _priority: priority,
+    _timeUntil: formatTimeUntil(eventAt, now),
+    _requestAge: submittedAt ? formatDuration(now - submittedAt) : "—",
+    _responseTime: responseMs ? formatDuration(responseMs) : "—",
+    _notificationStatus: notificationStatus(reservation),
+    _historyCount: Array.isArray(reservation?.transaction_history) ? reservation.transaction_history.length : 0,
+  };
+}
+
+function PriorityBadge({ priority }) {
+  const badge = priority || priorityForReservation({});
+  return (
+    <span style={{
+      display:"inline-flex",alignItems:"center",gap:5,
+      padding:"3px 9px",
+      borderRadius:20,
+      background:badge.bg,
+      border:`1px solid ${badge.border}`,
+      color:badge.color,
+      fontFamily:F.label,
+      fontSize:9,
+      fontWeight:800,
+      letterSpacing:"0.11em",
+      textTransform:"uppercase",
+      whiteSpace:"nowrap",
+    }}>
+      <span style={{width:5,height:5,borderRadius:"50%",background:badge.color}}/>
+      {badge.label}
+    </span>
+  );
+}
+
+function OperationalMetricCard({ label, value, helper, tone = "gold", onClick }) {
+  const color = tone === "red" ? C.red : tone === "green" ? C.green : C.gold;
+  const bg = tone === "red" ? C.redFaint : tone === "green" ? C.greenFaint : C.goldFaint;
+  const border = tone === "red" ? C.redBorder : tone === "green" ? C.greenBorder : C.borderAccent;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        minHeight:78,
+        textAlign:"left",
+        border:`1px solid ${border}`,
+        borderRadius:10,
+        background:`linear-gradient(180deg, ${C.surfaceBase} 0%, ${bg} 100%)`,
+        padding:"13px 15px",
+        cursor:onClick ? "pointer" : "default",
+        display:"grid",
+        gap:5,
+        boxShadow:"0 1px 4px rgba(0,0,0,0.045)",
+      }}
+    >
+      <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.15em",textTransform:"uppercase",color:C.textTertiary}}>{label}</span>
+      <span style={{fontFamily:F.display,fontSize:25,fontWeight:760,lineHeight:1,color}}>{value}</span>
+      <span style={{fontSize:11.5,color:C.textSecondary,lineHeight:1.35}}>{helper}</span>
+    </button>
+  );
+}
+
+function queueTone(tone) {
+  if (tone === "red") return { color: C.red, bg: C.redFaint, border: C.redBorder };
+  if (tone === "green") return { color: C.green, bg: C.greenFaint, border: C.greenBorder };
+  if (tone === "muted") return { color: C.textSecondary, bg: "rgba(0,0,0,0.035)", border: C.borderDefault };
+  return { color: C.gold, bg: C.goldFaint, border: C.borderAccent };
+}
+
+function QueueMetric({ label, value, helper, tone = "gold", active = false, onClick, isMobile }) {
+  const palette = queueTone(tone);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border:`1px solid ${active ? palette.border : C.cardBorder}`,
+        borderRadius:10,
+        background:active ? palette.bg : C.surfaceBase,
+        padding:isMobile ? "10px 11px" : "12px 14px",
+        minHeight:isMobile ? 68 : 76,
+        display:"grid",
+        alignContent:"center",
+        gap:5,
+        textAlign:"left",
+        cursor:onClick ? "pointer" : "default",
+        boxShadow:active ? `0 8px 20px ${palette.color}16` : "0 1px 5px rgba(0,0,0,0.04)",
+        transition:"border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease",
+      }}
+      onMouseEnter={(e)=>{e.currentTarget.style.borderColor=palette.border;e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow=`0 8px 20px ${palette.color}12`;}}
+      onMouseLeave={(e)=>{e.currentTarget.style.borderColor=active ? palette.border : C.cardBorder;e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow=active ? `0 8px 20px ${palette.color}16` : "0 1px 5px rgba(0,0,0,0.04)";}}
+    >
+      <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:active ? palette.color : C.textTertiary}}>
+        {label}
+      </span>
+      <span style={{display:"flex",alignItems:"baseline",gap:8}}>
+        <span style={{fontFamily:F.display,fontSize:isMobile?24:28,fontWeight:760,lineHeight:1,color:palette.color}}>
+          {value}
+        </span>
+        <span style={{fontSize:11.5,color:C.textSecondary,lineHeight:1.25,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+          {helper}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function InlineMetric({ label, value, tone = "gold" }) {
+  const palette = queueTone(tone);
+  return (
+    <span style={{
+      display:"inline-flex",
+      alignItems:"center",
+      gap:6,
+      padding:"5px 9px",
+      borderRadius:999,
+      background:palette.bg,
+      border:`1px solid ${palette.border}`,
+      color:palette.color,
+      fontFamily:F.label,
+      fontSize:9,
+      fontWeight:800,
+      letterSpacing:"0.10em",
+      textTransform:"uppercase",
+      whiteSpace:"nowrap",
+    }}>
+      <span style={{color:palette.color,fontSize:11,fontWeight:800,letterSpacing:0}}>{value}</span>
+      {label}
+    </span>
+  );
+}
+
 function getSeatStatusColor(status) {
   const s = (status || "").toLowerCase();
   if (s === "approved" || s === "reserved") return C.red;
@@ -1653,6 +1900,10 @@ export default function ReservationDashboard() {
   const [filteredReservations,setFilteredReservations]=useState([]);
   const [filterStatus,setFilterStatus]=useState("ALL");
   const [filterRoom,setFilterRoom]=useState("ALL");           // ← NEW
+  const [filterPriority,setFilterPriority]=useState("ALL");
+  const [filterType,setFilterType]=useState("ALL");
+  const [quickFilter,setQuickFilter]=useState("ALL");
+  const [sortBy,setSortBy]=useState("smart");
   const [search,setSearch]=useState("");
   const [selectedReservation,setSelectedReservation]=useState(null);
   const [showModal,setShowModal]=useState(false);
@@ -1688,6 +1939,11 @@ export default function ReservationDashboard() {
       .sort((a, b) => a.localeCompare(b));
     return [...ADMIN_OUTLET_ROOMS, ...extras];
   }, [reservations]);
+
+  const enrichedReservations = useMemo(
+    () => reservations.map((reservation) => enrichReservation(reservation)),
+    [reservations]
+  );
 
   const refreshDashboardData = useCallback(async (silent = true) => {
     if (!silent) setLoading(true);
@@ -1802,7 +2058,8 @@ export default function ReservationDashboard() {
 
   // ─── Filter logic (now includes room filter) ─────────────────────────────────
   useEffect(()=>{
-    let filtered=reservations;
+    let filtered=[...enrichedReservations];
+    const now = new Date();
 
     if(filterStatus!=="ALL"){
       filtered=filtered.filter((r)=>{
@@ -1825,15 +2082,65 @@ export default function ReservationDashboard() {
       );
     }
 
+    if(filterPriority!=="ALL"){
+      filtered=filtered.filter((r)=>r._priority?.key===filterPriority.toLowerCase());
+    }
+
+    if(filterType!=="ALL"){
+      filtered=filtered.filter((r)=>{
+        const type=String(r.type || "").toLowerCase();
+        if(filterType==="standalone") return type==="standalone" || String(r.table_number || "").toUpperCase()==="STANDALONE";
+        if(filterType==="whole") return type==="whole";
+        if(filterType==="individual") return type==="individual";
+        return true;
+      });
+    }
+
+    if(quickFilter!=="ALL"){
+      filtered=filtered.filter((r)=>{
+        const eventAt = r._eventAt;
+        const status = String(r.status || "").toLowerCase();
+        const days = eventAt ? daysBetween(now, eventAt) : null;
+        if(quickFilter==="today") return days===0;
+        if(quickFilter==="tomorrow") return days===1;
+        if(quickFilter==="week") return days!==null && days>=0 && days<=7;
+        if(quickFilter==="awaiting") return status==="pending";
+        if(quickFilter==="urgent") return ["urgent","overdue"].includes(r._priority?.key);
+        return true;
+      });
+    }
+
     if(search.trim()){
       const q=search.toLowerCase();
       filtered=filtered.filter((r)=>
         r.name?.toLowerCase().includes(q)||
         r.email?.toLowerCase().includes(q)||
+        String(r.phone || "").toLowerCase().includes(q)||
+        String(r.room || "").toLowerCase().includes(q)||
         r.reference_code?.toLowerCase().includes(q)||
         (q==="standalone"&&(String(r.table_number||"").toUpperCase()==="STANDALONE"||r.type==="standalone"))
       );
     }
+
+    filtered.sort((a,b)=>{
+      const statusRank = (r) => String(r.status || "").toLowerCase()==="pending" ? 0 : 1;
+      const eventTime = (r) => r._eventAt ? r._eventAt.getTime() : Number.MAX_SAFE_INTEGER;
+      const submittedTime = (r) => r._submittedAt ? r._submittedAt.getTime() : 0;
+      if(sortBy==="smart"){
+        return statusRank(a)-statusRank(b)
+          || (a._priority?.rank ?? 9)-(b._priority?.rank ?? 9)
+          || eventTime(a)-eventTime(b)
+          || submittedTime(a)-submittedTime(b);
+      }
+      if(sortBy==="event_asc") return eventTime(a)-eventTime(b);
+      if(sortBy==="oldest_waiting") return submittedTime(a)-submittedTime(b);
+      if(sortBy==="newest_request") return submittedTime(b)-submittedTime(a);
+      if(sortBy==="priority") return (a._priority?.rank ?? 9)-(b._priority?.rank ?? 9);
+      if(sortBy==="status") return String(a.status || "").localeCompare(String(b.status || ""));
+      if(sortBy==="room") return String(a.room || "").localeCompare(String(b.room || ""));
+      if(sortBy==="guests") return Number(b.guests_count || 0)-Number(a.guests_count || 0);
+      return 0;
+    });
 
     setFilteredReservations(filtered);
     setPagination((p)=>({
@@ -1842,7 +2149,7 @@ export default function ReservationDashboard() {
       totalItems: filtered.length,
       currentPage: 1,
     }));
-  },[reservations,filterStatus,filterRoom,search]);
+  },[enrichedReservations,filterStatus,filterRoom,filterPriority,filterType,quickFilter,search,sortBy]);
 
   useEffect(()=>{
     const total    = reservations.length;
@@ -1853,6 +2160,21 @@ export default function ReservationDashboard() {
     const inactive = reservations.filter(r=>getReservationState(r)==="inactive").length;
     setStats({total,pending,approved,rejected,active,inactive});
   },[reservations]);
+
+  const operationalStats = useMemo(() => {
+    const now = new Date();
+    return enrichedReservations.reduce((acc, reservation) => {
+      const days = reservation._eventAt ? daysBetween(now, reservation._eventAt) : null;
+      const status = String(reservation.status || "").toLowerCase();
+      if (days === 0) acc.today += 1;
+      if (days !== null && days >= 0 && days <= 7) acc.week += 1;
+      if (reservation._priority?.key === "urgent") acc.urgent += 1;
+      if (reservation._priority?.key === "overdue") acc.overdue += 1;
+      if (status === "pending") acc.awaiting += 1;
+      if (reservation._notificationStatus === "Failed") acc.notificationIssues += 1;
+      return acc;
+    }, { today:0, week:0, urgent:0, overdue:0, awaiting:0, notificationIssues:0 });
+  }, [enrichedReservations]);
 
   const handlePageChange = (page) => {
     if (page < 1 || page > pagination.lastPage) return;
@@ -2038,7 +2360,7 @@ export default function ReservationDashboard() {
   );
 
   // Whether any filter is active (for "clear all" affordance)
-  const hasActiveFilters = filterStatus !== "ALL" || filterRoom !== "ALL" || search.trim() !== "";
+  const hasActiveFilters = filterStatus !== "ALL" || filterRoom !== "ALL" || filterPriority !== "ALL" || filterType !== "ALL" || quickFilter !== "ALL" || search.trim() !== "";
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
@@ -2091,7 +2413,7 @@ export default function ReservationDashboard() {
               </div>
 
               {/* ── Search + Room filter in navbar ── */}
-              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:isMobile?"wrap":"nowrap"}}>
+              <div style={{display:"none",alignItems:"center",gap:8,flexWrap:isMobile?"wrap":"nowrap"}}>
                 {/* Room filter dropdown */}
                 <RoomFilterDropdown
                   rooms={roomOptions}
@@ -2144,7 +2466,44 @@ export default function ReservationDashboard() {
               </div>
 
               {/* ── Stat cards ── */}
-              <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(3,1fr)",gap:isMobile?10:12,marginBottom:isMobile?18:22}}>
+              <div style={{
+                background:C.cardBg,
+                border:`1px solid ${C.cardBorder}`,
+                borderRadius:12,
+                padding:isMobile?"12px":"14px 16px",
+                marginBottom:isMobile?16:18,
+                boxShadow:"0 2px 10px rgba(0,0,0,0.045)",
+                display:"grid",
+                gap:12,
+              }}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+                  <div>
+                    <div style={{fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.18em",textTransform:"uppercase",color:C.gold,marginBottom:4}}>
+                      Queue Focus
+                    </div>
+                    <div style={{fontSize:12,color:C.textSecondary}}>
+                      Prioritize pending requests, near events, and delayed responses.
+                    </div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+                    <InlineMetric label="Total" value={loading?"--":stats.total} tone="gold" />
+                    <InlineMetric label="Active" value={loading?"--":stats.active} tone="green" />
+                    <InlineMetric label="Inactive" value={loading?"--":stats.inactive} tone="muted" />
+                    <InlineMetric label="Week" value={loading?"--":operationalStats.week} tone="gold" />
+                    <InlineMetric label="Notify" value={loading?"--":operationalStats.notificationIssues} tone={operationalStats.notificationIssues ? "red" : "green"} />
+                  </div>
+                </div>
+
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":isTablet?"repeat(2,1fr)":"repeat(5,minmax(0,1fr))",gap:10}}>
+                  <QueueMetric label="Pending" value={loading?"--":stats.pending} helper="awaiting action" tone="gold" active={filterStatus==="PENDING"} onClick={()=>{setFilterStatus("PENDING");setQuickFilter("ALL");}} isMobile={isMobile} />
+                  <QueueMetric label="Urgent" value={loading?"--":operationalStats.urgent} helper="within 24h" tone="red" active={quickFilter==="urgent"} onClick={()=>setQuickFilter("urgent")} isMobile={isMobile} />
+                  <QueueMetric label="Overdue" value={loading?"--":operationalStats.overdue} helper="pending over 24h" tone="red" active={filterPriority==="overdue"} onClick={()=>setFilterPriority("overdue")} isMobile={isMobile} />
+                  <QueueMetric label="Today" value={loading?"--":operationalStats.today} helper="events today" tone="green" active={quickFilter==="today"} onClick={()=>setQuickFilter("today")} isMobile={isMobile} />
+                  <QueueMetric label="Reserved" value={loading?"--":stats.approved} helper="confirmed" tone="green" active={filterStatus==="APPROVED"} onClick={()=>{setFilterStatus("APPROVED");setQuickFilter("ALL");}} isMobile={isMobile} />
+                </div>
+              </div>
+
+              <div style={{display:"none",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(3,1fr)",gap:isMobile?10:12,marginBottom:isMobile?18:22}}>
                 {statCards.map(({label,count,filter,color,bg,border})=>{
                   const active=filterStatus===filter;
                   return(
@@ -2174,6 +2533,15 @@ export default function ReservationDashboard() {
               </div>
 
               {/* ── Table card ── */}
+              <div style={{display:"none",gridTemplateColumns:isMobile?"repeat(2,1fr)":isTablet?"repeat(3,1fr)":"repeat(6,1fr)",gap:10,marginBottom:isMobile?18:22}}>
+                <OperationalMetricCard label="Awaiting" value={operationalStats.awaiting} helper="Need admin response" tone="gold" onClick={()=>{setQuickFilter("awaiting");setFilterStatus("PENDING");}} />
+                <OperationalMetricCard label="Overdue" value={operationalStats.overdue} helper="Pending over 24h" tone="red" onClick={()=>setFilterPriority("overdue")} />
+                <OperationalMetricCard label="Urgent" value={operationalStats.urgent} helper="Within 24 hours" tone="red" onClick={()=>setQuickFilter("urgent")} />
+                <OperationalMetricCard label="Today" value={operationalStats.today} helper="Events today" tone="green" onClick={()=>setQuickFilter("today")} />
+                <OperationalMetricCard label="This Week" value={operationalStats.week} helper="Upcoming schedule" tone="gold" onClick={()=>setQuickFilter("week")} />
+                <OperationalMetricCard label="Notifications" value={operationalStats.notificationIssues} helper="Delivery issues" tone={operationalStats.notificationIssues ? "red" : "green"} />
+              </div>
+
               <div style={{background:C.cardBg,borderRadius:12,border:`1px solid ${C.cardBorder}`,overflow:"hidden",boxShadow:"0 2px 10px rgba(0,0,0,0.06)"}}>
 
                 {/* Table toolbar */}
@@ -2261,6 +2629,125 @@ export default function ReservationDashboard() {
                   </div>
                 </div>
 
+                <div style={{padding:isMobile?"12px 14px":"14px 22px",borderBottom:`1px solid ${C.divider}`,background:C.surfaceBase,display:"grid",gap:12}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    {[
+                      ["ALL","All"],
+                      ["today","Today"],
+                      ["tomorrow","Tomorrow"],
+                      ["week","This Week"],
+                      ["urgent","Urgent"],
+                      ["awaiting","Awaiting Response"],
+                    ].map(([value,label])=>(
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={()=>setQuickFilter(value)}
+                        style={{
+                          padding:"6px 10px",
+                          borderRadius:999,
+                          border:`1px solid ${quickFilter===value?C.borderAccent:C.borderDefault}`,
+                          background:quickFilter===value?C.goldFaint:C.surfaceBase,
+                          color:quickFilter===value?C.gold:C.textSecondary,
+                          fontFamily:F.label,
+                          fontSize:9,
+                          fontWeight:800,
+                          letterSpacing:"0.11em",
+                          textTransform:"uppercase",
+                          cursor:"pointer",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                    <div style={{position:"relative",marginLeft:isMobile?0:"auto",flex:isMobile?"1 1 100%":"1 1 240px",maxWidth:isMobile?"100%":340}}>
+                      <svg style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}
+                        width="12" height="12" viewBox="0 0 24 24" fill="none"
+                        stroke={searchFocused?C.gold:C.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                      </svg>
+                      <input
+                        style={{
+                          padding:"8px 12px 8px 30px",
+                          background:C.surfaceInput,
+                          border:`1px solid ${searchFocused?C.borderAccent:C.borderDefault}`,
+                          borderRadius:8,
+                          color:C.textPrimary,
+                          fontFamily:F.body,
+                          fontSize:12,
+                          width:"100%",
+                          outline:"none",
+                          transition:"border-color 0.18s,box-shadow 0.18s",
+                          boxShadow:searchFocused?C.inputFocusShadow:"none",
+                        }}
+                        placeholder="Search guest, contact, room, or reference"
+                        value={search}
+                        onChange={(e)=>setSearch(e.target.value)}
+                        onFocus={()=>setSearchFocused(true)}
+                        onBlur={()=>setSearchFocused(false)}
+                      />
+                    </div>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":isTablet?"repeat(2,1fr)":"repeat(6, minmax(140px,1fr))",gap:10,alignItems:"end"}}>
+                    <label style={{display:"grid",gap:5}}>
+                      <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Room</span>
+                      <RoomFilterDropdown
+                        rooms={roomOptions}
+                        selectedRoom={filterRoom}
+                        onSelect={(room) => setFilterRoom(room)}
+                        isMobile={isMobile}
+                      />
+                    </label>
+                    <label style={{display:"grid",gap:5}}>
+                      <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Status</span>
+                      <select value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)} style={{padding:"9px 10px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
+                        <option value="ALL">All statuses</option>
+                        <option value="PENDING">Pending</option>
+                        <option value="APPROVED">Reserved</option>
+                        <option value="REJECTED">Rejected</option>
+                        <option value="ACTIVE">Active</option>
+                        <option value="INACTIVE">Inactive</option>
+                      </select>
+                    </label>
+                    <label style={{display:"grid",gap:5}}>
+                      <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Priority</span>
+                      <select value={filterPriority} onChange={(e)=>setFilterPriority(e.target.value)} style={{padding:"9px 10px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
+                        <option value="ALL">All priorities</option>
+                        <option value="overdue">Overdue response</option>
+                        <option value="urgent">Urgent</option>
+                        <option value="soon">Soon</option>
+                        <option value="normal">Normal</option>
+                      </select>
+                    </label>
+                    <label style={{display:"grid",gap:5}}>
+                      <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Type</span>
+                      <select value={filterType} onChange={(e)=>setFilterType(e.target.value)} style={{padding:"9px 10px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
+                        <option value="ALL">All types</option>
+                        <option value="whole">Whole table</option>
+                        <option value="individual">Individual seat</option>
+                        <option value="standalone">Standalone</option>
+                      </select>
+                    </label>
+                    <label style={{display:"grid",gap:5}}>
+                      <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Queue Sort</span>
+                      <select value={sortBy} onChange={(e)=>setSortBy(e.target.value)} style={{padding:"9px 10px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
+                        <option value="smart">Smart priority</option>
+                        <option value="event_asc">Event soonest</option>
+                        <option value="oldest_waiting">Oldest request</option>
+                        <option value="newest_request">Newest request</option>
+                        <option value="guests">Guest count</option>
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={()=>{setFilterStatus("ALL");setFilterRoom("ALL");setFilterPriority("ALL");setFilterType("ALL");setQuickFilter("ALL");setSearch("");setSortBy("smart");}}
+                      style={{alignSelf:"end",minHeight:37,border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceBase,color:C.textSecondary,fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer"}}
+                    >
+                      Reset Queue
+                    </button>
+                  </div>
+                </div>
+
                 {/* Reservation rows */}
                 <div style={{padding:isMobile?"10px":"12px 18px",display:"flex",flexDirection:"column",gap:8}}>
                   {loading?(
@@ -2277,7 +2764,7 @@ export default function ReservationDashboard() {
                       </div>
                       {hasActiveFilters && (
                         <button
-                          onClick={() => { setFilterStatus("ALL"); setFilterRoom("ALL"); setSearch(""); }}
+                          onClick={() => { setFilterStatus("ALL"); setFilterRoom("ALL"); setFilterPriority("ALL"); setFilterType("ALL"); setQuickFilter("ALL"); setSearch(""); setSortBy("smart"); }}
                           style={{
                             marginTop:12,padding:"7px 14px",background:"transparent",
                             border:`1px solid ${C.borderAccent}`,borderRadius:7,
@@ -2335,6 +2822,11 @@ export default function ReservationDashboard() {
                                       {new Date(reservation.event_date+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}
                                     </span>
                                   )}
+                                  {reservation.event_time&&(
+                                    <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.gold,padding:"2px 6px",background:C.goldFaint,border:`1px solid ${C.borderAccent}`,borderRadius:4,flexShrink:0}}>
+                                      {reservation.event_time}
+                                    </span>
+                                  )}
                                   {isStandaloneCard&&(
                                     <span style={{fontFamily:F.label,fontSize:8,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.gold,padding:"2px 7px",background:C.goldFaint,border:`1px solid ${C.borderAccent}`,borderRadius:4,flexShrink:0}}>
                                       Standalone
@@ -2366,10 +2858,29 @@ export default function ReservationDashboard() {
                                     </>
                                   )}
                                 </div>
+                                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(6,minmax(90px,1fr))",gap:8,marginTop:10,paddingTop:10,borderTop:`1px solid ${C.divider}`}}>
+                                  {[
+                                    ["Time Until", reservation._timeUntil],
+                                    ["Request Age", reservation._requestAge],
+                                    ["Guests", `${reservation.guests_count || reservation.guests || 0} pax`],
+                                    ["Type", String(reservation.type || "whole").replace(/_/g," ")],
+                                    ["Last Action", reservation._lastAction ? transactionLabel(reservation._lastAction.action) : "No activity"],
+                                    ["Notify", reservation._notificationStatus],
+                                  ].map(([label,value])=>(
+                                    <div key={label} style={{minWidth:0}}>
+                                      <div style={{fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.13em",textTransform:"uppercase",color:C.textTertiary,marginBottom:3}}>{label}</div>
+                                      <div style={{fontSize:11.5,color:C.textSecondary,fontWeight:label==="Time Until"&&reservation._priority?.key==="urgent"?700:520,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textTransform:label==="Type"?"capitalize":"none"}}>{value}</div>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                               <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:7,flexShrink:0}}>
+                                <PriorityBadge priority={reservation._priority}/>
                                 <StatusBadge status={reservation.status}/>
                                 <StateBadge state={getReservationState(reservation)}/>
+                                <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.textTertiary}}>
+                                  {reservation._historyCount} history
+                                </span>
                                 <div style={{display:"flex",alignItems:"center",gap:3,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.textTertiary}}>
                                   View
                                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
