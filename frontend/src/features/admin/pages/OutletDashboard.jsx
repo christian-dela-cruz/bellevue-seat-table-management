@@ -12,6 +12,17 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
+import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
@@ -485,75 +496,111 @@ function PeriodSwitch({ value, onChange }) {
   );
 }
 
-function LineChart({ rows, period = "monthly" }) {
-  const [hovered, setHovered] = useState(null);
-  const width = 640;
-  const height = 190;
-  const pad = 28;
-  const max = Math.max(1, ...rows.map((row) => row.count));
-  const yTicks = Array.from(new Set([0, Math.ceil(max / 2), max]));
-  const step = rows.length > 1 ? (width - pad * 2) / (rows.length - 1) : 0;
-  const points = rows.map((row, index) => {
-    const x = pad + index * step;
-    const y = height - pad - (row.count / max) * (height - pad * 2);
-    return { ...row, x, y };
-  });
-  const path = points.reduce((acc, point, index) => {
-    if (index === 0) return `M ${point.x} ${point.y}`;
-    const previous = points[index - 1];
-    const midX = (previous.x + point.x) / 2;
-    return `${acc} C ${midX} ${previous.y}, ${midX} ${point.y}, ${point.x} ${point.y}`;
-  }, "");
-  const areaPath = path && points.length
-    ? `${path} L ${points[points.length - 1].x} ${height - pad} L ${points[0].x} ${height - pad} Z`
-    : "";
-  const tooltipLeft = hovered ? Math.min(Math.max((hovered.x / width) * 100, 11), 89) : 50;
+function OutletChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  const visiblePayload = Array.from(
+    payload.reduce((items, item) => {
+      const key = item.dataKey || item.name;
+      const existing = items.get(key);
+      if (!existing || String(existing.name || existing.dataKey) === String(existing.dataKey)) {
+        items.set(key, item);
+      }
+      return items;
+    }, new Map()).values()
+  );
 
   return (
-    <div style={{ position: "relative" }}>
-    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: 220, display: "block" }}>
-      <defs>
-        <linearGradient id="od-line-fill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="rgba(59,111,168,0.20)" />
-          <stop offset="100%" stopColor="rgba(59,111,168,0.02)" />
-        </linearGradient>
-      </defs>
-      {yTicks.map((tick) => {
-        const y = height - pad - (tick / max) * (height - pad * 2);
-        return (
-          <g key={tick}>
-            <line x1={pad} x2={width - pad} y1={y} y2={y} stroke="rgba(0,0,0,0.06)" />
-            <text x={pad - 10} y={y + 4} textAnchor="end" fontSize="10" fill={C.faint}>{tick}</text>
-          </g>
-        );
-      })}
-      {path && (
-        <>
-          <path className="od-area" d={areaPath} fill="url(#od-line-fill)" />
-          <path className="od-line" d={path} fill="none" stroke={C.blue} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        </>
-      )}
-      {points.map((point, index) => (
-        <g key={point.date || point.label} onMouseEnter={() => setHovered({ ...point, index })} onMouseLeave={() => setHovered(null)} style={{ cursor: "default" }}>
-          {hovered?.index === index && <line x1={point.x} x2={point.x} y1={pad} y2={height - pad} stroke="rgba(59,111,168,0.16)" strokeWidth="2" />}
-          <circle cx={point.x} cy={point.y} r={hovered?.index === index ? "6.5" : "4.5"} fill={hovered?.index === index ? C.blue : C.surface} stroke={C.blue} strokeWidth="2.5" style={{ transition: "r 0.16s, fill 0.16s" }}>
-            <title>{`${periodLabel(point, period)}: ${point.count} reservation${point.count === 1 ? "" : "s"}`}</title>
-          </circle>
-        </g>
-      ))}
-      {points.filter((_, index) => index === 0 || index === points.length - 1 || index === Math.floor(points.length / 2)).map((point) => (
-        <text key={`label-${point.date || point.label}`} x={point.x} y={height - 6} textAnchor="middle" fontSize="10" fill={C.faint}>{period === "yearly" ? point.label : readableDate(point.date).replace(", 2026", "")}</text>
-      ))}
-    </svg>
-    {hovered && (
-      <div style={{ position: "absolute", left: `${tooltipLeft}%`, transform: "translateX(-50%)", top: Math.max(8, hovered.y - 54), minWidth: 128, pointerEvents: "none", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: "0 14px 34px rgba(31,25,15,0.16)", padding: "8px 10px", textAlign: "left", transition: "left 0.12s ease, top 0.12s ease" }}>
-        <div style={{ fontSize: 10, fontWeight: 750, color: C.gold, textTransform: "uppercase", letterSpacing: "0.08em" }}>{periodLabel(hovered, period)}</div>
-        <div style={{ marginTop: 4, display: "flex", justifyContent: "space-between", gap: 18, alignItems: "center", fontSize: 12, color: C.muted }}>
-          <span>Reservations</span>
-          <strong style={{ color: C.text, fontSize: 17 }}>{hovered.count}</strong>
-        </div>
+    <div style={{ background: C.surface, border: "1px solid rgba(140,107,42,0.18)", borderRadius: 10, boxShadow: "0 12px 26px rgba(24,20,14,0.12)", padding: "10px 11px", minWidth: 154 }}>
+      <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 850, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>{label}</div>
+      <div style={{ display: "grid", gap: 6 }}>
+        {visiblePayload.map((item) => (
+          <div key={item.dataKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, fontSize: 12, color: C.muted }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+              <span style={{ width: 7, height: 7, borderRadius: 999, background: item.color }} />
+              {item.name}
+            </span>
+            <strong style={{ color: C.text, fontWeight: 750 }}>{item.value || 0}</strong>
+          </div>
+        ))}
       </div>
-    )}
+    </div>
+  );
+}
+
+function LineChart({ rows, period = "monthly" }) {
+  const data = (rows || []).map((row) => ({
+    ...row,
+    label: periodLabel(row, period),
+    reservations: Number(row.count || 0),
+  }));
+  const labelInterval = data.length > 16 ? Math.ceil(data.length / 8) - 1 : 0;
+
+  return (
+    <div style={{ width: "100%", minHeight: 260, borderRadius: 14, background: "linear-gradient(135deg,#FFFFFF 0%,#FAF8F4 58%,#F1ECE1 100%)", border: `1px solid ${C.divider}`, padding: "16px 12px 8px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)" }}>
+      <ResponsiveContainer width="100%" height={235}>
+        <ComposedChart data={data} margin={{ top: 12, right: 26, bottom: 8, left: -8 }}>
+          <defs>
+            <linearGradient id="outletReservationFill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor={C.blue} stopOpacity="0.22" />
+              <stop offset="54%" stopColor={C.blue} stopOpacity="0.08" />
+              <stop offset="100%" stopColor={C.blue} stopOpacity="0.01" />
+            </linearGradient>
+            <filter id="outletLineShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#3B6FA8" floodOpacity="0.16" />
+            </filter>
+          </defs>
+          <CartesianGrid stroke="rgba(24,20,14,0.07)" vertical={false} />
+          <XAxis
+            dataKey="label"
+            interval={labelInterval}
+            tick={{ fill: C.muted, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            minTickGap={12}
+            padding={{ left: 12, right: 16 }}
+          />
+          <YAxis
+            allowDecimals={false}
+            tick={{ fill: C.faint, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            width={34}
+          />
+          <Tooltip content={<OutletChartTooltip />} cursor={{ stroke: "rgba(140,107,42,0.22)", strokeDasharray: "4 4" }} wrapperStyle={{ outline: "none" }} />
+          <Legend
+            verticalAlign="top"
+            align="right"
+            iconType="plainline"
+            wrapperStyle={{ fontSize: 11, color: C.muted, paddingBottom: 12 }}
+            payload={[{ value: "Reservations", type: "plainline", color: C.blue }]}
+          />
+          <Area
+            type="monotone"
+            dataKey="reservations"
+            legendType="none"
+            fill="url(#outletReservationFill)"
+            stroke="none"
+            dot={false}
+            activeDot={false}
+            connectNulls
+            isAnimationActive
+            animationDuration={760}
+          />
+          <Line
+            type="monotone"
+            dataKey="reservations"
+            name="Reservations"
+            stroke={C.blue}
+            strokeWidth={3.2}
+            dot={false}
+            activeDot={{ r: 5.5, strokeWidth: 3, stroke: C.surface, fill: C.blue }}
+            connectNulls
+            isAnimationActive
+            animationDuration={720}
+            filter="url(#outletLineShadow)"
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
     </div>
   );
 }

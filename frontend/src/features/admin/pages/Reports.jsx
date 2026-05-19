@@ -344,12 +344,22 @@ function SummaryPanel({ title, children }) {
 
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
+  const visiblePayload = Array.from(
+    payload.reduce((items, item) => {
+      const key = item.dataKey || item.name;
+      const existing = items.get(key);
+      if (!existing || String(existing.name || existing.dataKey) === String(existing.dataKey)) {
+        items.set(key, item);
+      }
+      return items;
+    }, new Map()).values()
+  );
 
   return (
     <div style={{ background: C.surface, border: "1px solid rgba(140,107,42,0.18)", borderRadius: 10, boxShadow: "0 12px 26px rgba(24,20,14,0.12)", padding: "10px 11px", minWidth: 160 }}>
       <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>{label}</div>
       <div style={{ display: "grid", gap: 6 }}>
-        {payload.map((item) => (
+        {visiblePayload.map((item) => (
           <div key={item.dataKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, fontSize: 12, color: C.muted }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
               <span style={{ width: 7, height: 7, borderRadius: 999, background: item.color }} />
@@ -570,10 +580,15 @@ function MonthlyLineChart({ months }) {
               align="right"
               iconType="plainline"
               wrapperStyle={{ fontSize: 11, color: C.muted, paddingBottom: 12 }}
+              payload={[
+                { value: "Reservations", type: "plainline", color: C.blue },
+                { value: "Promotion mentions", type: "plainline", color: C.gold },
+              ]}
             />
             <Area
               type="monotone"
               dataKey="reservations"
+              legendType="none"
               fill="url(#reportsReservationFill)"
               stroke="none"
               dot={false}
