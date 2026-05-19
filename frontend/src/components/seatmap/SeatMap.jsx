@@ -1,7 +1,9 @@
 // src/components/seatmap/SeatMap.jsx
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { dispatchSeatMapUpdate } from "../../utils/seatMapPersistence.js";
 import { cleanupReservationsForDeletedTable, cleanupReservationsForDeletedSeat, cleanupReservationsForDeletedStandaloneSeat } from "../../utils/reservationCleanup.js";
+import { authAPI } from "../../services/authAPI.js";
+import { getScopedOutletGroups } from "../../constants/outletCatalog.js";
 
 // Status Colors
 export const STATUS_COLORS = {
@@ -840,15 +842,17 @@ function WingRoomSidebar({ activeWing, activeRoom, onSelect, venueStructure, onO
         ))}
       </div>
 
-      <div style={{ padding: "10px 12px 14px", borderTop: `1px solid ${C.divider}`, flexShrink: 0 }}>
-        <button onClick={onOpenVenueManager}
-          style={{ width: "100%", padding: "8px 0", background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 7, fontFamily: F, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}
-          onMouseEnter={e => { e.currentTarget.style.background = C.goldFaint; }}
-          onMouseLeave={e => { e.currentTarget.style.background = C.goldFaintest; }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-          Manage Venue
-        </button>
-      </div>
+      {onOpenVenueManager && (
+        <div style={{ padding: "10px 12px 14px", borderTop: `1px solid ${C.divider}`, flexShrink: 0 }}>
+          <button onClick={onOpenVenueManager}
+            style={{ width: "100%", padding: "8px 0", background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 7, fontFamily: F, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}
+            onMouseEnter={e => { e.currentTarget.style.background = C.goldFaint; }}
+            onMouseLeave={e => { e.currentTarget.style.background = C.goldFaintest; }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            Manage Venue
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1061,6 +1065,12 @@ export default function SeatMap({
   const [showVenueManager, setShowVenueManager] = useState(false);
 
   const [venueStructure, setVenueStructure] = useState(() => loadVenueStructure());
+  const currentAdmin = useMemo(() => authAPI.getCurrentUser(), []);
+  const visibleVenueStructure = useMemo(
+    () => getScopedOutletGroups(currentAdmin, venueStructure),
+    [currentAdmin, venueStructure]
+  );
+  const canManageVenues = authAPI.hasPermission("manage_venues");
 
   const [activeWing, setActiveWing] = useState(wing || "Main Wing");
   const [activeRoom, setActiveRoom] = useState(room || "Alabang Function Room");
@@ -1078,6 +1088,14 @@ export default function SeatMap({
     window.addEventListener("venue:structure:changed", handler);
     return () => window.removeEventListener("venue:structure:changed", handler);
   }, []);
+
+  useEffect(() => {
+    if (!editMode || !visibleVenueStructure.length) return;
+    const activeAllowed = visibleVenueStructure.some((group) => group.label === activeWing && group.rooms.includes(activeRoom));
+    if (activeAllowed) return;
+    setActiveWing(visibleVenueStructure[0].label);
+    setActiveRoom(visibleVenueStructure[0].rooms[0]);
+  }, [activeRoom, activeWing, editMode, visibleVenueStructure]);
 
   // ── FIX: LOAD — reset counters before loading so new tables get clean IDs ───
   useEffect(() => {
@@ -1361,7 +1379,7 @@ export default function SeatMap({
       <style>{`html, body { overflow: hidden !important; height: 100vh !important; max-height: 100vh !important; } #root { overflow: hidden !important; height: 100vh !important; max-height: 100vh !important; }`}</style>
 
       {deleteConfirm && <DeleteConfirmModal message={deleteConfirm.message} onConfirm={handleConfirmDelete} onCancel={() => setDeleteConfirm(null)} />}
-      {showVenueManager && <VenueManagerModal venueStructure={venueStructure} onSave={handleSaveVenue} onClose={() => setShowVenueManager(false)} />}
+      {showVenueManager && canManageVenues && <VenueManagerModal venueStructure={venueStructure} onSave={handleSaveVenue} onClose={() => setShowVenueManager(false)} />}
 
       {/* Toolbar */}
       <div style={{ flexShrink: 0, padding: "12px 16px", background: C.surfaceBase, borderBottom: `1px solid ${C.borderDefault}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -1416,7 +1434,8 @@ export default function SeatMap({
       <div style={{ flex: "1 1 0", minHeight: 0, display: "flex", overflow: "hidden" }}>
         <WingRoomSidebar
           activeWing={activeWing} activeRoom={activeRoom} onSelect={handleSelectRoom}
-          venueStructure={venueStructure} onOpenVenueManager={() => setShowVenueManager(true)}
+          venueStructure={visibleVenueStructure}
+          onOpenVenueManager={canManageVenues ? () => setShowVenueManager(true) : null}
         />
 
         {/* Canvas */}

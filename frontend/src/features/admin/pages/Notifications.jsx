@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import { reservationAPI } from "../../../services/reservationAPI";
 import { authAPI } from "../../../services/authAPI";
-import { ADMIN_OUTLET_GROUPS, ADMIN_OUTLET_ROOMS, canonicalOutletName } from "../../../constants/outletCatalog";
+import { ADMIN_OUTLET_GROUPS, ADMIN_OUTLET_ROOMS, canonicalOutletName, getScopedOutletRooms } from "../../../constants/outletCatalog";
 
 function getTokens() {
   return {
@@ -297,6 +297,26 @@ function loadAcknowledgments() {
   } catch {
     return {};
   }
+}
+
+function normalizeAcknowledgments(items) {
+  if (!Array.isArray(items)) return {};
+  return items.reduce((acc, item) => {
+    const id = String(item.id || item.notification_key || item.reservation_id || "");
+    if (!id) return acc;
+    acc[id] = {
+      id,
+      reservation_id: item.reservation_id,
+      name: item.name || "Reservation",
+      room: item.room || item.outlet || "",
+      eventDate: item.eventDate || item.event_date,
+      eventTime: item.eventTime || item.event_time,
+      acknowledgedAt: item.acknowledgedAt || item.acknowledged_at,
+      acknowledgedBy: item.acknowledgedBy || item.acknowledged_by_name,
+      acknowledgedByRole: item.acknowledgedByRole || item.acknowledged_by_role,
+    };
+    return acc;
+  }, {});
 }
 
 // ─── Audio ────────────────────────────────────────────────────────────────────
@@ -1053,7 +1073,7 @@ function AcknowledgmentMonitor({ activeAlerts, acknowledgedAlerts, onAcknowledge
 function NotificationDashboard() {
   const C=getTokens();
   const navigate = useNavigate();
-  const currentUser = authAPI.getCurrentUser();
+  const currentUser = useMemo(()=>authAPI.getCurrentUser(),[]);
   const canManageReservations = authAPI.hasPermission("manage_reservations");
   const canAcknowledgeNotifications = authAPI.hasPermission("acknowledge_notifications");
 
@@ -1090,19 +1110,54 @@ function NotificationDashboard() {
   useEffect(()=>{isMounted.current=true;return()=>{isMounted.current=false;};},[]);
   const addToast=useCallback((message,type="success")=>{const id=Date.now();setToasts(p=>[...p,{id,message,type}]);setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),3500);},[]);
   const dismissPopup=useCallback(()=>{setPopupQueue(q=>{const next=q.slice(1);if(!next.length)stopAlert();return next;});},[]);
-  const acknowledgeAlerts=useCallback((alerts)=>{
+  const syncAcknowledgments=useCallback(async()=>{
+    try{
+      const resp=await reservationAPI.getAcknowledgments();
+      const shared=normalizeAcknowledgments(resp?.data||resp||[]);
+      setAcknowledgments(shared);
+      localStorage.setItem(ACK_STORAGE_KEY,JSON.stringify(shared));
+    }catch{}
+  },[]);
+
+  useEffect(()=>{syncAcknowledgments();},[syncAcknowledgments]);
+
+  const acknowledgeAlerts=useCallback(async(alerts)=>{
     const items=Array.isArray(alerts)?alerts:(alerts?.items||[]);
     if(!items.length)return;
     const now=new Date().toISOString();
+    const payloadItems=items.map(item=>{
+      const id=notificationId(item);
+      const reservationId=Number(item.db_id||item.reservation_id||item.reservationId);
+      return {
+        notification_key:id,
+        reservation_id:Number.isFinite(reservationId)&&reservationId>0?reservationId:null,
+        outlet:item.room||item.outlet||"",
+        event_date:item.eventDate||item.event_date,
+        event_time:item.eventTime||item.event_time,
+        metadata:{name:item.name||item.guest_name||"Reservation"},
+      };
+    }).filter(item=>item.notification_key);
+
     setAcknowledgments(prev=>{
       const next={...prev};
       items.forEach(item=>{
         const id=notificationId(item);
-        if(id)next[id]={id,name:item.name||item.guest_name||"Reservation",room:item.room||"",eventDate:item.eventDate||item.event_date,eventTime:item.eventTime||item.event_time,acknowledgedAt:now};
+        if(id)next[id]={id,name:item.name||item.guest_name||"Reservation",room:item.room||"",eventDate:item.eventDate||item.event_date,eventTime:item.eventTime||item.event_time,acknowledgedAt:now,acknowledgedBy:"Current session"};
       });
       localStorage.setItem(ACK_STORAGE_KEY,JSON.stringify(next));
       return next;
     });
+    try{
+      const resp=await reservationAPI.acknowledgeNotifications(payloadItems);
+      const shared=normalizeAcknowledgments(resp?.data||[]);
+      if(Object.keys(shared).length){
+        setAcknowledgments(prev=>{
+          const next={...prev,...shared};
+          localStorage.setItem(ACK_STORAGE_KEY,JSON.stringify(next));
+          return next;
+        });
+      }
+    }catch{}
     setPopupQueue(q=>q.slice(1));
     stopAlert();
     addToast("Notification acknowledged.","success");
@@ -1121,7 +1176,7 @@ function NotificationDashboard() {
     }).filter(Boolean).sort((a,b)=>a.diff-b.diff);
     if(!cands.length)return;
     cands.forEach(({key})=>firedAlerts.current.add(key));
-    const items=cands.map(({res})=>({id:res.id??res.db_id,name:res.guest_name||res.name||"Guest",room:res.room||res.venue||"",eventDate:res.event_date||res.eventDate||res.reservationDate,eventTime:res.event_time||res.eventTime||res.reservationTime}));
+    const items=cands.map(({res})=>({id:res.id??res.db_id,db_id:res.db_id,name:res.guest_name||res.name||"Guest",room:res.room||res.venue||"",eventDate:res.event_date||res.eventDate||res.reservationDate,eventTime:res.event_time||res.eventTime||res.reservationTime}));
     setPopupQueue(q=>[...q,{items,primaryId:items[0].id}]);
     const first=cands[0].res,rel=relLabel(cands[0].diff);
     if(cands.length===1)playAlertThenSpeak(`Reminder. ${first.guest_name||first.name||"A guest"}'s reservation starts in ${rel}.`);
@@ -1292,6 +1347,18 @@ function NotificationDashboard() {
             if(payload&&typeof payload==="object")upsertReservation(normaliseRow(payload),false);
             return;
           }
+          if(eventName==="NotificationAcknowledged"){
+            const payload=data?.payload?.acknowledgments||data?.payload?.data||[];
+            const shared=normalizeAcknowledgments(payload);
+            if(Object.keys(shared).length){
+              setAcknowledgments(prev=>{
+                const next={...prev,...shared};
+                localStorage.setItem(ACK_STORAGE_KEY,JSON.stringify(next));
+                return next;
+              });
+            }
+            return;
+          }
           if(eventName==="ReservationDeleted"){
             const deletedId=data?.payload?.id??data?.payload?.reservation?.id;
             if(deletedId===undefined||deletedId===null)return;
@@ -1313,13 +1380,16 @@ function NotificationDashboard() {
     };
   },[syncReservations,upsertReservation]);
 
+  const scopedOutletRooms=useMemo(()=>getScopedOutletRooms(currentUser),[currentUser]);
   const outletSummaries=useMemo(()=>outletCountsFor(allCards),[allCards]);
   const completeOutletSummaries=useMemo(()=>{
-    const byName=new Map(outletSummaries.map(item=>[item.outlet,item]));
-    const catalogRows=ADMIN_OUTLET_ROOMS.map(outlet=>byName.get(outlet)||{outlet,total:0,pending:0,upcoming:0,accepted:0,declined:0});
-    const extras=outletSummaries.filter(item=>!ADMIN_OUTLET_ROOMS.includes(item.outlet));
+    const allowedSet=new Set(scopedOutletRooms.map(canonicalOutletName));
+    const masterSet=new Set(ADMIN_OUTLET_ROOMS.map(canonicalOutletName));
+    const byName=new Map(outletSummaries.map(item=>[canonicalOutletName(item.outlet),item]));
+    const catalogRows=scopedOutletRooms.map(outlet=>byName.get(canonicalOutletName(outlet))||{outlet,total:0,pending:0,upcoming:0,accepted:0,declined:0});
+    const extras=outletSummaries.filter(item=>allowedSet.has(canonicalOutletName(item.outlet))&&!masterSet.has(canonicalOutletName(item.outlet)));
     return [...catalogRows,...extras];
-  },[outletSummaries]);
+  },[outletSummaries,scopedOutletRooms]);
   const outletOptions=useMemo(()=>["ALL",...completeOutletSummaries.map(item=>item.outlet)],[completeOutletSummaries]);
 
   useEffect(()=>{
@@ -1361,7 +1431,7 @@ function NotificationDashboard() {
         if(!id||!dt||acknowledgments[id])return null;
         const diff=dt.getTime()-now;
         if(diff<=0||diff>2*3_600_000)return null;
-        return {id,name:res.guest_name||res.name||"Guest",room:getOutletName(res),eventDate:res.event_date||res.eventDate||res.reservationDate,eventTime:res.event_time||res.eventTime||res.reservationTime};
+        return {id,db_id:res.db_id,name:res.guest_name||res.name||"Guest",room:getOutletName(res),eventDate:res.event_date||res.eventDate||res.reservationDate,eventTime:res.event_time||res.eventTime||res.reservationTime};
       })
       .filter(Boolean);
     return {activeAlerts:active,acknowledgedAlerts:Object.values(acknowledgments)};

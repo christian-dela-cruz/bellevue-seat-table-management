@@ -38,6 +38,16 @@ class Reservation extends Model
         'rejection_reason',
         'cancellation_reason',
         'cancelled_at',
+        'assigned_admin_id',
+        'assigned_handler_name',
+        'coordination_status',
+        'internal_notes',
+        'handoff_notes',
+        'seen_by',
+        'last_handled_by_id',
+        'last_handled_by_name',
+        'last_operational_action',
+        'last_operational_at',
     ];
 
     protected $casts = [
@@ -48,6 +58,8 @@ class Reservation extends Model
         'rejected_at' => 'datetime',
         'reverted_at' => 'datetime',
         'is_standalone' => 'boolean',
+        'seen_by' => 'array',
+        'last_operational_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -96,6 +108,16 @@ class Reservation extends Model
     public function transactions(): HasMany
     {
         return $this->hasMany(ReservationTransaction::class)->latest();
+    }
+
+    public function assignedAdmin(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class, 'assigned_admin_id');
+    }
+
+    public function lastHandledBy(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class, 'last_handled_by_id');
     }
 
     public function seats(): HasMany

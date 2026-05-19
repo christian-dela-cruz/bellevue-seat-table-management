@@ -4,6 +4,7 @@ import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { reportAPI } from "../../../services/reportAPI";
 import { Building2, Download, Layers, Printer, Utensils } from "lucide-react";
+import { canAccessOutlet, canonicalOutletName } from "../../../constants/outletCatalog";
 import {
   Area,
   CartesianGrid,
@@ -853,6 +854,7 @@ export default function Reports() {
   const canViewReports = authAPI.hasPermission("view_outlet_reports");
   const canViewTransactions = authAPI.hasPermission("view_transactions");
   const canViewGlobalReports = authAPI.hasPermission("view_global_reports");
+  const currentUser = useMemo(() => authAPI.getCurrentUser(), []);
 
   const loadReport = async () => {
     if (!canViewReports) return;
@@ -883,7 +885,7 @@ export default function Reports() {
   }, []);
 
   const filteredOutlets = useMemo(() => {
-    const rows = report.data || [];
+    const rows = (report.data || []).filter((row) => canAccessOutlet(currentUser, row.name));
     const outletFiltered = selectedOutlet === "ALL"
       ? rows
       : rows.filter((row) => String(row.name) === selectedOutlet);
@@ -891,13 +893,19 @@ export default function Reports() {
       ? outletFiltered
       : outletFiltered.filter((row) => outletGroup(row) === selectedOutletGroup);
     return sortRows(groupFiltered, outletSort);
-  }, [report.data, selectedOutlet, selectedOutletGroup, outletSort]);
+  }, [currentUser, report.data, selectedOutlet, selectedOutletGroup, outletSort]);
 
   const summary = report.summary || {};
   const category = report.category_breakdown || {};
   const statuses = report.status_breakdown || {};
-  const roomDetails = useMemo(() => sortRows(report.room_details || [], roomSort), [report.room_details, roomSort]);
-  const allOutlets = report.data || [];
+  const roomDetails = useMemo(
+    () => sortRows((report.room_details || []).filter((row) => canAccessOutlet(currentUser, row.room)), roomSort),
+    [currentUser, report.room_details, roomSort]
+  );
+  const allOutlets = useMemo(
+    () => (report.data || []).filter((row) => canAccessOutlet(currentUser, row.name)),
+    [currentUser, report.data]
+  );
   const roomOutletCount = allOutlets.filter((outlet) => outletGroup(outlet) === "rooms").length;
   const diningOutletCount = allOutlets.filter((outlet) => outletGroup(outlet) === "dining").length;
   const outletSections = useMemo(() => {
@@ -910,6 +918,22 @@ export default function Reports() {
     const extras = filteredOutlets.filter((outlet) => !known.has(outlet.wing || "Main Wing"));
     return [...sections, ...(extras.length ? [{ wing: "Other", rows: extras }] : [])].filter((section) => section.rows.length > 0);
   }, [filteredOutlets]);
+  const outletOptions = useMemo(
+    () => allOutlets.map((outlet) => canonicalOutletName(outlet.name)),
+    [allOutlets]
+  );
+
+  useEffect(() => {
+    if (selectedOutlet === "ALL") return;
+    if (!outletOptions.includes(canonicalOutletName(selectedOutlet))) {
+      setSelectedOutlet("ALL");
+    }
+  }, [outletOptions, selectedOutlet]);
+
+  useEffect(() => {
+    if (selectedOutletGroup === "dining" && diningOutletCount === 0) setSelectedOutletGroup("all");
+    if (selectedOutletGroup === "rooms" && roomOutletCount === 0) setSelectedOutletGroup("all");
+  }, [diningOutletCount, roomOutletCount, selectedOutletGroup]);
   const transactionSummary = transactionReport.summary || {};
   const dateRangeLabel = `${readableDate(startDate)} to ${readableDate(endDate)}`;
   const isTrendTab = activeTab === "monthly" || activeTab === "yearly";
@@ -1049,7 +1073,7 @@ export default function Reports() {
                         <FilterField label="Outlet">
                           <select value={selectedOutlet} onChange={(e) => setSelectedOutlet(e.target.value)} style={{ ...filterStyle(), minWidth: 190 }}>
                             <option value="ALL">All outlets</option>
-                            {(report.data || []).map((outlet) => <option key={outlet.name || outlet.venue_id} value={String(outlet.name)}>{outlet.name}</option>)}
+                            {allOutlets.map((outlet) => <option key={outlet.name || outlet.venue_id} value={String(outlet.name)}>{outlet.name}</option>)}
                           </select>
                         </FilterField>
                       )}
@@ -1127,10 +1151,10 @@ export default function Reports() {
                   <div style={{ display: "grid", gap: 14 }}>
                     <ReportCard style={{ padding: 12 }}>
                       <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,0.8fr) minmax(280px,1.2fr)", gap: 12, alignItems: "center" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: `repeat(${1 + (roomOutletCount > 0 ? 1 : 0) + (diningOutletCount > 0 ? 1 : 0)},minmax(0,1fr))`, gap: 8 }}>
                           <FilterChip icon={Layers} label="All" count={allOutlets.length} active={selectedOutletGroup === "all"} onClick={() => setSelectedOutletGroup("all")} />
-                          <FilterChip icon={Building2} label="Rooms" count={roomOutletCount} active={selectedOutletGroup === "rooms"} onClick={() => setSelectedOutletGroup("rooms")} />
-                          <FilterChip icon={Utensils} label="Dining" count={diningOutletCount} active={selectedOutletGroup === "dining"} onClick={() => setSelectedOutletGroup("dining")} />
+                          {roomOutletCount > 0 && <FilterChip icon={Building2} label="Rooms" count={roomOutletCount} active={selectedOutletGroup === "rooms"} onClick={() => setSelectedOutletGroup("rooms")} />}
+                          {diningOutletCount > 0 && <FilterChip icon={Utensils} label="Dining" count={diningOutletCount} active={selectedOutletGroup === "dining"} onClick={() => setSelectedOutletGroup("dining")} />}
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end" }}>
                           <SortSelect value={outletSort} options={SORT_OPTIONS.outlets} onChange={setOutletSort} />

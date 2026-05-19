@@ -30,4 +30,14 @@ export const reservationAPI = {
 
   // Revert rejected reservation to pending
   revert: (id) => api.patch(`/admin/reservations/${id}/revert`),
+
+  // Update operational coordination metadata
+  updateCoordination: (id, coordinationData) => api.patch(`/admin/reservations/${id}/coordination`, coordinationData),
+
+  // Mark reservation detail as seen by the current operations user
+  markSeen: (id) => api.post(`/admin/reservations/${id}/seen`),
+
+  // Shared notification acknowledgment state
+  getAcknowledgments: () => api.get('/admin/notifications/acknowledgments'),
+  acknowledgeNotifications: (items = []) => api.post('/admin/notifications/acknowledgments', { items }),
 };

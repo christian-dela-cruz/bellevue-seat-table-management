@@ -49,6 +49,11 @@ Route::prefix('admin/reports')->group(function () {
     Route::get('/monthly', [AdminReportController::class, 'monthlyReports'])->middleware(AdminAccess::class . ':view_outlet_reports');
 });
 
+Route::prefix('admin/notifications')->group(function () {
+    Route::get('/acknowledgments', [AdminReservationController::class, 'acknowledgments'])->middleware(AdminAccess::class . ':view_admin');
+    Route::post('/acknowledgments', [AdminReservationController::class, 'acknowledgeNotification'])->middleware(AdminAccess::class . ':acknowledge_notifications');
+});
+
 // Venue routes
 Route::prefix('venues')->group(function () {
     Route::get('/', [VenueController::class, 'index']);
@@ -85,6 +90,8 @@ Route::prefix('admin/reservations')->group(function () {
     Route::post('/', [AdminReservationController::class, 'store'])->middleware(AdminAccess::class . ':manage_reservations');
     Route::get('/{reservation}', [AdminReservationController::class, 'show'])->middleware(AdminAccess::class . ':view_admin');
     Route::put('/{reservation}', [AdminReservationController::class, 'update'])->middleware(AdminAccess::class . ':adjust_reservation_details');
+    Route::patch('/{reservation}/coordination', [AdminReservationController::class, 'updateCoordination'])->middleware(AdminAccess::class . ':adjust_reservation_details');
+    Route::post('/{reservation}/seen', [AdminReservationController::class, 'markSeen'])->middleware(AdminAccess::class . ':view_admin');
     Route::patch('/{id}/approve', [AdminReservationController::class, 'approve'])->middleware(AdminAccess::class . ':manage_reservations');
     Route::patch('/{id}/reject', [AdminReservationController::class, 'reject'])->middleware(AdminAccess::class . ':manage_reservations');
     Route::patch('/{id}/revert', [AdminReservationController::class, 'revert'])->middleware(AdminAccess::class . ':manage_reservations');

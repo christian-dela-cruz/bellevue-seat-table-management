@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Activity,
@@ -44,6 +44,11 @@ const F = {
   body: "'Inter','Helvetica Neue',Arial,sans-serif",
   label: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
+
+const POLL_INTERVAL_MS = 5000;
+const RECONNECT_WINDOW_MS = 60000;
+const MAX_RECONNECTS_IN_WINDOW = 5;
+const WS_RECOVERY_RETRY_MS = 45000;
 
 const OUTLET_TREE = [
   {
@@ -627,6 +632,11 @@ function ReservationRow({ reservation, showPriority = false }) {
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reservation.name || reservation.guest_name || "Guest"}</div>
         <div style={{ marginTop: 3, fontSize: 11.5, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reservation.reference_code || reservation.reference || "-"} - {outlet}</div>
+        {(reservation.last_handled_by_name || reservation.assigned_handler_name || reservation.last_operational_action) && (
+          <div style={{ marginTop: 4, fontSize: 10.5, color: C.faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {reservation.last_operational_action || "Coordination"}{reservation.last_handled_by_name || reservation.assigned_handler_name ? ` by ${reservation.last_handled_by_name || reservation.assigned_handler_name}` : ""}
+          </div>
+        )}
       </div>
       <div style={{ fontSize: 12, color: C.muted }}>{readableDate(reservation.event_date)}<br /><span style={{ color: C.faint }}>{readableTime(reservation.event_time)}</span></div>
       <div style={{ fontSize: 12, color: C.muted }}>{reservation.guests_count || reservation.guests || 0} guests</div>
@@ -650,15 +660,25 @@ function OutletDashboard() {
   const [reports, setReports] = useState({ data: [], summary: {} });
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [wsStatus, setWsStatus] = useState("connecting");
   const [error, setError] = useState("");
+  const isMounted = useRef(true);
+  const wsRef = useRef(null);
+  const reconnectTimer = useRef(null);
+  const reconnectDelay = useRef(2000);
+  const reconnectAttempts = useRef([]);
+  const pollTimer = useRef(null);
+  const recoveryTimer = useRef(null);
 
   const canViewReports = authAPI.hasPermission("view_outlet_reports");
   const canManageReservations = authAPI.hasPermission("manage_reservations");
   const currentUser = authAPI.getCurrentUser();
 
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async (silent = false) => {
     if (!canViewReports) return;
-    setLoading(true);
+    if (silent) setSyncing(true);
+    else setLoading(true);
     setError("");
     try {
       const [reportData, reservationData] = await Promise.all([
@@ -670,13 +690,125 @@ function OutletDashboard() {
     } catch (err) {
       setError(err.message || "Failed to load outlet dashboard.");
     } finally {
-      setLoading(false);
+      if (silent) setSyncing(false);
+      else setLoading(false);
     }
-  };
+  }, [canViewReports, endDate, startDate]);
 
   useEffect(() => {
-    loadDashboard();
-  }, []);
+    isMounted.current = true;
+    loadDashboard(false);
+    return () => {
+      isMounted.current = false;
+    };
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    if (!canViewReports) return undefined;
+
+    const wsHost = import.meta.env.VITE_WS_HOST || "localhost";
+    const wsPort = import.meta.env.VITE_WS_PORT || "6001";
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${wsHost}:${wsPort}`;
+
+    const clearReconnect = () => {
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current);
+        reconnectTimer.current = null;
+      }
+    };
+
+    const clearPoll = () => {
+      if (pollTimer.current) {
+        clearInterval(pollTimer.current);
+        pollTimer.current = null;
+      }
+      if (recoveryTimer.current) {
+        clearInterval(recoveryTimer.current);
+        recoveryTimer.current = null;
+      }
+    };
+
+    const shouldFallbackToPolling = () => {
+      const now = Date.now();
+      reconnectAttempts.current = [...reconnectAttempts.current.filter((ts) => now - ts <= RECONNECT_WINDOW_MS), now];
+      return reconnectAttempts.current.length >= MAX_RECONNECTS_IN_WINDOW;
+    };
+
+    const refreshFromEvent = () => {
+      if (!isMounted.current) return;
+      loadDashboard(true);
+    };
+
+    const connect = () => {
+      if (!isMounted.current) return;
+      clearReconnect();
+      if (!wsRef.current) setWsStatus((prev) => (prev === "polling" ? prev : "connecting"));
+
+      const socket = new WebSocket(wsUrl);
+      wsRef.current = socket;
+
+      socket.onopen = () => {
+        setWsStatus("connected");
+        reconnectDelay.current = 2000;
+        reconnectAttempts.current = [];
+        clearPoll();
+      };
+
+      socket.onclose = () => {
+        wsRef.current = null;
+        if (!isMounted.current) return;
+        if (shouldFallbackToPolling()) {
+          setWsStatus("polling");
+          if (!pollTimer.current) {
+            refreshFromEvent();
+            pollTimer.current = setInterval(refreshFromEvent, POLL_INTERVAL_MS);
+          }
+          if (!recoveryTimer.current) {
+            recoveryTimer.current = setInterval(() => {
+              if (!wsRef.current && isMounted.current) connect();
+            }, WS_RECOVERY_RETRY_MS);
+          }
+          return;
+        }
+        setWsStatus("disconnected");
+        const delay = reconnectDelay.current;
+        reconnectTimer.current = setTimeout(connect, delay);
+        reconnectDelay.current = Math.min(reconnectDelay.current * 2, 30000);
+      };
+
+      socket.onerror = () => {
+        if (!isMounted.current) return;
+        setWsStatus((prev) => (prev === "polling" ? "polling" : "error"));
+        if (socket.readyState === WebSocket.OPEN) socket.close();
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          const eventName = data?.event;
+          if (eventName === "connected") return;
+          if (["ReservationCreated", "ReservationUpdated", "ReservationDeleted", "NotificationAcknowledged", "updated"].includes(eventName)) {
+            refreshFromEvent();
+          }
+        } catch (err) {
+          console.error("[OutletDashboard WS] Parse error:", err);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      clearReconnect();
+      clearPoll();
+      if (wsRef.current) {
+        const socket = wsRef.current;
+        wsRef.current = null;
+        socket.close();
+      }
+    };
+  }, [canViewReports, loadDashboard]);
 
   const outlets = useMemo(() => {
     const rows = reports.data || [];
@@ -845,6 +977,9 @@ function OutletDashboard() {
             </div>
             {selectedOutlet && (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <span style={{ borderRadius: 999, padding: "5px 9px", background: wsStatus === "connected" ? C.greenFaint : wsStatus === "polling" ? C.goldFaint : C.slateFaint, border: `1px solid ${wsStatus === "connected" ? "rgba(46,122,90,0.18)" : wsStatus === "polling" ? "rgba(140,107,42,0.22)" : C.border}`, color: wsStatus === "connected" ? C.green : wsStatus === "polling" ? C.gold : C.muted, fontSize: 11, fontWeight: 750 }}>
+                  {syncing ? "Syncing" : wsStatus === "connected" ? "Live" : wsStatus === "polling" ? "Polling" : "Reconnecting"}
+                </span>
                 <StatusPill status={canManageReservations ? "reserved" : "pending"} />
                 <span style={{ borderRadius: 999, padding: "5px 9px", background: C.soft, border: `1px solid ${C.border}`, color: C.muted, fontSize: 11, fontWeight: 700 }}>{currentUser?.role || "admin"}</span>
               </div>
@@ -902,8 +1037,8 @@ function OutletDashboard() {
                       <option value="status">Status A-Z</option>
                     </select>
                   </Field>
-                  <button onClick={loadDashboard} disabled={loading} style={{ height: 38, border: "none", borderRadius: 9, background: C.gold, color: "#fff", padding: "0 14px", fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", cursor: loading ? "not-allowed" : "pointer" }}>
-                    Apply
+                  <button onClick={() => loadDashboard(false)} disabled={loading || syncing} style={{ height: 38, border: "none", borderRadius: 9, background: C.gold, color: "#fff", padding: "0 14px", fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", cursor: loading || syncing ? "not-allowed" : "pointer" }}>
+                    {syncing ? "Syncing" : "Apply"}
                   </button>
                 </div>
               </Panel>

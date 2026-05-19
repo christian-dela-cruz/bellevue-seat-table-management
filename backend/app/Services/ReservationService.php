@@ -6,6 +6,8 @@ use App\Models\Reservation;
 use App\Models\ReservationTransaction;
 use App\Models\Seat;
 use App\Models\Venue;
+use App\Models\NotificationAcknowledgment;
+use Illuminate\Support\Facades\Schema;
 
 class ReservationService
 {
@@ -32,7 +34,7 @@ class ReservationService
     /**
      * Approve a reservation and reserve seats
      */
-    public function approveReservation(Reservation $reservation): Reservation
+    public function approveReservation(Reservation $reservation, ?array $actor = null): Reservation
     {
         $fromStatus = $reservation->status;
         $reservation->update(['status' => 'reserved']);
@@ -44,7 +46,9 @@ class ReservationService
             'status_changed',
             $fromStatus,
             $reservation->status,
-            'Reservation approved and selected seat/table reserved.'
+            'Reservation approved and selected seat/table reserved.',
+            [],
+            $actor
         );
 
         return $reservation->fresh(['venue']);
@@ -53,7 +57,7 @@ class ReservationService
     /**
      * Reject a reservation and release seats
      */
-    public function rejectReservation(Reservation $reservation, string $reason): Reservation
+    public function rejectReservation(Reservation $reservation, string $reason, ?array $actor = null): Reservation
     {
         $fromStatus = $reservation->status;
         $reservation->update([
@@ -69,7 +73,8 @@ class ReservationService
             $fromStatus,
             $reservation->status,
             'Reservation rejected by admin.',
-            ['reason' => $reason]
+            ['reason' => $reason],
+            $actor
         );
 
         return $reservation->fresh(['venue']);
@@ -78,7 +83,7 @@ class ReservationService
     /**
      * Revert a rejected reservation back to pending review.
      */
-    public function revertRejectedReservation(Reservation $reservation): Reservation
+    public function revertRejectedReservation(Reservation $reservation, ?array $actor = null): Reservation
     {
         $fromStatus = $reservation->status;
         $reservation->update([
@@ -92,7 +97,9 @@ class ReservationService
             'status_changed',
             $fromStatus,
             $reservation->status,
-            'Rejected reservation reverted to pending review.'
+            'Rejected reservation reverted to pending review.',
+            [],
+            $actor
         );
 
         return $reservation->fresh(['venue']);
@@ -104,16 +111,225 @@ class ReservationService
         ?string $fromStatus = null,
         ?string $toStatus = null,
         ?string $notes = null,
-        array $metadata = []
+        array $metadata = [],
+        ?array $actor = null
     ): ReservationTransaction {
-        return ReservationTransaction::create([
+        $actorPayload = $this->actorPayload($actor);
+        $transactionMetadata = array_filter(array_merge($metadata, [
+            'actor' => $actorPayload ?: null,
+        ]));
+
+        $payload = [
             'reservation_id' => $reservation->id,
             'action' => $action,
             'from_status' => $fromStatus,
             'to_status' => $toStatus,
             'notes' => $notes,
-            'metadata' => $metadata ?: null,
-        ]);
+            'metadata' => $transactionMetadata ?: null,
+        ];
+
+        if ($actorPayload && Schema::hasColumn('reservation_transactions', 'actor_admin_id')) {
+            $payload['actor_admin_id'] = $actorPayload['id'] ?? null;
+            $payload['actor_name'] = $actorPayload['name'] ?? null;
+            $payload['actor_role'] = $actorPayload['role'] ?? null;
+            $payload['actor_email'] = $actorPayload['email'] ?? null;
+        }
+
+        $transaction = ReservationTransaction::create($payload);
+        $this->touchOperationalState($reservation, $action, $actorPayload, $notes);
+
+        return $transaction;
+    }
+
+    public function updateCoordination(Reservation $reservation, array $data, ?array $actor = null): Reservation
+    {
+        $updates = [];
+
+        foreach (['coordination_status', 'internal_notes', 'handoff_notes'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $updates[$field] = $data[$field];
+            }
+        }
+
+        if (array_key_exists('assigned_admin_id', $data)) {
+            $updates['assigned_admin_id'] = $data['assigned_admin_id'];
+            $updates['assigned_handler_name'] = $data['assigned_handler_name'] ?? null;
+        }
+
+        if (!empty($updates)) {
+            $reservation->update($updates);
+        }
+
+        $this->recordTransaction(
+            $reservation->fresh(),
+            'coordination_updated',
+            $reservation->status,
+            $reservation->status,
+            $data['activity_note'] ?? 'Reservation coordination updated.',
+            ['coordination' => $updates],
+            $actor
+        );
+
+        return $reservation->fresh(['venue']);
+    }
+
+    public function markSeen(Reservation $reservation, ?array $actor = null): Reservation
+    {
+        $actorPayload = $this->actorPayload($actor);
+        if (!$actorPayload || !Schema::hasColumn('reservations', 'seen_by')) {
+            return $reservation->fresh(['venue']);
+        }
+
+        $seenBy = $reservation->seen_by ?: [];
+        $key = (string) ($actorPayload['id'] ?? $actorPayload['email'] ?? $actorPayload['name']);
+        $seenBy[$key] = [
+            'id' => $actorPayload['id'] ?? null,
+            'name' => $actorPayload['name'] ?? null,
+            'role' => $actorPayload['role'] ?? null,
+            'seen_at' => now()->toISOString(),
+        ];
+
+        $reservation->update(['seen_by' => $seenBy]);
+
+        $this->recordTransaction(
+            $reservation->fresh(),
+            'reservation_seen',
+            $reservation->status,
+            $reservation->status,
+            'Reservation viewed by operations user.',
+            [],
+            $actor
+        );
+
+        return $reservation->fresh(['venue']);
+    }
+
+    public function acknowledgeNotification(array $data, ?array $actor = null): ?NotificationAcknowledgment
+    {
+        if (!Schema::hasTable('notification_acknowledgments')) {
+            return null;
+        }
+
+        $actorPayload = $this->actorPayload($actor);
+        $reservationId = $data['reservation_id'] ?? null;
+        $reservation = $reservationId ? Reservation::find($reservationId) : null;
+        $notificationKey = (string) ($data['notification_key'] ?? $reservationId ?? uniqid('notification_', true));
+
+        $acknowledgment = NotificationAcknowledgment::updateOrCreate(
+            ['notification_key' => $notificationKey],
+            [
+                'reservation_id' => $reservation?->id,
+                'acknowledged_by_id' => $actorPayload['id'] ?? null,
+                'acknowledged_by_name' => $actorPayload['name'] ?? null,
+                'acknowledged_by_role' => $actorPayload['role'] ?? null,
+                'outlet' => $data['outlet'] ?? $reservation?->room ?? $reservation?->venue?->name,
+                'event_date' => $data['event_date'] ?? optional($reservation?->event_date)->format('Y-m-d'),
+                'event_time' => $data['event_time'] ?? $reservation?->event_time,
+                'acknowledged_at' => now(),
+                'metadata' => $data['metadata'] ?? null,
+            ]
+        );
+
+        if ($reservation) {
+            $this->recordTransaction(
+                $reservation,
+                'notification_acknowledged',
+                $reservation->status,
+                $reservation->status,
+                'Operational notification acknowledged.',
+                ['notification_key' => $notificationKey],
+                $actor
+            );
+        }
+
+        return $acknowledgment;
+    }
+
+    public function notificationAcknowledgments(?array $admin = null): array
+    {
+        if (!Schema::hasTable('notification_acknowledgments')) {
+            return [];
+        }
+
+        $query = NotificationAcknowledgment::query()->with('reservation.venue')->latest('acknowledged_at');
+
+        if ($admin && !$this->hasGlobalReportAccess($admin) && ($admin['scope_type'] ?? 'all') === 'assigned') {
+            $scope = $admin['outlet_scope'] ?? [];
+            $venueIds = array_values(array_filter(array_map(fn ($value) => is_numeric($value) ? (int) $value : null, $scope)));
+            $roomNames = array_values(array_filter(array_map(fn ($value) => is_numeric($value) ? null : (string) $value, $scope)));
+
+            if (empty($venueIds) && empty($roomNames)) {
+                return [];
+            }
+
+            $query->where(function ($scopeQuery) use ($venueIds, $roomNames) {
+                if (!empty($roomNames)) {
+                    $scopeQuery->whereIn('outlet', $roomNames);
+                }
+                $scopeQuery->orWhereHas('reservation', function ($reservationQuery) use ($venueIds, $roomNames) {
+                    if (!empty($venueIds)) {
+                        $reservationQuery->whereIn('venue_id', $venueIds);
+                    }
+                    if (!empty($roomNames)) {
+                        $reservationQuery->orWhereIn('room', $roomNames);
+                    }
+                });
+            });
+        }
+
+        return $query->limit(500)->get()->map(fn (NotificationAcknowledgment $ack) => [
+            'id' => $ack->notification_key,
+            'reservation_id' => $ack->reservation_id,
+            'name' => $ack->reservation?->name,
+            'room' => $ack->outlet,
+            'eventDate' => optional($ack->event_date)->format('Y-m-d'),
+            'eventTime' => $ack->event_time,
+            'acknowledgedAt' => optional($ack->acknowledged_at)->toISOString(),
+            'acknowledgedBy' => $ack->acknowledged_by_name,
+            'acknowledgedByRole' => $ack->acknowledged_by_role,
+        ])->values()->toArray();
+    }
+
+    private function actorPayload(?array $actor): array
+    {
+        if (!$actor) {
+            return [];
+        }
+
+        return [
+            'id' => $actor['id'] ?? null,
+            'name' => $actor['name'] ?? $actor['username'] ?? $actor['email'] ?? null,
+            'role' => $actor['role'] ?? null,
+            'email' => $actor['email'] ?? null,
+        ];
+    }
+
+    private function touchOperationalState(Reservation $reservation, string $action, array $actorPayload = [], ?string $notes = null): void
+    {
+        if (!Schema::hasColumn('reservations', 'last_operational_action')) {
+            return;
+        }
+
+        $updates = [
+            'last_operational_action' => $this->humanizeAction($action),
+            'last_operational_at' => now(),
+        ];
+
+        if (!empty($actorPayload)) {
+            $updates['last_handled_by_id'] = $actorPayload['id'] ?? null;
+            $updates['last_handled_by_name'] = $actorPayload['name'] ?? null;
+        }
+
+        if ($action === 'coordination_updated' && $notes && Schema::hasColumn('reservations', 'handoff_notes')) {
+            $updates['handoff_notes'] = $notes;
+        }
+
+        $reservation->forceFill($updates)->saveQuietly();
+    }
+
+    private function humanizeAction(string $action): string
+    {
+        return ucwords(str_replace('_', ' ', $action));
     }
 
     private function tableNumberCandidates(string $tableNumber): array
@@ -302,6 +518,16 @@ class ReservationService
                         'setupRequirements' => $reservation->setup_requirements,
                         'specialRequests'  => $reservation->special_requests,
                         'rejectionReason'  => $reservation->rejection_reason,
+                        'assigned_admin_id' => $reservation->assigned_admin_id,
+                        'assigned_handler_name' => $reservation->assigned_handler_name,
+                        'coordination_status' => $reservation->coordination_status,
+                        'internal_notes' => $reservation->internal_notes,
+                        'handoff_notes' => $reservation->handoff_notes,
+                        'seen_by' => $reservation->seen_by,
+                        'last_handled_by_id' => $reservation->last_handled_by_id,
+                        'last_handled_by_name' => $reservation->last_handled_by_name,
+                        'last_operational_action' => $reservation->last_operational_action,
+                        'last_operational_at' => optional($reservation->last_operational_at)->toISOString(),
                     ];
                 }
             );
@@ -342,6 +568,16 @@ class ReservationService
                     'rejectionReason'  => $reservation->rejection_reason,
                     'submittedAt'      => $reservation->submitted_at->format('M j, Y · g:i A'),
                     'submittedTimestamp' => $reservation->submitted_at->timestamp,
+                    'assigned_admin_id' => $reservation->assigned_admin_id,
+                    'assigned_handler_name' => $reservation->assigned_handler_name,
+                    'coordination_status' => $reservation->coordination_status,
+                    'internal_notes' => $reservation->internal_notes,
+                    'handoff_notes' => $reservation->handoff_notes,
+                    'seen_by' => $reservation->seen_by,
+                    'last_handled_by_id' => $reservation->last_handled_by_id,
+                    'last_handled_by_name' => $reservation->last_handled_by_name,
+                    'last_operational_action' => $reservation->last_operational_action,
+                    'last_operational_at' => optional($reservation->last_operational_at)->toISOString(),
                 ];
             })
             ->toArray();
@@ -620,6 +856,10 @@ class ReservationService
                 'to_status' => $transaction->to_status,
                 'notes' => $transaction->notes,
                 'metadata' => $transaction->metadata,
+                'actor_admin_id' => $transaction->actor_admin_id,
+                'actor_name' => $transaction->actor_name,
+                'actor_role' => $transaction->actor_role,
+                'actor_email' => $transaction->actor_email,
                 'created_at' => optional($transaction->created_at)->toISOString(),
             ])
             ->values()
@@ -638,6 +878,10 @@ class ReservationService
             'to_status' => $transaction->to_status,
             'notes' => $transaction->notes,
             'metadata' => $transaction->metadata,
+            'actor_admin_id' => $transaction->actor_admin_id,
+            'actor_name' => $transaction->actor_name,
+            'actor_role' => $transaction->actor_role,
+            'actor_email' => $transaction->actor_email,
             'created_at' => optional($transaction->created_at)->toISOString(),
             'reservation' => [
                 'id' => $reservation?->id,
@@ -648,6 +892,10 @@ class ReservationService
                 'room' => $reservation?->room ?: $venue?->name,
                 'event_date' => $reservation?->event_date?->format('Y-m-d'),
                 'event_time' => $reservation?->event_time,
+                'assigned_handler_name' => $reservation?->assigned_handler_name,
+                'coordination_status' => $reservation?->coordination_status,
+                'last_handled_by_name' => $reservation?->last_handled_by_name,
+                'last_operational_action' => $reservation?->last_operational_action,
             ],
             'venue' => [
                 'id' => $venue?->id,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Admin;
 use App\Models\Reservation;
 use App\Models\Venue;
 use App\Services\ReservationService;
@@ -250,7 +251,8 @@ class AdminReservationController extends Controller
                 [
                     'changes' => $changes,
                     'updated_by' => $admin['username'] ?? $admin['email'] ?? null,
-                ]
+                ],
+                $admin
             );
         }
 
@@ -306,15 +308,16 @@ class AdminReservationController extends Controller
         return response()->json($reservations);
     }
 
-    public function approve(int $id): JsonResponse
+    public function approve(Request $request, int $id): JsonResponse
     {
         \Log::info('AdminReservationController::approve called for reservation ID: ' . $id);
         
         try {
             $reservation = Reservation::findOrFail($id);
             \Log::info('Reservation found: ' . $reservation->email . ', status: ' . $reservation->status);
+            $admin = $this->currentAdmin($request);
 
-            if (!$this->reservationService->canAccessReservation($this->currentAdmin(request()), $reservation)) {
+            if (!$this->reservationService->canAccessReservation($admin, $reservation)) {
                 return $this->scopeDeniedResponse();
             }
 
@@ -335,7 +338,7 @@ class AdminReservationController extends Controller
                 ], 422);
             }
             
-            $reservation = $this->reservationService->approveReservation($reservation);
+            $reservation = $this->reservationService->approveReservation($reservation, $admin);
             \Log::info('Reservation approved, sending email to: ' . $reservation->email);
 
             // Send approval email to the client
@@ -349,7 +352,8 @@ class AdminReservationController extends Controller
                     $reservation->status,
                     $reservation->status,
                     'Confirmation email sent to guest.',
-                    ['channel' => 'email', 'type' => 'reservation_confirmed']
+                    ['channel' => 'email', 'type' => 'reservation_confirmed'],
+                    $admin
                 );
             } catch (\Exception $e) {
                 \Log::error('Failed to send approval email: ' . $e->getMessage());
@@ -359,7 +363,8 @@ class AdminReservationController extends Controller
                     $reservation->status,
                     $reservation->status,
                     'Confirmation email failed to send.',
-                    ['channel' => 'email', 'type' => 'reservation_confirmed', 'error' => $e->getMessage()]
+                    ['channel' => 'email', 'type' => 'reservation_confirmed', 'error' => $e->getMessage()],
+                    $admin
                 );
             }
 
@@ -410,7 +415,8 @@ class AdminReservationController extends Controller
                 ], 422);
             }
             
-            $reservation = $this->reservationService->rejectReservation($reservation, $validated['reason']);
+            $admin = $this->currentAdmin($request);
+            $reservation = $this->reservationService->rejectReservation($reservation, $validated['reason'], $admin);
             \Log::info('Reservation rejected, sending email to: ' . $reservation->email . ' with reason: ' . $validated['reason']);
 
             // Send rejection email to the client
@@ -424,7 +430,8 @@ class AdminReservationController extends Controller
                     $reservation->status,
                     $reservation->status,
                     'Rejection email sent to guest.',
-                    ['channel' => 'email', 'type' => 'reservation_rejected']
+                    ['channel' => 'email', 'type' => 'reservation_rejected'],
+                    $admin
                 );
             } catch (\Exception $e) {
                 \Log::error('Failed to send rejection email: ' . $e->getMessage());
@@ -434,7 +441,8 @@ class AdminReservationController extends Controller
                     $reservation->status,
                     $reservation->status,
                     'Rejection email failed to send.',
-                    ['channel' => 'email', 'type' => 'reservation_rejected', 'error' => $e->getMessage()]
+                    ['channel' => 'email', 'type' => 'reservation_rejected', 'error' => $e->getMessage()],
+                    $admin
                 );
             }
 
@@ -487,7 +495,7 @@ class AdminReservationController extends Controller
                 ], 422);
             }
 
-            $reservation = $this->reservationService->revertRejectedReservation($reservation);
+            $reservation = $this->reservationService->revertRejectedReservation($reservation, $this->currentAdmin(request()));
 
             try {
                 broadcast(new ReservationUpdated($reservation))->toOthers();
@@ -512,6 +520,141 @@ class AdminReservationController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    public function updateCoordination(Request $request, Reservation $reservation): JsonResponse
+    {
+        $admin = $this->currentAdmin($request);
+
+        if (!$this->reservationService->canAccessReservation($admin, $reservation)) {
+            return $this->scopeDeniedResponse();
+        }
+
+        $validated = $request->validate([
+            'assigned_admin_id' => 'nullable|exists:admins,id',
+            'assigned_handler_name' => 'nullable|string|max:255',
+            'coordination_status' => 'nullable|in:unassigned,assigned,in_review,awaiting_outlet,awaiting_supervisor,handled,closed',
+            'internal_notes' => 'nullable|string|max:5000',
+            'handoff_notes' => 'nullable|string|max:5000',
+            'activity_note' => 'nullable|string|max:1000',
+        ]);
+
+        if (!empty($validated['assigned_admin_id']) && empty($validated['assigned_handler_name'])) {
+            $assignedAdmin = Admin::find($validated['assigned_admin_id']);
+            $validated['assigned_handler_name'] = $assignedAdmin?->name
+                ?: $assignedAdmin?->username
+                ?: $assignedAdmin?->email;
+        }
+
+        $reservation = $this->reservationService->updateCoordination($reservation, $validated, $admin);
+
+        try {
+            broadcast(new ReservationUpdated($reservation))->toOthers();
+            WebsocketBroadcaster::broadcast('reservations', 'ReservationUpdated', [
+                'reservation' => $reservation,
+                'coordination' => true,
+            ]);
+        } catch (\Throwable $broadcastError) {
+            \Log::warning('Reservation coordination broadcast failed: ' . $broadcastError->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Reservation coordination updated successfully',
+            'reservation' => $reservation,
+            'transaction_history' => $reservation->transactions()->latest()->limit(8)->get(),
+        ]);
+    }
+
+    public function markSeen(Request $request, Reservation $reservation): JsonResponse
+    {
+        $admin = $this->currentAdmin($request);
+
+        if (!$this->reservationService->canAccessReservation($admin, $reservation)) {
+            return $this->scopeDeniedResponse();
+        }
+
+        $reservation = $this->reservationService->markSeen($reservation, $admin);
+
+        try {
+            WebsocketBroadcaster::broadcast('reservations', 'ReservationUpdated', [
+                'reservation' => $reservation,
+                'seen' => true,
+            ]);
+        } catch (\Throwable $broadcastError) {
+            \Log::warning('Reservation seen broadcast failed: ' . $broadcastError->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'reservation' => $reservation,
+            'seen_by' => $reservation->seen_by,
+        ]);
+    }
+
+    public function acknowledgments(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->reservationService->notificationAcknowledgments($this->currentAdmin($request)),
+        ]);
+    }
+
+    public function acknowledgeNotification(Request $request): JsonResponse
+    {
+        $admin = $this->currentAdmin($request);
+        $validated = $request->validate([
+            'items' => 'nullable|array',
+            'items.*.reservation_id' => 'nullable|exists:reservations,id',
+            'items.*.notification_key' => 'nullable|string|max:255',
+            'items.*.outlet' => 'nullable|string|max:255',
+            'items.*.event_date' => 'nullable|date',
+            'items.*.event_time' => 'nullable|string|max:50',
+            'items.*.metadata' => 'nullable|array',
+            'reservation_id' => 'nullable|exists:reservations,id',
+            'notification_key' => 'nullable|string|max:255',
+            'outlet' => 'nullable|string|max:255',
+            'event_date' => 'nullable|date',
+            'event_time' => 'nullable|string|max:50',
+            'metadata' => 'nullable|array',
+        ]);
+
+        $items = $validated['items'] ?? [$validated];
+        $acknowledgments = [];
+
+        foreach ($items as $item) {
+            if (empty($item['notification_key']) && empty($item['reservation_id'])) {
+                continue;
+            }
+
+            if (!empty($item['reservation_id'])) {
+                $reservation = Reservation::find($item['reservation_id']);
+                if ($reservation && !$this->reservationService->canAccessReservation($admin, $reservation)) {
+                    return $this->scopeDeniedResponse();
+                }
+            }
+
+            $acknowledgment = $this->reservationService->acknowledgeNotification($item, $admin);
+            if ($acknowledgment) {
+                $acknowledgments[] = $acknowledgment;
+            }
+        }
+
+        $sharedList = $this->reservationService->notificationAcknowledgments($admin);
+
+        try {
+            WebsocketBroadcaster::broadcast('reservations', 'NotificationAcknowledged', [
+                'acknowledgments' => $sharedList,
+            ]);
+        } catch (\Throwable $broadcastError) {
+            \Log::warning('Notification acknowledgment broadcast failed: ' . $broadcastError->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notification acknowledged successfully',
+            'data' => $sharedList,
+        ]);
     }
 
     private function currentAdmin(Request $request): ?array

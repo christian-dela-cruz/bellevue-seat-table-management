@@ -6,7 +6,7 @@ import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
 import { fetchReservations, approveReservation, rejectReservation, revertReservation, updateReservation, getReservationStats } from "../../../utils/api";
 import { authAPI } from "../../../services/authAPI";
-import { ADMIN_OUTLET_GROUPS, ADMIN_OUTLET_ROOMS, canonicalOutletName } from "../../../constants/outletCatalog";
+import { ADMIN_OUTLET_GROUPS, ADMIN_OUTLET_ROOMS, canonicalOutletName, getScopedOutletRooms } from "../../../constants/outletCatalog";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -540,12 +540,17 @@ function RoomFilterDropdown({ rooms, selectedRoom, onSelect, isMobile }) {
 
   const label = selectedRoom === "ALL" ? "All Rooms" : selectedRoom;
   const hasFilter = selectedRoom !== "ALL";
+  const visibleRoomSet = new Set(rooms.map(canonicalOutletName));
+  const masterRoomSet = new Set(ADMIN_OUTLET_ROOMS.map(canonicalOutletName));
   const groupedRooms = [
-    ...ADMIN_OUTLET_GROUPS,
+    ...ADMIN_OUTLET_GROUPS.map((group) => ({
+      ...group,
+      rooms: group.rooms.filter((room) => visibleRoomSet.has(canonicalOutletName(room))),
+    })),
     {
       id: "other",
       label: "Other",
-      rooms: rooms.filter(room => !ADMIN_OUTLET_ROOMS.includes(room)),
+      rooms: rooms.filter(room => !masterRoomSet.has(canonicalOutletName(room))),
     },
   ].filter(group => group.rooms.length > 0);
 
@@ -1926,19 +1931,22 @@ export default function ReservationDashboard() {
 
   const isMobile=windowWidth<640;
   const isTablet=windowWidth<960;
+  const currentUser = useMemo(() => authAPI.getCurrentUser(), []);
 
   // ─── Master room list + any extra rooms found in reservations ───────────────
   const roomOptions = useMemo(() => {
+    const scopedRooms = getScopedOutletRooms(currentUser);
+    const scopedRoomSet = new Set(scopedRooms.map(canonicalOutletName));
     const fromReservations = reservations
       .map(r => canonicalOutletName(r.room))
-      .filter(Boolean);
-    const masterSet = new Set(ADMIN_OUTLET_ROOMS);
+      .filter(room => room && scopedRoomSet.has(canonicalOutletName(room)));
+    const masterSet = new Set(scopedRooms);
     // Only add rooms from DB that aren't already in the master list
     const extras = Array.from(new Set(fromReservations))
       .filter(r => !masterSet.has(r))
       .sort((a, b) => a.localeCompare(b));
-    return [...ADMIN_OUTLET_ROOMS, ...extras];
-  }, [reservations]);
+    return [...scopedRooms, ...extras];
+  }, [currentUser, reservations]);
 
   const enrichedReservations = useMemo(
     () => reservations.map((reservation) => enrichReservation(reservation)),
