@@ -1473,6 +1473,16 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
   const formatHistoryAction = (action) => String(action || "")
     .replace(/_/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase()) || "Transaction";
+  const editSummaryRows = [
+    ["Reference", reservation.reference_code || "-"],
+    ["Room", form.room || "-"],
+    ["Type", form.type === "standalone" ? "Standalone Seat" : form.type === "whole" ? "Whole Table" : "Individual Seat"],
+    ["Table", form.type === "standalone" ? "STANDALONE" : form.table_number || "-"],
+    ["Seat", form.seat_number || "-"],
+    ["Guests", form.guests_count ? `${form.guests_count} guest${Number(form.guests_count) === 1 ? "" : "s"}` : "-"],
+    ["Date", form.event_date || "-"],
+    ["Time", form.event_time ? fmtTime(form.event_time) : "-"],
+  ];
 
   return (
     <>
@@ -1489,7 +1499,7 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
       >
         <div style={{
           background:C.surfaceBase,borderRadius:14,
-          width:"100%",maxWidth:520,
+          width:"100%",maxWidth:isEditing?980:760,
           maxHeight:"92vh",
           boxShadow:"0 24px 80px rgba(0,0,0,0.16)",
           border:`1px solid ${C.borderDefault}`,
@@ -1552,31 +1562,47 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
 
           <div style={{padding:"18px 22px 24px",overflowY:"auto",flex:1}}>
             {isEditing ? (
-              <>
-                <SectionLabel>Update Reservation Details</SectionLabel>
-                <ReservationEditForm form={form} setForm={setForm} disabled={!!actionLoading}/>
-                {editError && (
-                  <div style={{marginTop:12,padding:"9px 12px",borderRadius:8,background:C.redFaint,border:`1px solid ${C.redBorder}`,fontFamily:F.body,fontSize:12,color:C.red,lineHeight:1.5}}>
-                    {editError}
+              <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 280px",gap:18,alignItems:"start"}}>
+                <div>
+                  <SectionLabel>Update Reservation Details</SectionLabel>
+                  <ReservationEditForm form={form} setForm={setForm} disabled={!!actionLoading}/>
+                  {editError && (
+                    <div style={{marginTop:12,padding:"9px 12px",borderRadius:8,background:C.redFaint,border:`1px solid ${C.redBorder}`,fontFamily:F.body,fontSize:12,color:C.red,lineHeight:1.5}}>
+                      {editError}
+                    </div>
+                  )}
+                </div>
+                <aside style={{position:"sticky",top:0,display:"grid",gap:12,padding:14,borderRadius:12,background:C.goldFaintest,border:`1px solid ${C.borderAccent}`}}>
+                  <div>
+                    <div style={{fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.16em",textTransform:"uppercase",color:C.gold,marginBottom:8}}>
+                      Edit Summary
+                    </div>
+                    {editSummaryRows.map(([label,value])=>(
+                      <div key={label} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"8px 0",borderBottom:`1px solid ${C.divider}`}}>
+                        <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.13em",textTransform:"uppercase",color:C.textTertiary}}>{label}</span>
+                        <span style={{fontFamily:F.body,fontSize:12.5,fontWeight:label==="Reference"?700:560,color:label==="Reference"?C.gold:C.textPrimary,textAlign:"right",lineHeight:1.4,maxWidth:150,overflowWrap:"anywhere"}}>{value}</span>
+                      </div>
+                    ))}
                   </div>
-                )}
-                <div style={{display:"flex",gap:8,marginTop:18}}>
+                  <div style={{padding:"10px 12px",borderRadius:9,background:C.surfaceInput,border:`1px solid ${C.borderDefault}`,fontFamily:F.body,fontSize:11.5,color:C.textSecondary,lineHeight:1.55}}>
+                    Review changes before saving. A reservation history entry will be recorded for audit tracking.
+                  </div>
                   <button
                     onClick={()=>{setIsEditing(false);setEditError("");}}
                     disabled={!!actionLoading}
-                    style={{flex:1,padding:"11px",background:"transparent",border:`1px solid ${C.borderDefault}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textSecondary,cursor:actionLoading?"not-allowed":"pointer"}}
+                    style={{width:"100%",padding:"11px",background:"transparent",border:`1px solid ${C.borderDefault}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textSecondary,cursor:actionLoading?"not-allowed":"pointer"}}
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleReviewSave}
                     disabled={!!actionLoading}
-                    style={{flex:2,padding:"11px",background:C.gold,border:"none",borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:"#fff",cursor:actionLoading?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}
+                    style={{width:"100%",padding:"11px",background:C.gold,border:"none",borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:"#fff",cursor:actionLoading?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}
                   >
                     Review Changes
                   </button>
-                </div>
-              </>
+                </aside>
+              </div>
             ) : (
               <>
             <SectionLabel>Reservation Details</SectionLabel>

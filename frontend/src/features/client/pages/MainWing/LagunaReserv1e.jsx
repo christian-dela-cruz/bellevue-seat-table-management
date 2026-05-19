@@ -182,10 +182,10 @@ function CloseBtn({ onClick, disabled = false, C }) {
 function ModalShell({ children, onClose, disabled, C, maxWidth = 500 }) {
   return (
     <div
-      style={{ position: "fixed", inset: 0, background: C.modalOverlay, zIndex: 4000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
+      style={{ position: "fixed", inset: 0, background: C.modalOverlay, zIndex: 20000, display: "flex", alignItems: "center", justifyContent: "center", padding: "28px 20px", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
       onClick={e => { if (e.target === e.currentTarget && !disabled) onClose(); }}
     >
-      <div style={{ background: C.surfaceBase, borderRadius: 14, width: "100%", maxWidth, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(0,0,0,0.30)", border: `1px solid ${C.borderDefault}`, fontFamily: F.body, position: "relative", animation: "modalIn 0.20s cubic-bezier(0.16,1,0.3,1)", overflow: "hidden" }}>
+      <div style={{ background: C.surfaceBase, borderRadius: 14, width: "100%", maxWidth, maxHeight: "calc(100vh - 40px)", overflowY: "auto", boxShadow: "0 30px 90px rgba(0,0,0,0.42)", border: "none", fontFamily: F.body, position: "relative", animation: "modalIn 0.20s cubic-bezier(0.16,1,0.3,1)", overflow: "hidden" }}>
         <div style={{ height: "2px", background: `linear-gradient(90deg, transparent 0%, ${C.gold}80 30%, ${C.gold}80 70%, transparent 100%)` }} />
         {children}
       </div>
@@ -195,8 +195,8 @@ function ModalShell({ children, onClose, disabled, C, maxWidth = 500 }) {
 
 function ModalHeader({ eyebrow, title, onClose, disabled, C, meta }) {
   return (
-    <div style={{ background: C.headerGradient, padding: "20px 22px 18px", position: "sticky", top: 0, zIndex: 2, borderBottom: `1px solid ${C.divider}` }}>
-      <div style={{ position: "absolute", top: 14, right: 16, zIndex: 20 }}>
+    <div style={{ background: C.headerGradient, padding: "26px 28px 22px", position: "sticky", top: 0, zIndex: 2, borderBottom: `1px solid ${C.divider}` }}>
+      <div style={{ position: "absolute", top: 18, right: 20, zIndex: 20 }}>
         <CloseBtn onClick={onClose} disabled={disabled} C={C} />
       </div>
       <div style={{ paddingRight: 44 }}>
@@ -234,7 +234,7 @@ function GhostBtn({ children, onClick, disabled = false, C, style = {} }) {
 function StepIndicator({ step, C }) {
   const steps = ["Guest Count", "Details", "Confirm"];
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", marginTop: 16 }}>
+    <div style={{ display: "flex", alignItems: "flex-start", marginTop: 18 }}>
       {steps.map((label, i) => {
         const idx = i + 1; const done = step > idx; const active = step === idx;
         return (
@@ -393,7 +393,7 @@ function ModalGuestCount({ seatData, tableData, mode, onContinue, onCancel, C, i
 }
 
 // ─── MODAL 2: Details ─────────────────────────────────────────────────────────
-function ModalDetails({ tableData, seatData, mode, guests, onReview, onCancel, prefill, C, isDark, secondsLeft, onTimerExpired }) {
+function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onReview, onCancel, prefill, C, isDark, secondsLeft, onTimerExpired }) {
   const today = new Date().toISOString().split("T")[0];
   const [form, setForm] = useState({
     firstName: prefill?.firstName || "", lastName: prefill?.lastName || "",
@@ -417,6 +417,8 @@ function ModalDetails({ tableData, seatData, mode, guests, onReview, onCancel, p
   const mins = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
   const secs = String(secondsLeft % 60).padStart(2, "0");
   const isUrgent = secondsLeft <= 60;
+  const roomLabel = typeof ROOM !== "undefined" ? ROOM : "Selected Outlet";
+  const wingLabel = typeof WING !== "undefined" ? WING : "Venue";
 
   const set = k => v => {
     if (k === "phone") {
@@ -432,87 +434,94 @@ function ModalDetails({ tableData, seatData, mode, guests, onReview, onCancel, p
     form.phone.trim()     !== "" && form.phone !== "+63" &&
     form.eventDate.trim() !== "";
 
-  const seatDisplay = mode === "whole" ? getWholeSeatLabel(guests, tableData) : seatData ? `Seat ${seatData.num ?? seatData.id}` : "—";
+  const seatDisplay = mode === "whole" ? getWholeSeatLabel(guests, tableData) : seatData ? `Seat ${seatData.num ?? seatData.id}` : "-";
+  const summaryRows = [
+    ["Venue", "The Bellevue Manila"],
+    ["Outlet", roomLabel],
+    ["Wing", wingLabel],
+    ...(isStandalone || !tableData ? [] : [["Table", `Table ${tableData?.id ?? "-"}`]]),
+    ["Seat", seatDisplay],
+    ["Guests", `${guests} guest${guests !== 1 ? "s" : ""}`],
+    ["Date", form.eventDate || "Select date"],
+    ["Time", form.eventTime || "Select time"],
+  ];
+
+  const SummaryRow = ({ label, value, accent }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.divider}` }}>
+      <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: C.textTertiary }}>{label}</span>
+      <span style={{ fontFamily: F.body, fontSize: 12.5, color: accent ? C.gold : C.textPrimary, fontWeight: accent ? 700 : 560, textAlign: "right", lineHeight: 1.45, maxWidth: 170, overflowWrap: "anywhere" }}>{value}</span>
+    </div>
+  );
 
   return (
-    <ModalShell onClose={onCancel} C={C}>
-      <ModalHeader eyebrow={mode === "individual" ? "Seat Reservation" : "Table Reservation"} title="Your Information" onClose={onCancel} C={C} meta={<StepIndicator step={2} C={C} />} />
-      <div style={{ padding: "18px 24px 26px", maxHeight: "64vh", overflowY: "auto" }}>
-        {/* Timer */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 8, marginBottom: 16, background: isUrgent ? C.statusNote.rejected : C.goldFaintest, border: `1px solid ${isUrgent ? C.statusNoteBorder.rejected : C.borderAccent}` }}>
-          <div>
-            <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: isUrgent ? C.red : C.textSecondary, marginBottom: 2 }}>Seat Hold Timer</div>
-            <div style={{ fontFamily: F.body, fontSize: 11, color: isUrgent ? C.red : C.textTertiary }}>{isUrgent ? "⚠ Hold expiring soon" : "Complete before the timer expires"}</div>
+    <ModalShell onClose={onCancel} C={C} maxWidth={960}>
+      <ModalHeader eyebrow={isStandalone ? "Standalone Seat Reservation" : mode === "individual" ? "Seat Reservation" : "Table Reservation"} title="Your Information" onClose={onCancel} C={C} meta={<StepIndicator step={2} C={C} />} />
+      <div style={{ display: "grid", gridTemplateColumns: window.innerWidth < 820 ? "1fr" : "minmax(0,1fr) 280px", gap: 0, maxHeight: window.innerWidth < 820 ? "calc(100vh - 180px)" : "calc(100vh - 214px)", overflow: "hidden" }}>
+        <div style={{ padding: "28px 30px 30px", overflowY: "auto" }}>
+          <SectionLabel C={C}>Personal Information</SectionLabel>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
+            <Field label="First Name" value={form.firstName} onChange={set("firstName")} C={C} isDark={isDark} required />
+            <Field label="Last Name" value={form.lastName} onChange={set("lastName")} C={C} isDark={isDark} required />
           </div>
-          <div style={{ fontFamily: F.mono, fontSize: 20, fontWeight: 700, color: isUrgent ? C.red : C.gold, letterSpacing: "0.04em" }}>{mins}:{secs}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.25fr) minmax(0,0.75fr)", gap: 12 }}>
+            <Field label="Email Address" value={form.email} onChange={set("email")} type="email" C={C} isDark={isDark} required />
+            <Field label="Phone Number" value={form.phone} onChange={set("phone")} type="tel" C={C} isDark={isDark} required placeholder="+63XXXXXXXXXX" />
+          </div>
+
+          <SectionLabel C={C} style={{ marginTop: 8 }}>Event Details</SectionLabel>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
+            <Field label="Event Date" value={form.eventDate} onChange={set("eventDate")} type="date" min={today} C={C} isDark={isDark} required />
+            <Field label="Event Time" value={form.eventTime} onChange={set("eventTime")} type="time" C={C} isDark={isDark} />
+          </div>
+          <Field label="Special Requests (Optional)" value={form.specialRequests} onChange={set("specialRequests")} type="textarea" rows={4} C={C} isDark={isDark} placeholder="Optional requests, preferences, or notes for the reservation." />
         </div>
 
-        {/* Booking summary strip */}
-        <div style={{ display: "flex", gap: 0, marginBottom: 20, borderRadius: 8, overflow: "hidden", border: `1px solid ${C.borderDefault}` }}>
-          {[
-            ["Room", ROOM.split(" ").slice(0, 2).join(" ")],
-            ...(tableData ? [["Table", `Table ${tableData?.id ?? "—"}`]] : []),
-            ["Seat", seatDisplay],
-            ["Guests", String(guests)]
-          ].map(([label, value], i, arr) => (
-            <div key={label} style={{ flex: 1, padding: "10px 12px", background: C.surfaceInput, borderRight: i < arr.length - 1 ? `1px solid ${C.borderDefault}` : "none" }}>
-              <div style={{ fontFamily: F.label, fontSize: 8, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: C.textTertiary, marginBottom: 3 }}>{label}</div>
-              <div style={{ fontFamily: F.body, fontSize: 11, fontWeight: 600, color: label === "Seat" ? C.gold : C.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
+        <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "24px 22px 30px", overflowY: "auto" }}>
+          <div style={{ display: "grid", gap: 16 }}>
+            <div style={{ padding: "12px 14px", borderRadius: 10, background: isUrgent ? C.statusNote?.rejected || C.goldFaint : C.surfaceInput, border: `1px solid ${isUrgent ? C.statusNoteBorder?.rejected || C.borderAccent : C.borderAccent}` }}>
+              <div style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: isUrgent ? C.red : C.textSecondary, marginBottom: 3 }}>Seat Hold Timer</div>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+                <span style={{ fontSize: 11.5, color: isUrgent ? C.red : C.textTertiary }}>{isUrgent ? "Hold expiring soon" : "Complete before expiry"}</span>
+                <strong style={{ fontFamily: F.mono, fontSize: 22, color: isUrgent ? C.red : C.gold, letterSpacing: "0.04em" }}>{mins}:{secs}</strong>
+              </div>
             </div>
-          ))}
-        </div>
-
-        <SectionLabel C={C}>Personal Information</SectionLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label="First Name" value={form.firstName} onChange={set("firstName")} C={C} isDark={isDark} required />
-          <Field label="Last Name"  value={form.lastName}  onChange={set("lastName")}  C={C} isDark={isDark} required />
-        </div>
-        <Field label="Email Address" value={form.email} onChange={set("email")} type="email" C={C} isDark={isDark} required />
-        <Field label="Phone Number"  value={form.phone} onChange={set("phone")} type="tel" C={C} isDark={isDark} required placeholder="+63XXXXXXXXXX" />
-
-        <SectionLabel C={C} style={{ marginTop: 4 }}>Event Details</SectionLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label="Event Date" value={form.eventDate} onChange={set("eventDate")} type="date" min={today} C={C} isDark={isDark} required />
-          <Field label="Event Time" value={form.eventTime} onChange={set("eventTime")} type="time" C={C} isDark={isDark} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-          <Field label="Event Area" value={form.eventArea} onChange={set("eventArea")} C={C} isDark={isDark} placeholder="e.g. Ballroom foyer, stage side" />
-          <Field label="Tables Needed" value={form.setupTables} onChange={set("setupTables")} type="number" C={C} isDark={isDark} placeholder="0" />
-          <Field label="Chairs Needed" value={form.setupChairs} onChange={set("setupChairs")} type="number" C={C} isDark={isDark} placeholder="0" />
-        </div>
-        <Field label="Setup Requirements" value={form.setupRequirements} onChange={set("setupRequirements")} type="textarea" C={C} isDark={isDark} placeholder="Stage, AV, registration table, layout instructions..." />
-        <Field label="Special Requests" value={form.specialRequests} onChange={set("specialRequests")} type="textarea" C={C} isDark={isDark} placeholder="Dietary needs, accessibility, preferences…" />
-
-        <button
-          onClick={() => allFilled && onReview(form)} disabled={!allFilled}
-          style={{ width: "100%", padding: "13px", marginTop: 6, background: allFilled ? C.gold : (isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"), border: allFilled ? "none" : `1px solid ${C.borderDefault}`, borderRadius: 8, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: allFilled ? C.textOnAccent : C.textTertiary, cursor: allFilled ? "pointer" : "not-allowed", transition: "all 0.20s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-          onMouseEnter={e => { if (allFilled) e.currentTarget.style.background = C.goldLight; }}
-          onMouseLeave={e => { if (allFilled) e.currentTarget.style.background = C.gold; }}
-        >
-          Review Booking
-        </button>
+            <div>
+              <SectionLabel C={C} style={{ marginBottom: 6 }}>Reservation Summary</SectionLabel>
+              {summaryRows.map(([label, value]) => <SummaryRow key={label} label={label} value={value} accent={["Seat", "Date", "Time"].includes(label)} />)}
+            </div>
+            <button
+              onClick={() => allFilled && onReview(form)}
+              disabled={!allFilled}
+              style={{ width: "100%", padding: "13px", background: allFilled ? C.gold : C.textTertiary, border: "none", borderRadius: 8, fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: allFilled ? C.textOnAccent : C.textSecondary, cursor: allFilled ? "pointer" : "not-allowed", transition: "all 0.20s" }}
+              onMouseEnter={e => { if (allFilled) e.currentTarget.style.background = C.goldLight; }}
+              onMouseLeave={e => { if (allFilled) e.currentTarget.style.background = C.gold; }}
+            >Review Booking</button>
+            <GhostBtn onClick={onCancel} C={C}>Back to Seats</GhostBtn>
+          </div>
+        </aside>
       </div>
     </ModalShell>
   );
 }
 
+
 // ─── MODAL 3: Review ──────────────────────────────────────────────────────────
-function ModalReview({ form, guests, tableData, seatData, mode, onSubmit, onEdit, submitting, isRebook, rebookFrom, C }) {
+function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, onSubmit, onEdit, submitting, isRebook, rebookFrom, C }) {
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const fmt = t => { if (!t) return null; const [h, m] = t.split(":"); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr >= 12 ? "PM" : "AM"}`; };
-  const seatDisplay = mode === "whole" ? getWholeSeatLabel(guests, tableData) : `Seat ${seatData?.num ?? seatData?.id ?? "—"}`;
+  const roomLabel = typeof ROOM !== "undefined" ? ROOM : "Selected Outlet";
+  const wingLabel = typeof WING !== "undefined" ? WING : "Venue";
+  const seatDisplay = mode === "whole" ? getWholeSeatLabel(guests, tableData) : `Seat ${seatData?.num ?? seatData?.id ?? "-"}`;
+  const canSubmit = consentAccepted && !submitting;
 
   const reservationRows = [
     ["Venue", "The Bellevue Manila"],
-    ["Room",  `${WING} — ${ROOM}`],
-    ...(tableData ? [["Table", `Table ${tableData?.id ?? "—"}`]] : []),
+    ["Room", `${wingLabel} - ${roomLabel}`],
+    ...(isStandalone || !tableData ? [] : [["Table", `Table ${tableData?.id ?? "-"}`]]),
     ["Seat(s)", seatDisplay],
     ["Guests", `${guests} guest${guests !== 1 ? "s" : ""}`],
-    ["Event Date", form.eventDate || "—"],
-    ["Event Time", form.eventTime ? fmt(form.eventTime) : "—"],
-    ...(form.eventArea ? [["Event Area", form.eventArea]] : []),
-    ...(form.setupTables ? [["Tables Needed", form.setupTables]] : []),
-    ...(form.setupChairs ? [["Chairs Needed", form.setupChairs]] : []),
-    ...(form.setupRequirements ? [["Setup Requirements", form.setupRequirements]] : []),
+    ["Event Date", form.eventDate || "-"],
+    ["Event Time", form.eventTime ? fmt(form.eventTime) : "-"],
   ];
   const guestRows = [
     ["Full Name", `${form.firstName} ${form.lastName}`],
@@ -522,47 +531,67 @@ function ModalReview({ form, guests, tableData, seatData, mode, onSubmit, onEdit
   ];
 
   const Row = ({ label, value, accent }) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "9px 0", borderBottom: `1px solid ${C.divider}` }}>
-      <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary, minWidth: 90, flexShrink: 0 }}>{label}</span>
-      <span style={{ fontFamily: F.body, fontSize: 12.5, color: accent ? C.gold : C.textPrimary, fontWeight: accent ? 700 : 500, textAlign: "right", maxWidth: 260, lineHeight: 1.5 }}>{value}</span>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.divider}` }}>
+      <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary, minWidth: 96, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontFamily: F.body, fontSize: 12.5, color: accent ? C.gold : C.textPrimary, fontWeight: accent ? 720 : 520, textAlign: "right", maxWidth: 300, lineHeight: 1.5, overflowWrap: "anywhere" }}>{value}</span>
     </div>
   );
 
   return (
-    <ModalShell onClose={onEdit} disabled={submitting} C={C}>
-      <ModalHeader eyebrow={isRebook ? "Rebook / Move Seat" : mode === "individual" ? "Seat Reservation" : "Table Reservation"} title="Review Your Booking" onClose={onEdit} disabled={submitting} C={C} meta={<StepIndicator step={3} C={C} />} />
-      <div style={{ padding: "20px 24px 26px", maxHeight: "64vh", overflowY: "auto" }}>
-        {isRebook && rebookFrom && (
-          <div style={{ padding: "11px 14px", borderRadius: 8, marginBottom: 18, background: C.statusNote.pending, border: `1px solid ${C.statusNoteBorder.pending}`, fontSize: 12, color: C.gold, lineHeight: 1.65 }}>
-            <strong style={{ color: C.gold }}>Rebooking notice:</strong> Previous reservation{" "}
-            <strong>{rebookFrom.reference_code || rebookFrom.id}</strong> will be cancelled on submit.
+    <ModalShell onClose={onEdit} disabled={submitting} C={C} maxWidth={960}>
+      <ModalHeader eyebrow={isRebook ? "Rebook / Move Seat" : isStandalone ? "Standalone Seat Reservation" : mode === "individual" ? "Seat Reservation" : "Table Reservation"} title="Review Your Booking" onClose={onEdit} disabled={submitting} C={C} meta={<StepIndicator step={3} C={C} />} />
+      <div style={{ display: "grid", gridTemplateColumns: window.innerWidth < 820 ? "1fr" : "minmax(0,1fr) 300px", gap: 0, maxHeight: window.innerWidth < 820 ? "calc(100vh - 180px)" : "calc(100vh - 214px)", overflow: "hidden" }}>
+        <div style={{ padding: "28px 30px 30px", overflowY: "auto" }}>
+          {isRebook && rebookFrom && (
+            <div style={{ padding: "11px 14px", borderRadius: 8, marginBottom: 18, background: C.statusNote?.pending || C.goldFaintest, border: `1px solid ${C.statusNoteBorder?.pending || C.borderAccent}`, fontSize: 12, color: C.gold, lineHeight: 1.65 }}>
+              <strong style={{ color: C.gold }}>Rebooking notice:</strong> Previous reservation <strong>{rebookFrom.reference_code || rebookFrom.id}</strong> will be cancelled on submit.
+            </div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: window.innerWidth < 820 ? "1fr" : "repeat(2,minmax(0,1fr))", gap: 18 }}>
+            <div>
+              <SectionLabel C={C}>Reservation Details</SectionLabel>
+              {reservationRows.map(([k, v]) => <Row key={k} label={k} value={v} accent={k === "Seat(s)" || k === "Event Date" || k === "Event Time"} />)}
+            </div>
+            <div>
+              <SectionLabel C={C}>Guest Information</SectionLabel>
+              {guestRows.map(([k, v]) => <Row key={k} label={k} value={v} />)}
+            </div>
           </div>
-        )}
-        <SectionLabel C={C}>Reservation Details</SectionLabel>
-        {reservationRows.map(([k, v]) => <Row key={k} label={k} value={v} accent={k === "Seat(s)"} />)}
-        <SectionLabel C={C} style={{ marginTop: 18 }}>Guest Information</SectionLabel>
-        {guestRows.map(([k, v]) => <Row key={k} label={k} value={v} />)}
-        <div style={{ padding: "10px 14px", borderRadius: 8, margin: "18px 0 20px", background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, fontSize: 11.5, color: C.textSecondary, lineHeight: 1.65 }}>
-          Your booking will be <strong style={{ color: C.textPrimary }}>reviewed by our team</strong> upon submission.
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onEdit} disabled={submitting}
-            style={{ flex: 1, padding: "12px", border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: "transparent", color: C.textSecondary, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: submitting ? "not-allowed" : "pointer", transition: "all 0.18s" }}
-            onMouseEnter={e => { if (!submitting) { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.color = C.gold; } }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.color = C.textSecondary; }}
-          >Edit Details</button>
-          <button onClick={onSubmit} disabled={submitting}
-            style={{ flex: 2, padding: "12px", border: "none", borderRadius: 8, background: submitting ? C.textSecondary : C.gold, color: C.textOnAccent, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: submitting ? "not-allowed" : "pointer", transition: "all 0.18s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-            onMouseEnter={e => { if (!submitting) e.currentTarget.style.background = C.goldLight; }}
-            onMouseLeave={e => { if (!submitting) e.currentTarget.style.background = C.gold; }}
-          >
-            {submitting ? <><Spinner C={C} />Submitting…</> : isRebook ? "Confirm Rebook" : "Submit Booking"}
-          </button>
-        </div>
+
+        <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "24px 22px 30px", overflowY: "auto" }}>
+          <div style={{ display: "grid", gap: 16 }}>
+            <div style={{ padding: "12px 14px", borderRadius: 10, background: C.surfaceInput, border: `1px solid ${C.borderAccent}` }}>
+              <div style={{ fontFamily: F.label, fontSize: 8.5, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, fontWeight: 800, marginBottom: 8 }}>Final Review</div>
+              <div style={{ fontSize: 12.5, color: C.textSecondary, lineHeight: 1.6 }}>Your booking will be reviewed by our team after submission. You will receive the final reservation status through the provided contact details.</div>
+            </div>
+
+            <label style={{ display: "grid", gridTemplateColumns: "18px minmax(0,1fr)", gap: 10, alignItems: "flex-start", padding: "14px 15px", borderRadius: 10, background: consentAccepted ? C.goldFaint : C.surfaceInput, border: `1px solid ${consentAccepted ? C.borderAccent : C.borderDefault}`, cursor: submitting ? "not-allowed" : "pointer" }}>
+              <input type="checkbox" checked={consentAccepted} disabled={submitting} onChange={(e) => setConsentAccepted(e.target.checked)} style={{ marginTop: 2, width: 15, height: 15, accentColor: C.gold }} />
+              <span style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.65 }}>
+                I acknowledge and consent to the collection and processing of my personal information for reservation management and operational communication purposes.
+              </span>
+            </label>
+
+            <div style={{ fontSize: 11.5, color: C.textTertiary, lineHeight: 1.6 }}>
+              Personal details are used to process the reservation, coordinate operational requirements, and contact the guest regarding reservation status.
+            </div>
+
+            <button onClick={onSubmit} disabled={!canSubmit}
+              style={{ width: "100%", padding: "13px", border: "none", borderRadius: 8, background: canSubmit ? C.gold : C.textTertiary, color: canSubmit ? C.textOnAccent : C.textSecondary, fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", cursor: canSubmit ? "pointer" : "not-allowed", transition: "all 0.18s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+              onMouseEnter={e => { if (canSubmit) e.currentTarget.style.background = C.goldLight; }}
+              onMouseLeave={e => { if (canSubmit) e.currentTarget.style.background = C.gold; }}
+            >
+              {submitting ? <><Spinner C={C} />Submitting...</> : isRebook ? "Confirm Rebook" : "Submit Booking"}
+            </button>
+            <GhostBtn onClick={onEdit} disabled={submitting} C={C}>Edit Details</GhostBtn>
+          </div>
+        </aside>
       </div>
     </ModalShell>
   );
 }
+
 
 // ─── QR Code ──────────────────────────────────────────────────────────────────
 function QRCodeWithRef({ value, size = 120, imgRef }) {
