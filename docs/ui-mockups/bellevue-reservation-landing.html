@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Bellevue Manila - Seat & Table Reservations</title>
+    <style>
+      :root {
+        --ink: #171310;
+        --muted: #786f66;
+        --panel: rgba(255, 252, 246, 0.82);
+        --line: rgba(102, 82, 49, 0.18);
+        --gold: #b89454;
+        --gold-soft: rgba(184, 148, 84, 0.28);
+        --cream: #f7f0e4;
+        --ivory: #fffaf1;
+        --charcoal: #181412;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #15110f;
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+      }
+
+      .screen {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(320px, 34%) 1fr;
+        gap: clamp(22px, 2.5vw, 42px);
+        width: 100vw;
+        height: 100vh;
+        padding: clamp(26px, 3vw, 48px);
+        background:
+          radial-gradient(circle at 14% 12%, rgba(218, 183, 112, 0.18), transparent 30%),
+          radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.5), transparent 28%),
+          linear-gradient(120deg, #1e1714 0%, #2a211d 33%, #f6efe5 33.2%, #fff9ef 100%);
+      }
+
+      .brand-panel {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 0;
+        padding: clamp(28px, 3.1vw, 54px);
+        overflow: hidden;
+        color: #fff7ea;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 32px;
+        background:
+          linear-gradient(160deg, rgba(255, 255, 255, 0.08), transparent 34%),
+          linear-gradient(180deg, rgba(23, 18, 15, 0.94), rgba(12, 10, 9, 0.98));
+        box-shadow: 0 26px 70px rgba(0, 0, 0, 0.36);
+      }
+
+      .brand-panel::before {
+        position: absolute;
+        inset: -18% -48% auto auto;
+        width: 82%;
+        height: 42%;
+        content: "";
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(191, 151, 82, 0.26), transparent 72%);
+        filter: blur(2px);
+      }
+
+      .brand-mark {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: rgba(255, 248, 235, 0.86);
+      }
+
+      .brand-symbol {
+        display: grid;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        border: 1px solid rgba(218, 182, 108, 0.48);
+        border-radius: 50%;
+        color: #e8c37a;
+        font-family: Georgia, serif;
+        font-size: 1.15rem;
+      }
+
+      .intro {
+        position: relative;
+        max-width: 430px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 22px;
+        color: rgba(235, 202, 142, 0.86);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        display: block;
+        width: 36px;
+        height: 1px;
+        content: "";
+        background: currentColor;
+      }
+
+      h1 {
+        max-width: 390px;
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(2.65rem, 4.5vw, 5.15rem);
+        font-weight: 500;
+        line-height: 0.94;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        max-width: 360px;
+        margin: 24px 0 0;
+        color: rgba(255, 249, 237, 0.74);
+        font-size: clamp(0.96rem, 1vw, 1.08rem);
+        line-height: 1.7;
+      }
+
+      .helper {
+        position: relative;
+        display: grid;
+        gap: 14px;
+        max-width: 360px;
+        padding-top: 26px;
+        border-top: 1px solid rgba(255, 255, 255, 0.11);
+      }
+
+      .helper strong {
+        color: #fff8e9;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(1.05rem, 1.15vw, 1.28rem);
+        font-weight: 500;
+      }
+
+      .helper span {
+        color: rgba(255, 249, 237, 0.62);
+        font-size: 0.9rem;
+        line-height: 1.55;
+      }
+
+      .launcher {
+        display: flex;
+        min-width: 0;
+        min-height: 0;
+        flex-direction: column;
+        gap: clamp(18px, 1.55vw, 24px);
+        padding: clamp(20px, 1.8vw, 30px);
+        border: 1px solid rgba(104, 82, 45, 0.16);
+        border-radius: 34px;
+        background:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.66), rgba(255, 248, 236, 0.78)),
+          rgba(255, 252, 245, 0.8);
+        box-shadow: 0 26px 80px rgba(65, 45, 21, 0.16);
+        backdrop-filter: blur(18px);
+      }
+
+      .launcher > div {
+        min-height: 0;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+
+      .section-title {
+        margin: 0;
+        color: #221a15;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(1.45rem, 1.65vw, 2.05rem);
+        font-weight: 500;
+        line-height: 1;
+      }
+
+      .section-note {
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .dining-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: clamp(15px, 1.35vw, 21px);
+      }
+
+      .event-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: clamp(14px, 1.15vw, 18px);
+      }
+
+      .venue-card {
+        position: relative;
+        display: grid;
+        min-width: 0;
+        overflow: hidden;
+        cursor: pointer;
+        border: 1px solid rgba(255, 244, 219, 0.34);
+        border-radius: 24px;
+        background: #1b1410;
+        box-shadow: 0 16px 42px rgba(66, 44, 21, 0.14);
+        transition:
+          transform 220ms ease,
+          border-color 220ms ease,
+          box-shadow 220ms ease;
+      }
+
+      .venue-card::after {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        content: "";
+        border-radius: inherit;
+        opacity: 0;
+        box-shadow: inset 0 0 0 1px rgba(218, 182, 108, 0.5);
+        transition: opacity 220ms ease;
+      }
+
+      .venue-card:hover,
+      .venue-card:focus-visible {
+        transform: translateY(-5px);
+        border-color: rgba(184, 148, 84, 0.56);
+        box-shadow: 0 24px 54px rgba(69, 45, 20, 0.2), 0 0 0 5px rgba(184, 148, 84, 0.08);
+        outline: none;
+      }
+
+      .venue-card:hover::after,
+      .venue-card:focus-visible::after {
+        opacity: 1;
+      }
+
+      .venue-card:active {
+        transform: translateY(-2px) scale(0.99);
+      }
+
+      .dining-card {
+        min-height: clamp(238px, 27vh, 304px);
+      }
+
+      .venue-card .media {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+      }
+
+      .venue-bg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: saturate(0.96) contrast(0.98);
+        transition: transform 360ms ease, filter 360ms ease;
+      }
+
+      .venue-card:hover .venue-bg,
+      .venue-card:focus-visible .venue-bg {
+        transform: scale(1.055);
+        filter: saturate(1.05) contrast(1.02);
+      }
+
+      .venue-card .media::after {
+        position: absolute;
+        inset: 0;
+        content: "";
+        background:
+          linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.15) 36%, rgba(13, 9, 7, 0.86) 100%),
+          linear-gradient(90deg, rgba(0, 0, 0, 0.4), transparent 62%);
+      }
+
+      .logo-badge {
+        position: absolute;
+        z-index: 2;
+        top: 16px;
+        left: 16px;
+        display: grid;
+        width: clamp(82px, 6.6vw, 116px);
+        height: clamp(62px, 5.2vw, 86px);
+        place-items: center;
+        padding: 10px;
+        border: 1px solid rgba(255, 243, 218, 0.54);
+        border-radius: 18px;
+        background: rgba(255, 250, 239, 0.82);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+        backdrop-filter: blur(12px);
+      }
+
+      .logo-badge img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+      }
+
+      .event-card {
+        min-height: clamp(178px, 19.4vh, 224px);
+      }
+
+      .card-copy {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        min-height: 100%;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-self: stretch;
+        padding: clamp(18px, 1.35vw, 24px);
+      }
+
+      .venue-name {
+        margin: 0;
+        color: #fff8eb;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(1.1rem, 1.18vw, 1.36rem);
+        font-weight: 600;
+        line-height: 1.06;
+        text-shadow: 0 3px 18px rgba(0, 0, 0, 0.56);
+      }
+
+      .dining-card .venue-name {
+        max-width: 92%;
+        font-size: clamp(1.32rem, 1.58vw, 1.86rem);
+      }
+
+      .event-card .card-copy {
+        padding: clamp(16px, 1.18vw, 21px);
+      }
+
+      .event-card .venue-name {
+        max-width: 96%;
+        font-size: clamp(1.02rem, 1.06vw, 1.24rem);
+      }
+
+      .subspaces {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      .chip {
+        display: inline-flex;
+        min-width: 24px;
+        height: 22px;
+        align-items: center;
+        justify-content: center;
+        padding: 0 8px;
+        border: 1px solid rgba(255, 235, 196, 0.42);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.13);
+        color: rgba(255, 248, 233, 0.86);
+        font-size: 0.68rem;
+        font-weight: 700;
+      }
+
+      .event-card:not(.has-subspaces) .subspaces {
+        display: none;
+      }
+
+      @media (max-width: 1180px) {
+        .screen {
+          grid-template-columns: 32% 1fr;
+          padding: 24px;
+        }
+
+        .brand-panel {
+          padding: 30px;
+        }
+
+        .launcher {
+          padding: 22px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="screen" aria-label="The Bellevue Manila Seat and Table Reservation launcher">
+      <section class="brand-panel" aria-labelledby="reservation-title">
+        <div class="brand-mark">
+          <span class="brand-symbol">B</span>
+          <span>The Bellevue Manila</span>
+        </div>
+
+        <div class="intro">
+          <span class="eyebrow">Concierge Booking</span>
+          <h1 id="reservation-title">Seat &amp; Table Reservations</h1>
+          <p class="lead">
+            A refined reservation gateway for dining outlets, function rooms, and signature hotel venues.
+          </p>
+        </div>
+
+        <p class="helper">
+          <strong>Select a venue to begin.</strong>
+          <span>Select a dining outlet or event venue to begin your reservation.</span>
+        </p>
+      </section>
+
+      <section class="launcher" aria-label="Reservation venue choices">
+        <div>
+          <div class="section-head">
+            <h2 class="section-title">Dining Outlets</h2>
+            <span class="section-note">Click a card to reserve</span>
+          </div>
+
+          <div class="dining-grid">
+            <article class="venue-card dining-card" role="button" tabindex="0" aria-label="Reserve Hanakazu Japanese Restaurant">
+              <div class="media">
+                <img class="venue-bg" src="bellevue-reservation-assets/hanakazu-dining.jpg" alt="Hanakazu Japanese Restaurant dining room" />
+              </div>
+              <div class="logo-badge" aria-hidden="true">
+                <img src="bellevue-reservation-assets/hanakazu.png" alt="" />
+              </div>
+              <div class="card-copy">
+                <h3 class="venue-name">Hanakazu Japanese Restaurant</h3>
+              </div>
+            </article>
+
+            <article class="venue-card dining-card" role="button" tabindex="0" aria-label="Reserve Qsina Restaurant">
+              <div class="media">
+                <img class="venue-bg" src="bellevue-reservation-assets/qsina-dining.jpg" alt="Qsina Restaurant dining room" />
+              </div>
+              <div class="logo-badge" aria-hidden="true">
+                <img src="bellevue-reservation-assets/qsina.jpeg" alt="" />
+              </div>
+              <div class="card-copy">
+                <h3 class="venue-name">Qsina Restaurant</h3>
+              </div>
+            </article>
+
+            <article class="venue-card dining-card" role="button" tabindex="0" aria-label="Reserve Phoenix Court">
+              <div class="media">
+                <img class="venue-bg" src="bellevue-reservation-assets/phoenix-court-dining.webp" alt="Phoenix Court dining room" />
+              </div>
+              <div class="logo-badge" aria-hidden="true">
+                <img src="bellevue-reservation-assets/phoenix-court.webp" alt="" />
+              </div>
+              <div class="card-copy">
+                <h3 class="venue-name">Phoenix Court</h3>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-head">
+            <h2 class="section-title">Events &amp; Function Venues</h2>
+            <span class="section-note">Rooms remain inside the card</span>
+          </div>
+
+          <div class="event-grid">
+            <article class="venue-card event-card" role="button" tabindex="0" aria-label="Reserve Alabang Function Room">
+              <div class="media">
+                <img class="venue-bg" src="bellevue-reservation-assets/alabangroom-2.jpg" alt="Alabang Function Room" />
+              </div>
+              <div class="card-copy">
+                <h3 class="venue-name">Alabang Function Room</h3>
+                <div class="subspaces" aria-hidden="true"></div>
+              </div>
+            </article>
+
+            <article class="venue-card event-card has-subspaces" role="button" tabindex="0" aria-label="Reserve Laguna Ballroom">
+              <div class="media">
+                <img class="venue-bg" src="bellevue-reservation-assets/lagunaroom-1.jpg" alt="Laguna Ballroom" />
+              </div>
+              <div class="card-copy">
+                <h3 class="venue-name">Laguna Ballroom</h3>
+                <div class="subspaces" aria-hidden="true">
+                  <span class="chip">1</span>
+                  <span class="chip">2</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="venue-card event-card has-subspaces" role="button" tabindex="0" aria-label="Reserve 20/20 Function Room">
+              <div class="media">
+                <img class="venue-bg" src="bellevue-reservation-assets/2020-1.jpg" alt="20/20 Function Room" />
+              </div>
+              <div class="card-copy">
+                <h3 class="venue-name">20/20 Function Room</h3>
+                <div class="subspaces" aria-hidden="true">
+                  <span class="chip">A</span>
+                  <span class="chip">B</span>
+                  <span class="chip">C</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="venue-card event-card" role="button" tabindex="0" aria-label="Reserve Grand Ballroom">
+              <div class="media">
+                <img class="venue-bg" src="bellevue-reservation-assets/grandroom-1.jpg" alt="Grand Ballroom" />
+              </div>
+              <div class="card-copy">
+                <h3 class="venue-name">Grand Ballroom</h3>
+                <div class="subspaces" aria-hidden="true"></div>
+              </div>
+            </article>
+
+            <article class="venue-card event-card" role="button" tabindex="0" aria-label="Reserve Tower Ballroom">
+              <div class="media">
+                <img class="venue-bg" src="bellevue-reservation-assets/towerroom-2.jpg" alt="Tower Ballroom" />
+              </div>
+              <div class="card-copy">
+                <h3 class="venue-name">Tower Ballroom</h3>
+                <div class="subspaces" aria-hidden="true"></div>
+              </div>
+            </article>
+
+            <article class="venue-card event-card" role="button" tabindex="0" aria-label="Reserve Business Center">
+              <div class="media">
+                <img class="venue-bg" src="bellevue-reservation-assets/businesscenter-1.jpg" alt="Business Center" />
+              </div>
+              <div class="card-copy">
+                <h3 class="venue-name">Business Center</h3>
+                <div class="subspaces" aria-hidden="true"></div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

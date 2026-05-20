@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import HomePage from "../features/client/pages/HomePage";
-import VenuesPage from "../features/client/pages/VenuesPage";
+import ReservationLanding from "../features/client/pages/ReservationLanding";
 import ManageBooking from "../features/client/pages/ManageBooking";
 import AlabangReserve from "../features/client/pages/MainWing/AlabangReserve";
 import LagunaReserv1e from "../features/client/pages/MainWing/LagunaReserv1e";
@@ -50,8 +49,8 @@ export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<><Navbar /><HomePage /></>} />
-        <Route path="/venues" element={<VenuesPage />} />
+        <Route path="/" element={<ReservationLanding />} />
+        <Route path="/venues" element={<ReservationLanding />} />
         <Route path="/manage-booking" element={<ManageBooking />} />
         <Route path="/alabang-reserve" element={<><SharedNavbar /><AlabangReserve /></>} />
         <Route path="/laguna-reserv1e" element={<><SharedNavbar /><LagunaReserv1e /></>} />
