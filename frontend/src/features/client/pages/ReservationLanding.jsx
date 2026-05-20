@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import bellevueLogo from "../../../assets/bellevue-logo.png";
 import hanakazuImg from "../../../assets/hanakazu.jpeg";
@@ -6,7 +6,7 @@ import qsinaImg from "../../../assets/qsina.jpeg";
 import phoenixCourtImg from "../../../assets/phoenix-court.jpeg";
 import hanakazuLogo from "../../../assets/hanakazu-logo-enhanced.png";
 import qsinaLogo from "../../../assets/qsina-logo-enhanced.png";
-import phoenixCourtLogo from "../../../assets/phoenix-court-logo.webp";
+import phoenixCourtLogo from "../../../assets/phoenix-court-logo-enhanced.png";
 import alabangImg from "../../../assets/afc.jpeg";
 import lagunaImg from "../../../assets/laguna.jpeg";
 import twentyTwentyImg from "../../../assets/20-20.jpeg";
@@ -90,7 +90,7 @@ const eventVenues = [
   },
 ];
 
-function VenueCard({ item, variant = "event" }) {
+function VenueCard({ item, variant = "event", isInteractive = true }) {
   const navigate = useNavigate();
 
   return (
@@ -111,6 +111,7 @@ function VenueCard({ item, variant = "event" }) {
         className="reservation-card__hitarea"
         onClick={() => navigate(item.route)}
         aria-label={`Reserve ${item.title}`}
+        tabIndex={isInteractive ? 0 : -1}
       />
 
       {variant === "dining" && (
@@ -123,24 +124,146 @@ function VenueCard({ item, variant = "event" }) {
         </span>
       )}
 
-      <span className="reservation-card__title">{item.title}</span>
+      <div className="reservation-card__meta">
+        <span className="reservation-card__title">{item.title}</span>
 
-      {item.rooms?.length > 0 && (
-        <span className="reservation-card__rooms" aria-label={`${item.title} rooms`}>
-          {item.rooms.map((room) => (
-            <button
-              key={room.route}
-              type="button"
-              className="reservation-card__room"
-              onClick={() => navigate(room.route)}
-              aria-label={`Reserve ${item.title} ${room.label}`}
-            >
-              {room.label}
-            </button>
-          ))}
-        </span>
-      )}
+        {item.rooms?.length > 0 && (
+          <span className="reservation-card__rooms" aria-label={`${item.title} rooms`}>
+            {item.rooms.map((room) => (
+              <button
+                key={room.route}
+                type="button"
+                className="reservation-card__room"
+                onClick={() => navigate(room.route)}
+                aria-label={`Reserve ${item.title} ${room.label}`}
+                tabIndex={isInteractive ? 0 : -1}
+              >
+                {room.label}
+              </button>
+            ))}
+          </span>
+        )}
+      </div>
     </article>
+  );
+}
+
+function DiningCarousel({ items }) {
+  const viewportRef = useRef(null);
+  const [slideIndex, setSlideIndex] = useState(items.length);
+  const [isAnimating, setIsAnimating] = useState(true);
+  const [metrics, setMetrics] = useState({
+    cardWidth: 470,
+    gap: 18,
+    visibleCards: 2.08,
+    viewportWidth: 1030,
+    edgePadding: 14,
+  });
+  const loopedItems = [...items, ...items, ...items];
+  const slideStep = metrics.cardWidth + metrics.gap;
+  const centeredOffset = (metrics.viewportWidth - metrics.cardWidth) / 2 - metrics.edgePadding;
+
+  useEffect(() => {
+    const updateMetrics = () => {
+      const viewport = viewportRef.current;
+      const width = viewport?.clientWidth || 0;
+      const viewportWidth = window.innerWidth;
+      const viewportStyles = viewport ? window.getComputedStyle(viewport) : null;
+      const edgePadding = Number.parseFloat(viewportStyles?.paddingLeft || "0") || 0;
+      const visibleCards = viewportWidth <= 720 ? 1.08 : viewportWidth <= 980 ? 1.48 : 2.08;
+      const gap = viewportWidth <= 720 ? 12 : viewportWidth <= 980 ? 16 : 18;
+      const minimumWidth = viewportWidth <= 720 ? 260 : viewportWidth <= 980 ? 340 : 420;
+      const cardWidth = Math.max(minimumWidth, (width - gap * (visibleCards - 1)) / visibleCards);
+
+      setMetrics({ cardWidth, gap, visibleCards, viewportWidth: width, edgePadding });
+    };
+
+    updateMetrics();
+    window.addEventListener("resize", updateMetrics);
+    return () => window.removeEventListener("resize", updateMetrics);
+  }, []);
+
+  const moveCarousel = (direction) => {
+    setIsAnimating(true);
+    setSlideIndex((current) => current + direction);
+  };
+
+  const handleTransitionEnd = () => {
+    const itemCount = items.length;
+
+    if (slideIndex >= itemCount * 2) {
+      setIsAnimating(false);
+      setSlideIndex(slideIndex - itemCount);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setIsAnimating(true));
+      });
+    }
+
+    if (slideIndex < itemCount) {
+      setIsAnimating(false);
+      setSlideIndex(slideIndex + itemCount);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setIsAnimating(true));
+      });
+    }
+  };
+
+  return (
+    <div className="reservation-carousel" role="region" aria-roledescription="carousel" aria-label="Dining outlets carousel">
+      <button
+        type="button"
+        className="reservation-carousel__control reservation-carousel__control--prev"
+        onClick={() => moveCarousel(-1)}
+        aria-label="Show previous dining outlet"
+      >
+        <span aria-hidden="true">&lsaquo;</span>
+      </button>
+
+      <div className="reservation-carousel__viewport" ref={viewportRef}>
+        <div
+          className="reservation-carousel__track"
+          onTransitionEnd={handleTransitionEnd}
+          style={{
+            gap: `${metrics.gap}px`,
+            transform: `translate3d(${centeredOffset - slideIndex * slideStep}px, 0, 0)`,
+            transition: isAnimating ? "transform 560ms cubic-bezier(0.22, 1, 0.36, 1)" : "none",
+          }}
+        >
+          {loopedItems.map((outlet, index) => {
+            const offsetFromActive = index - slideIndex;
+            const distanceFromActive = Math.abs(offsetFromActive);
+            const slideState =
+              distanceFromActive === 0
+                ? "is-active"
+                : distanceFromActive === 1
+                  ? `is-near ${offsetFromActive < 0 ? "is-before" : "is-after"}`
+                  : "is-dimmed";
+            const isVisibleSlide = distanceFromActive <= 2;
+            const isInteractiveSlide = distanceFromActive <= 1;
+
+            return (
+              <div
+                className={`reservation-carousel__slide ${slideState}`}
+                key={`${outlet.title}-${index}`}
+                style={{ flexBasis: `${metrics.cardWidth}px` }}
+                aria-hidden={!isVisibleSlide}
+              >
+                <VenueCard item={outlet} variant="dining" isInteractive={isInteractiveSlide} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        className="reservation-carousel__control reservation-carousel__control--next"
+        onClick={() => moveCarousel(1)}
+        aria-label="Show next dining outlet"
+      >
+        <span aria-hidden="true">&rsaquo;</span>
+      </button>
+    </div>
   );
 }
 
@@ -152,19 +275,7 @@ export default function ReservationLanding() {
   return (
     <main className="reservation-launcher" data-theme={theme}>
       <header className="reservation-topbar">
-        <button
-          type="button"
-          className="reservation-topbar__brand"
-          onClick={() => navigate("/")}
-          aria-label="The Bellevue Manila reservation home"
-        >
-          <img src={bellevueLogo} alt="" />
-        </button>
-
         <nav className="reservation-topbar__nav" aria-label="Reservation quick navigation">
-          <button type="button" onClick={() => navigate("/manage-booking")}>
-            Manage Booking
-          </button>
           <button
             type="button"
             className="reservation-theme-toggle"
@@ -181,6 +292,14 @@ export default function ReservationLanding() {
       <div className="reservation-shell">
         <section className="reservation-hero" aria-label="Bellevue reservation introduction">
           <div className="reservation-hero__content">
+            <button
+              type="button"
+              className="reservation-hero__brand"
+              onClick={() => navigate("/")}
+              aria-label="The Bellevue Manila reservation home"
+            >
+              <img src={bellevueLogo} alt="" />
+            </button>
             <div className="reservation-eyebrow">Concierge Booking</div>
             <h1>
               Seat &amp;
@@ -193,6 +312,13 @@ export default function ReservationLanding() {
               A refined reservation gateway for dining outlets, function rooms,
               and signature hotel venues.
             </p>
+            <button
+              type="button"
+              className="reservation-hero__manage"
+              onClick={() => navigate("/manage-booking")}
+            >
+              Manage Existing Booking
+            </button>
           </div>
 
           <div className="reservation-hero__footer">
@@ -208,14 +334,9 @@ export default function ReservationLanding() {
                 <span className="reservation-section__kicker">Dining Reservation</span>
                 <h2>Dining Outlets</h2>
               </div>
-              <span>Click a card to reserve</span>
             </div>
 
-            <div className="reservation-grid reservation-grid--dining">
-              {diningOutlets.map((outlet) => (
-                <VenueCard key={outlet.title} item={outlet} variant="dining" />
-              ))}
-            </div>
+            <DiningCarousel items={diningOutlets} />
           </div>
 
           <div className="reservation-section reservation-section--events">
@@ -224,7 +345,6 @@ export default function ReservationLanding() {
                 <span className="reservation-section__kicker">Event Reservation</span>
                 <h2>Events &amp; Function Venues</h2>
               </div>
-              <span>Rooms remain inside the card</span>
             </div>
 
             <div className="reservation-grid reservation-grid--events">
@@ -260,6 +380,7 @@ export default function ReservationLanding() {
           color: var(--cream);
           font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
           box-sizing: border-box;
+          font-size: 14px;
           transition: background 0.35s ease, color 0.35s ease;
           animation: reservationSceneIn 0.58s ease both;
         }
@@ -274,7 +395,7 @@ export default function ReservationLanding() {
         .reservation-topbar {
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          justify-content: flex-end;
           gap: 18px;
           min-width: 0;
           padding: 7px 10px 7px 12px;
@@ -291,30 +412,11 @@ export default function ReservationLanding() {
           background: rgba(255, 252, 246, 0.74);
         }
 
-        .reservation-topbar__brand,
         .reservation-topbar__nav button {
           font: inherit;
           border: 0;
           background: transparent;
           color: inherit;
-        }
-
-        .reservation-topbar__brand {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          min-width: 0;
-          cursor: pointer;
-        }
-
-        .reservation-topbar__brand img {
-          width: 34px;
-          height: 34px;
-          object-fit: contain;
-          padding: 6px;
-          border: 1px solid rgba(196, 163, 90, 0.48);
-          border-radius: 12px;
-          background: rgba(16, 12, 8, 0.28);
         }
 
         .reservation-topbar__nav button {
@@ -444,13 +546,43 @@ export default function ReservationLanding() {
           animation: reservationTextIn 0.68s ease 0.24s both;
         }
 
+        .reservation-hero__brand {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 58px;
+          height: 58px;
+          margin-bottom: clamp(24px, 4vh, 46px);
+          border: 1px solid rgba(196, 163, 90, 0.48);
+          border-radius: 14px;
+          background: rgba(255, 250, 241, 0.055);
+          box-shadow: 0 18px 32px rgba(0,0,0,0.22), inset 0 0 0 1px rgba(255, 250, 241, 0.035);
+          cursor: pointer;
+          transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+        }
+
+        .reservation-hero__brand img {
+          width: 42px;
+          height: 42px;
+          object-fit: contain;
+          filter: drop-shadow(0 8px 16px rgba(0,0,0,0.24));
+        }
+
+        .reservation-hero__brand:hover,
+        .reservation-hero__brand:focus-visible {
+          background: rgba(196, 163, 90, 0.13);
+          box-shadow: 0 22px 42px rgba(0,0,0,0.26), 0 0 0 1px rgba(196, 163, 90, 0.18);
+          transform: translateY(-1px);
+          outline: none;
+        }
+
         .reservation-eyebrow {
           display: flex;
           align-items: center;
           gap: 12px;
           margin-bottom: clamp(16px, 2vh, 26px);
           color: var(--gold-soft);
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 700;
           letter-spacing: 0.24em;
           text-transform: uppercase;
@@ -467,7 +599,7 @@ export default function ReservationLanding() {
         .reservation-hero h1 {
           margin: 0;
           font-family: "Playfair Display", Georgia, serif;
-          font-size: clamp(48px, 4.1vw, 72px);
+          font-size: clamp(44px, 3.75vw, 64px);
           line-height: 0.95;
           letter-spacing: -0.035em;
           font-weight: 540;
@@ -478,8 +610,37 @@ export default function ReservationLanding() {
           margin: clamp(18px, 2.4vh, 28px) 0 0;
           max-width: 360px;
           color: rgba(255, 248, 236, 0.84);
-          font-size: clamp(13px, 0.95vw, 16px);
+          font-size: clamp(13px, 0.82vw, 14px);
           line-height: 1.7;
+        }
+
+        .reservation-hero__manage {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 38px;
+          margin-top: clamp(18px, 2.4vh, 26px);
+          border: 1px solid rgba(196, 163, 90, 0.42);
+          border-radius: 10px;
+          padding: 0 16px;
+          background: rgba(255, 250, 241, 0.045);
+          color: rgba(255, 250, 241, 0.88);
+          font: inherit;
+          font-size: 10px;
+          font-weight: 760;
+          letter-spacing: 0.13em;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: background 0.22s ease, color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+        }
+
+        .reservation-hero__manage:hover,
+        .reservation-hero__manage:focus-visible {
+          background: rgba(196, 163, 90, 0.16);
+          color: #fffaf1;
+          box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+          transform: translateY(-1px);
+          outline: none;
         }
 
         .reservation-hero__footer {
@@ -510,7 +671,7 @@ export default function ReservationLanding() {
           min-height: 0;
           display: grid;
           grid-template-rows: auto minmax(0, 1fr);
-          gap: clamp(12px, 1.5vh, 18px);
+          gap: clamp(24px, 2.6vh, 34px);
           padding: clamp(18px, 2vw, 28px);
           border-radius: var(--radius-panel);
           background:
@@ -538,6 +699,10 @@ export default function ReservationLanding() {
           grid-template-rows: auto minmax(0, 1fr);
         }
 
+        .reservation-section--dining {
+          min-width: 0;
+        }
+
         .reservation-section__header {
           display: flex;
           align-items: flex-end;
@@ -546,10 +711,9 @@ export default function ReservationLanding() {
           margin-bottom: 10px;
         }
 
-        .reservation-section__kicker,
-        .reservation-section__header > span {
+        .reservation-section__kicker {
           color: var(--muted);
-          font-size: 9px;
+          font-size: 8.5px;
           font-weight: 700;
           letter-spacing: 0.2em;
           text-transform: uppercase;
@@ -564,10 +728,11 @@ export default function ReservationLanding() {
 
         .reservation-section__header h2 {
           margin: 0;
-          font-family: "Playfair Display", Georgia, serif;
-          font-size: clamp(24px, 1.8vw, 34px);
-          line-height: 1;
-          font-weight: 540;
+          font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+          font-size: clamp(20px, 1.35vw, 27px);
+          line-height: 1.05;
+          font-weight: 760;
+          letter-spacing: -0.035em;
           color: var(--ink);
         }
 
@@ -575,13 +740,158 @@ export default function ReservationLanding() {
           color: var(--cream);
         }
 
-        .reservation-launcher[data-theme="dark"] .reservation-section__header > span {
-          color: rgba(255, 248, 236, 0.62);
-        }
-
         .reservation-grid {
           display: grid;
           gap: clamp(10px, 1vw, 16px);
+        }
+
+        .reservation-carousel {
+          position: relative;
+          min-width: 0;
+        }
+
+        .reservation-carousel__viewport {
+          overflow: hidden;
+          min-width: 0;
+          margin: -22px -14px -18px;
+          padding: 22px 14px 18px;
+        }
+
+        .reservation-carousel__track {
+          display: flex;
+          align-items: center;
+          min-width: 0;
+          will-change: transform;
+        }
+
+        .reservation-carousel__slide {
+          position: relative;
+          flex: 0 0 auto;
+          min-width: 0;
+          opacity: 0.28;
+          filter: saturate(0.62) brightness(0.58);
+          transform: scale(0.76);
+          transform-origin: center;
+          transition:
+            opacity 520ms cubic-bezier(0.22, 1, 0.36, 1),
+            filter 520ms cubic-bezier(0.22, 1, 0.36, 1),
+            transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+          z-index: 1;
+          pointer-events: none;
+        }
+
+        .reservation-carousel__slide .reservation-card {
+          height: 100%;
+          transition: transform 0.32s ease, box-shadow 0.32s ease, filter 0.32s ease;
+        }
+
+        .reservation-carousel__slide.is-near {
+          opacity: 0.66;
+          filter: saturate(0.82) brightness(0.74);
+          transform: scale(0.9);
+          pointer-events: auto;
+        }
+
+        .reservation-carousel__slide.is-before {
+          transform: translateX(12px) scale(0.9);
+        }
+
+        .reservation-carousel__slide.is-after {
+          transform: translateX(-12px) scale(0.9);
+        }
+
+        .reservation-carousel__slide.is-active {
+          opacity: 1;
+          filter: saturate(1.12) brightness(1.05);
+          transform: translateX(0) scale(1.08);
+          z-index: 5;
+          pointer-events: auto;
+        }
+
+        .reservation-carousel__slide.is-active .reservation-card {
+          box-shadow: 0 32px 68px rgba(23, 19, 14, 0.36), 0 10px 28px rgba(164, 120, 33, 0.13), inset 0 0 0 1px rgba(196, 163, 90, 0.16);
+        }
+
+        .reservation-carousel__slide.is-near .reservation-card {
+          box-shadow: 0 14px 30px rgba(23, 19, 14, 0.18), inset 0 0 0 1px rgba(255, 250, 241, 0.035);
+        }
+
+        .reservation-carousel__slide.is-active .reservation-card__shade {
+          background:
+            linear-gradient(180deg, rgba(0,0,0,0.01), rgba(0,0,0,0.56)),
+            radial-gradient(circle at 24% 18%, rgba(255, 232, 182, 0.2), transparent 40%),
+            linear-gradient(90deg, rgba(0,0,0,0.22), transparent 70%);
+        }
+
+        .reservation-carousel__slide.is-near .reservation-card__shade {
+          background:
+            linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.76)),
+            radial-gradient(circle at 24% 18%, rgba(255, 232, 182, 0.08), transparent 34%),
+            linear-gradient(90deg, rgba(0,0,0,0.38), transparent 64%);
+        }
+
+        .reservation-carousel__slide.is-dimmed .reservation-card__title,
+        .reservation-carousel__slide.is-dimmed .reservation-card__logo {
+          opacity: 0.62;
+        }
+
+        .reservation-carousel__control {
+          position: absolute;
+          top: 50%;
+          z-index: 8;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 38px;
+          height: 46px;
+          border: 1px solid rgba(255, 250, 241, 0.18);
+          border-radius: 11px;
+          background: rgba(17, 13, 9, 0.58);
+          color: #fffaf1;
+          box-shadow: 0 18px 34px rgba(0, 0, 0, 0.22), inset 0 0 0 1px rgba(196, 163, 90, 0.12);
+          backdrop-filter: blur(14px);
+          cursor: pointer;
+          transform: translateY(-50%);
+          transition: background 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease, color 0.22s ease;
+        }
+
+        .reservation-carousel__control span {
+          display: block;
+          margin-top: -2px;
+          font-size: 30px;
+          line-height: 1;
+          font-family: Georgia, serif;
+        }
+
+        .reservation-carousel__control--prev {
+          left: 4px;
+        }
+
+        .reservation-carousel__control--next {
+          right: 4px;
+        }
+
+        .reservation-carousel__control:hover,
+        .reservation-carousel__control:focus-visible {
+          background: rgba(164, 120, 33, 0.86);
+          border-color: rgba(255, 250, 241, 0.34);
+          box-shadow: 0 20px 42px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(196, 163, 90, 0.18);
+          color: #fffaf1;
+          outline: none;
+          transform: translateY(-50%) scale(1.035);
+        }
+
+        .reservation-launcher[data-theme="light"] .reservation-carousel__control {
+          border-color: rgba(164, 120, 33, 0.24);
+          background: rgba(255, 252, 246, 0.72);
+          color: #6d4d16;
+          box-shadow: 0 16px 32px rgba(42, 31, 18, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.52);
+        }
+
+        .reservation-launcher[data-theme="light"] .reservation-carousel__control:hover,
+        .reservation-launcher[data-theme="light"] .reservation-carousel__control:focus-visible {
+          background: rgba(164, 120, 33, 0.88);
+          color: #fffaf1;
         }
 
         .reservation-grid--dining {
@@ -620,7 +930,7 @@ export default function ReservationLanding() {
         .reservation-card:nth-child(6) { animation-delay: 0.6s; }
 
         .reservation-card--dining {
-          aspect-ratio: 1.9 / 1;
+          aspect-ratio: 1.85 / 1;
         }
 
         .reservation-card--event {
@@ -667,14 +977,13 @@ export default function ReservationLanding() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: clamp(70px, 5.5vw, 92px);
-          height: clamp(70px, 5.5vw, 92px);
+          width: clamp(58px, 4.7vw, 76px);
+          height: clamp(58px, 4.7vw, 76px);
           padding: 0;
           border-radius: 10px;
-          background: linear-gradient(145deg, rgba(255, 250, 241, 0.94), rgba(238, 228, 208, 0.82));
+          background: #ffffff;
           color: #7f5e20;
-          box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.44);
-          backdrop-filter: blur(10px);
+          box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
           overflow: hidden;
           pointer-events: none;
         }
@@ -695,55 +1004,59 @@ export default function ReservationLanding() {
           text-align: center;
         }
 
-        .reservation-card__title {
+        .reservation-card__meta {
           position: absolute;
           left: clamp(14px, 1.1vw, 20px);
           right: clamp(14px, 1.1vw, 20px);
           bottom: clamp(13px, 1vw, 18px);
           z-index: 3;
-          font-family: "Playfair Display", Georgia, serif;
-          font-size: clamp(19px, 1.45vw, 28px);
-          line-height: 0.98;
-          color: #fffaf1;
-          font-weight: 620;
-          text-shadow: 0 3px 18px rgba(0, 0, 0, 0.76);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          min-width: 0;
           pointer-events: none;
         }
 
+        .reservation-card__title {
+          min-width: 0;
+          font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+          font-size: clamp(16px, 1.02vw, 21px);
+          line-height: 1.05;
+          color: #fffaf1;
+          font-weight: 780;
+          letter-spacing: -0.035em;
+          text-shadow: 0 3px 18px rgba(0, 0, 0, 0.76);
+        }
+
         .reservation-card--event .reservation-card__title {
-          font-size: clamp(17px, 1.15vw, 23px);
-          max-width: calc(100% - 28px);
+          font-size: clamp(15px, 0.92vw, 19px);
+          max-width: none;
         }
 
         .reservation-card__rooms {
-          position: absolute;
-          right: clamp(10px, 0.9vw, 15px);
-          top: 50%;
-          z-index: 4;
           display: inline-flex;
-          flex-direction: column;
-          gap: 7px;
-          transform: translateY(-50%);
-        }
-
-        .reservation-card--has-rooms .reservation-card__title {
-          right: clamp(50px, 3.6vw, 62px);
+          flex: 0 0 auto;
+          align-items: center;
+          gap: 5px;
+          pointer-events: auto;
         }
 
         .reservation-card__room {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 25px;
-          height: 25px;
-          border: 1px solid rgba(255, 250, 241, 0.62);
+          width: 23px;
+          height: 23px;
+          border: 0;
           border-radius: 8px;
-          background: rgba(14, 11, 8, 0.58);
+          background: rgba(14, 11, 8, 0.5);
           color: #fffaf1;
-          font-size: 10px;
+          font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+          font-size: 9px;
           font-weight: 760;
           line-height: 1;
-          box-shadow: 0 7px 16px rgba(0,0,0,0.28);
+          box-shadow: 0 7px 16px rgba(0,0,0,0.26), inset 0 0 0 1px rgba(255, 250, 241, 0.16);
           backdrop-filter: blur(10px);
           transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
           cursor: pointer;
@@ -768,6 +1081,10 @@ export default function ReservationLanding() {
           transform: translateY(-5px);
           transition: opacity 0.22s ease, transform 0.22s ease;
           pointer-events: none;
+        }
+
+        .reservation-card--has-rooms::after {
+          display: none;
         }
 
         .reservation-card:hover,
@@ -807,7 +1124,6 @@ export default function ReservationLanding() {
         .reservation-card__room:hover,
         .reservation-card__room:focus-visible {
           background: #c4a35a;
-          border-color: #c4a35a;
           color: #17130e;
           transform: translateY(-1px);
           box-shadow: 0 10px 20px rgba(0,0,0,0.32);
@@ -893,7 +1209,7 @@ export default function ReservationLanding() {
           }
 
           .reservation-hero h1 {
-            font-size: clamp(44px, 3.8vw, 62px);
+            font-size: clamp(40px, 3.45vw, 56px);
           }
 
           .reservation-hero p {
@@ -903,7 +1219,7 @@ export default function ReservationLanding() {
 
           .reservation-directory {
             padding: 18px 22px;
-            gap: 10px;
+            gap: 22px;
           }
 
           .reservation-section__header h2 {
@@ -949,6 +1265,26 @@ export default function ReservationLanding() {
             height: auto;
           }
 
+          .reservation-carousel__slide {
+            transform: scale(0.78);
+          }
+
+          .reservation-carousel__slide.is-near {
+            transform: scale(0.88);
+          }
+
+          .reservation-carousel__slide.is-before {
+            transform: translateX(10px) scale(0.88);
+          }
+
+          .reservation-carousel__slide.is-after {
+            transform: translateX(-10px) scale(0.88);
+          }
+
+          .reservation-carousel__slide.is-active {
+            transform: translateX(0) scale(1.06);
+          }
+
           .reservation-card--event {
             aspect-ratio: 1.7 / 1;
           }
@@ -990,7 +1326,7 @@ export default function ReservationLanding() {
           }
 
           .reservation-hero h1 {
-            font-size: 46px;
+            font-size: 42px;
           }
 
           .reservation-section__header {
@@ -1004,6 +1340,46 @@ export default function ReservationLanding() {
             grid-template-columns: 1fr;
           }
 
+          .reservation-carousel__viewport {
+            margin: -22px -6px -22px;
+            padding: 22px 6px;
+          }
+
+          .reservation-carousel__control {
+            width: 31px;
+            height: 38px;
+          }
+
+          .reservation-carousel__control--prev {
+            left: 3px;
+          }
+
+          .reservation-carousel__control--next {
+            right: 3px;
+          }
+
+          .reservation-carousel__slide {
+            opacity: 0.34;
+            transform: scale(0.8);
+          }
+
+          .reservation-carousel__slide.is-near {
+            opacity: 0.6;
+            transform: scale(0.84);
+          }
+
+          .reservation-carousel__slide.is-before {
+            transform: translateX(8px) scale(0.84);
+          }
+
+          .reservation-carousel__slide.is-after {
+            transform: translateX(-8px) scale(0.84);
+          }
+
+          .reservation-carousel__slide.is-active {
+            transform: translateX(0) scale(1.03);
+          }
+
           .reservation-card--dining,
           .reservation-card--event {
             aspect-ratio: 1.62 / 1;
@@ -1013,3 +1389,4 @@ export default function ReservationLanding() {
     </main>
   );
 }
+
