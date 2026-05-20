@@ -167,10 +167,13 @@ function DiningCarousel({ items }) {
     const updateMetrics = () => {
       const viewport = viewportRef.current;
       const width = viewport?.clientWidth || 0;
+      if (!width) return;
+
       const viewportWidth = window.innerWidth;
       const viewportStyles = viewport ? window.getComputedStyle(viewport) : null;
       const edgePadding = Number.parseFloat(viewportStyles?.paddingLeft || "0") || 0;
-      const visibleCards = viewportWidth <= 720 ? 1.08 : viewportWidth <= 980 ? 1.48 : 2.08;
+      const compactHeight = window.innerHeight <= 760;
+      const visibleCards = viewportWidth <= 720 ? 1.08 : viewportWidth <= 980 ? 1.48 : compactHeight ? 2.22 : 2.08;
       const gap = viewportWidth <= 720 ? 12 : viewportWidth <= 980 ? 16 : 18;
       const minimumWidth = viewportWidth <= 720 ? 260 : viewportWidth <= 980 ? 340 : 420;
       const cardWidth = Math.max(minimumWidth, (width - gap * (visibleCards - 1)) / visibleCards);
@@ -179,8 +182,16 @@ function DiningCarousel({ items }) {
     };
 
     updateMetrics();
+    const resizeObserver = window.ResizeObserver && viewportRef.current ? new ResizeObserver(updateMetrics) : null;
+    if (viewportRef.current && resizeObserver) {
+      resizeObserver.observe(viewportRef.current);
+    }
+
     window.addEventListener("resize", updateMetrics);
-    return () => window.removeEventListener("resize", updateMetrics);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateMetrics);
+    };
   }, []);
 
   const moveCarousel = (direction) => {
@@ -367,8 +378,13 @@ export default function ReservationLanding() {
           --muted: rgba(74, 60, 39, 0.68);
           --radius-panel: 22px;
           --radius-card: 14px;
+          --brand-logo-size: clamp(46px, 4vw, 58px);
+          --brand-mark-size: clamp(34px, 3.05vw, 42px);
+          --outlet-logo-size: clamp(52px, 4.35vw, 74px);
           min-height: 100vh;
+          min-height: 100svh;
           height: 100vh;
+          height: 100svh;
           overflow: hidden;
           display: grid;
           grid-template-rows: 52px minmax(0, 1fr);
@@ -502,7 +518,7 @@ export default function ReservationLanding() {
         .reservation-shell {
           min-height: 0;
           display: grid;
-          grid-template-columns: minmax(300px, 0.68fr) minmax(720px, 1.42fr);
+          grid-template-columns: minmax(clamp(280px, 32vw, 430px), 0.68fr) minmax(0, 1.42fr);
           gap: clamp(18px, 2vw, 32px);
           animation: reservationRiseIn 0.62s ease 0.14s both;
         }
@@ -550,8 +566,8 @@ export default function ReservationLanding() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 58px;
-          height: 58px;
+          width: var(--brand-logo-size);
+          height: var(--brand-logo-size);
           margin-bottom: clamp(24px, 4vh, 46px);
           border: 1px solid rgba(196, 163, 90, 0.48);
           border-radius: 14px;
@@ -562,8 +578,8 @@ export default function ReservationLanding() {
         }
 
         .reservation-hero__brand img {
-          width: 42px;
-          height: 42px;
+          width: var(--brand-mark-size);
+          height: var(--brand-mark-size);
           object-fit: contain;
           filter: drop-shadow(0 8px 16px rgba(0,0,0,0.24));
         }
@@ -673,6 +689,7 @@ export default function ReservationLanding() {
           grid-template-rows: auto minmax(0, 1fr);
           gap: clamp(24px, 2.6vh, 34px);
           padding: clamp(18px, 2vw, 28px);
+          container-type: inline-size;
           border-radius: var(--radius-panel);
           background:
             linear-gradient(145deg, var(--paper-strong), var(--paper)),
@@ -748,6 +765,7 @@ export default function ReservationLanding() {
         .reservation-carousel {
           position: relative;
           min-width: 0;
+          isolation: isolate;
         }
 
         .reservation-carousel__viewport {
@@ -977,8 +995,8 @@ export default function ReservationLanding() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: clamp(58px, 4.7vw, 76px);
-          height: clamp(58px, 4.7vw, 76px);
+          width: var(--outlet-logo-size);
+          height: var(--outlet-logo-size);
           padding: 0;
           border-radius: 10px;
           background: #ffffff;
@@ -993,6 +1011,7 @@ export default function ReservationLanding() {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          object-position: center;
           filter: contrast(1.04) saturate(1.04);
         }
 
@@ -1194,6 +1213,9 @@ export default function ReservationLanding() {
 
         @media (max-height: 840px) and (min-width: 981px) {
           .reservation-launcher {
+            --brand-logo-size: 50px;
+            --brand-mark-size: 36px;
+            --outlet-logo-size: clamp(48px, 4vw, 64px);
             grid-template-rows: 46px minmax(0, 1fr);
             gap: 10px;
             padding: 10px 22px 12px;
@@ -1232,8 +1254,12 @@ export default function ReservationLanding() {
         }
 
         @media (max-width: 1280px) {
+          .reservation-launcher {
+            --outlet-logo-size: clamp(50px, 4.6vw, 68px);
+          }
+
           .reservation-shell {
-            grid-template-columns: minmax(280px, 0.72fr) minmax(660px, 1.28fr);
+            grid-template-columns: minmax(clamp(260px, 32vw, 390px), 0.72fr) minmax(0, 1.28fr);
             gap: 18px;
           }
 
@@ -1244,8 +1270,12 @@ export default function ReservationLanding() {
 
         @media (max-width: 980px) {
           .reservation-launcher {
+            --brand-logo-size: 54px;
+            --brand-mark-size: 39px;
+            --outlet-logo-size: clamp(50px, 8vw, 68px);
             height: auto;
             min-height: 100vh;
+            min-height: 100svh;
             overflow: auto;
             grid-template-rows: auto auto;
             background: linear-gradient(160deg, #17130e 0%, #2a2118 30%, #f8f3e9 30.2%, #fbf7ef 100%);
@@ -1294,6 +1324,9 @@ export default function ReservationLanding() {
           .reservation-launcher {
             --radius-panel: 18px;
             --radius-card: 12px;
+            --brand-logo-size: 48px;
+            --brand-mark-size: 34px;
+            --outlet-logo-size: clamp(46px, 16vw, 58px);
             padding: 12px;
             gap: 12px;
           }
@@ -1383,6 +1416,37 @@ export default function ReservationLanding() {
           .reservation-card--dining,
           .reservation-card--event {
             aspect-ratio: 1.62 / 1;
+          }
+        }
+
+        @media (max-width: 460px) {
+          .reservation-launcher {
+            --outlet-logo-size: clamp(42px, 14vw, 52px);
+            padding: 10px;
+          }
+
+          .reservation-directory {
+            padding: 14px;
+          }
+
+          .reservation-card__logo {
+            top: 10px;
+            left: 10px;
+          }
+
+          .reservation-card__title {
+            font-size: clamp(14px, 4.4vw, 18px);
+          }
+
+          .reservation-card__meta {
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+          }
+
+          .reservation-card__room {
+            width: 21px;
+            height: 21px;
           }
         }
       `}</style>
