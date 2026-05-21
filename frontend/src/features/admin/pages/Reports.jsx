@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
+import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { reportAPI } from "../../../services/reportAPI";
@@ -327,7 +328,7 @@ function FilterChip({ icon: Icon, label, count, active, onClick }) {
 
 function ReportCard({ children, style }) {
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 10px 30px rgba(24,20,14,0.04)", ...style }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 1px 5px rgba(24,20,14,0.025)", ...style }}>
       {children}
     </div>
   );
@@ -356,7 +357,7 @@ function ChartTooltip({ active, payload, label }) {
   );
 
   return (
-    <div style={{ background: C.surface, border: "1px solid rgba(140,107,42,0.18)", borderRadius: 10, boxShadow: "0 12px 26px rgba(24,20,14,0.12)", padding: "10px 11px", minWidth: 160 }}>
+    <div style={{ background: C.surface, border: "1px solid rgba(140,107,42,0.18)", borderRadius: 10, boxShadow: "0 2px 8px rgba(24,20,14,0.045)", padding: "10px 11px", minWidth: 160 }}>
       <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>{label}</div>
       <div style={{ display: "grid", gap: 6 }}>
         {visiblePayload.map((item) => (
@@ -836,7 +837,7 @@ function ReportTabs({ groups, activeTab, onChange }) {
                     whiteSpace: "nowrap",
                     cursor: "pointer",
                     transition: "background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease",
-                    boxShadow: active ? "0 8px 18px rgba(140,107,42,0.08)" : "none",
+                    boxShadow: active ? "0 1px 5px rgba(140,107,42,0.045)" : "none",
                   }}
                 >
                   {tab.label}
@@ -1050,15 +1051,14 @@ export default function Reports() {
       <AdminNavbar />
       <div style={{ display: "flex" }}>
         <Sidebar activeNav="reports" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
-        <main style={{ flex: 1, height: "calc(100vh - 60px)", overflow: "auto", padding: "28px 32px" }}>
-          <div className="reports-top" style={{ display: "grid", gridTemplateColumns: "minmax(260px,1fr) auto", gap: 18, alignItems: "end", marginBottom: 18 }}>
-            <div>
-              <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>Reports</div>
-              <h1 style={{ margin: 0, fontSize: 32, lineHeight: 1.1, color: C.text, fontWeight: 650 }}>Outlet Performance</h1>
-              {canViewReports && <div style={{ marginTop: 6, fontSize: 12.5, color: C.muted }}>{activeReport?.label || "Reports"} uses {filterModeLabel}.</div>}
-            </div>
-
-            {canViewReports && (
+        <main style={{ flex: 1, height: "calc(100vh - 60px)", overflow: "auto", padding: "30px 32px 42px" }}>
+          <AdminPageHeader
+            eyebrow="Reports"
+            title="Outlet Performance"
+            description={canViewReports ? `${activeReport?.label || "Reports"} uses ${filterModeLabel}.` : "Performance reporting and export tools for authorized administrators."}
+            C={C}
+            F={F}
+            actions={canViewReports && (
               <div className="reports-filter-panel" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, display: "grid", gap: 10, minWidth: 320 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
                   <div>
@@ -1102,7 +1102,7 @@ export default function Reports() {
                 </div>
               </div>
             )}
-          </div>
+          />
 
           {!canViewReports ? (
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 22, color: C.muted }}>

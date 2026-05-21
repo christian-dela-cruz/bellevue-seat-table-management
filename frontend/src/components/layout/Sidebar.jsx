@@ -32,19 +32,21 @@ function HamburgerBtn({ onClick, isOpen }) {
       title={isOpen ? "Collapse sidebar" : "Expand sidebar"}
       style={{
         width: 36, height: 36,
-        background: hovered ? "rgba(201,168,76,0.12)" : "transparent",
-        border: "none", cursor: "pointer",
+        background: hovered ? "rgba(140,107,42,0.12)" : "rgba(255,255,255,0.42)",
+        border: "1px solid rgba(140,107,42,0.14)", cursor: "pointer",
         display: "flex", flexDirection: "column",
         justifyContent: "center", alignItems: "center",
         gap: 5, padding: 6, borderRadius: 6,
-        transition: "background 0.2s", flexShrink: 0,
+        transition: "background 0.2s, border-color 0.2s, transform 0.2s", flexShrink: 0,
+        boxShadow: hovered ? "0 4px 10px rgba(55,39,17,0.035)" : "none",
+        transform: hovered ? "translateY(-1px)" : "none",
       }}
     >
       {[0, 1, 2].map(i => (
         <span key={i} style={{
           display: "block",
           width: i === 1 && isOpen ? 12 : 18,
-          height: 2, background: "#C9A84C", borderRadius: 2,
+          height: 2, background: "#8C6B2A", borderRadius: 2,
           transition: "width 0.2s",
           marginLeft: i === 1 && isOpen ? "auto" : 0,
         }} />
@@ -60,10 +62,10 @@ function NavItem({ item, isActive, isOpen, onClick }) {
 
   const isCancelled = item.id === "cancelled";
 
-  const activeColor  = isCancelled ? "#8C6B2A" : "#C9A84C";
-  const hoverColor   = isCancelled ? "#8C6B2A" : "#C9A84C";
-  const activeBg     = isCancelled ? "rgba(140,107,42,0.10)"  : "rgba(201,168,76,0.10)";
-  const hoverBg      = isCancelled ? "rgba(140,107,42,0.06)"  : "rgba(201,168,76,0.05)";
+  const activeColor  = isCancelled ? "#7E5E25" : "#8C6B2A";
+  const hoverColor   = isCancelled ? "#7E5E25" : "#8C6B2A";
+  const activeBg     = isCancelled ? "rgba(140,107,42,0.13)"  : "rgba(140,107,42,0.13)";
+  const hoverBg      = isCancelled ? "rgba(140,107,42,0.07)"  : "rgba(140,107,42,0.07)";
   const borderColor  = isCancelled ? "#8C6B2A" : "#C9A84C";
 
   const handleClick = () => {
@@ -99,21 +101,39 @@ function NavItem({ item, isActive, isOpen, onClick }) {
         onClick={handleClick}
         style={{
           display: "flex", alignItems: "center", gap: 10,
-          padding: isOpen ? "11px 20px" : "11px 0",
+          margin: isOpen ? "3px 10px 3px 12px" : "4px 7px",
+          padding: isOpen ? "10px 12px" : "10px 0",
           justifyContent: isOpen ? "flex-start" : "center",
-          fontFamily: F.body, fontSize: 12,
-          color: isActive ? activeColor : hovered ? hoverColor : "#555",
-          background: isActive ? activeBg : hovered ? hoverBg : "transparent",
-          borderLeft: isActive
-            ? `3px solid ${borderColor}`
-            : "3px solid transparent",
+          fontFamily: F.body, fontSize: 12.5,
+          color: isActive ? activeColor : hovered ? hoverColor : "#5E5548",
+          background: isActive
+            ? `linear-gradient(135deg, ${activeBg}, rgba(255,255,255,0.56))`
+            : hovered ? hoverBg : "transparent",
+          border: `1px solid ${isActive ? "rgba(140,107,42,0.20)" : "transparent"}`,
           cursor: "pointer",
-          fontWeight: isActive ? 700 : 400,
-          transition: "all 0.15s",
+          fontWeight: isActive ? 700 : 540,
+          transition: "background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease",
           userSelect: "none",
-          borderRadius: isOpen ? "0 6px 6px 0" : 0,
+          borderRadius: 11,
+          boxShadow: isActive ? "inset 0 0 0 1px rgba(255,255,255,0.46)" : "none",
+          transform: hovered && !isActive ? "translateX(1px)" : "none",
+          position: "relative",
         }}
       >
+        <span
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            left: isOpen ? -1 : 4,
+            top: "50%",
+            width: 3,
+            height: isActive ? 20 : 0,
+            borderRadius: 999,
+            background: borderColor,
+            transform: "translateY(-50%)",
+            transition: "height 0.18s ease",
+          }}
+        />
         {item.iconStyle === "lucide"
           ? <LucideIcon icon={item.icon} />
           : <span style={{ fontSize: 15, flexShrink: 0 }}>{item.icon}</span>
@@ -135,7 +155,7 @@ function StatRow({ label, value, color, isOpen }) {
   return (
     <div style={{
       display: "flex", justifyContent: "space-between", alignItems: "center",
-      padding: "7px 20px", fontFamily: F.body, fontSize: 11,
+      padding: "6px 16px", fontFamily: F.body, fontSize: 11,
     }}>
       <span style={{ color: "#777" }}>{label}</span>
       <span style={{
@@ -160,35 +180,47 @@ export default function Sidebar({
   onToggle = () => {},
 }) {
   const visibleItems = NAV_ITEMS.filter((item) => !item.permission || authAPI.hasPermission(item.permission));
+  const currentUser = authAPI.getCurrentUser();
+  const displayName = String(currentUser?.name || currentUser?.username || "Admin User");
+  const roleLabel = String(currentUser?.role || "Administrator").replace(/_/g, " ");
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "A";
 
   return (
     <aside style={{
-      width: isOpen ? 220 : 52,
+      width: isOpen ? 236 : 58,
       height: "calc(100vh - 60px)",
-      background: "#FAF6F0",
-      borderRight: "1px solid rgba(201,168,76,0.18)",
+      background: "linear-gradient(180deg, #FFFCF7 0%, #F7F0E5 54%, #EFE4D1 100%)",
+      borderRight: "1px solid rgba(140,107,42,0.18)",
       display: "flex", flexDirection: "column",
       flexShrink: 0,
       transition: "width 0.25s ease",
       overflow: "hidden",
+      boxShadow: "6px 0 18px rgba(55,39,17,0.035)",
+      position: "relative",
+      zIndex: 5,
     }}>
 
       {/* ── Top: logo area + hamburger ── */}
       <div style={{
         display: "flex", alignItems: "center",
         justifyContent: isOpen ? "space-between" : "center",
-        padding: isOpen ? "20px 16px 20px 20px" : "20px 0",
-        borderBottom: "1px solid rgba(201,168,76,0.12)",
+        padding: isOpen ? "18px 14px 18px 18px" : "18px 0",
+        borderBottom: "1px solid rgba(140,107,42,0.12)",
         flexShrink: 0,
       }}>
         {isOpen && (
           <div style={{
-            fontFamily: F.body, fontSize: 16, fontWeight: 700,
-            color: "#1B2A4A", letterSpacing: 0.5, lineHeight: 1.3,
+            fontFamily: F.body, fontSize: 15, fontWeight: 800,
+            color: "#18140E", letterSpacing: 0.3, lineHeight: 1.3,
             whiteSpace: "nowrap", overflow: "hidden",
           }}>
             <span style={{
-              color: "#C9A84C", fontSize: 10, fontFamily: F.body,
+              color: "#8C6B2A", fontSize: 9.5, fontFamily: F.body,
               letterSpacing: 2, fontWeight: 700,
             }}>ADMIN PANEL</span>
           </div>
@@ -197,11 +229,11 @@ export default function Sidebar({
       </div>
 
       {/* ── Navigation ── */}
-      <div style={{ paddingTop: 16, flexShrink: 0 }}>
+      <div style={{ paddingTop: 14, flexShrink: 0 }}>
         {isOpen && (
           <div style={{
-            padding: "0 20px", marginBottom: 8,
-            fontSize: 9, letterSpacing: 2, color: "#BBBBBB",
+            padding: "0 18px", marginBottom: 8,
+            fontSize: 9, letterSpacing: 2, color: "#9B9285",
             fontFamily: F.body, fontWeight: 700, textTransform: "uppercase",
           }}>
             Navigation
@@ -219,14 +251,14 @@ export default function Sidebar({
       </div>
 
       {/* ── Divider ── */}
-      <div style={{ height: 1, background: "rgba(201,168,76,0.12)", margin: "20px 0 4px" }} />
+      <div style={{ height: 1, background: "rgba(140,107,42,0.12)", margin: "18px 14px 4px" }} />
 
       {/* ── Quick Stats ── */}
       {isOpen && (
-        <div style={{ paddingBottom: 16 }}>
+        <div style={{ paddingBottom: 14 }}>
           <div style={{
-            padding: "0 20px", marginBottom: 10,
-            fontSize: 9, letterSpacing: 2, color: "#BBBBBB",
+            padding: "0 18px", marginBottom: 10,
+            fontSize: 9, letterSpacing: 2, color: "#9B9285",
             fontFamily: F.body, fontWeight: 700, textTransform: "uppercase",
           }}>
             Quick Stats
@@ -257,6 +289,51 @@ export default function Sidebar({
           ))}
         </div>
       )}
+
+      <div style={{ flex: 1 }} />
+
+      <div style={{
+        margin: isOpen ? "0 12px 14px" : "0 7px 14px",
+        paddingTop: 12,
+        borderTop: "1px solid rgba(140,107,42,0.14)",
+      }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: isOpen ? "flex-start" : "center",
+          gap: 10,
+          padding: isOpen ? "11px 10px" : "8px 0",
+          borderRadius: 13,
+          background: "rgba(255,255,255,0.46)",
+          border: "1px solid rgba(140,107,42,0.14)",
+          boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.42)",
+        }}>
+          <span style={{
+            width: 34,
+            height: 34,
+            borderRadius: "50%",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            background: "linear-gradient(135deg, #C9A84C, #8C6B2A)",
+            color: "#fff",
+            fontSize: 11,
+            fontWeight: 850,
+            letterSpacing: "0.05em",
+            position: "relative",
+          }}>
+            {initials}
+            <i aria-hidden="true" style={{ position: "absolute", right: 0, bottom: 1, width: 8, height: 8, borderRadius: "50%", background: "#4CAF79", border: "2px solid #FFFCF7" }} />
+          </span>
+          {isOpen && (
+            <span style={{ minWidth: 0, display: "grid", gap: 2 }}>
+              <span style={{ color: "#18140E", fontSize: 12.5, fontWeight: 680, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</span>
+              <span style={{ color: "#7A7060", fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{roleLabel}</span>
+            </span>
+          )}
+        </div>
+      </div>
 
     </aside>
   );

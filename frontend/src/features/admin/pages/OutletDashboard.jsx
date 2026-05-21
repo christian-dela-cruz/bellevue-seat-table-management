@@ -24,6 +24,7 @@ import {
   YAxis,
 } from "recharts";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
+import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { reportAPI } from "../../../services/reportAPI";
@@ -329,7 +330,7 @@ function OutletSelector({ outlets, selectedOutlet, onSelect }) {
       </button>
 
       {open && (
-        <div style={{ position: "absolute", top: 45, left: 0, right: 0, zIndex: 30, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 18px 44px rgba(40,32,18,0.16)", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 45, left: 0, right: 0, zIndex: 30, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 8px 18px rgba(40,32,18,0.08)", overflow: "hidden" }}>
           <div style={{ padding: 10, borderBottom: `1px solid ${C.divider}` }}>
             <div style={{ height: 36, border: `1px solid ${C.border}`, borderRadius: 9, background: C.soft, display: "flex", alignItems: "center", gap: 8, padding: "0 10px" }}>
               <Search size={14} color={C.faint} />
@@ -479,7 +480,7 @@ function PeriodSwitch({ value, onChange }) {
             padding: "0 10px",
             background: value === key ? C.surface : "transparent",
             color: value === key ? C.gold : C.muted,
-            boxShadow: value === key ? "0 4px 14px rgba(40,32,18,0.08)" : "none",
+            boxShadow: value === key ? "0 1px 5px rgba(40,32,18,0.04)" : "none",
             fontFamily: F.label,
             fontSize: 9,
             fontWeight: 850,
@@ -510,7 +511,7 @@ function OutletChartTooltip({ active, payload, label }) {
   );
 
   return (
-    <div style={{ background: C.surface, border: "1px solid rgba(140,107,42,0.18)", borderRadius: 10, boxShadow: "0 12px 26px rgba(24,20,14,0.12)", padding: "10px 11px", minWidth: 154 }}>
+    <div style={{ background: C.surface, border: "1px solid rgba(140,107,42,0.18)", borderRadius: 10, boxShadow: "0 2px 8px rgba(24,20,14,0.045)", padding: "10px 11px", minWidth: 154 }}>
       <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 850, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>{label}</div>
       <div style={{ display: "grid", gap: 6 }}>
         {visiblePayload.map((item) => (
@@ -1009,20 +1010,20 @@ function OutletDashboard() {
           rejected={quickStats.rejected || 0}
           cancelled={quickStats.cancelled || 0}
         />
-        <main style={{ flex: 1, height: "calc(100vh - 60px)", overflow: "auto", padding: "26px 32px" }}>
-          <div className="od-top" style={{ display: "grid", gridTemplateColumns: "minmax(260px,1fr) auto", gap: 18, alignItems: "end", marginBottom: 16 }}>
-            <div>
-              <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>Outlet Operations</div>
-              <h1 style={{ margin: 0, fontSize: 32, lineHeight: 1.1, color: C.text, fontWeight: 680 }}>{selectedOutlet?.name || "Outlet Dashboard"}</h1>
-              <div style={{ marginTop: 7, fontSize: 12.5, color: C.muted }}>
-                {selectedOutlet?.aggregate
-                  ? `${selectedOutlet.wing} grouped dashboard - combined tracking for ${selectedOutlet.children.length} sub-rooms from ${readableDate(startDate)} to ${readableDate(endDate)}`
-                  : selectedOutlet
-                    ? `${outletGroupLabel(selectedOutlet.name)} dashboard - isolated operational tracking from ${readableDate(startDate)} to ${readableDate(endDate)}`
-                    : "Dedicated monitoring view for assigned outlet operations."}
-              </div>
-            </div>
-            {selectedOutlet && (
+        <main style={{ flex: 1, height: "calc(100vh - 60px)", overflow: "auto", padding: "30px 32px 42px" }}>
+          <AdminPageHeader
+            eyebrow="Outlet Operations"
+            title={selectedOutlet?.name || "Outlet Dashboard"}
+            description={
+              selectedOutlet?.aggregate
+                ? `${selectedOutlet.wing} grouped dashboard - combined tracking for ${selectedOutlet.children.length} sub-rooms from ${readableDate(startDate)} to ${readableDate(endDate)}`
+                : selectedOutlet
+                  ? `${outletGroupLabel(selectedOutlet.name)} dashboard - isolated operational tracking from ${readableDate(startDate)} to ${readableDate(endDate)}`
+                  : "Dedicated monitoring view for assigned outlet operations."
+            }
+            C={C}
+            F={F}
+            actions={selectedOutlet && (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                 <span style={{ borderRadius: 999, padding: "5px 9px", background: wsStatus === "connected" ? C.greenFaint : wsStatus === "polling" ? C.goldFaint : C.slateFaint, border: `1px solid ${wsStatus === "connected" ? "rgba(46,122,90,0.18)" : wsStatus === "polling" ? "rgba(140,107,42,0.22)" : C.border}`, color: wsStatus === "connected" ? C.green : wsStatus === "polling" ? C.gold : C.muted, fontSize: 11, fontWeight: 750 }}>
                   {syncing ? "Syncing" : wsStatus === "connected" ? "Live" : wsStatus === "polling" ? "Polling" : "Reconnecting"}
@@ -1031,7 +1032,7 @@ function OutletDashboard() {
                 <span style={{ borderRadius: 999, padding: "5px 9px", background: C.soft, border: `1px solid ${C.border}`, color: C.muted, fontSize: 11, fontWeight: 700 }}>{currentUser?.role || "admin"}</span>
               </div>
             )}
-          </div>
+          />
 
           {!canViewReports ? (
             <Panel>

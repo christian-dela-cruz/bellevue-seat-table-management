@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronRight as ChevronRightIcon, Search, UserPlus } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
+import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 
@@ -19,8 +20,8 @@ const C = {
   text: "#18140E",
   muted: "#7A7060",
   faint: "rgba(24,20,14,0.42)",
-  shadow: "0 18px 46px rgba(44,36,24,0.07)",
-  shadowSoft: "0 8px 24px rgba(44,36,24,0.045)",
+  shadow: "0 2px 8px rgba(44,36,24,0.035)",
+  shadowSoft: "0 1px 5px rgba(44,36,24,0.025)",
 };
 
 const F = {
@@ -75,7 +76,7 @@ function LoadingOverlay({ label }) {
   if (!label) return null;
   return (
     <div style={{ position:"absolute",inset:0,background:"rgba(255,255,255,0.72)",backdropFilter:"blur(1px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:5 }}>
-      <div style={{ display:"inline-flex",alignItems:"center",gap:10,padding:"10px 14px",border:`1px solid ${C.border}`,borderRadius:999,background:C.surface,boxShadow:"0 10px 30px rgba(0,0,0,0.08)",fontSize:12,color:C.muted,fontWeight:700 }}>
+      <div style={{ display:"inline-flex",alignItems:"center",gap:10,padding:"10px 14px",border:`1px solid ${C.border}`,borderRadius:999,background:C.surface,boxShadow:"0 1px 5px rgba(24,20,14,0.035)",fontSize:12,color:C.muted,fontWeight:650 }}>
         <Spinner />
         {label}
       </div>
@@ -707,8 +708,8 @@ export default function Accounts() {
   };
 
   const showEditor = canManage;
-  const directoryTitle = "Account Directory";
-  const directoryEyebrow = "Account List";
+  const directoryTitle = "Accounts";
+  const directoryEyebrow = "Directory";
 
   return (
     <div style={{ minHeight:"100vh",background:C.pageBg,fontFamily:F.body }}>
@@ -732,20 +733,19 @@ export default function Accounts() {
         <Sidebar activeNav="accounts" isOpen={sidebarOpen} onToggle={()=>setSidebarOpen(!sidebarOpen)} />
         <main style={{ flex:1,padding:"30px 32px 42px",overflow:"auto",height:"calc(100vh - 60px)" }}>
           <div style={{ maxWidth:1440,display:"grid",gap:18 }}>
-          <div style={{ display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:18 }}>
-            <div>
-              <SectionTitle eyebrow="Access Control" title="Account Manager" />
-              <p style={{ margin:"-8px 0 0",maxWidth:660,fontSize:13,lineHeight:1.55,color:C.muted }}>
-                Manage administrative access, role permissions, and outlet scope assignments from one controlled workspace.
-              </p>
-            </div>
-            {canManage && (
-              <button type="button" onClick={resetForm} style={{ height:40,padding:"0 14px",border:`1px solid rgba(140,107,42,0.20)`,borderRadius:9,background:C.gold,color:"#fff",fontFamily:F.label,fontSize:10,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer",display:"inline-flex",alignItems:"center",gap:8,boxShadow:"0 10px 24px rgba(140,107,42,0.18)",whiteSpace:"nowrap" }}>
+          <AdminPageHeader
+            eyebrow="Access Control"
+            title="Account Manager"
+            description="Manage administrative access, role permissions, and outlet scope assignments from one controlled workspace."
+            C={C}
+            F={F}
+            actions={canManage && (
+              <button type="button" onClick={resetForm} style={{ height:40,padding:"0 14px",border:`1px solid rgba(140,107,42,0.20)`,borderRadius:9,background:C.gold,color:"#fff",fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer",display:"inline-flex",alignItems:"center",gap:8,boxShadow:"0 2px 8px rgba(140,107,42,0.10)",whiteSpace:"nowrap" }}>
                 <UserPlus size={14} />
                 New Account
               </button>
             )}
-          </div>
+          />
 
           {canManage && (
             <div className="account-summary-grid" style={{ display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:14 }}>

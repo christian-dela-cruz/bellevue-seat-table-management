@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
+import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 import { fetchReservations, approveReservation, rejectReservation, revertReservation, updateReservation, getReservationStats } from "../../../utils/api";
 import { authAPI } from "../../../services/authAPI";
@@ -355,11 +356,11 @@ function QueueMetric({ label, value, helper, tone = "gold", active = false, onCl
         gap:5,
         textAlign:"left",
         cursor:onClick ? "pointer" : "default",
-        boxShadow:active ? `0 8px 20px ${palette.color}16` : "0 1px 5px rgba(0,0,0,0.04)",
+        boxShadow:active ? `0 1px 5px ${palette.color}10` : "0 1px 3px rgba(24,20,14,0.025)",
         transition:"border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease",
       }}
-      onMouseEnter={(e)=>{e.currentTarget.style.borderColor=palette.border;e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow=`0 8px 20px ${palette.color}12`;}}
-      onMouseLeave={(e)=>{e.currentTarget.style.borderColor=active ? palette.border : C.cardBorder;e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow=active ? `0 8px 20px ${palette.color}16` : "0 1px 5px rgba(0,0,0,0.04)";}}
+      onMouseEnter={(e)=>{e.currentTarget.style.borderColor=palette.border;e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow=`0 2px 7px ${palette.color}10`;}}
+      onMouseLeave={(e)=>{e.currentTarget.style.borderColor=active ? palette.border : C.cardBorder;e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow=active ? `0 1px 5px ${palette.color}10` : "0 1px 3px rgba(24,20,14,0.025)";}}
     >
       <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:active ? palette.color : C.textTertiary}}>
         {label}
@@ -2436,7 +2437,7 @@ export default function ReservationDashboard() {
               borderBottom:`1px solid ${C.navBorder}`,
               padding:isMobile?"10px 16px":"0 28px",
               height:isMobile?"auto":52,
-              display:"flex",alignItems:"center",
+              display:"none",alignItems:"center",
               justifyContent:"space-between",
               gap:10,flexWrap:isMobile?"wrap":"nowrap",
             }}>
@@ -2484,20 +2485,16 @@ export default function ReservationDashboard() {
               </div>
             </div>
 
-            <div style={{padding:isMobile?"20px 16px":isTablet?"24px 20px":"28px 32px",animation:"fadeUp 0.28s ease"}}>
+            <div style={{padding:isMobile?"22px 16px 30px":isTablet?"26px 22px 36px":"30px 32px 42px",animation:"fadeUp 0.28s ease"}}>
 
-              <div style={{marginBottom:isMobile?18:22}}>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-                  <span style={{display:"inline-block",width:22,height:"1px",background:C.gold,opacity:0.6}}/>
-                  <span style={{fontFamily:F.label,fontSize:9,letterSpacing:"0.26em",color:C.gold,fontWeight:700,textTransform:"uppercase"}}>Dashboard</span>
-                </div>
-                <h1 style={{fontFamily:F.display,fontSize:isMobile?22:isTablet?28:34,fontWeight:700,color:C.textPrimary,lineHeight:1.15,margin:"0 0 6px",letterSpacing:"0.01em"}}>
-                  Reservation Dashboard
-                </h1>
-                <p style={{fontFamily:F.body,fontSize:13,color:C.textSecondary,margin:0,lineHeight:1.65}}>
-                  Manage and review all reservation requests
-                </p>
-              </div>
+              <AdminPageHeader
+                eyebrow="Reservations"
+                title="Reservation Dashboard"
+                description="Manage and review reservation requests, pending actions, near events, and delayed responses."
+                C={C}
+                F={F}
+                compact={isMobile || isTablet}
+              />
 
               {/* ── Stat cards ── */}
               <div style={{
@@ -2506,7 +2503,7 @@ export default function ReservationDashboard() {
                 borderRadius:12,
                 padding:isMobile?"12px":"14px 16px",
                 marginBottom:isMobile?16:18,
-                boxShadow:"0 2px 10px rgba(0,0,0,0.045)",
+                boxShadow:"0 1px 4px rgba(24,20,14,0.025)",
                 display:"grid",
                 gap:12,
               }}>
@@ -2549,13 +2546,13 @@ export default function ReservationDashboard() {
                         padding:isMobile?"14px 12px":"18px 20px",
                         textAlign:"left",cursor:"pointer",
                         transition:"all 0.18s ease",outline:"none",
-                        boxShadow:active?`0 4px 18px ${color}1A`:"0 1px 4px rgba(0,0,0,0.05)",
+                        boxShadow:active?`0 1px 5px ${color}12`:"0 1px 3px rgba(24,20,14,0.025)",
                         transform:active?"translateY(-1px)":"translateY(0)",
                       }}
-                      onMouseEnter={(e)=>{if(!active){e.currentTarget.style.borderColor=border;e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=`0 6px 18px ${color}14`;}}}
-                      onMouseLeave={(e)=>{if(!active){e.currentTarget.style.borderColor=C.cardBorder;e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.05)";}}}
+                      onMouseEnter={(e)=>{if(!active){e.currentTarget.style.borderColor=border;e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow=`0 2px 7px ${color}10`;}}}
+                      onMouseLeave={(e)=>{if(!active){e.currentTarget.style.borderColor=C.cardBorder;e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 1px 3px rgba(24,20,14,0.025)";}}}
                     >
-                      <div style={{fontFamily:F.display,fontSize:isMobile?28:36,fontWeight:700,color:color,lineHeight:1,marginBottom:isMobile?6:8,letterSpacing:"-0.02em"}}>
+                      <div style={{fontFamily:F.display,fontSize:isMobile?28:36,fontWeight:650,color:color,lineHeight:1,marginBottom:isMobile?6:8,letterSpacing:0}}>
                         {loading?"—":count}
                       </div>
                       <div style={{fontFamily:F.label,fontSize:9,color:active?color:C.textTertiary,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.14em",transition:"color 0.18s"}}>
@@ -2576,7 +2573,7 @@ export default function ReservationDashboard() {
                 <OperationalMetricCard label="Notifications" value={operationalStats.notificationIssues} helper="Delivery issues" tone={operationalStats.notificationIssues ? "red" : "green"} />
               </div>
 
-              <div style={{background:C.cardBg,borderRadius:12,border:`1px solid ${C.cardBorder}`,overflow:"hidden",boxShadow:"0 2px 10px rgba(0,0,0,0.06)"}}>
+              <div style={{background:C.cardBg,borderRadius:12,border:`1px solid ${C.cardBorder}`,overflow:"hidden",boxShadow:"0 1px 4px rgba(24,20,14,0.03)"}}>
 
                 {/* Table toolbar */}
                 <div style={{

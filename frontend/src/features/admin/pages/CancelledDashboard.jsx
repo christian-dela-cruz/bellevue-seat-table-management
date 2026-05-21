@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
+import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
@@ -121,18 +122,18 @@ function ReviewMetric({ label, value, helper, tone = "slate", active = false, on
         alignContent: "center",
         textAlign: "left",
         cursor: onClick ? "pointer" : "default",
-        boxShadow: active ? `0 8px 20px ${palette.color}14` : "0 1px 5px rgba(0,0,0,0.04)",
+        boxShadow: active ? `0 1px 5px ${palette.color}10` : "0 1px 3px rgba(24,20,14,0.025)",
         transition: "border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = palette.border;
         e.currentTarget.style.transform = "translateY(-1px)";
-        e.currentTarget.style.boxShadow = `0 8px 20px ${palette.color}12`;
+        e.currentTarget.style.boxShadow = `0 2px 7px ${palette.color}10`;
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = active ? palette.border : C.cardBorder;
         e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = active ? `0 8px 20px ${palette.color}14` : "0 1px 5px rgba(0,0,0,0.04)";
+        e.currentTarget.style.boxShadow = active ? `0 1px 5px ${palette.color}10` : "0 1px 3px rgba(24,20,14,0.025)";
       }}
     >
       <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: active ? palette.color : C.textTertiary }}>
@@ -628,7 +629,7 @@ export default function CancelledDashboard() {
               borderBottom: `1px solid ${C.navBorder}`,
               padding: isMobile ? "10px 16px" : "0 28px",
               height: isMobile ? "auto" : 52,
-              display: "flex", alignItems: "center",
+              display: "none", alignItems: "center",
               justifyContent: "space-between",
               gap: 10, flexWrap: isMobile ? "wrap" : "nowrap",
             }}>
@@ -693,10 +694,19 @@ export default function CancelledDashboard() {
             </div>
 
             {/* Content */}
-            <div style={{ padding: isMobile ? "20px 16px" : isTablet ? "24px 20px" : "28px 32px", animation: "fadeUp 0.28s ease" }}>
+            <div style={{ padding: isMobile ? "22px 16px 30px" : isTablet ? "26px 22px 36px" : "30px 32px 42px", animation: "fadeUp 0.28s ease" }}>
+
+              <AdminPageHeader
+                eyebrow="Cancellation Review"
+                title="Cancelled Reservations"
+                description="Review guest-cancelled reservations, cancellation reasons, and records that may need follow-up."
+                C={C}
+                F={F}
+                compact={isMobile || isTablet}
+              />
 
               {/* Heading */}
-              <div style={{ marginBottom: isMobile ? 18 : 22 }}>
+              <div style={{ display: "none", marginBottom: isMobile ? 18 : 22 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                   <span style={{ display: "inline-block", width: 22, height: "1px", background: C.gold, opacity: 0.5 }} />
                   <span style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.26em", color: C.gold, fontWeight: 700, textTransform: "uppercase" }}>Dashboard</span>
@@ -716,7 +726,7 @@ export default function CancelledDashboard() {
                 borderRadius: 12,
                 padding: isMobile ? "12px" : "14px 16px",
                 marginBottom: isMobile ? 16 : 18,
-                boxShadow: "0 2px 10px rgba(0,0,0,0.045)",
+                boxShadow: "0 1px 4px rgba(24,20,14,0.025)",
                 display: "grid",
                 gap: 12,
               }}>
@@ -779,7 +789,7 @@ export default function CancelledDashboard() {
               </div>
 
               {/* Table card */}
-              <div style={{ background: C.cardBg, borderRadius: 12, border: `1px solid ${C.cardBorder}`, overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.06)" }}>
+              <div style={{ background: C.cardBg, borderRadius: 12, border: `1px solid ${C.cardBorder}`, overflow: "hidden", boxShadow: "0 1px 4px rgba(24,20,14,0.03)" }}>
 
                 {/* Card header */}
                 <div style={{
