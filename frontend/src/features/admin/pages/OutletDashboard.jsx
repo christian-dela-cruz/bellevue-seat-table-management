@@ -1000,7 +1000,7 @@ function OutletDashboard() {
         }
       `}</style>
       <AdminNavbar />
-      <div style={{ display: "flex" }}>
+      <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0, overflow: "hidden" }}>
         <Sidebar
           activeNav="outlets"
           isOpen={sidebarOpen}
@@ -1023,15 +1023,6 @@ function OutletDashboard() {
             }
             C={C}
             F={F}
-            actions={selectedOutlet && (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                <span style={{ borderRadius: 999, padding: "5px 9px", background: wsStatus === "connected" ? C.greenFaint : wsStatus === "polling" ? C.goldFaint : C.slateFaint, border: `1px solid ${wsStatus === "connected" ? "rgba(46,122,90,0.18)" : wsStatus === "polling" ? "rgba(140,107,42,0.22)" : C.border}`, color: wsStatus === "connected" ? C.green : wsStatus === "polling" ? C.gold : C.muted, fontSize: 11, fontWeight: 750 }}>
-                  {syncing ? "Syncing" : wsStatus === "connected" ? "Live" : wsStatus === "polling" ? "Polling" : "Reconnecting"}
-                </span>
-                <StatusPill status={canManageReservations ? "reserved" : "pending"} />
-                <span style={{ borderRadius: 999, padding: "5px 9px", background: C.soft, border: `1px solid ${C.border}`, color: C.muted, fontSize: 11, fontWeight: 700 }}>{currentUser?.role || "admin"}</span>
-              </div>
-            )}
           />
 
           {!canViewReports ? (

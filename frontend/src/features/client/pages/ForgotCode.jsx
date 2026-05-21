@@ -3,6 +3,9 @@ import { useState, createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import bellevueLogo from "../../../assets/bellevue-logo.png";
 import SharedNavbar from "../../../components/SharedNavbar.jsx";
+import grandBallroomShowcase from "../../../assets/grand-ballroom-hires.jpg";
+import diningShowcase from "../../../assets/qsina-dining-hires.jpg";
+import towerShowcase from "../../../assets/tower-ballroom-hires.jpg";
 
 const ThemeContext = createContext({ isDark: true, toggle: () => {} });
 const useTheme = () => useContext(ThemeContext);
@@ -268,7 +271,7 @@ export default function ForgotCode() {
     }
     const parsed = parseLookup(trimmed);
     if (!parsed) {
-      setError("Enter your surname + last 2 phone digits. Example: abane35");
+      setError("Enter your surname followed by the last 2 digits of your phone number.");
       return;
     }
 
@@ -323,6 +326,175 @@ export default function ForgotCode() {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         @keyframes spin   { to { transform: rotate(360deg) } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes servicePanelIn { from { opacity: 0; transform: translateY(18px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes serviceVisualIn { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
+        .guest-service-shell {
+          position: relative;
+          z-index: 1;
+          min-height: 100vh;
+          display: grid;
+          grid-template-columns: minmax(380px, 42%) minmax(0, 58%);
+          padding-top: 64px;
+        }
+        .guest-service-left {
+          position: relative;
+          min-height: calc(100vh - 64px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: clamp(34px, 5vw, 72px) clamp(24px, 5vw, 84px);
+        }
+        .guest-service-back {
+          position: absolute;
+          top: clamp(18px, 3vh, 34px);
+          left: clamp(20px, 4vw, 52px);
+        }
+        .guest-service-visual {
+          min-height: calc(100vh - 64px);
+          display: flex;
+          align-items: stretch;
+          padding: clamp(22px, 3vw, 42px) clamp(22px, 4vw, 60px) clamp(22px, 3vw, 42px) 0;
+        }
+        .guest-service-visual__frame {
+          position: relative;
+          flex: 1;
+          overflow: hidden;
+          border-radius: 28px;
+          background-size: cover;
+          background-position: center;
+          min-height: 520px;
+          box-shadow: 0 34px 88px rgba(0,0,0,0.30), inset 0 0 0 1px rgba(255,250,241,0.12);
+          animation: serviceVisualIn 0.58s cubic-bezier(0.22,1,0.36,1) both;
+        }
+        .guest-service-visual__frame::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(90deg, rgba(10,9,8,0.62), rgba(10,9,8,0.12) 52%, rgba(10,9,8,0.48)),
+            radial-gradient(circle at 24% 20%, rgba(196,163,90,0.22), transparent 34%);
+        }
+        .guest-service-visual__content {
+          position: absolute;
+          left: clamp(24px, 4vw, 56px);
+          right: clamp(24px, 4vw, 56px);
+          bottom: clamp(24px, 4vw, 56px);
+          color: #fffaf1;
+          max-width: 440px;
+        }
+        .guest-service-visual__eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 14px;
+          color: #d8bd78;
+          font-family: ${F.label};
+          font-size: 10px;
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+        .guest-service-visual__eyebrow::before {
+          content: "";
+          width: 28px;
+          height: 1px;
+          background: #d8bd78;
+          opacity: 0.72;
+        }
+        .guest-service-visual__title {
+          margin: 0 0 12px;
+          font-family: ${F.display};
+          font-size: clamp(34px, 4vw, 58px);
+          font-weight: 500;
+          line-height: 0.96;
+        }
+        .guest-service-visual__copy {
+          margin: 0;
+          color: rgba(255,250,241,0.74);
+          font-size: 14px;
+          line-height: 1.72;
+          max-width: 370px;
+        }
+        .guest-service-visual__tile {
+          position: absolute;
+          width: clamp(126px, 15vw, 210px);
+          aspect-ratio: 1.38 / 1;
+          border-radius: 18px;
+          background-size: cover;
+          background-position: center;
+          box-shadow: 0 20px 46px rgba(0,0,0,0.26), inset 0 0 0 1px rgba(255,250,241,0.14);
+          overflow: hidden;
+        }
+        .guest-service-visual__tile::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.34));
+        }
+        .guest-service-visual__tile--one {
+          top: clamp(22px, 5vw, 70px);
+          right: clamp(20px, 4vw, 54px);
+        }
+        .guest-service-visual__tile--two {
+          top: clamp(150px, 20vw, 260px);
+          right: clamp(84px, 11vw, 178px);
+          width: clamp(110px, 13vw, 178px);
+        }
+        @media (max-width: 1080px) {
+          .guest-service-shell {
+            grid-template-columns: minmax(360px, 46%) minmax(0, 54%);
+          }
+          .guest-service-visual {
+            padding-right: clamp(18px, 3vw, 34px);
+          }
+          .guest-service-visual__frame {
+            min-height: 460px;
+          }
+          .guest-service-visual__tile--two {
+            display: none;
+          }
+        }
+        @media (max-width: 860px) {
+          .guest-service-shell {
+            display: flex;
+            flex-direction: column;
+          }
+          .guest-service-visual {
+            order: 1;
+            min-height: 300px;
+            padding: 20px 20px 0;
+          }
+          .guest-service-visual__frame {
+            min-height: 300px;
+            border-radius: 22px;
+          }
+          .guest-service-left {
+            order: 2;
+            min-height: auto;
+            padding: 26px 20px 44px;
+          }
+          .guest-service-back {
+            top: 18px;
+            left: 20px;
+          }
+          .guest-service-visual__tile {
+            display: none;
+          }
+        }
+        @media (max-width: 560px) {
+          .guest-service-visual {
+            min-height: 220px;
+            padding: 14px 14px 0;
+          }
+          .guest-service-visual__frame {
+            min-height: 220px;
+            border-radius: 18px;
+          }
+          .guest-service-visual__title {
+            font-size: 34px;
+          }
+          .guest-service-visual__copy {
+            display: none;
+          }
+        }
       `}</style>
 
       <div style={{
@@ -331,20 +503,7 @@ export default function ForgotCode() {
         position: "relative",
         transition: "background 0.30s",
       }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        @keyframes spin   { to { transform: rotate(360deg) } }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
 
-      <div style={{
-        minHeight: "100vh", fontFamily: F.body,
-        background: C.pageBg,
-        position: "relative",
-        transition: "background 0.30s",
-      }}>
-
-        {/* Background image */}
         {/* Background image */}
         <div style={{ position: "fixed", inset: 0, zIndex: 0 }}>
           <div style={{
@@ -352,14 +511,16 @@ export default function ForgotCode() {
             backgroundImage: "url('/src/assets/bg-login.jpeg')",
             backgroundSize: "cover", backgroundPosition: "center",
             filter: isDark
-              ? "blur(6px) brightness(0.35)"
-              : "blur(6px) brightness(0.45) saturate(0.4)",
-            transform: "scale(1.05)",
-            transition: "filter 0.40s",
+              ? "blur(3.5px) brightness(0.58) saturate(1.05)"
+              : "blur(3.5px) brightness(0.82) saturate(0.82)",
+            transform: "scale(1.025)",
+            transition: "filter 0.40s, transform 0.40s",
           }} />
           <div style={{
             position: "absolute", inset: 0,
-            background: isDark ? "rgba(12,11,10,0.75)" : "rgba(237,233,224,0.65)",
+            background: isDark
+              ? "radial-gradient(circle at 50% 42%, rgba(196,163,90,0.10), transparent 34%), linear-gradient(135deg, rgba(10,9,8,0.78), rgba(10,9,8,0.56))"
+              : "radial-gradient(circle at 50% 42%, rgba(196,163,90,0.12), transparent 36%), linear-gradient(135deg, rgba(250,246,238,0.78), rgba(242,234,219,0.62))",
             transition: "background 0.40s",
           }} />
         </div>
@@ -374,33 +535,22 @@ export default function ForgotCode() {
         />
 
         {/* Page body */}
-        <div style={{
-          position: "relative", zIndex: 1,
-          minHeight: "100vh",
-          display: "flex",
-          paddingTop: 64,
-        }}>
-          <div style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "clamp(40px,6vh,80px) clamp(20px,6vw,80px)",
-            minHeight: "calc(100vh - 64px)",
-          }}>
+        <div className="guest-service-shell">
+          <div className="guest-service-left">
 
             {/* Back button */}
-            <div style={{ position: "absolute", top: 80, left: "clamp(16px,4vw,40px)" }}>
+            <div className="guest-service-back">
               <button
                 onClick={() => navigate("/manage-booking")}
                 title="Go back"
                 style={{
                   width: 36, height: 36, borderRadius: "50%",
-                  background: "transparent",
+                  background: isDark ? "rgba(17,16,9,0.58)" : "rgba(255,255,255,0.58)",
                   border: `1px solid ${C.borderDefault}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   cursor: "pointer", transition: "all 0.18s", padding: 0,
+                  backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+                  boxShadow: isDark ? "0 12px 28px rgba(0,0,0,0.22)" : "0 12px 28px rgba(78,60,32,0.12)",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = C.borderAccent;
@@ -408,7 +558,7 @@ export default function ForgotCode() {
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.borderColor = C.borderDefault;
-                  e.currentTarget.style.background  = "transparent";
+                  e.currentTarget.style.background  = isDark ? "rgba(17,16,9,0.58)" : "rgba(255,255,255,0.58)";
                 }}
               >
                 <svg
@@ -430,11 +580,26 @@ export default function ForgotCode() {
             </div>
 
             {/* ── Card ── */}
-            <div style={{ width: "100%", maxWidth: 420 }}>
+            <div style={{
+              width: "100%",
+              maxWidth: results ? 520 : 462,
+              padding: results ? 0 : "clamp(24px,3vw,34px)",
+              borderRadius: results ? 0 : 24,
+              background: results ? "transparent" : (isDark
+                ? "linear-gradient(145deg, rgba(255,250,241,0.075), rgba(255,250,241,0.025)), rgba(17,16,9,0.70)"
+                : "linear-gradient(145deg, rgba(255,255,255,0.88), rgba(255,250,241,0.66)), rgba(255,255,255,0.62)"),
+              border: results ? "none" : `1px solid ${isDark ? "rgba(255,250,241,0.13)" : "rgba(140,107,42,0.17)"}`,
+              boxShadow: results ? "none" : (isDark
+                ? "0 28px 70px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.08)"
+                : "0 28px 70px rgba(78,60,32,0.16), inset 0 1px 0 rgba(255,255,255,0.72)"),
+              backdropFilter: results ? undefined : "blur(18px) saturate(1.08)",
+              WebkitBackdropFilter: results ? undefined : "blur(18px) saturate(1.08)",
+              animation: "servicePanelIn 0.48s cubic-bezier(0.22,1,0.36,1) both",
+            }}>
 
               {/* Header — hidden once results appear */}
               {!results && (
-                <div style={{ marginBottom: 40, animation: "fadeUp 0.32s ease" }}>
+                <div style={{ marginBottom: 28, animation: "fadeUp 0.32s ease" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                     <span style={{ display: "inline-block", width: 24, height: "1px", background: C.gold, opacity: 0.6 }} />
                     <span style={{
@@ -453,7 +618,7 @@ export default function ForgotCode() {
                   </h1>
                   <p style={{
                     fontFamily: F.body, fontSize: 13.5, color: C.textSecondary,
-                    margin: "0 0 -20px", lineHeight: 1.70,
+                    margin: 0, lineHeight: 1.72,
                   }}>
                     Enter your combination code to locate your booking reference.
                   </p>
@@ -466,8 +631,8 @@ export default function ForgotCode() {
 
                   {/* How-it-works hint */}
                   <div style={{
-                    padding: "12px 14px", borderRadius: 8, marginBottom: 20,
-                    background: C.goldFaint, border: `1px solid ${C.borderAccent}`,
+                    padding: "12px 14px", borderRadius: 12, marginBottom: 20,
+                    background: isDark ? "rgba(196,163,90,0.075)" : "rgba(140,107,42,0.065)", border: `1px solid ${C.borderAccent}`,
                     display: "flex", gap: 12, alignItems: "flex-start",
                   }}>
                     <div style={{
@@ -495,10 +660,7 @@ export default function ForgotCode() {
                         fontFamily: F.body, fontSize: 12,
                         color: C.textSecondary, lineHeight: 1.65,
                       }}>
-                        Combine your surname with the last 2 digits of your phone number.<br />
-                        <span style={{ color: C.textPrimary, fontWeight: 500 }}>
-                          Example: "abane35"
-                        </span>
+                        Combine your surname with the last 2 digits of your phone number.
                       </div>
                     </div>
                   </div>
@@ -532,14 +694,14 @@ export default function ForgotCode() {
                       style={{
                         width: "100%", boxSizing: "border-box",
                         padding: "14px 18px",
-                        border: `1.5px solid ${focused ? C.borderAccent : C.borderDefault}`,
-                        borderRadius: 10,
-                        background: C.surfaceInput,
+                        border: `1px solid ${focused ? C.borderAccent : C.borderDefault}`,
+                        borderRadius: 12,
+                        background: isDark ? "rgba(255,250,241,0.055)" : "rgba(255,255,255,0.76)",
                         fontFamily: F.mono, fontSize: 17, fontWeight: 500,
                         letterSpacing: "0.06em", color: C.textPrimary,
                         outline: "none",
-                        transition: "border-color 0.18s, box-shadow 0.18s",
-                        boxShadow: focused ? C.inputFocusShadow : "none",
+                        transition: "border-color 0.18s, box-shadow 0.18s, background 0.18s",
+                        boxShadow: focused ? `${C.inputFocusShadow}, inset 0 1px 0 rgba(255,255,255,0.04)` : "inset 0 1px 0 rgba(255,255,255,0.035)",
                         colorScheme: isDark ? "dark" : "light",
                       }}
                     />
@@ -572,9 +734,9 @@ export default function ForgotCode() {
                       width: "100%", padding: "14px",
                       background: searching
                         ? (isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)")
-                        : C.gold,
+                        : `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`,
                       border: `1px solid ${searching ? C.borderDefault : "transparent"}`,
-                      borderRadius: 10,
+                      borderRadius: 12,
                       fontFamily: F.label, fontSize: 10, fontWeight: 700,
                       letterSpacing: "0.18em", textTransform: "uppercase",
                       color: searching ? C.textSecondary : C.textOnAccent,
@@ -583,9 +745,10 @@ export default function ForgotCode() {
                       display: "flex", alignItems: "center",
                       justifyContent: "center", gap: 10,
                       marginBottom: 0,
+                      boxShadow: searching ? "none" : "0 14px 26px rgba(140,107,42,0.22)",
                     }}
                     onMouseEnter={(e) => { if (!searching) e.currentTarget.style.background = C.goldLight; }}
-                    onMouseLeave={(e) => { if (!searching) e.currentTarget.style.background = C.gold; }}
+                    onMouseLeave={(e) => { if (!searching) e.currentTarget.style.background = `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`; }}
                   >
                     {searching ? (
                       <>
@@ -835,7 +998,28 @@ export default function ForgotCode() {
               )}
             </div>
           </div>
-          </div>
+          <aside className="guest-service-visual" aria-hidden="true">
+            <div
+              className="guest-service-visual__frame"
+              style={{ backgroundImage: `url(${grandBallroomShowcase})` }}
+            >
+              <div
+                className="guest-service-visual__tile guest-service-visual__tile--one"
+                style={{ backgroundImage: `url(${diningShowcase})` }}
+              />
+              <div
+                className="guest-service-visual__tile guest-service-visual__tile--two"
+                style={{ backgroundImage: `url(${towerShowcase})` }}
+              />
+              <div className="guest-service-visual__content">
+                <div className="guest-service-visual__eyebrow">The Bellevue Manila</div>
+                <h2 className="guest-service-visual__title">Reference Recovery</h2>
+                <p className="guest-service-visual__copy">
+                  A refined guest-service path for finding your reservation details with less friction.
+                </p>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
     </ThemeContext.Provider>

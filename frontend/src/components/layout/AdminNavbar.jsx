@@ -1,20 +1,17 @@
 // src/components/layout/AdminNavbar.jsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { authAPI } from "../../services/authAPI";
 import bellevueLogo from "../../assets/bellevue-logo.png";
 
-function AdminNavbar({ onLogout, pendingCount: pendingProp, leftContent = null }) {
+function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
   const navigate  = useNavigate();
   const location  = useLocation();
   const [pending, setPending] = useState(pendingProp ?? 0);
-  const [accountOpen, setAccountOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
   const [profileMessage, setProfileMessage] = useState(null);
-  const menuRef = useRef(null);
   const currentUser = authAPI.getCurrentUser() || {};
   const [profile, setProfile] = useState({
     name: currentUser.name || "",
@@ -41,42 +38,18 @@ function AdminNavbar({ onLogout, pendingCount: pendingProp, leftContent = null }
   }, [pendingProp]);
 
   useEffect(() => {
-    const closeMenu = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setAccountOpen(false);
-      }
+    const openAccountSettings = () => {
+      resetProfileForm();
+      setSettingsOpen(true);
     };
 
-    document.addEventListener("mousedown", closeMenu);
-    return () => document.removeEventListener("mousedown", closeMenu);
+    window.addEventListener("bellevue:open-account-settings", openAccountSettings);
+    return () => window.removeEventListener("bellevue:open-account-settings", openAccountSettings);
   }, []);
 
   const isNotifActive = location.pathname === "/admin/notifications";
   const roleLabel = roleLabels[currentUser.role] || currentUser.role || "Admin";
   const displayName = currentUser.name || currentUser.username || "Admin";
-  const initials = displayName
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-  const handleLogout = async () => {
-    if (loggingOut) return;
-    setLoggingOut(true);
-
-    try {
-      if (onLogout) {
-        await onLogout();
-        return;
-      }
-
-      await authAPI.logout();
-      navigate("/login", { replace: true });
-    } finally {
-      setLoggingOut(false);
-    }
-  };
 
   const submitProfile = async (event) => {
     event.preventDefault();
@@ -124,13 +97,6 @@ function AdminNavbar({ onLogout, pendingCount: pendingProp, leftContent = null }
       password_confirmation: "",
     });
     setProfileMessage(null);
-  };
-
-  const openSettings = () => {
-    resetProfileForm();
-    setEditingProfile(false);
-    setSettingsOpen(true);
-    setAccountOpen(false);
   };
 
   const closeSettings = () => {
@@ -233,68 +199,6 @@ function AdminNavbar({ onLogout, pendingCount: pendingProp, leftContent = null }
           )}
         </button>
 
-        <div ref={menuRef} style={{ position: "relative" }}>
-          <button
-            onClick={() => setAccountOpen((open) => !open)}
-            title="Account menu"
-            style={{
-              width: 38,
-              height: 38,
-              border: accountOpen ? "1px solid rgba(201,168,76,0.45)" : "1px solid rgba(0,0,0,0.08)",
-              background: accountOpen ? "rgba(201,168,76,0.10)" : "#FFFFFF",
-              color: "#8C6B2A",
-              borderRadius: "50%",
-              fontFamily: "Montserrat, sans-serif",
-              fontSize: 12,
-              fontWeight: 800,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "all 0.15s ease",
-              overflow: "hidden",
-            }}
-          >
-            {initials || "A"}
-          </button>
-
-          {accountOpen && (
-            <div style={{
-              position: "absolute",
-              top: 46,
-              right: 0,
-              width: 286,
-              background: "#FFFFFF",
-              border: "1px solid rgba(0,0,0,0.10)",
-              borderRadius: 12,
-              boxShadow: "0 18px 50px rgba(0,0,0,0.14)",
-              padding: 14,
-              zIndex: 3100,
-              fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-            }}>
-              <div style={{ display: "flex", gap: 11, alignItems: "center", paddingBottom: 12 }}>
-                <div style={{ width: 42,height: 42,borderRadius: "50%",background: "rgba(140,107,42,0.10)",border: "1px solid rgba(140,107,42,0.24)",color: "#8C6B2A",display: "flex",alignItems: "center",justifyContent: "center",fontWeight: 800,fontSize: 13,flexShrink: 0 }}>
-                  {initials || "A"}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 14,fontWeight: 800,color: "#18140E",whiteSpace: "nowrap",overflow: "hidden",textOverflow: "ellipsis" }}>{displayName}</div>
-                  <div style={{ fontSize: 12,color: "#7A7060",whiteSpace: "nowrap",overflow: "hidden",textOverflow: "ellipsis" }}>{currentUser.email || currentUser.username || "Account"}</div>
-                </div>
-              </div>
-
-              <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", display: "grid", gap: 8, paddingTop: 10 }}>
-                <button onClick={openSettings} style={menuButtonStyle()}>
-                  <UserIcon />
-                  Account settings
-                </button>
-                <button onClick={handleLogout} disabled={loggingOut} style={{ ...menuButtonStyle(), color: "#A03838", opacity:loggingOut?0.70:1, cursor:loggingOut?"not-allowed":"pointer" }}>
-                  <LogoutIcon />
-                  {loggingOut ? "Logging out..." : "Logout"}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
 
       {settingsOpen && (
@@ -403,42 +307,6 @@ function profileInputStyle() {
     background:"#FFFFFF",
     outline:"none",
   };
-}
-
-function menuButtonStyle() {
-  return {
-    width:"100%",
-    display:"flex",
-    alignItems:"center",
-    gap:10,
-    padding:"10px 8px",
-    border:"none",
-    borderRadius:7,
-    background:"transparent",
-    color:"#18140E",
-    fontSize:13,
-    cursor:"pointer",
-    textAlign:"left",
-  };
-}
-
-function UserIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21a8 8 0 0 0-16 0" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
-
-function LogoutIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16,17 21,12 16,7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  );
 }
 
 export default AdminNavbar;

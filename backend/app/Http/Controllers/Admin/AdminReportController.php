@@ -49,12 +49,14 @@ class AdminReportController extends Controller
     {
         $validated = $request->validate([
             'year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+            'month' => ['nullable', 'integer', 'min:1', 'max:12'],
         ]);
 
         return response()->json(
             $this->reservationService->getMonthlyReports(
                 $request->attributes->get('admin'),
                 (int) ($validated['year'] ?? now()->year),
+                isset($validated['month']) ? (int) $validated['month'] : null,
             )
         );
     }

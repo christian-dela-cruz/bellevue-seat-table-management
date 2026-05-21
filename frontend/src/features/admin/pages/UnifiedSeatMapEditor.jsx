@@ -137,7 +137,7 @@ export default function UnifiedSeatMapEditor() {
   const F         = FONTS[config.theme];
 
   return (
-    <div style={{ minHeight: "100vh", fontFamily: F.body, background: C.pageBg, color: C.textPrimary }}>
+    <div style={{ height: "100vh", overflow: "hidden", fontFamily: F.body, background: C.pageBg, color: C.textPrimary }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700;800&display=swap');
@@ -147,7 +147,7 @@ export default function UnifiedSeatMapEditor() {
 
       <AdminNavbar onLogout={handleLogout} />
 
-      <div style={{ display: "flex", minHeight: "100vh" }}>
+      <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0 }}>
         <Sidebar
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen(!sidebarOpen)}

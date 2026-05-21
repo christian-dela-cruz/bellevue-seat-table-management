@@ -729,7 +729,7 @@ export default function Accounts() {
         }
       `}</style>
       <AdminNavbar />
-      <div style={{ display:"flex" }}>
+      <div style={{ display:"flex", height:"calc(100vh - 60px)", minHeight:0, overflow:"hidden" }}>
         <Sidebar activeNav="accounts" isOpen={sidebarOpen} onToggle={()=>setSidebarOpen(!sidebarOpen)} />
         <main style={{ flex:1,padding:"30px 32px 42px",overflow:"auto",height:"calc(100vh - 60px)" }}>
           <div style={{ maxWidth:1440,display:"grid",gap:18 }}>

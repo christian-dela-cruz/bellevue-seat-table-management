@@ -613,10 +613,10 @@ export default function CancelledDashboard() {
         ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 4px; }
       `}</style>
 
-      <div style={{ minHeight: "100vh", fontFamily: F.body, background: C.pageBg, color: C.textPrimary }}>
+      <div style={{ height: "100vh", overflow: "hidden", fontFamily: F.body, background: C.pageBg, color: C.textPrimary }}>
         <AdminNavbar />
 
-        <div style={{ display: "flex", minHeight: "100vh" }}>
+        <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0 }}>
           <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} activeNav="cancelled" />
 
           <div style={{ flex: 1, minWidth: 0, height: "calc(100vh - 60px)", background: C.pageBg, overflow: "auto" }}>

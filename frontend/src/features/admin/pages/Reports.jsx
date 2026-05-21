@@ -61,6 +61,22 @@ function readableDate(value) {
     : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function monthName(month, format = "long") {
+  const date = new Date(2026, Number(month || 1) - 1, 1);
+  return date.toLocaleDateString("en-US", { month: format });
+}
+
+function monthLabel(month, year) {
+  return `${monthName(month)} ${year}`;
+}
+
+function monthOptions() {
+  return Array.from({ length: 12 }, (_, index) => ({
+    value: String(index + 1),
+    label: monthName(index + 1),
+  }));
+}
+
 function readableDateTime(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -530,19 +546,23 @@ function TransactionMonitor({ transactionReport, isGlobal, sort, onSort }) {
   );
 }
 
-function MonthlyLineChart({ months }) {
-  const data = (months || []).map((month) => ({
-    ...month,
-    label: month.label || month.month,
-    reservations: Number(month.reservations || 0),
-    promotion_mentions: Number(month.promotion_mentions || 0),
+function MonthlyLineChart({
+  months,
+  description = "Reservation volume by month, with promotion mentions shown as a comparison line.",
+  xAxisKey = "label",
+}) {
+  const data = (months || []).map((row) => ({
+    ...row,
+    label: row.label || row.month || row.date_range || row.date,
+    reservations: Number(row.reservations || 0),
+    promotion_mentions: Number(row.promotion_mentions || 0),
   }));
   const labelInterval = data.length > 16 ? Math.ceil(data.length / 8) - 1 : 0;
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ fontSize: 12.5, color: C.muted }}>Reservation volume by month, with promotion mentions shown as a comparison line.</div>
+        <div style={{ fontSize: 12.5, color: C.muted }}>{description}</div>
       </div>
 
       <div style={{ width: "100%", minHeight: 320, borderRadius: 14, background: "linear-gradient(135deg,#FFFFFF 0%,#FAF8F4 58%,#F1ECE1 100%)", border: `1px solid ${C.divider}`, padding: "16px 12px 8px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)" }}>
@@ -560,12 +580,12 @@ function MonthlyLineChart({ months }) {
             </defs>
             <CartesianGrid stroke="rgba(24,20,14,0.07)" vertical={false} />
             <XAxis
-              dataKey="label"
+              dataKey={xAxisKey}
               interval={labelInterval}
               tick={{ fill: C.muted, fontSize: 11 }}
               axisLine={false}
               tickLine={false}
-              minTickGap={12}
+              minTickGap={10}
               padding={{ left: 12, right: 16 }}
             />
             <YAxis
@@ -582,7 +602,7 @@ function MonthlyLineChart({ months }) {
               iconType="plainline"
               wrapperStyle={{ fontSize: 11, color: C.muted, paddingBottom: 12 }}
               payload={[
-                { value: "Reservations", type: "plainline", color: C.blue },
+                { value: "Reservation activity", type: "plainline", color: C.blue },
                 { value: "Promotion mentions", type: "plainline", color: C.gold },
               ]}
             />
@@ -631,40 +651,50 @@ function MonthlyLineChart({ months }) {
   );
 }
 
-function MonthlyReports({ monthlyReport }) {
-  const months = monthlyReport.months || [];
-  const outlets = monthlyReport.outlets || [];
-  const summary = monthlyReport.summary || {};
+function MonthlyReports({ monthlyReport, granularity = "daily", monthLabelText }) {
+  const selectedMonth = monthlyReport.selected_month || {};
+  const outlets = selectedMonth.outlets || [];
+  const summary = selectedMonth.summary || {};
+  const activityRows = granularity === "weekly" ? (selectedMonth.weeks || []) : (selectedMonth.days || []);
+  const chartDescription = granularity === "weekly"
+    ? `Weekly reservation density for ${monthLabelText}, useful for management review and staffing rhythm.`
+    : `Daily reservation activity for ${monthLabelText}, showing spikes, quiet dates, and promotion mentions.`;
   const reservations = summary.reservations || 0;
   const reserved = summary.reserved || summary.approved || 0;
   const approvalRate = reservations ? Math.round((reserved / reservations) * 100) : 0;
-  const peakMonth = summary.peak_month || months.reduce((best, month) => ((month.reservations || 0) > (best.reservations || 0) ? month : best), {}).label || "-";
-  const promoMonth = months.reduce((best, month) => ((month.promotion_mentions || 0) > (best.promotion_mentions || 0) ? month : best), {}).label || "-";
-  const activeMonths = months.filter((month) => (month.reservations || 0) > 0).length;
+  const peakPeriod = granularity === "weekly"
+    ? (summary.peak_week || activityRows.reduce((best, row) => ((row.reservations || 0) > (best.reservations || 0) ? row : best), {}).label || "-")
+    : (summary.peak_day || activityRows.reduce((best, row) => ((row.reservations || 0) > (best.reservations || 0) ? row : best), {}).label || "-");
+  const promoPeriod = activityRows.reduce((best, row) => ((row.promotion_mentions || 0) > (best.promotion_mentions || 0) ? row : best), {}).label || "-";
+  const activeDays = summary.active_days || (selectedMonth.days || []).filter((day) => (day.reservations || 0) > 0).length;
   const topOutlet = outlets[0];
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
-        <MetricCard label="Year Total" value={reservations} detail={`${activeMonths} active months`} tone="blue" />
+        <MetricCard label="Month Total" value={reservations} detail={`${activeDays} active day${activeDays === 1 ? "" : "s"}`} tone="blue" />
         <MetricCard label="Approval Rate" value={`${approvalRate}%`} detail={`${reserved} approved`} tone="green" />
-        <MetricCard label="Peak Month" value={peakMonth} tone="gold" />
+        <MetricCard label={granularity === "weekly" ? "Peak Week" : "Peak Date"} value={peakPeriod} tone="gold" />
         <MetricCard label="Promotions" value={summary.promotion_mentions || 0} detail="mentions" tone="slate" />
       </div>
 
       <div className="reports-grid" style={{ display: "grid", gridTemplateColumns: "minmax(320px,1.2fr) minmax(280px,0.8fr)", gap: 14 }}>
-        <SummaryPanel title={`Monthly Trend ${monthlyReport.year || ""}`}>
+        <SummaryPanel title={`Reservation Activity - ${monthLabelText}`}>
           <div style={{ display: "grid", gap: 12 }}>
-            <MonthlyLineChart months={months} />
+            <MonthlyLineChart
+              months={activityRows}
+              description={chartDescription}
+              xAxisKey="label"
+            />
           </div>
         </SummaryPanel>
 
-        <SummaryPanel title="Monthly Management Highlights">
+        <SummaryPanel title="Operational Highlights">
           <div style={{ display: "grid", gap: 12 }}>
-            <InsightRow label="Busiest month" value={peakMonth} detail="Highest reservation volume in the selected year." tone="gold" />
-            <InsightRow label="Top outlet" value={topOutlet?.outlet || "-"} detail={topOutlet ? `${topOutlet.reservations || 0} reservations recorded.` : "No outlet activity yet."} tone="blue" />
-            <InsightRow label="Promotion activity" value={promoMonth} detail={`${summary.promotion_mentions || 0} total promotion mentions.`} tone="slate" />
-            <InsightRow label="Reservation health" value={`${approvalRate}% approved`} detail="Quick read for monthly operations review." tone="green" />
+            <InsightRow label={granularity === "weekly" ? "Busiest week" : "Busiest date"} value={peakPeriod} detail={`Highest reservation volume in ${monthLabelText}.`} tone="gold" />
+            <InsightRow label="Top outlet" value={topOutlet?.outlet || "-"} detail={topOutlet ? `${topOutlet.reservations || 0} reservations recorded this month.` : "No outlet activity yet."} tone="blue" />
+            <InsightRow label="Promotion activity" value={promoPeriod} detail={`${summary.promotion_mentions || 0} total promotion mentions.`} tone="slate" />
+            <InsightRow label="Reservation health" value={`${approvalRate}% approved`} detail="Quick read for month-level operational review." tone="green" />
           </div>
         </SummaryPanel>
       </div>
@@ -680,7 +710,7 @@ function MonthlyReports({ monthlyReport }) {
         </SummaryPanel>
 
         <TableCard
-          title="Top Outlets This Year"
+          title="Top Outlets This Month"
           headers={["Outlet", "Reservations"]}
           rows={outlets.slice(0, 6)}
           renderRow={(outlet) => (
@@ -728,7 +758,10 @@ function YearlyReports({ monthlyReport, transactionSummary }) {
       <div className="reports-grid" style={{ display: "grid", gridTemplateColumns: "minmax(320px,1.15fr) minmax(280px,0.85fr)", gap: 14 }}>
         <SummaryPanel title={`Annual Activity ${monthlyReport.year || ""}`}>
           <div style={{ display: "grid", gap: 12 }}>
-            <MonthlyLineChart months={months} />
+            <MonthlyLineChart
+              months={months}
+              description="Annual reservation seasonality by month, with promotion mentions shown as a comparison line."
+            />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10 }}>
               {quarters.map((quarter) => (
                 <div key={quarter.label} style={{ border: `1px solid ${C.divider}`, borderRadius: 9, background: C.soft, padding: 10 }}>
@@ -857,6 +890,8 @@ export default function Reports() {
   const [startDate, setStartDate] = useState(monthStart());
   const [endDate, setEndDate] = useState(today());
   const [reportYear, setReportYear] = useState(today().slice(0, 4));
+  const [reportMonth, setReportMonth] = useState(String(Number(today().slice(5, 7))));
+  const [monthlyGranularity, setMonthlyGranularity] = useState("daily");
   const [selectedOutlet, setSelectedOutlet] = useState("ALL");
   const [selectedOutletGroup, setSelectedOutletGroup] = useState("all");
   const [outletSort, setOutletSort] = useState({ key: "total_reservations", direction: "desc" });
@@ -879,12 +914,13 @@ export default function Reports() {
 
     try {
       const selectedYear = Number(reportYear) || Number(today().slice(0, 4));
+      const selectedMonth = Number(reportMonth) || Number(today().slice(5, 7));
       const [outletData, transactionData, monthlyData] = await Promise.all([
         reportAPI.getOutletReports({ start_date: startDate, end_date: endDate }),
         canViewTransactions
           ? reportAPI.getTransactionReports({ start_date: startDate, end_date: endDate })
           : Promise.resolve(null),
-        reportAPI.getMonthlyReports({ year: selectedYear }),
+        reportAPI.getMonthlyReports({ year: selectedYear, month: selectedMonth }),
       ]);
       setReport(outletData);
       if (transactionData) setTransactionReport(transactionData);
@@ -956,6 +992,12 @@ export default function Reports() {
   const showOutletFilter = activeTab === "summary" || activeTab === "outlets";
   const currentYear = Number(today().slice(0, 4));
   const yearOptions = Array.from({ length: 6 }, (_, index) => currentYear - 3 + index);
+  const monthSelectOptions = monthOptions();
+  const selectedMonthLabel = monthlyReport.selected_month?.label || monthLabel(reportMonth, reportYear);
+  const trendFilterDescription = activeTab === "monthly"
+    ? "Monthly Performance focuses on one selected month. Use Daily or Weekly to change the activity grouping."
+    : "Yearly reports use Jan-Dec to show annual seasonality and peak business periods.";
+  const trendFilterBadge = activeTab === "monthly" ? "Month" : "Year";
   const reservedCount = (statuses.reserved || 0) + (statuses.approved || 0);
   const totalReservations = summary.reservations || 0;
   const handleExportCsv = () => {
@@ -978,6 +1020,10 @@ export default function Reports() {
       ["Monthly", "Reservations", "Promotion Mentions"],
       ...(monthlyReport.months || []).map((month) => [month.label, month.reservations || 0, month.promotion_mentions || 0]),
       [],
+      [`${selectedMonthLabel} ${monthlyGranularity === "weekly" ? "Weekly" : "Daily"} Activity`, "Reservations", "Promotion Mentions"],
+      ...((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || [])
+        .map((row) => [row.label, row.reservations || 0, row.promotion_mentions || 0]),
+      [],
       ["Outlet", "Reservations", "Guests", "Reserved", "Pending", "Rejected", "Cancelled", "Dine-In", "Promo"],
       ...filteredOutlets.map((outlet) => [
         outlet.name,
@@ -991,7 +1037,10 @@ export default function Reports() {
         outlet.promotion_mentions || 0,
       ]),
     ];
-    downloadCsv(isTrendTab ? `outlet-report-${reportYear}.csv` : `outlet-report-${startDate}-to-${endDate}.csv`, rows);
+    const trendName = activeTab === "monthly"
+      ? `outlet-report-${reportYear}-${String(reportMonth).padStart(2, "0")}-${monthlyGranularity}.csv`
+      : `outlet-report-${reportYear}.csv`;
+    downloadCsv(isTrendTab ? trendName : `outlet-report-${startDate}-to-${endDate}.csv`, rows);
   };
   const reportGroups = [
     {
@@ -1004,10 +1053,10 @@ export default function Reports() {
     },
     {
       label: "Trend Analytics",
-      description: "Year-based reporting for monthly and annual trends.",
+      description: "Month-focused operations and annual seasonality.",
       tabs: [
-        { id: "monthly", label: "Monthly" },
-        { id: "yearly", label: "Yearly" },
+        { id: "monthly", label: "Monthly Performance" },
+        { id: "yearly", label: "Yearly Trends" },
       ],
     },
     ...(canViewTransactions
@@ -1019,7 +1068,9 @@ export default function Reports() {
       : []),
   ];
   const activeReport = reportGroups.flatMap((group) => group.tabs).find((tab) => tab.id === activeTab);
-  const filterModeLabel = isTrendTab ? `${reportYear} trend reporting` : `${dateRangeLabel} date range`;
+  const filterModeLabel = activeTab === "monthly"
+    ? `${selectedMonthLabel} ${monthlyGranularity} activity`
+    : isTrendTab ? `${reportYear} annual trend reporting` : `${dateRangeLabel} date range`;
 
   return (
     <div style={{ minHeight: "100vh", background: C.page, fontFamily: F.body }}>
@@ -1049,7 +1100,7 @@ export default function Reports() {
         }
       `}</style>
       <AdminNavbar />
-      <div style={{ display: "flex" }}>
+      <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0, overflow: "hidden" }}>
         <Sidebar activeNav="reports" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
         <main style={{ flex: 1, height: "calc(100vh - 60px)", overflow: "auto", padding: "30px 32px 42px" }}>
           <AdminPageHeader
@@ -1063,14 +1114,56 @@ export default function Reports() {
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
                   <div>
                     <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>{isTrendTab ? "Trend Filter" : "Date Range Filter"}</div>
-                    <div style={{ marginTop: 2, fontSize: 11.5, color: C.muted }}>{isTrendTab ? "Monthly and yearly reports use the selected year only." : "Summary, outlets, and audit trail use this date range."}</div>
+                    <div style={{ marginTop: 2, fontSize: 11.5, color: C.muted }}>{isTrendTab ? trendFilterDescription : "Summary, outlets, and audit trail use this date range."}</div>
                   </div>
                   <span style={{ borderRadius: 999, background: isTrendTab ? C.blueFaint : C.goldFaint, color: isTrendTab ? C.blue : C.gold, padding: "5px 8px", fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                    {isTrendTab ? "Year" : "Range"}
+                    {isTrendTab ? trendFilterBadge : "Range"}
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                  {isTrendTab ? (
+                  {activeTab === "monthly" ? (
+                    <>
+                      <FilterField label="Month">
+                        <select value={reportMonth} onChange={(e) => setReportMonth(e.target.value)} style={{ ...filterStyle(), minWidth: 150 }}>
+                          {monthSelectOptions.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
+                        </select>
+                      </FilterField>
+                      <FilterField label="Year">
+                        <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} style={{ ...filterStyle(), minWidth: 120 }}>
+                          {yearOptions.map((year) => <option key={year} value={String(year)}>{year}</option>)}
+                        </select>
+                      </FilterField>
+                      <FilterField label="Group By">
+                        <div style={{ display: "inline-flex", height: 38, border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden", background: C.surface }}>
+                          {["daily", "weekly"].map((mode) => {
+                            const active = monthlyGranularity === mode;
+                            return (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => setMonthlyGranularity(mode)}
+                                style={{
+                                  border: "none",
+                                  borderRight: mode === "daily" ? `1px solid ${C.border}` : "none",
+                                  background: active ? C.goldFaint : "transparent",
+                                  color: active ? C.gold : C.muted,
+                                  padding: "0 12px",
+                                  fontFamily: F.label,
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  letterSpacing: "0.10em",
+                                  textTransform: "uppercase",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {mode}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </FilterField>
+                    </>
+                  ) : activeTab === "yearly" ? (
                     <FilterField label="Report Year">
                       <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} style={{ ...filterStyle(), minWidth: 150 }}>
                         {yearOptions.map((year) => <option key={year} value={String(year)}>{year}</option>)}
@@ -1150,13 +1243,13 @@ export default function Reports() {
               )}
 
               {activeTab === "monthly" && (
-                <Section title="Monthly Reporting" subtitle="Year-to-date monthly view based on scheduled event dates, with promotions, outlet activity, and statuses.">
-                  <MonthlyReports monthlyReport={monthlyReport} />
+                <Section title="Monthly Performance" subtitle={`Showing reservation activity for ${selectedMonthLabel}. Switch between daily precision and weekly summaries for operational review.`}>
+                  <MonthlyReports monthlyReport={monthlyReport} granularity={monthlyGranularity} monthLabelText={selectedMonthLabel} />
                 </Section>
               )}
 
               {activeTab === "yearly" && (
-                <Section title="Yearly Management Report" subtitle="Annual view for performance review, presentation reporting, and management-level decisions.">
+                <Section title="Yearly Trends" subtitle={`Annual Jan-Dec overview for ${reportYear}, showing seasonality, reservation distribution, and peak business periods.`}>
                   <YearlyReports monthlyReport={monthlyReport} transactionSummary={transactionSummary} />
                 </Section>
               )}

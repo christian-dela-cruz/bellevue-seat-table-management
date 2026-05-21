@@ -1459,7 +1459,7 @@ function NotificationDashboard() {
         ::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.10);border-radius:4px;}
       `}</style>
 
-      <div style={{ minHeight:"100vh",fontFamily:F.body,background:C.pageBg,color:C.textPrimary,display:"flex",flexDirection:"column",position:"relative" }}>
+      <div style={{ height:"100vh",overflow:"hidden",fontFamily:F.body,background:C.pageBg,color:C.textPrimary,display:"flex",flexDirection:"column",position:"relative" }}>
 
         <div style={{ position:"fixed",inset:0,zIndex:0 }}>
           <div style={{ position:"absolute",inset:0,backgroundImage:"url('/src/assets/bg-login.jpeg')",backgroundSize:"cover",backgroundPosition:"center",filter:C.bgFilter,transform:"scale(1.05)",transition:"filter 0.40s" }}/>
@@ -1479,7 +1479,7 @@ function NotificationDashboard() {
           )}
         />
 
-        <div style={{ position:"relative",zIndex:1,minHeight:"calc(100vh - 60px)",display:"flex",flexDirection:"column" }}>
+        <div style={{ position:"relative",zIndex:1,height:"calc(100vh - 60px)",minHeight:0,display:"flex",flexDirection:"column",overflow:"auto" }}>
           {loading&&(
             <div style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16 }}>
               <Spinner C={C} size={22}/>

@@ -728,9 +728,10 @@ class ReservationService
         ];
     }
 
-    public function getMonthlyReports(?array $admin = null, ?int $year = null): array
+    public function getMonthlyReports(?array $admin = null, ?int $year = null, ?int $month = null): array
     {
         $year = $year ?: (int) now()->year;
+        $selectedMonth = max(1, min(12, $month ?: (int) now()->month));
 
         $reservations = $this->scopedReservationQuery($admin)
             ->with('venue')
@@ -792,6 +793,73 @@ class ReservationService
             ->values();
 
         $peakMonth = $months->sortByDesc('reservations')->first();
+        $selectedMonthDate = now()->setDate($year, $selectedMonth, 1)->startOfDay();
+        $selectedMonthReservations = $reservations
+            ->filter(fn (Reservation $reservation) => (int) $reservation->event_date?->format('n') === $selectedMonth)
+            ->values();
+        $daysInMonth = $selectedMonthDate->daysInMonth;
+
+        $formatActivityRow = function ($items): array {
+            return [
+                'reservations' => $items->count(),
+                'guests' => $items->sum('guests_count'),
+                'outlets' => $items
+                    ->map(fn (Reservation $reservation) => $this->roomLabel($reservation))
+                    ->filter()
+                    ->unique()
+                    ->count(),
+                'promotion_mentions' => $items->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
+                'pending' => $items->where('status', 'pending')->count(),
+                'reserved' => $items->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                'rejected' => $items->where('status', 'rejected')->count(),
+                'cancelled' => $items->where('status', 'cancelled')->count(),
+            ];
+        };
+
+        $days = collect(range(1, $daysInMonth))->map(function (int $day) use ($selectedMonthReservations, $selectedMonthDate, $formatActivityRow) {
+            $date = $selectedMonthDate->copy()->setDay($day);
+            $dateKey = $date->format('Y-m-d');
+            $items = $selectedMonthReservations
+                ->filter(fn (Reservation $reservation) => $reservation->event_date?->format('Y-m-d') === $dateKey)
+                ->values();
+
+            return array_merge([
+                'date' => $dateKey,
+                'day' => $day,
+                'label' => $date->format('M j'),
+                'short_label' => (string) $day,
+            ], $formatActivityRow($items));
+        });
+
+        $weeks = collect(range(1, (int) ceil($daysInMonth / 7)))->map(function (int $week) use ($selectedMonthReservations, $selectedMonthDate, $daysInMonth, $formatActivityRow) {
+            $startDay = (($week - 1) * 7) + 1;
+            $endDay = min($startDay + 6, $daysInMonth);
+            $startDate = $selectedMonthDate->copy()->setDay($startDay);
+            $endDate = $selectedMonthDate->copy()->setDay($endDay);
+            $items = $selectedMonthReservations
+                ->filter(function (Reservation $reservation) use ($startDate, $endDate) {
+                    $eventDate = $reservation->event_date;
+                    return $eventDate && $eventDate->betweenIncluded($startDate, $endDate);
+                })
+                ->values();
+
+            return array_merge([
+                'week' => $week,
+                'label' => "Week {$week}",
+                'date_range' => $startDate->format('M j') . ' - ' . $endDate->format('M j'),
+            ], $formatActivityRow($items));
+        });
+
+        $monthOutletSummary = $selectedMonthReservations
+            ->groupBy(fn (Reservation $reservation) => $this->roomLabel($reservation))
+            ->map(fn ($items, string $outlet) => array_merge([
+                'outlet' => $outlet,
+            ], $formatActivityRow($items)))
+            ->sortByDesc('reservations')
+            ->values();
+
+        $peakDay = $days->sortByDesc('reservations')->first();
+        $peakWeek = $weeks->sortByDesc('reservations')->first();
 
         return [
             'year' => $year,
@@ -808,6 +876,28 @@ class ReservationService
             ],
             'months' => $months->values()->toArray(),
             'outlets' => $outletSummary->take(8)->values()->toArray(),
+            'selected_month' => [
+                'year' => $year,
+                'month' => $selectedMonth,
+                'month_key' => sprintf('%d-%02d', $year, $selectedMonth),
+                'label' => $selectedMonthDate->format('F Y'),
+                'summary' => [
+                    'reservations' => $selectedMonthReservations->count(),
+                    'guests' => $selectedMonthReservations->sum('guests_count'),
+                    'outlets' => $monthOutletSummary->count(),
+                    'promotion_mentions' => $selectedMonthReservations->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
+                    'pending' => $selectedMonthReservations->where('status', 'pending')->count(),
+                    'reserved' => $selectedMonthReservations->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                    'rejected' => $selectedMonthReservations->where('status', 'rejected')->count(),
+                    'cancelled' => $selectedMonthReservations->where('status', 'cancelled')->count(),
+                    'active_days' => $days->where('reservations', '>', 0)->count(),
+                    'peak_day' => ($peakDay['reservations'] ?? 0) > 0 ? $peakDay['label'] : null,
+                    'peak_week' => ($peakWeek['reservations'] ?? 0) > 0 ? $peakWeek['label'] : null,
+                ],
+                'days' => $days->values()->toArray(),
+                'weeks' => $weeks->values()->toArray(),
+                'outlets' => $monthOutletSummary->take(8)->values()->toArray(),
+            ],
         ];
     }
 

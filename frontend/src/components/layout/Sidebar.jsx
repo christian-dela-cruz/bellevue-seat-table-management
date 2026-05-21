@@ -1,7 +1,7 @@
 // src/components/admin/Sidebar.jsx
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, ClipboardList, Map, UserCog, BarChart3, LayoutDashboard } from "lucide-react";
+import { X, ClipboardList, Map, UserCog, BarChart3, LayoutDashboard, Settings, LogOut, ChevronUp } from "lucide-react";
 import { authAPI } from "../../services/authAPI";
 
 const F = { body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" };
@@ -179,6 +179,9 @@ export default function Sidebar({
   isOpen = true,
   onToggle = () => {},
 }) {
+  const navigate = useNavigate();
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef(null);
   const visibleItems = NAV_ITEMS.filter((item) => !item.permission || authAPI.hasPermission(item.permission));
   const currentUser = authAPI.getCurrentUser();
   const displayName = String(currentUser?.name || currentUser?.username || "Admin User");
@@ -189,6 +192,28 @@ export default function Sidebar({
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("") || "A";
+
+  useEffect(() => {
+    const closeAccountMenu = (event) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target)) {
+        setAccountMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", closeAccountMenu);
+    return () => document.removeEventListener("mousedown", closeAccountMenu);
+  }, []);
+
+  const handleAccountSettings = () => {
+    setAccountMenuOpen(false);
+    window.dispatchEvent(new CustomEvent("bellevue:open-account-settings"));
+  };
+
+  const handleLogout = async () => {
+    setAccountMenuOpen(false);
+    await authAPI.logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <aside style={{
@@ -204,6 +229,12 @@ export default function Sidebar({
       position: "relative",
       zIndex: 5,
     }}>
+      <style>{`
+        @keyframes sidebarAccountMenuIn {
+          from { opacity: 0; transform: translateY(8px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
 
       {/* ── Top: logo area + hamburger ── */}
       <div style={{
@@ -292,25 +323,96 @@ export default function Sidebar({
 
       <div style={{ flex: 1 }} />
 
-      <div style={{
-        margin: isOpen ? "0 12px 14px" : "0 7px 14px",
-        paddingTop: 12,
-        borderTop: "1px solid rgba(140,107,42,0.14)",
+      <div
+        ref={accountMenuRef}
+        style={{
+        margin: isOpen ? "0 13px 12px" : "0 7px 12px",
+        paddingTop: 10,
+        borderTop: "1px solid rgba(140,107,42,0.10)",
+        position: "relative",
       }}>
-        <div style={{
+        {accountMenuOpen && (
+          <div
+            style={{
+              position: "absolute",
+              left: isOpen ? 0 : 48,
+              right: isOpen ? 0 : "auto",
+              bottom: "calc(100% + 7px)",
+              width: isOpen ? "auto" : 204,
+              padding: 6,
+              borderRadius: 12,
+              background: "rgba(255,252,247,0.96)",
+              border: "1px solid rgba(140,107,42,0.14)",
+              boxShadow: "0 12px 28px rgba(55,39,17,0.10)",
+              zIndex: 20,
+              display: "grid",
+              gap: 3,
+              animation: "sidebarAccountMenuIn 0.16s ease both",
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleAccountSettings}
+              style={accountMenuButtonStyle("#5E5548")}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.background = "rgba(140,107,42,0.08)";
+                event.currentTarget.style.color = "#8C6B2A";
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.background = "transparent";
+                event.currentTarget.style.color = "#5E5548";
+              }}
+            >
+              <Settings size={14} strokeWidth={2.25} />
+              Account Settings
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={accountMenuButtonStyle("#A03838")}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.background = "rgba(160,56,56,0.08)";
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.background = "transparent";
+              }}
+            >
+              <LogOut size={14} strokeWidth={2.25} />
+              Logout
+            </button>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setAccountMenuOpen((open) => !open)}
+          onMouseEnter={(event) => {
+            event.currentTarget.style.background = "rgba(140,107,42,0.07)";
+          }}
+          onMouseLeave={(event) => {
+            event.currentTarget.style.background = accountMenuOpen ? "rgba(140,107,42,0.09)" : "transparent";
+          }}
+          aria-expanded={accountMenuOpen}
+          title={!isOpen ? `${displayName} account menu` : "Account menu"}
+          style={{
+          width: "100%",
           display: "flex",
           alignItems: "center",
           justifyContent: isOpen ? "flex-start" : "center",
-          gap: 10,
-          padding: isOpen ? "11px 10px" : "8px 0",
-          borderRadius: 13,
-          background: "rgba(255,255,255,0.46)",
-          border: "1px solid rgba(140,107,42,0.14)",
-          boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.42)",
+          gap: 9,
+          padding: isOpen ? "8px 7px" : "7px 0",
+          borderRadius: 11,
+          background: accountMenuOpen ? "rgba(140,107,42,0.09)" : "transparent",
+          border: "1px solid transparent",
+          boxShadow: "none",
+          cursor: "pointer",
+          transition: "background 0.18s ease, border-color 0.18s ease, transform 0.18s ease",
+          fontFamily: F.body,
+          textAlign: "left",
         }}>
           <span style={{
-            width: 34,
-            height: 34,
+            width: 31,
+            height: 31,
             borderRadius: "50%",
             display: "inline-flex",
             alignItems: "center",
@@ -318,23 +420,51 @@ export default function Sidebar({
             flexShrink: 0,
             background: "linear-gradient(135deg, #C9A84C, #8C6B2A)",
             color: "#fff",
-            fontSize: 11,
+            fontSize: 10.5,
             fontWeight: 850,
             letterSpacing: "0.05em",
             position: "relative",
           }}>
             {initials}
-            <i aria-hidden="true" style={{ position: "absolute", right: 0, bottom: 1, width: 8, height: 8, borderRadius: "50%", background: "#4CAF79", border: "2px solid #FFFCF7" }} />
+            <i aria-hidden="true" style={{ position: "absolute", right: -1, bottom: 1, width: 7, height: 7, borderRadius: "50%", background: "#4CAF79", border: "2px solid #F7F0E5" }} />
           </span>
           {isOpen && (
-            <span style={{ minWidth: 0, display: "grid", gap: 2 }}>
-              <span style={{ color: "#18140E", fontSize: 12.5, fontWeight: 680, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</span>
-              <span style={{ color: "#7A7060", fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{roleLabel}</span>
+            <span style={{ minWidth: 0, display: "grid", gap: 2, flex: 1 }}>
+              <span style={{ color: "#18140E", fontSize: 12.25, fontWeight: 670, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</span>
+              <span style={{ color: "#7A7060", fontSize: 9.5, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{roleLabel}</span>
             </span>
           )}
-        </div>
+          {isOpen && (
+            <ChevronUp
+              size={14}
+              color="#8C6B2A"
+              strokeWidth={2.4}
+              style={{ flexShrink: 0, transition: "transform 0.18s ease", transform: accountMenuOpen ? "rotate(180deg)" : "none" }}
+            />
+          )}
+        </button>
       </div>
 
     </aside>
   );
+}
+
+function accountMenuButtonStyle(color) {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: 9,
+    width: "100%",
+    padding: "8px 9px",
+    border: 0,
+    borderRadius: 9,
+    background: "transparent",
+    color,
+    cursor: "pointer",
+    fontFamily: F.body,
+    fontSize: 12.25,
+    fontWeight: 680,
+    textAlign: "left",
+    transition: "background 0.16s ease, color 0.16s ease",
+  };
 }
