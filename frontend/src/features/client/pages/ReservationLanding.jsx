@@ -150,18 +150,17 @@ function VenueCard({ item, variant = "event", isInteractive = true }) {
 
 function DiningCarousel({ items }) {
   const viewportRef = useRef(null);
-  const [slideIndex, setSlideIndex] = useState(items.length);
-  const [isAnimating, setIsAnimating] = useState(true);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [metrics, setMetrics] = useState({
     cardWidth: 470,
     gap: 18,
-    visibleCards: 2.08,
     viewportWidth: 1030,
-    edgePadding: 14,
+    cardRatio: 1.85,
   });
-  const loopedItems = [...items, ...items, ...items];
   const slideStep = metrics.cardWidth + metrics.gap;
-  const centeredOffset = (metrics.viewportWidth - metrics.cardWidth) / 2 - metrics.edgePadding;
+  const centeredOffset = (metrics.viewportWidth - metrics.cardWidth) / 2;
+  const trackHeight = metrics.cardWidth / metrics.cardRatio;
+  const itemCount = items.length;
 
   useEffect(() => {
     const updateMetrics = () => {
@@ -170,15 +169,14 @@ function DiningCarousel({ items }) {
       if (!width) return;
 
       const viewportWidth = window.innerWidth;
-      const viewportStyles = viewport ? window.getComputedStyle(viewport) : null;
-      const edgePadding = Number.parseFloat(viewportStyles?.paddingLeft || "0") || 0;
       const compactHeight = window.innerHeight <= 760;
       const visibleCards = viewportWidth <= 720 ? 1.08 : viewportWidth <= 980 ? 1.48 : compactHeight ? 2.22 : 2.08;
       const gap = viewportWidth <= 720 ? 12 : viewportWidth <= 980 ? 16 : 18;
       const minimumWidth = viewportWidth <= 720 ? 260 : viewportWidth <= 980 ? 340 : 420;
       const cardWidth = Math.max(minimumWidth, (width - gap * (visibleCards - 1)) / visibleCards);
+      const cardRatio = viewportWidth <= 720 ? 1.62 : viewportWidth <= 980 ? 1.7 : 1.85;
 
-      setMetrics({ cardWidth, gap, visibleCards, viewportWidth: width, edgePadding });
+      setMetrics({ cardWidth, gap, viewportWidth: width, cardRatio });
     };
 
     updateMetrics();
@@ -195,28 +193,15 @@ function DiningCarousel({ items }) {
   }, []);
 
   const moveCarousel = (direction) => {
-    setIsAnimating(true);
-    setSlideIndex((current) => current + direction);
+    setActiveIndex((current) => (current + direction + itemCount) % itemCount);
   };
 
-  const handleTransitionEnd = () => {
-    const itemCount = items.length;
-
-    if (slideIndex >= itemCount * 2) {
-      setIsAnimating(false);
-      setSlideIndex(slideIndex - itemCount);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setIsAnimating(true));
-      });
-    }
-
-    if (slideIndex < itemCount) {
-      setIsAnimating(false);
-      setSlideIndex(slideIndex + itemCount);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setIsAnimating(true));
-      });
-    }
+  const circularOffset = (index) => {
+    let offset = index - activeIndex;
+    const midpoint = itemCount / 2;
+    if (offset > midpoint) offset -= itemCount;
+    if (offset < -midpoint) offset += itemCount;
+    return offset;
   };
 
   return (
@@ -233,15 +218,10 @@ function DiningCarousel({ items }) {
       <div className="reservation-carousel__viewport" ref={viewportRef}>
         <div
           className="reservation-carousel__track"
-          onTransitionEnd={handleTransitionEnd}
-          style={{
-            gap: `${metrics.gap}px`,
-            transform: `translate3d(${centeredOffset - slideIndex * slideStep}px, 0, 0)`,
-            transition: isAnimating ? "transform 560ms cubic-bezier(0.22, 1, 0.36, 1)" : "none",
-          }}
+          style={{ height: `${trackHeight}px` }}
         >
-          {loopedItems.map((outlet, index) => {
-            const offsetFromActive = index - slideIndex;
+          {items.map((outlet, index) => {
+            const offsetFromActive = circularOffset(index);
             const distanceFromActive = Math.abs(offsetFromActive);
             const slideState =
               distanceFromActive === 0
@@ -255,8 +235,11 @@ function DiningCarousel({ items }) {
             return (
               <div
                 className={`reservation-carousel__slide ${slideState}`}
-                key={`${outlet.title}-${index}`}
-                style={{ flexBasis: `${metrics.cardWidth}px` }}
+                key={outlet.title}
+                style={{
+                  width: `${metrics.cardWidth}px`,
+                  "--slide-x": `${centeredOffset + offsetFromActive * slideStep}px`,
+                }}
                 aria-hidden={!isVisibleSlide}
               >
                 <VenueCard item={outlet} variant="dining" isInteractive={isInteractiveSlide} />
@@ -776,26 +759,31 @@ export default function ReservationLanding() {
         }
 
         .reservation-carousel__track {
-          display: flex;
-          align-items: center;
+          position: relative;
           min-width: 0;
-          will-change: transform;
+          contain: layout paint;
         }
 
         .reservation-carousel__slide {
-          position: relative;
-          flex: 0 0 auto;
+          position: absolute;
+          top: 0;
+          left: 0;
+          height: 100%;
           min-width: 0;
+          --slide-x: 0px;
+          --slide-nudge: 0px;
           opacity: 0.28;
           filter: saturate(0.62) brightness(0.58);
-          transform: scale(0.76);
+          transform: translate3d(calc(var(--slide-x) + var(--slide-nudge)), 0, 0) scale(0.76);
           transform-origin: center;
           transition:
             opacity 520ms cubic-bezier(0.22, 1, 0.36, 1),
             filter 520ms cubic-bezier(0.22, 1, 0.36, 1),
             transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+          will-change: transform, opacity, filter;
           z-index: 1;
           pointer-events: none;
+          backface-visibility: hidden;
         }
 
         .reservation-carousel__slide .reservation-card {
@@ -806,22 +794,22 @@ export default function ReservationLanding() {
         .reservation-carousel__slide.is-near {
           opacity: 0.66;
           filter: saturate(0.82) brightness(0.74);
-          transform: scale(0.9);
+          transform: translate3d(calc(var(--slide-x) + var(--slide-nudge)), 0, 0) scale(0.9);
           pointer-events: auto;
         }
 
         .reservation-carousel__slide.is-before {
-          transform: translateX(12px) scale(0.9);
+          --slide-nudge: 12px;
         }
 
         .reservation-carousel__slide.is-after {
-          transform: translateX(-12px) scale(0.9);
+          --slide-nudge: -12px;
         }
 
         .reservation-carousel__slide.is-active {
           opacity: 1;
           filter: saturate(1.12) brightness(1.05);
-          transform: translateX(0) scale(1.08);
+          transform: translate3d(var(--slide-x), 0, 0) scale(1.08);
           z-index: 5;
           pointer-events: auto;
         }
@@ -1296,23 +1284,23 @@ export default function ReservationLanding() {
           }
 
           .reservation-carousel__slide {
-            transform: scale(0.78);
+            transform: translate3d(calc(var(--slide-x) + var(--slide-nudge)), 0, 0) scale(0.78);
           }
 
           .reservation-carousel__slide.is-near {
-            transform: scale(0.88);
+            transform: translate3d(calc(var(--slide-x) + var(--slide-nudge)), 0, 0) scale(0.88);
           }
 
           .reservation-carousel__slide.is-before {
-            transform: translateX(10px) scale(0.88);
+            --slide-nudge: 10px;
           }
 
           .reservation-carousel__slide.is-after {
-            transform: translateX(-10px) scale(0.88);
+            --slide-nudge: -10px;
           }
 
           .reservation-carousel__slide.is-active {
-            transform: translateX(0) scale(1.06);
+            transform: translate3d(var(--slide-x), 0, 0) scale(1.06);
           }
 
           .reservation-card--event {
@@ -1393,24 +1381,24 @@ export default function ReservationLanding() {
 
           .reservation-carousel__slide {
             opacity: 0.34;
-            transform: scale(0.8);
+            transform: translate3d(calc(var(--slide-x) + var(--slide-nudge)), 0, 0) scale(0.8);
           }
 
           .reservation-carousel__slide.is-near {
             opacity: 0.6;
-            transform: scale(0.84);
+            transform: translate3d(calc(var(--slide-x) + var(--slide-nudge)), 0, 0) scale(0.84);
           }
 
           .reservation-carousel__slide.is-before {
-            transform: translateX(8px) scale(0.84);
+            --slide-nudge: 8px;
           }
 
           .reservation-carousel__slide.is-after {
-            transform: translateX(-8px) scale(0.84);
+            --slide-nudge: -8px;
           }
 
           .reservation-carousel__slide.is-active {
-            transform: translateX(0) scale(1.03);
+            transform: translate3d(var(--slide-x), 0, 0) scale(1.03);
           }
 
           .reservation-card--dining,

@@ -575,13 +575,30 @@ function DiningSection({ initialRestaurantId, onNavigateToDining }) {
   const r    = RESTAURANTS[activeR];
   const imgs = r?.imgs ?? [];
 
+  const goRestaurant = (nextIndex) => {
+    const next = Math.max(0, Math.min(RESTAURANTS.length - 1, nextIndex));
+    if (next === activeR) return;
+    setActiveR(next);
+    setActiveImg(0);
+  };
+
+  const restaurantTrackStyle = {
+    display: "flex",
+    height: "100%",
+    transform: `translate3d(${-activeR * 100}%, 0, 0)`,
+    transition: "transform 520ms cubic-bezier(0.16, 1, 0.3, 1)",
+    willChange: "transform",
+  };
+
   useEffect(() => {
     if (!initialRestaurantId) return;
     const idx = RESTAURANTS.findIndex(x => x.id === initialRestaurantId);
-    if (idx >= 0) setActiveR(idx);
+    if (idx >= 0 && idx !== activeR) {
+      setActiveR(idx);
+      setActiveImg(0);
+    }
   }, [initialRestaurantId]);
 
-  useEffect(() => { setActiveImg(0); }, [activeR]);
   useEffect(() => {
     const id = setInterval(() => setActiveImg(n => (n + 1) % imgs.length), 4000);
     return () => clearInterval(id);
@@ -600,13 +617,37 @@ function DiningSection({ initialRestaurantId, onNavigateToDining }) {
 
   const imgBlock = (h) => (
     <div style={{ height:h, position:"relative", overflow:"hidden", borderRadius:4 }}>
-      {imgs.map((src, i) => (
-        <img key={i} src={src} alt="" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", opacity:activeImg===i?1:0, transition:"opacity 0.7s ease, transform 6s ease", transform: activeImg===i ? "scale(1.05)" : "scale(1)" }} />
-      ))}
-      <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top,rgba(14,13,9,0.72) 0%,transparent 50%)" }} />
-      <div style={{ position:"absolute", top:16, left:16, background:isDark?"rgba(0,0,0,0.56)":"rgba(255,255,255,0.90)", backdropFilter:"blur(12px)", padding:"6px 14px 6px 10px", display:"flex", alignItems:"center", gap:8, borderRadius:2 }}>
-        <div style={{ width:6, height:6, borderRadius:"50%", background:C.gold }} />
-        <span style={{ fontFamily:BODY, fontSize:10, fontWeight:700, letterSpacing:"0.16em", textTransform:"uppercase", color:C.gold }}>{r?.tag}</span>
+      <div style={restaurantTrackStyle}>
+        {RESTAURANTS.map((restaurant, restaurantIndex) => (
+          <div key={restaurant.id} style={{ position:"relative", flex:"0 0 100%", height:"100%", overflow:"hidden" }}>
+            {restaurant.imgs.map((src, i) => {
+              const isCurrentRestaurant = restaurantIndex === activeR;
+              const isVisible = isCurrentRestaurant ? activeImg === i : i === 0;
+              return (
+                <img
+                  key={`${restaurant.id}-${i}`}
+                  src={src}
+                  alt=""
+                  style={{
+                    position:"absolute",
+                    inset:0,
+                    width:"100%",
+                    height:"100%",
+                    objectFit:"cover",
+                    opacity:isVisible?1:0,
+                    transition:"opacity 0.7s ease, transform 6s ease",
+                    transform: isVisible ? "scale(1.05)" : "scale(1)",
+                  }}
+                />
+              );
+            })}
+            <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top,rgba(14,13,9,0.72) 0%,transparent 50%)" }} />
+            <div style={{ position:"absolute", top:16, left:16, background:isDark?"rgba(0,0,0,0.56)":"rgba(255,255,255,0.90)", backdropFilter:"blur(12px)", padding:"6px 14px 6px 10px", display:"flex", alignItems:"center", gap:8, borderRadius:2 }}>
+              <div style={{ width:6, height:6, borderRadius:"50%", background:C.gold }} />
+              <span style={{ fontFamily:BODY, fontSize:10, fontWeight:700, letterSpacing:"0.16em", textTransform:"uppercase", color:C.gold }}>{restaurant.tag}</span>
+            </div>
+          </div>
+        ))}
       </div>
       <div style={{ position:"absolute", bottom:14, left:"50%", transform:"translateX(-50%)", display:"flex", gap:6 }}>
         {imgs.map((_, i) => (
@@ -617,12 +658,13 @@ function DiningSection({ initialRestaurantId, onNavigateToDining }) {
     </div>
   );
 
-  const chips = () => (
+  const chips = (restaurant = r) => (
     <div style={{ display:"flex", flexWrap:"wrap", gap:isMobile?6:8, marginBottom:isMobile?18:28 }}>
-      {(r?.diningTimes ?? []).map(d => {
-        const hov = hovLabel === d.label;
+      {(restaurant?.diningTimes ?? []).map(d => {
+        const key = `${restaurant.id}-${d.label}`;
+        const hov = hovLabel === key;
         return (
-          <div key={d.label} onMouseEnter={() => setHovLabel(d.label)} onMouseLeave={() => setHovLabel(null)}
+          <div key={d.label} onMouseEnter={() => setHovLabel(key)} onMouseLeave={() => setHovLabel(null)}
             style={{ padding:isMobile?"5px 10px":"7px 14px", background:hov?C.goldFaint:"transparent", border:`1px solid ${hov?C.gold:C.border}`, display:"flex", flexDirection:"column", transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)", userSelect:"none", cursor:"default", borderRadius:2, transform: hov ? "translateY(-2px)" : "none" }}>
             <div style={{ fontFamily:BODY, fontSize:isMobile?11:12, fontWeight:700, letterSpacing:"0.06em", color:C.gold }}>{d.label}</div>
             {d.hours && <div style={{ fontFamily:BODY, fontSize:isMobile?10:11, color:C.textMuted, marginTop:2 }}>{d.hours}</div>}
@@ -633,15 +675,52 @@ function DiningSection({ initialRestaurantId, onNavigateToDining }) {
   );
 
   const thumbs = () => (
-    <div style={{ display:"flex", gap:isMobile?6:8 }}>
-      {imgs.map((src, i) => (
-        <div key={i} onClick={() => setActiveImg(i)}
-          style={{ flex:1, height:isMobile?50:60, overflow:"hidden", cursor:"pointer", border:activeImg===i?`2px solid ${C.gold}`:"2px solid transparent", transition:"border 0.22s", borderRadius:2 }}>
-          <img src={src} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", transition:"transform 0.4s" }}
-            onMouseEnter={e => e.currentTarget.style.transform="scale(1.08)"}
-            onMouseLeave={e => e.currentTarget.style.transform="scale(1)"} />
-        </div>
-      ))}
+    <div style={{ overflow:"hidden" }}>
+      <div style={{ ...restaurantTrackStyle, height:"auto" }}>
+        {RESTAURANTS.map((restaurant) => (
+          <div key={restaurant.id} style={{ flex:"0 0 100%", display:"flex", gap:isMobile?6:8 }}>
+            {restaurant.imgs.map((src, i) => (
+              <div key={i} onClick={() => setActiveImg(i)}
+                style={{ flex:1, height:isMobile?50:60, overflow:"hidden", cursor:"pointer", border:activeImg===i?`2px solid ${C.gold}`:"2px solid transparent", transition:"border 0.22s", borderRadius:2 }}>
+                <img src={src} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", transition:"transform 0.4s" }}
+                  onMouseEnter={e => e.currentTarget.style.transform="scale(1.08)"}
+                  onMouseLeave={e => e.currentTarget.style.transform="scale(1)"} />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const titleTrack = (titleStyle) => (
+    <div style={{ overflow:"hidden" }}>
+      <div style={{ ...restaurantTrackStyle, height:"auto" }}>
+        {RESTAURANTS.map((restaurant) => (
+          <h2 key={restaurant.id} style={{ ...titleStyle, flex:"0 0 100%" }}>
+            {restaurant.name}
+          </h2>
+        ))}
+      </div>
+    </div>
+  );
+
+  const detailsTrack = () => (
+    <div style={{ overflow:"hidden" }}>
+      <div style={{ ...restaurantTrackStyle, alignItems:"flex-start", height:"auto" }}>
+        {RESTAURANTS.map((restaurant) => (
+          <div key={restaurant.id} style={{ flex:"0 0 100%" }}>
+            <p style={{ fontFamily:BODY, fontSize:isMobile?13:14, color:C.textMuted, lineHeight:isMobile?1.78:1.88, marginBottom:isMobile?16:28, maxWidth:isMobile?"none":380 }}>{restaurant.description}</p>
+            {chips(restaurant)}
+            <button type="button" onClick={onNavigateToDining}
+              className={`dining-reserve-btn${isDark?"":" dining-reserve-btn-light"}`}
+              style={isMobile ? { width:"100%", justifyContent:"center", marginTop:8 } : undefined}>
+              Reserve a Dining Venue
+              <ChevRight size={14} color="currentColor" strokeWidth={2.5} />
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 
@@ -655,25 +734,16 @@ function DiningSection({ initialRestaurantId, onNavigateToDining }) {
                 <div style={{ width:24, height:1, background:C.gold }} />
                 <span style={{ fontFamily:BODY, fontSize:9, fontWeight:700, letterSpacing:"0.36em", textTransform:"uppercase", color:C.gold }}>Fine Dining</span>
               </div>
-              <h2 style={{ fontFamily:DISPLAY, fontSize:28, fontWeight:600, color:C.textPrimary, lineHeight:1, letterSpacing:"-0.01em", margin:0 }}>{r?.name}</h2>
+              {titleTrack({ fontFamily:DISPLAY, fontSize:28, fontWeight:600, color:C.textPrimary, lineHeight:1, letterSpacing:"-0.01em", margin:0 })}
             </div>
             <div style={{ display:"flex", gap:6, paddingTop:4 }}>
-              <NavDot disabled={activeR===0}                    icon="left"  C={C} onClick={() => setActiveR(n => Math.max(0,n-1))} />
-              <NavDot disabled={activeR===RESTAURANTS.length-1} icon="right" C={C} onClick={() => setActiveR(n => Math.min(RESTAURANTS.length-1,n+1))} />
+              <NavDot disabled={activeR===0}                    icon="left"  C={C} onClick={() => goRestaurant(activeR - 1)} />
+              <NavDot disabled={activeR===RESTAURANTS.length-1} icon="right" C={C} onClick={() => goRestaurant(activeR + 1)} />
             </div>
           </div>
           <div className="da" style={{ marginBottom:12, opacity:0 }}>{imgBlock(220)}</div>
           <div className="da" style={{ marginBottom:14, opacity:0 }}>{thumbs()}</div>
-          <div className="da" style={{ opacity:0 }}>
-            <p style={{ fontFamily:BODY, fontSize:13, color:C.textMuted, lineHeight:1.78, marginBottom:16 }}>{r?.description}</p>
-            {chips()}
-            <button type="button" onClick={onNavigateToDining}
-              className={`dining-reserve-btn${isDark?"":" dining-reserve-btn-light"}`}
-              style={{ width:"100%", justifyContent:"center", marginTop:8 }}>
-              Reserve a Dining Venue
-              <ChevRight size={14} color="currentColor" strokeWidth={2.5} />
-            </button>
-          </div>
+          <div className="da" style={{ opacity:0 }}>{detailsTrack()}</div>
         </div>
       </section>
     );
@@ -693,20 +763,14 @@ function DiningSection({ initialRestaurantId, onNavigateToDining }) {
           </div>
           <div className="da" style={{ paddingTop:8, opacity:0 }}>
             <div style={{ display:"flex", gap:8, marginBottom:24 }}>
-              <NavDot disabled={activeR===0}                    icon="left"  C={C} onClick={() => setActiveR(n => Math.max(0,n-1))} />
-              <NavDot disabled={activeR===RESTAURANTS.length-1} icon="right" C={C} onClick={() => setActiveR(n => Math.min(RESTAURANTS.length-1,n+1))} />
+              <NavDot disabled={activeR===0}                    icon="left"  C={C} onClick={() => goRestaurant(activeR - 1)} />
+              <NavDot disabled={activeR===RESTAURANTS.length-1} icon="right" C={C} onClick={() => goRestaurant(activeR + 1)} />
               <span style={{ fontFamily:MONO, fontSize:11, color:C.textFaint, alignSelf:"center", marginLeft:4 }}>
                 {String(activeR+1).padStart(2,"0")} / {String(RESTAURANTS.length).padStart(2,"0")}
               </span>
             </div>
-            <h2 style={{ fontFamily:DISPLAY, fontSize:"clamp(32px,4vw,56px)", fontWeight:600, color:C.textPrimary, marginBottom:14, lineHeight:0.95, letterSpacing:"-0.01em" }}>{r?.name}</h2>
-            <p style={{ fontFamily:BODY, fontSize:14, color:C.textMuted, lineHeight:1.88, marginBottom:28, maxWidth:380 }}>{r?.description}</p>
-            {chips()}
-            <button type="button" onClick={onNavigateToDining}
-              className={`dining-reserve-btn${isDark?"":" dining-reserve-btn-light"}`}>
-              Reserve a Dining Venue
-              <ChevRight size={14} color="currentColor" />
-            </button>
+            {titleTrack({ fontFamily:DISPLAY, fontSize:"clamp(32px,4vw,56px)", fontWeight:600, color:C.textPrimary, marginBottom:14, lineHeight:0.95, letterSpacing:"-0.01em" })}
+            {detailsTrack()}
           </div>
         </div>
       </div>
