@@ -2,7 +2,7 @@ import api from './api.js';
 
 export const venueAPI = {
   // Get all venues
-  getAll: () => api.get('/venues'),
+  getAll: (params = {}) => api.get('/venues', params),
 
   // Get single venue with seats and reservations
   getById: (id) => api.get(`/venues/${id}`),
@@ -12,6 +12,12 @@ export const venueAPI = {
 
   // Update venue
   update: (id, venueData) => api.put(`/venues/${id}`, venueData),
+
+  uploadImage: (id, file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return api.postForm(`/venues/${id}/image`, formData);
+  },
 
   // Delete venue
   delete: (id) => api.delete(`/venues/${id}`),

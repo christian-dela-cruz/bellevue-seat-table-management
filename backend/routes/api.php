@@ -61,6 +61,7 @@ Route::prefix('venues')->group(function () {
     Route::get('/{id}', [VenueController::class, 'show']);
     Route::post('/', [VenueController::class, 'store'])->middleware(AdminAccess::class . ':manage_venues');
     Route::put('/{id}', [VenueController::class, 'update'])->middleware(AdminAccess::class . ':manage_venues');
+    Route::post('/{id}/image', [VenueController::class, 'uploadImage'])->middleware(AdminAccess::class . ':manage_venues');
     Route::delete('/{id}', [VenueController::class, 'destroy'])->middleware(AdminAccess::class . ':manage_venues');
     
     // Additional venue endpoints

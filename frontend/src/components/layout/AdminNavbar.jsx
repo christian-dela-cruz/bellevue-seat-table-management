@@ -50,6 +50,12 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
   const isNotifActive = location.pathname === "/admin/notifications";
   const roleLabel = roleLabels[currentUser.role] || currentUser.role || "Admin";
   const displayName = currentUser.name || currentUser.username || "Admin";
+  const initials = String(displayName)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "A";
 
   const submitProfile = async (event) => {
     event.preventDefault();

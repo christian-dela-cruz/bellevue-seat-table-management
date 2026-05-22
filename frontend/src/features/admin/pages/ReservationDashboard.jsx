@@ -1948,6 +1948,7 @@ export default function ReservationDashboard() {
   const [searchFocused,setSearchFocused]=useState(false);
 
   const pollingRef = useRef(null);
+  const filterSignatureRef = useRef("");
 
   const [windowWidth,setWindowWidth]=useState(window.innerWidth);
   useEffect(()=>{
@@ -2178,12 +2179,18 @@ export default function ReservationDashboard() {
     });
 
     setFilteredReservations(filtered);
-    setPagination((p)=>({
-      ...p,
-      lastPage: Math.max(1, Math.ceil(filtered.length / p.rowsPerPage)),
-      totalItems: filtered.length,
-      currentPage: 1,
-    }));
+    const filterSignature = JSON.stringify([filterStatus, filterRoom, filterPriority, filterType, quickFilter, search, sortBy]);
+    const filterChanged = filterSignatureRef.current !== filterSignature;
+    filterSignatureRef.current = filterSignature;
+    setPagination((p) => {
+      const lastPage = Math.max(1, Math.ceil(filtered.length / p.rowsPerPage));
+      return {
+        ...p,
+        lastPage,
+        totalItems: filtered.length,
+        currentPage: filterChanged ? 1 : Math.min(p.currentPage, lastPage),
+      };
+    });
   },[enrichedReservations,filterStatus,filterRoom,filterPriority,filterType,quickFilter,search,sortBy]);
 
   useEffect(()=>{

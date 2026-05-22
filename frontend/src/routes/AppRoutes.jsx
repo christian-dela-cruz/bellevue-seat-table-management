@@ -28,6 +28,7 @@ import CancelledDashboard from "../features/admin/pages/CancelledDashboard";
 import Accounts from "../features/admin/pages/Accounts";
 import Reports from "../features/admin/pages/Reports";
 import OutletDashboard from "../features/admin/pages/OutletDashboard";
+import FunctionRooms from "../features/admin/pages/FunctionRooms";
 import ForgotCode from "../features/client/pages/ForgotCode";
 import LoginPage from "../features/auth/pages/LoginPage";
 import { authAPI } from "../services/authAPI";
@@ -160,6 +161,14 @@ export default function AppRoutes() {
           element={
             <RequireAdminAuth>
               <OutletDashboard />
+            </RequireAdminAuth>
+          }
+        />
+        <Route
+          path="/admin/function-rooms"
+          element={
+            <RequireAdminAuth>
+              <FunctionRooms />
             </RequireAdminAuth>
           }
         />

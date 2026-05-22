@@ -689,12 +689,12 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
             <label style={{ display: "grid", gridTemplateColumns: "18px minmax(0,1fr)", gap: 10, alignItems: "flex-start", padding: "14px 15px", borderRadius: 10, background: consentAccepted ? C.goldFaint : C.surfaceInput, border: `1px solid ${consentAccepted ? C.borderAccent : C.borderDefault}`, cursor: submitting ? "not-allowed" : "pointer" }}>
               <input type="checkbox" checked={consentAccepted} disabled={submitting} onChange={(e) => setConsentAccepted(e.target.checked)} style={{ marginTop: 2, width: 15, height: 15, accentColor: C.gold }} />
               <span style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.65 }}>
-                I acknowledge and consent to the collection and processing of my personal information for reservation management and operational communication purposes.
+                I consent to the collection, use, and processing of my personal information for managing my reservation, communicating updates, and supporting related guest service operations, in accordance with the Data Privacy Act of 2012.
               </span>
             </label>
 
             <div style={{ fontSize: 11.5, color: C.textTertiary, lineHeight: 1.6 }}>
-              Personal details are used to process the reservation, coordinate operational requirements, and contact the guest regarding reservation status.
+              Your personal information will only be used to process your reservation, coordinate guest service needs, and provide reservation status updates.
             </div>
 
             <button onClick={onSubmit} disabled={!canSubmit}

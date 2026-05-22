@@ -84,6 +84,34 @@ class ApiService {
     });
   }
 
+  async postForm(endpoint, formData) {
+    const token = localStorage.getItem('admin_token');
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorData = {};
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = { message: `HTTP error! status: ${response.status}` };
+      }
+      const error = new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
+      error.status = response.status;
+      error.data = errorData;
+      throw error;
+    }
+
+    if (response.status === 204) return {};
+    return response.json();
+  }
+
   put(endpoint, data = {}) {
     return this.request(endpoint, {
       method: 'PUT',

@@ -676,11 +676,11 @@ export default function ManageBooking() {
           min-height: 100vh;
           display: grid;
           grid-template-columns: minmax(380px, 42%) minmax(0, 58%);
-          padding-top: 64px;
+          padding-top: 82px;
         }
         .guest-service-left {
           position: relative;
-          min-height: calc(100vh - 64px);
+          min-height: calc(100vh - 82px);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -692,7 +692,7 @@ export default function ManageBooking() {
           left: clamp(20px, 4vw, 52px);
         }
         .guest-service-visual {
-          min-height: calc(100vh - 64px);
+          min-height: calc(100vh - 82px);
           display: flex;
           align-items: stretch;
           padding: clamp(22px, 3vw, 42px) clamp(22px, 4vw, 60px) clamp(22px, 3vw, 42px) 0;
@@ -863,7 +863,7 @@ export default function ManageBooking() {
           }} />
         </div>
 
-        <SharedNavbar isDark={isDark} toggle={toggleTheme} />
+        <SharedNavbar isDark={isDark} toggle={toggleTheme} height={58} variant="reservation" />
 
         <div className="guest-service-shell">
           <div className="guest-service-left">

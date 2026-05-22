@@ -1,7 +1,7 @@
 // src/components/admin/Sidebar.jsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, ClipboardList, Map, UserCog, BarChart3, LayoutDashboard, Settings, LogOut, ChevronUp } from "lucide-react";
+import { X, ClipboardList, Map, UserCog, BarChart3, LayoutDashboard, Settings, LogOut, ChevronUp, Building2 } from "lucide-react";
 import { authAPI } from "../../services/authAPI";
 
 const F = { body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" };
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { id: "reservations", label: "Reservations", icon: ClipboardList, iconStyle: "lucide" },
   { id: "cancelled",    label: "Cancelled",    icon: X,           iconStyle: "lucide" },
   { id: "outlets",      label: "Outlet Dashboard", icon: LayoutDashboard, iconStyle: "lucide", permission: "view_outlet_reports" },
+  { id: "function-rooms", label: "Function Rooms", icon: Building2, iconStyle: "lucide", permission: "view_admin" },
   { id: "reports",      label: "Reports",      icon: BarChart3,   iconStyle: "lucide", permission: "view_outlet_reports" },
   {
     id: "accounts",
@@ -73,6 +74,7 @@ function NavItem({ item, isActive, isOpen, onClick }) {
       "reservations": "/admin/reservations",
       "cancelled":    "/admin/cancelled",
       "outlets":      "/admin/outlets",
+      "function-rooms": "/admin/function-rooms",
       "reports":      "/admin/reports",
       "accounts":     "/admin/accounts",
       "seat-map":     "/admin/seatmap",

@@ -13,6 +13,7 @@ import twentyTwentyImg from "../../../assets/twenty-twenty-function-hires.jpg";
 import grandBallroomImg from "../../../assets/grand-ballroom-hires.jpg";
 import towerBallroomImg from "../../../assets/tower-ballroom-hires.jpg";
 import businessCenterImg from "../../../assets/business-center-hires.jpg";
+import { venueAPI } from "../../../services/venueAPI";
 
 const diningOutlets = [
   {
@@ -38,7 +39,7 @@ const diningOutlets = [
   },
 ];
 
-const eventVenues = [
+const fallbackEventVenues = [
   {
     title: "Alabang Function Room",
     image: alabangImg,
@@ -95,6 +96,128 @@ const eventVenues = [
     imageFocus: "center 50%",
   },
 ];
+
+const roomImageMap = {
+  "afc.jpeg": alabangImg,
+  "alabangroom-2.jpg": alabangImg,
+  "laguna.jpeg": lagunaImg,
+  "lagunaroom-1.jpg": lagunaImg,
+  "20-20.jpeg": twentyTwentyImg,
+  "2020-1.jpg": twentyTwentyImg,
+  "grandroom-1.jpg": grandBallroomImg,
+  "towerb.jpeg": towerBallroomImg,
+  "towerroom-2.jpg": towerBallroomImg,
+  "bc.jpeg": businessCenterImg,
+  "businesscenter-1.jpg": businessCenterImg,
+};
+
+const roomRouteMap = {
+  "alabang function room": "/alabang-reserve",
+  "laguna ballroom": "/laguna-reserv1e",
+  "laguna ballroom 1": "/laguna-reserv1e",
+  "laguna ballroom 2": "/laguna-reserv2e",
+  "20/20 function room": "/twenty-twenty-a",
+  "20/20 function room a": "/twenty-twenty-a",
+  "20/20 function room b": "/twenty-twenty-b",
+  "20/20 function room c": "/twenty-twenty-c",
+  "grand ballroom": "/grand-ballroom-a",
+  "grand ballroom a": "/grand-ballroom-a",
+  "grand ballroom b": "/grand-ballroom-b",
+  "grand ballroom c": "/grand-ballroom-c",
+  "tower ballroom": "/tower1",
+  "tower 1": "/tower1",
+  "tower 2": "/tower2",
+  "tower 3": "/tower3",
+  "business center": "/business-center-reserve",
+};
+
+function resolveRoomImage(image) {
+  if (!image) return businessCenterImg;
+  if (/^(https?:|data:|blob:)/i.test(image)) return image;
+  const key = String(image).split("/").pop();
+  if (roomImageMap[key]) return roomImageMap[key];
+  const apiRoot = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "");
+  if (String(image).startsWith("/")) return `${apiRoot}${image}`;
+  if (String(image).includes("/")) return `${apiRoot}/${String(image).replace(/^\/+/, "")}`;
+  return `${apiRoot}/images/${image}`;
+}
+
+function roomRoute(room) {
+  return room?.reservation_route || roomRouteMap[String(room?.name || "").toLowerCase()] || "/venues";
+}
+
+function childLabel(child, parentName) {
+  const display = child.display_name || child.name || "";
+  return display.replace(parentName, "").replace(/Function Room|Ballroom/gi, "").trim() || display || "Room";
+}
+
+function canonicalRoomName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^a-z0-9/ ]/g, "")
+    .trim();
+}
+
+function uniqueConfiguredRooms(rooms = []) {
+  const childCounts = new Map();
+  rooms.forEach((room) => {
+    if (room.parent_id) {
+      childCounts.set(Number(room.parent_id), (childCounts.get(Number(room.parent_id)) || 0) + 1);
+    }
+  });
+
+  const score = (room) =>
+    (childCounts.get(Number(room.id)) || 0) * 10 +
+    (room.slug ? 3 : 0) +
+    (room.reservation_route ? 2 : 0) +
+    (room.show_on_landing ? 1 : 0);
+
+  const byKey = new Map();
+  rooms.forEach((room) => {
+    const nameKey = canonicalRoomName(room.display_name || room.name);
+    if (!nameKey) return;
+    const key = room.parent_id
+      ? `child:${room.parent_id}:${nameKey}`
+      : `parent:${nameKey}`;
+    const existing = byKey.get(key);
+    if (!existing || score(room) >= score(existing)) {
+      byKey.set(key, room);
+    }
+  });
+
+  return Array.from(byKey.values());
+}
+
+function buildEventVenuesFromConfig(rooms = []) {
+  const visible = uniqueConfiguredRooms(rooms)
+    .filter((room) => room.type === "function_room" && room.is_active && room.is_visible)
+    .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0) || String(a.name).localeCompare(String(b.name)));
+  const byParent = new Map();
+  visible.forEach((room) => {
+    if (room.parent_id) {
+      byParent.set(Number(room.parent_id), [...(byParent.get(Number(room.parent_id)) || []), room]);
+    }
+  });
+
+  return visible
+    .filter((room) => !room.parent_id && room.show_on_landing)
+    .map((room) => {
+      const children = (byParent.get(Number(room.id)) || [])
+        .filter((child) => child.is_active && child.is_visible && child.reservations_enabled)
+        .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0));
+      return {
+        title: room.display_name || room.name,
+        image: resolveRoomImage(room.image),
+        route: room.parent_selectable && room.reservations_enabled ? roomRoute(room) : roomRoute(children[0] || room),
+        imageFocus: room.image_position || "center 50%",
+        rooms: children.map((child) => ({
+          label: childLabel(child, room.name),
+          route: roomRoute(child),
+        })),
+      };
+    });
+}
 
 function VenueCard({ item, variant = "event", isInteractive = true }) {
   const navigate = useNavigate();
@@ -272,7 +395,22 @@ function DiningCarousel({ items }) {
 export default function ReservationLanding() {
   const navigate = useNavigate();
   const [theme, setTheme] = useState("dark");
+  const [eventVenues, setEventVenues] = useState(fallbackEventVenues);
   const isLight = theme === "light";
+
+  useEffect(() => {
+    let mounted = true;
+    venueAPI.getAll({ type: "function_room", active: true, visible: true })
+      .then((rooms) => {
+        if (!mounted) return;
+        const configured = buildEventVenuesFromConfig(Array.isArray(rooms) ? rooms : []);
+        setEventVenues(configured.length ? configured : fallbackEventVenues);
+      })
+      .catch(() => {
+        if (mounted) setEventVenues(fallbackEventVenues);
+      });
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <main className="reservation-launcher" data-theme={theme}>
@@ -285,7 +423,6 @@ export default function ReservationLanding() {
             aria-pressed={isLight}
             aria-label={`Switch to ${isLight ? "dark" : "light"} mode`}
           >
-            <span className="reservation-theme-toggle__label">{isLight ? "Light" : "Dark"}</span>
             <span className="reservation-theme-toggle__switch" aria-hidden="true">
               <span className="reservation-theme-toggle__icon reservation-theme-toggle__icon--moon">
                 <svg viewBox="0 0 24 24" role="presentation">
@@ -498,14 +635,10 @@ export default function ReservationLanding() {
         }
 
         .reservation-theme-toggle {
-          gap: 10px;
-          min-width: 106px;
-          padding: 0 8px 0 12px !important;
-        }
-
-        .reservation-theme-toggle__label {
-          min-width: 38px;
-          text-align: left;
+          gap: 0;
+          justify-content: center;
+          min-width: 58px;
+          padding: 0 6px !important;
         }
 
         .reservation-theme-toggle__switch {

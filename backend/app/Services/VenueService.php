@@ -12,23 +12,20 @@ class VenueService
     /**
      * Get all venues without pagination (for index page)
      */
-    public function getAllVenues(): array
+    public function getAllVenues(array $filters = []): array
     {
-        return Venue::all()->map(function($venue) {
-            return [
-                'id' => $venue->id,
-                'name' => $venue->name,
-                'wing' => $venue->wing,
-                'type' => $venue->type,
-                'capacity' => $venue->capacity,
-                'price_per_hour' => $venue->price_per_hour,
-                'description' => $venue->description,
-                'image' => $venue->image,
-                'is_active' => $venue->is_active,
-                'created_at' => $venue->created_at,
-                'updated_at' => $venue->updated_at,
-            ];
-        })->toArray();
+        return Venue::query()
+            ->with(['children', 'parent'])
+            ->when($filters['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
+            ->when($filters['category'] ?? null, fn ($query, $category) => $query->where('category', $category))
+            ->when(isset($filters['active']), fn ($query) => $query->where('is_active', filter_var($filters['active'], FILTER_VALIDATE_BOOLEAN)))
+            ->when(isset($filters['visible']), fn ($query) => $query->where('is_visible', filter_var($filters['visible'], FILTER_VALIDATE_BOOLEAN)))
+            ->when(isset($filters['landing']), fn ($query) => $query->where('show_on_landing', filter_var($filters['landing'], FILTER_VALIDATE_BOOLEAN)))
+            ->orderBy('display_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Venue $venue) => $this->formatVenue($venue))
+            ->toArray();
     }
 
     /**
@@ -67,6 +64,44 @@ class VenueService
         
         $venue->update($data);
         return $venue;
+    }
+
+    public function formatVenue(Venue $venue): array
+    {
+        return [
+            'id' => $venue->id,
+            'parent_id' => $venue->parent_id,
+            'name' => $venue->name,
+            'slug' => $venue->slug,
+            'display_name' => $venue->display_name,
+            'wing' => $venue->wing,
+            'type' => $venue->type,
+            'category' => $venue->category,
+            'capacity' => $venue->capacity,
+            'price_per_hour' => $venue->price_per_hour,
+            'description' => $venue->description,
+            'image' => $venue->image,
+            'display_order' => $venue->display_order,
+            'is_active' => $venue->is_active,
+            'is_visible' => $venue->is_visible,
+            'show_on_landing' => $venue->show_on_landing,
+            'reservations_enabled' => $venue->reservations_enabled,
+            'parent_selectable' => $venue->parent_selectable,
+            'child_selectable' => $venue->child_selectable,
+            'reservation_route' => $venue->reservation_route,
+            'image_position' => $venue->image_position,
+            'metadata' => $venue->metadata,
+            'parent' => $venue->relationLoaded('parent') && $venue->parent ? [
+                'id' => $venue->parent->id,
+                'name' => $venue->parent->name,
+                'display_name' => $venue->parent->display_name,
+            ] : null,
+            'children' => $venue->relationLoaded('children')
+                ? $venue->children->map(fn (Venue $child) => $this->formatVenue($child))->toArray()
+                : [],
+            'created_at' => $venue->created_at,
+            'updated_at' => $venue->updated_at,
+        ];
     }
 
     /**

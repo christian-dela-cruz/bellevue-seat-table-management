@@ -7,6 +7,10 @@ use App\Services\VenueService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Http\Requests\Venue\VenueStoreRequest;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
 
 class VenueController extends Controller
 {
@@ -20,10 +24,10 @@ class VenueController extends Controller
     /**
      * Get all venues (no pagination for index)
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
-            $venues = $this->venueService->getAllVenues();
+            $venues = $this->venueService->getAllVenues($request->only(['type', 'category', 'active', 'visible', 'landing']));
             return response()->json($venues);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -70,8 +74,13 @@ class VenueController extends Controller
     {
         try {
             $validated = $request->validated();
+            $validated['slug'] = $validated['slug'] ?? Str::slug($validated['name']);
+            $validated['display_name'] = $validated['display_name'] ?? $validated['name'];
+            $this->guardParentConfiguration($validated);
             $venue = $this->venueService->createVenue($validated);
-            return response()->json($venue, 201);
+            return response()->json($this->venueService->formatVenue($venue->load(['parent', 'children'])), 201);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
@@ -84,15 +93,35 @@ class VenueController extends Controller
     {
         try {
             $validated = $request->validate([
+                'parent_id' => 'sometimes|nullable|exists:venues,id',
                 'name' => 'sometimes|required|string|max:255',
+                'slug' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('venues', 'slug')->ignore($id)],
+                'display_name' => 'sometimes|nullable|string|max:255',
                 'wing' => 'sometimes|required|string|max:255',
                 'type' => 'sometimes|required|string|max:255',
-                'capacity' => 'sometimes|required|integer|min:0',
+                'category' => 'sometimes|nullable|string|max:255',
+                'capacity' => 'sometimes|nullable|integer|min:0',
                 'price_per_hour' => 'sometimes|nullable|numeric|min:0',
                 'description' => 'sometimes|nullable|string',
                 'image' => 'sometimes|nullable|string',
+                'display_order' => 'sometimes|required|integer|min:0',
                 'is_active' => 'sometimes|boolean',
+                'is_visible' => 'sometimes|boolean',
+                'show_on_landing' => 'sometimes|boolean',
+                'reservations_enabled' => 'sometimes|boolean',
+                'parent_selectable' => 'sometimes|boolean',
+                'child_selectable' => 'sometimes|boolean',
+                'reservation_route' => 'sometimes|nullable|string|max:255',
+                'image_position' => 'sometimes|nullable|string|max:255',
+                'metadata' => 'sometimes|nullable|array',
             ]);
+            if (isset($validated['name']) && !array_key_exists('slug', $validated)) {
+                $validated['slug'] = Str::slug($validated['name']);
+            }
+            if (isset($validated['name']) && !array_key_exists('display_name', $validated)) {
+                $validated['display_name'] = $validated['name'];
+            }
+            $this->guardParentConfiguration($validated, $id);
 
             $venue = $this->venueService->updateVenue($id, $validated);
             
@@ -100,10 +129,37 @@ class VenueController extends Controller
                 return response()->json(['error' => 'Venue not found'], 404);
             }
             
-            return response()->json($venue);
+            return response()->json($this->venueService->formatVenue($venue->load(['parent', 'children'])));
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    public function uploadImage(Request $request, int $id): JsonResponse
+    {
+        $venue = Venue::find($id);
+        if (!$venue) {
+            return response()->json(['error' => 'Venue not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'image' => 'required|image|mimes:jpg,jpeg,png,webp|max:4096',
+        ]);
+
+        $directory = public_path('images/function-rooms');
+        if (!File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        $file = $validated['image'];
+        $filename = Str::slug($venue->slug ?: $venue->name) . '-' . time() . '.' . $file->getClientOriginalExtension();
+        $file->move($directory, $filename);
+
+        $venue->update(['image' => "/images/function-rooms/{$filename}"]);
+
+        return response()->json($this->venueService->formatVenue($venue->fresh(['parent', 'children'])));
     }
 
     /**
@@ -160,6 +216,26 @@ class VenueController extends Controller
             return response()->json($venues);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    private function guardParentConfiguration(array $data, ?int $venueId = null): void
+    {
+        $parentId = $data['parent_id'] ?? null;
+        if (!$parentId) {
+            return;
+        }
+
+        if ($venueId && (int) $parentId === (int) $venueId) {
+            throw ValidationException::withMessages(['parent_id' => 'A function room cannot be assigned as its own parent.']);
+        }
+
+        $cursor = Venue::find($parentId);
+        while ($cursor) {
+            if ($venueId && (int) $cursor->parent_id === (int) $venueId) {
+                throw ValidationException::withMessages(['parent_id' => 'Circular parent room relationships are not allowed.']);
+            }
+            $cursor = $cursor->parent_id ? Venue::find($cursor->parent_id) : null;
         }
     }
 }

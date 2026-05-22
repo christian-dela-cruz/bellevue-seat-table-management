@@ -23,23 +23,112 @@ function getTokens(isDark) {
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 
 function ThemeToggle({ isDark, toggle, C }) {
-  const TRACK_W = 48, TRACK_H = 26, KNOB = 20, PAD = 3;
   return (
-    <button type="button" onClick={toggle}
+    <button
+      type="button"
+      onClick={toggle}
       title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      style={{ position:"relative", width:TRACK_W, height:TRACK_H, borderRadius:TRACK_H/2, border:`1px solid ${C.goldBorder}`, background:isDark?C.gold:"transparent", cursor:"pointer", padding:0, flexShrink:0, transition:"all 0.3s ease", display:"flex", alignItems:"center" }}>
-      <span style={{ position:"absolute", top:"50%", transform:"translateY(-50%)", left:isDark?TRACK_W-KNOB-PAD:PAD, width:KNOB, height:KNOB, borderRadius:"50%", background:isDark?"#111009":C.gold, display:"block", transition:"all 0.3s cubic-bezier(0.4,0,0.2,1)", boxShadow:"0 2px 6px rgba(0,0,0,0.15)" }} />
+      style={{
+        width:58,
+        height:34,
+        borderRadius:999,
+        border:`1px solid ${C.goldBorder}`,
+        background:isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.28)",
+        cursor:"pointer",
+        padding:"0 6px",
+        flexShrink:0,
+        transition:"border-color 0.25s ease, background 0.25s ease, transform 0.25s ease",
+        display:"inline-flex",
+        alignItems:"center",
+        justifyContent:"center",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = C.goldLight;
+        e.currentTarget.style.transform = "translateY(-1px)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = C.goldBorder;
+        e.currentTarget.style.transform = "translateY(0)";
+      }}
+    >
+      <span
+        style={{
+          position:"relative",
+          display:"inline-flex",
+          alignItems:"center",
+          justifyContent:"space-between",
+          width:46,
+          height:24,
+          padding:"3px 5px",
+          borderRadius:999,
+          background:isDark
+            ? "linear-gradient(135deg, rgba(255,250,241,0.18), rgba(196,163,90,0.14)), rgba(10,8,6,0.24)"
+            : "linear-gradient(135deg, rgba(164,120,33,0.10), rgba(255,255,255,0.62)), rgba(255,252,246,0.82)",
+          boxShadow:isDark
+            ? "inset 0 0 0 1px rgba(255,255,255,0.13)"
+            : "inset 0 0 0 1px rgba(164,120,33,0.16)",
+          overflow:"hidden",
+          transition:"box-shadow 0.25s ease, background 0.25s ease",
+        }}
+      >
+        <span style={{ width:14, height:14, color:isDark ? "rgba(255,250,241,0.72)" : "rgba(74,60,39,0.34)", display:"inline-flex", alignItems:"center", justifyContent:"center", transition:"color 0.25s ease" }}>
+          <svg viewBox="0 0 24 24" role="presentation" style={{ width:"100%", height:"100%", fill:"currentColor", stroke:"none" }}>
+            <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
+          </svg>
+        </span>
+        <span style={{ width:14, height:14, color:isDark ? "rgba(255,250,241,0.42)" : "rgba(74,60,39,0.70)", display:"inline-flex", alignItems:"center", justifyContent:"center", transition:"color 0.25s ease" }}>
+          <svg viewBox="0 0 24 24" role="presentation" style={{ width:"100%", height:"100%", fill:"none", stroke:"currentColor", strokeWidth:1.9, strokeLinecap:"round", strokeLinejoin:"round" }}>
+            <circle cx="12" cy="12" r="4.2" />
+            <path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" />
+          </svg>
+        </span>
+        <span
+          style={{
+            position:"absolute",
+            top:3,
+            left:3,
+            width:18,
+            height:18,
+            borderRadius:"50%",
+            background:isDark ? "linear-gradient(135deg, #d8bd78, #a47821)" : "linear-gradient(135deg, #fffaf1, #d8bd78)",
+            color:isDark ? "#17130e" : "#8a621c",
+            padding:4,
+            transform:isDark ? "translateX(0)" : "translateX(22px)",
+            transition:"transform 0.32s cubic-bezier(0.22,1,0.36,1), background 0.28s ease, color 0.28s ease, box-shadow 0.28s ease",
+            boxShadow:"0 3px 9px rgba(0,0,0,0.24)",
+            zIndex:2,
+            display:"inline-flex",
+            alignItems:"center",
+            justifyContent:"center",
+          }}
+        >
+          {isDark ? (
+            <svg viewBox="0 0 24 24" role="presentation" style={{ width:"100%", height:"100%", fill:"currentColor", stroke:"none" }}>
+              <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" role="presentation" style={{ width:"100%", height:"100%", fill:"none", stroke:"currentColor", strokeWidth:1.9, strokeLinecap:"round", strokeLinejoin:"round" }}>
+              <circle cx="12" cy="12" r="4.2" />
+              <path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" />
+            </svg>
+          )}
+        </span>
+      </span>
     </button>
   );
 }
 
-export default function SharedNavbar({ isDark, toggle, showNavigation = false, scrolled = false, height = 58 }) {
+export default function SharedNavbar({ isDark, toggle, showNavigation = false, scrolled = false, height = 58, variant = "standard" }) {
   const navigate = useNavigate();
   const C = getTokens(isDark);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const navBg = isDark ? "#0E0C08" : "#F2EDE0";
+  const isGlass = variant === "reservation";
+  const navHeight = isGlass ? Math.min(height, 50) : height;
+  const navBg = isGlass
+    ? (isDark ? "rgba(17, 13, 9, 0.38)" : "rgba(255, 252, 246, 0.46)")
+    : (isDark ? "#0E0C08" : "#F2EDE0");
 
   const navLinkBase = {
     background:"none", border:"none", cursor:"pointer", fontFamily:FONT,
@@ -50,9 +139,9 @@ export default function SharedNavbar({ isDark, toggle, showNavigation = false, s
   return (
     <>
       <style>{`
-        #bv-nav,
-        #bv-nav::before,
-        #bv-nav::after {
+        #bv-nav.bv-nav-standard,
+        #bv-nav.bv-nav-standard::before,
+        #bv-nav.bv-nav-standard::after {
           border: none !important;
           border-top: none !important;
           border-bottom: none !important;
@@ -61,8 +150,8 @@ export default function SharedNavbar({ isDark, toggle, showNavigation = false, s
           outline: none !important;
           background-image: none !important;
         }
-        #bv-nav::before,
-        #bv-nav::after {
+        #bv-nav.bv-nav-standard::before,
+        #bv-nav.bv-nav-standard::after {
           display: none !important;
           content: none !important;
         }
@@ -76,27 +165,34 @@ export default function SharedNavbar({ isDark, toggle, showNavigation = false, s
         }
       `}</style>
 
-      <nav id="bv-nav" style={{
-        position:"fixed", top:0, left:0, right:0, zIndex:9000,
-        height:height,
+      <nav id="bv-nav" className={isGlass ? "bv-nav-glass" : "bv-nav-standard"} style={{
+        position:"fixed",
+        top:isGlass ? 12 : 0,
+        left:isGlass ? "clamp(16px,2vw,32px)" : 0,
+        right:isGlass ? "clamp(16px,2vw,32px)" : 0,
+        zIndex:9000,
+        height:navHeight,
         display:"flex", alignItems:"center", justifyContent:"space-between",
-        padding:"0 clamp(24px,4vw,60px)",
+        padding:isGlass ? "0 clamp(12px,2.2vw,28px)" : "0 clamp(24px,4vw,60px)",
         background: navBg,
-        border:       "none",
-        borderTop:    "none",
-        borderBottom: "none",
-        borderLeft:   "none",
-        borderRight:  "none",
-        boxShadow:    "none",
+        border:       isGlass ? `1px solid ${isDark ? "rgba(255,250,241,0.10)" : "rgba(164,120,33,0.20)"}` : "none",
+        borderTop:    isGlass ? undefined : "none",
+        borderBottom: isGlass ? undefined : "none",
+        borderLeft:   isGlass ? undefined : "none",
+        borderRight:  isGlass ? undefined : "none",
+        borderRadius: isGlass ? 18 : 0,
+        boxShadow:    isGlass ? "0 14px 30px rgba(18,12,7,0.08)" : "none",
         outline:      "none",
         boxSizing:    "border-box",
-        transition:   "background 0.35s",
+        backdropFilter:isGlass ? "blur(18px)" : undefined,
+        WebkitBackdropFilter:isGlass ? "blur(18px)" : undefined,
+        transition:   "background 0.35s, border-color 0.35s",
       }}>
         <img src={bellevueLogo} alt="The Bellevue Manila" onClick={() => navigate("/")}
-          style={{ height:height===58?28:32, width:"auto", cursor:"pointer", display:"block", flexShrink:0,
+          style={{ height:isGlass ? 23 : (height===58?28:32), width:"auto", cursor:"pointer", display:"block", flexShrink:0,
             filter: isDark
-              ? (height===58 ? "brightness(0) saturate(100%) invert(82%) sepia(18%) saturate(350%) hue-rotate(2deg)" : "none")
-              : (height===58 ? "brightness(0) saturate(100%) invert(20%) sepia(30%) saturate(600%) hue-rotate(8deg)" : "brightness(0) saturate(100%) invert(25%) sepia(40%) saturate(500%) hue-rotate(10deg)"),
+              ? (isGlass || height===58 ? "brightness(0) saturate(100%) invert(82%) sepia(18%) saturate(350%) hue-rotate(2deg)" : "none")
+              : (isGlass || height===58 ? "brightness(0) saturate(100%) invert(20%) sepia(30%) saturate(600%) hue-rotate(8deg)" : "brightness(0) saturate(100%) invert(25%) sepia(40%) saturate(500%) hue-rotate(10deg)"),
             opacity:0.90, transition:"filter 0.35s,opacity 0.25s" }} />
 
         <div style={{ display:"flex", alignItems:"center", gap:16, flexShrink:0 }}>
