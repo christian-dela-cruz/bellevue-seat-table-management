@@ -155,6 +155,8 @@ class VenueSeeder extends Seeder
             'image' => $data['image'] ?? null,
             'display_order' => $data['display_order'] ?? 0,
             'is_active' => $data['is_active'] ?? true,
+            'is_archived' => false,
+            'archived_at' => null,
             'is_visible' => $data['is_visible'] ?? true,
             'show_on_landing' => $data['show_on_landing'] ?? true,
             'reservations_enabled' => $data['reservations_enabled'] ?? true,

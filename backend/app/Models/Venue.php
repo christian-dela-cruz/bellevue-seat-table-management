@@ -22,6 +22,8 @@ class Venue extends Model
         'image',
         'display_order',
         'is_active',
+        'is_archived',
+        'archived_at',
         'is_visible',
         'show_on_landing',
         'reservations_enabled',
@@ -34,6 +36,8 @@ class Venue extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_archived' => 'boolean',
+        'archived_at' => 'datetime',
         'is_visible' => 'boolean',
         'show_on_landing' => 'boolean',
         'reservations_enabled' => 'boolean',

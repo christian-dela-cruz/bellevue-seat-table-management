@@ -27,7 +27,7 @@ class VenueController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $venues = $this->venueService->getAllVenues($request->only(['type', 'category', 'active', 'visible', 'landing']));
+            $venues = $this->venueService->getAllVenues($request->only(['type', 'category', 'active', 'visible', 'landing', 'include_archived']));
             return response()->json($venues);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
