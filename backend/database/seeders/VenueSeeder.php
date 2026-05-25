@@ -130,12 +130,26 @@ class VenueSeeder extends Seeder
             'wing' => 'Dining',
             'type' => 'dining',
             'category' => 'dining',
-            'capacity' => 60,
+            'capacity' => 81,
             'price_per_hour' => 0.00,
             'description' => 'Authentic Japanese restaurant with teppanyaki stations.',
             'image' => 'hanakazu.jpeg',
             'display_order' => 101,
             'reservation_route' => '/hanakazu',
+        ]);
+
+        $this->upsertVenue([
+            'name' => 'Phoenix Court',
+            'slug' => 'phoenix-court',
+            'wing' => 'Dining',
+            'type' => 'dining',
+            'category' => 'dining',
+            'capacity' => 250,
+            'price_per_hour' => 0.00,
+            'description' => 'Chinese restaurant dining outlet for table reservations.',
+            'image' => 'phoenix-court.webp',
+            'display_order' => 102,
+            'reservation_route' => '/phoenix-court',
         ]);
     }
 

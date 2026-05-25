@@ -4,6 +4,8 @@ export const venueAPI = {
   // Get all venues
   getAll: (params = {}) => api.get('/venues', params),
 
+  getTimeSlots: (params = {}) => api.get('/venues/time-slots', params),
+
   // Get single venue with seats and reservations
   getById: (id) => api.get(`/venues/${id}`),
 

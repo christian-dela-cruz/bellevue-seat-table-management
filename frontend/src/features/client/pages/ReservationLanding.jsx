@@ -12,7 +12,7 @@ import towerBallroomImg from "../../../assets/tower-ballroom-hires.jpg";
 import businessCenterImg from "../../../assets/business-center-hires.jpg";
 import { venueAPI } from "../../../services/venueAPI";
 
-const diningOutlets = [
+const fallbackDiningOutlets = [
   {
     title: "Hanakazu",
     route: "/hanakazu",
@@ -125,6 +125,17 @@ const roomRouteMap = {
   "business center": "/business-center-reserve",
 };
 
+const diningLogoMap = {
+  "hanakazu japanese restaurant": hanakazuLogo,
+  "hanakazu": hanakazuLogo,
+  "hanakazujapaneserestaurant": hanakazuLogo,
+  "qsina restaurant": qsinaLogo,
+  "qsina": qsinaLogo,
+  "qsinarestaurant": qsinaLogo,
+  "phoenix court": phoenixCourtLogo,
+  "phoenixcourt": phoenixCourtLogo,
+};
+
 function resolveRoomImage(image) {
   if (!image) return businessCenterImg;
   if (/^(https?:|data:|blob:)/i.test(image)) return image;
@@ -138,6 +149,12 @@ function resolveRoomImage(image) {
 
 function roomRoute(room) {
   return room?.reservation_route || roomRouteMap[String(room?.name || "").toLowerCase()] || "/venues";
+}
+
+function resolveDiningLogo(room) {
+  const key = canonicalRoomName(room?.display_name || room?.name);
+  if (room?.image && /^(https?:|data:|blob:|\/)/i.test(String(room.image))) return resolveRoomImage(room.image);
+  return diningLogoMap[key] || fallbackDiningOutlets.find((outlet) => canonicalRoomName(outlet.title) === key)?.logo || null;
 }
 
 function childLabel(child, parentName) {
@@ -181,6 +198,17 @@ const childParentNameMap = {
   "tower 3": "tower ballroom",
 };
 
+const diningAliases = {
+  "hanakazu": "hanakazu japanese restaurant",
+  "hanakazu japanese restaurant": "hanakazu japanese restaurant",
+  "hanakazujapaneserestaurant": "hanakazu japanese restaurant",
+  "qsina": "qsina restaurant",
+  "qsina restaurant": "qsina restaurant",
+  "qsinarestaurant": "qsina restaurant",
+  "phoenix court": "phoenix court",
+  "phoenixcourt": "phoenix court",
+};
+
 function isArchivedRoom(room) {
   return Boolean(room?.is_archived || room?.metadata?.archived_reason);
 }
@@ -195,6 +223,15 @@ function knownChildParentKey(room) {
   const name = canonicalRoomName(room?.name);
   const display = canonicalRoomName(room?.display_name);
   return childParentNameMap[name] || childParentNameMap[display] || null;
+}
+
+function diningKey(room) {
+  if (room?.type !== "dining") return null;
+  const name = canonicalRoomName(room?.name);
+  const display = canonicalRoomName(room?.display_name);
+  const slug = canonicalRoomName(String(room?.slug || "").replace(/-/g, " "));
+
+  return diningAliases[name] || diningAliases[display] || diningAliases[slug] || name || display || slug || null;
 }
 
 function childGroupingKey(room, parentName) {
@@ -227,9 +264,12 @@ function uniqueConfiguredRooms(rooms = []) {
   liveRooms.forEach((room) => {
     const nameKey = canonicalRoomName(room.display_name || room.name);
     if (!nameKey) return;
+    const diningGroup = diningKey(room);
     const derivedParent = knownChildParentKey(room);
     const parentKey = knownParentKey(room);
-    const key = derivedParent
+    const key = diningGroup
+      ? `dining:${diningGroup}`
+      : derivedParent
       ? `child:${derivedParent}:${childGroupingKey(room, derivedParent)}`
       : room.parent_id
         ? `child:${room.parent_id}:${nameKey}`
@@ -286,6 +326,58 @@ function buildEventVenuesFromConfig(rooms = []) {
         })),
       };
     });
+}
+
+function buildDiningOutletsFromConfig(rooms = []) {
+  const configuredDining = uniqueConfiguredRooms(rooms)
+    .filter((room) => room.type === "dining" && !isArchivedRoom(room))
+    .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0) || String(a.name).localeCompare(String(b.name)));
+
+  if (!configuredDining.length) return fallbackDiningOutlets;
+
+  const configuredByKey = new Map();
+  configuredDining.forEach((room) => {
+    const keys = [
+      diningKey(room),
+      canonicalRoomName(room.display_name || room.name),
+      canonicalRoomName(room.name),
+      canonicalRoomName(room.slug),
+      canonicalRoomName(String(room.slug || "").replace(/-/g, " ")),
+      canonicalRoomName(room.reservation_route),
+    ].filter(Boolean);
+    keys.forEach((key) => configuredByKey.set(key, room));
+  });
+
+  const usedIds = new Set();
+  const mappedFallbacks = fallbackDiningOutlets
+    .map((outlet) => {
+      const outletKey = diningAliases[canonicalRoomName(outlet.title)] || canonicalRoomName(outlet.title);
+      const match = configuredByKey.get(outletKey)
+        || configuredByKey.get(canonicalRoomName(outlet.title))
+        || configuredByKey.get(canonicalRoomName(outlet.route));
+      if (!match) return outlet;
+      usedIds.add(match.id);
+      if (!match.is_active || !match.is_visible || !match.show_on_landing) return null;
+      return {
+        title: match.display_name || outlet.title,
+        route: match.reservations_enabled ? roomRoute(match) : outlet.route,
+        logo: resolveDiningLogo(match) || outlet.logo,
+        mark: match.display_name || outlet.mark,
+      };
+    })
+    .filter(Boolean);
+
+  const configuredExtras = configuredDining
+    .filter((room) => !usedIds.has(room.id))
+    .filter((room) => room.is_active && room.is_visible && room.show_on_landing)
+    .map((room) => ({
+      title: room.display_name || room.name,
+      route: roomRoute(room),
+      logo: resolveDiningLogo(room),
+      mark: room.display_name || room.name,
+    }));
+
+  return [...mappedFallbacks, ...configuredExtras];
 }
 
 function VenueCard({ item, variant = "event", isInteractive = true }) {
@@ -361,20 +453,25 @@ function VenueCard({ item, variant = "event", isInteractive = true }) {
 export default function ReservationLanding() {
   const navigate = useNavigate();
   const [theme, setTheme] = useState("dark");
+  const [diningOutlets, setDiningOutlets] = useState(fallbackDiningOutlets);
   const [eventVenues, setEventVenues] = useState(null);
   const isLight = theme === "light";
 
   useEffect(() => {
     let mounted = true;
     const loadConfiguredRooms = () => {
-      venueAPI.getAll({ type: "function_room", _t: Date.now() })
+      venueAPI.getAll({ _t: Date.now() })
       .then((rooms) => {
         if (!mounted) return;
-        const configured = buildEventVenuesFromConfig(Array.isArray(rooms) ? rooms : []);
-        setEventVenues(configured);
+        const venueRows = Array.isArray(rooms) ? rooms : [];
+        setDiningOutlets(buildDiningOutletsFromConfig(venueRows));
+        setEventVenues(buildEventVenuesFromConfig(venueRows));
       })
       .catch(() => {
-        if (mounted) setEventVenues(fallbackEventVenues);
+        if (mounted) {
+          setDiningOutlets(fallbackDiningOutlets);
+          setEventVenues(fallbackEventVenues);
+        }
       });
     };
 

@@ -65,21 +65,157 @@ const emptyForm = {
   child_selectable: true,
   reservation_route: "",
   image_position: "center 50%",
+  metadata: {},
+  availability_enabled: true,
+  availability_start_time: "08:00",
+  availability_end_time: "23:00",
+  availability_interval_minutes: 60,
+  availability_max_reservations: 0,
+  availability_slot_capacity: 0,
+  availability_blocked_dates: "",
+  availability_blocked_times: "",
+  availability_periods: [],
+  availability_overrides: [],
 };
 
 function normalizeRoom(room = {}) {
+  const availability = room.metadata?.availability || {};
+  const capacity = room.capacity ?? 0;
   return {
     ...emptyForm,
     ...room,
     parent_id: room.parent_id ? String(room.parent_id) : "",
-    capacity: room.capacity ?? 0,
+    capacity,
     display_order: room.display_order ?? 0,
     display_name: room.display_name || room.name || "",
     slug: room.slug || "",
     image: room.image || "",
     reservation_route: room.reservation_route || "",
     image_position: room.image_position || "center 50%",
+    metadata: room.metadata || {},
+    availability_enabled: availability.enabled ?? true,
+    availability_start_time: availability.start_time || (room.type === "dining" ? "11:00" : "08:00"),
+    availability_end_time: availability.end_time || (room.type === "dining" ? "22:00" : "23:00"),
+    availability_interval_minutes: availability.interval_minutes ?? (room.type === "dining" ? 30 : 60),
+    availability_max_reservations: availability.max_reservations_per_slot ?? 0,
+    availability_slot_capacity: availability.slot_capacity ?? capacity,
+    availability_blocked_dates: Array.isArray(availability.blocked_dates) ? availability.blocked_dates.join(", ") : "",
+    availability_blocked_times: blockedTimesToText(availability.blocked_times),
+    availability_periods: normalizeSchedulePeriods(availability.periods, room),
+    availability_overrides: normalizeScheduleOverrides(availability.overrides),
   };
+}
+
+const DAY_OPTIONS = [
+  ["0", "Sun"],
+  ["1", "Mon"],
+  ["2", "Tue"],
+  ["3", "Wed"],
+  ["4", "Thu"],
+  ["5", "Fri"],
+  ["6", "Sat"],
+];
+
+function normalizedName(value) {
+  return canonical(value).replace(/\s+/g, " ");
+}
+
+function makePeriod(data = {}) {
+  return {
+    id: data.id || `period-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    label: data.label || "Reservation",
+    service_type: data.service_type || data.service || "Reservation",
+    days: Array.isArray(data.days) ? data.days.map(Number) : [0, 1, 2, 3, 4, 5, 6],
+    start_time: String(data.start_time || "08:00").substring(0, 5),
+    end_time: String(data.end_time || "23:00").substring(0, 5),
+    interval_minutes: Number(data.interval_minutes || 30),
+    max_reservations_per_slot: Number(data.max_reservations_per_slot || 0),
+    slot_capacity: Number(data.slot_capacity || 0),
+    min_guests: Number(data.min_guests || 0),
+    max_guests: Number(data.max_guests || 0),
+    enabled: data.enabled ?? true,
+  };
+}
+
+function defaultSchedulePeriods(room = {}) {
+  const capacity = Number(room.capacity || 0);
+  const name = normalizedName(room.display_name || room.name);
+  if (name.includes("hanakazu")) {
+    return [
+      makePeriod({ label: "Lunch", service_type: "À la carte", days: [2, 3, 4, 5, 6, 0], start_time: "11:30", end_time: "14:30", interval_minutes: 30, slot_capacity: capacity || 81 }),
+      makePeriod({ label: "Dinner", service_type: "À la carte", days: [2, 3, 4, 5, 6, 0], start_time: "17:30", end_time: "22:00", interval_minutes: 30, slot_capacity: capacity || 81 }),
+    ];
+  }
+  if (name.includes("qsina")) {
+    return [
+      makePeriod({ label: "Breakfast", service_type: "Breakfast buffet", days: [0, 1, 2, 3, 4, 5, 6], start_time: "06:00", end_time: "10:00", interval_minutes: 30, slot_capacity: capacity || 80 }),
+      makePeriod({ label: "Lunch", service_type: "À la carte", days: [1, 2, 6, 0], start_time: "11:30", end_time: "14:30", interval_minutes: 30, slot_capacity: capacity || 80 }),
+      makePeriod({ label: "Lunch", service_type: "Light lunch buffet", days: [3, 4, 5], start_time: "11:30", end_time: "14:30", interval_minutes: 30, slot_capacity: capacity || 80 }),
+      makePeriod({ label: "Dinner", service_type: "À la carte", days: [1, 2, 3, 4], start_time: "18:00", end_time: "22:00", interval_minutes: 30, slot_capacity: capacity || 80 }),
+      makePeriod({ label: "Dinner", service_type: "Dinner buffet", days: [5, 6, 0], start_time: "18:00", end_time: "22:00", interval_minutes: 30, slot_capacity: capacity || 80 }),
+    ];
+  }
+  if (name.includes("phoenix")) {
+    return [
+      makePeriod({ label: "Lunch", service_type: "Chinese fine dining", days: [0, 1, 2, 3, 4, 5, 6], start_time: "11:00", end_time: "14:30", interval_minutes: 30, slot_capacity: capacity || 250 }),
+      makePeriod({ label: "Dinner", service_type: "Chinese fine dining", days: [0, 1, 2, 3, 4, 5, 6], start_time: "18:00", end_time: "22:00", interval_minutes: 30, slot_capacity: capacity || 250 }),
+    ];
+  }
+  return [
+    makePeriod({
+      label: room.type === "dining" ? "Dining Service" : "Event Window",
+      service_type: room.type === "dining" ? "Reservation" : "Function reservation",
+      days: [0, 1, 2, 3, 4, 5, 6],
+      start_time: room.type === "dining" ? "11:00" : "08:00",
+      end_time: room.type === "dining" ? "22:00" : "23:00",
+      interval_minutes: room.type === "dining" ? 30 : 60,
+      slot_capacity: capacity,
+    }),
+  ];
+}
+
+function normalizeSchedulePeriods(periods, room = {}) {
+  const source = Array.isArray(periods) && periods.length ? periods : defaultSchedulePeriods(room);
+  return source.map(makePeriod);
+}
+
+function makeOverride(data = {}) {
+  return {
+    id: data.id || `override-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    date: data.date || "",
+    type: data.type || "closed",
+    label: data.label || "Manual override",
+    start_time: data.start_time || "",
+    end_time: data.end_time || "",
+    interval_minutes: Number(data.interval_minutes || 30),
+    blocked_times_text: Array.isArray(data.blocked_times) ? data.blocked_times.join(", ") : (data.blocked_times_text || ""),
+    slot_capacity: Number(data.slot_capacity || 0),
+    max_reservations_per_slot: Number(data.max_reservations_per_slot || 0),
+    note: data.note || "",
+    enabled: data.enabled ?? true,
+  };
+}
+
+function normalizeScheduleOverrides(overrides) {
+  return Array.isArray(overrides) ? overrides.map(makeOverride) : [];
+}
+
+function blockedTimesToText(blockedTimes) {
+  if (!blockedTimes || typeof blockedTimes !== "object") return "";
+  return Object.entries(blockedTimes)
+    .map(([date, times]) => `${date}: ${(Array.isArray(times) ? times : []).join(", ")}`)
+    .join("\n");
+}
+
+function parseBlockedTimes(text) {
+  return String(text || "")
+    .split(/\n+/)
+    .reduce((acc, line) => {
+      const [date, values] = line.split(":");
+      if (!date?.trim() || !values?.trim()) return acc;
+      acc[date.trim()] = values.split(",").map((item) => item.trim().substring(0, 5)).filter(Boolean);
+      return acc;
+    }, {});
 }
 
 function slugify(value) {
@@ -135,6 +271,17 @@ const childParentNameMap = {
   "tower 3": "tower ballroom",
 };
 
+const diningAliases = {
+  "hanakazu": "hanakazu japanese restaurant",
+  "hanakazu japanese restaurant": "hanakazu japanese restaurant",
+  "hanakazujapaneserestaurant": "hanakazu japanese restaurant",
+  "qsina": "qsina restaurant",
+  "qsina restaurant": "qsina restaurant",
+  "qsinarestaurant": "qsina restaurant",
+  "phoenix court": "phoenix court",
+  "phoenixcourt": "phoenix court",
+};
+
 function isArchivedRoom(room) {
   return Boolean(room?.is_archived || room?.metadata?.archived_reason);
 }
@@ -151,6 +298,15 @@ function knownChildParentKey(room) {
   return childParentNameMap[name] || childParentNameMap[display] || null;
 }
 
+function diningKey(room) {
+  if (room?.type !== "dining") return null;
+  const name = canonical(room?.name);
+  const display = canonical(room?.display_name);
+  const slug = canonical(String(room?.slug || "").replace(/-/g, " "));
+
+  return diningAliases[name] || diningAliases[display] || diningAliases[slug] || name || display || slug || null;
+}
+
 function childGroupingKey(room, parentName) {
   const display = canonical(room?.display_name);
   const name = canonical(room?.name);
@@ -159,6 +315,55 @@ function childGroupingKey(room, parentName) {
     .replace(/function room|ballroom/g, "")
     .trim();
   return value || name || String(room?.id || "");
+}
+
+function blockedDateList(value) {
+  return String(value || "")
+    .split(/[,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function availabilityPayload(form) {
+  const periods = normalizeSchedulePeriods(form.availability_periods, form)
+    .filter((period) => period.start_time && period.end_time)
+    .map((period) => ({
+      ...period,
+      days: period.days.map(Number),
+      interval_minutes: Number(period.interval_minutes || 30),
+      max_reservations_per_slot: Number(period.max_reservations_per_slot || 0),
+      slot_capacity: Number(period.slot_capacity || 0),
+      min_guests: Number(period.min_guests || 0),
+      max_guests: Number(period.max_guests || 0),
+      enabled: Boolean(period.enabled),
+    }));
+  const overrides = normalizeScheduleOverrides(form.availability_overrides)
+    .filter((override) => override.date)
+    .map((override) => ({
+      ...override,
+      blocked_times: String(override.blocked_times_text || "")
+        .split(",")
+        .map((item) => item.trim().substring(0, 5))
+        .filter(Boolean),
+      interval_minutes: Number(override.interval_minutes || 30),
+      slot_capacity: Number(override.slot_capacity || 0),
+      max_reservations_per_slot: Number(override.max_reservations_per_slot || 0),
+      enabled: Boolean(override.enabled),
+    }));
+
+  return {
+    enabled: Boolean(form.availability_enabled),
+    days: [0, 1, 2, 3, 4, 5, 6],
+    start_time: String(form.availability_start_time || "08:00").substring(0, 5),
+    end_time: String(form.availability_end_time || "23:00").substring(0, 5),
+    interval_minutes: Number(form.availability_interval_minutes || 60),
+    max_reservations_per_slot: Number(form.availability_max_reservations || 0),
+    slot_capacity: Number(form.availability_slot_capacity || form.capacity || 0),
+    blocked_dates: blockedDateList(form.availability_blocked_dates),
+    blocked_times: parseBlockedTimes(form.availability_blocked_times),
+    periods,
+    overrides,
+  };
 }
 
 function notifyVenueConfigUpdated() {
@@ -303,7 +508,7 @@ export default function FunctionRooms() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({ status: "all", visibility: "all", wing: "all", landing: "all" });
+  const [filters, setFilters] = useState({ type: "all", status: "all", visibility: "all", wing: "all", landing: "all" });
   const [sortBy, setSortBy] = useState("display_order");
   const [confirmAction, setConfirmAction] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -314,10 +519,10 @@ export default function FunctionRooms() {
   const loadRooms = async () => {
     setLoading(true);
     try {
-      const data = await venueAPI.getAll({ type: "function_room" });
+      const data = await venueAPI.getAll({ include_archived: false, _t: Date.now() });
       setRooms(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.message || "Unable to load function rooms.");
+      setError(err.message || "Unable to load venue configuration.");
     } finally {
       setLoading(false);
     }
@@ -388,9 +593,12 @@ export default function FunctionRooms() {
     liveRooms.forEach((room) => {
       const nameKey = canonical(room.display_name || room.name);
       if (!nameKey) return;
+      const diningGroup = diningKey(room);
       const derivedParent = knownChildParentKey(room);
       const parentKey = knownParentKey(room);
-      const key = derivedParent
+      const key = diningGroup
+        ? `dining:${diningGroup}`
+        : derivedParent
         ? `child:${derivedParent}:${childGroupingKey(room, derivedParent)}`
         : room.parent_id
           ? `child:${room.parent_id}:${nameKey}`
@@ -438,7 +646,9 @@ export default function FunctionRooms() {
     const matchesVisibility = filters.visibility === "all" || (filters.visibility === "visible" ? room.is_visible : !room.is_visible);
     const matchesLanding = filters.landing === "all" || (filters.landing === "shown" ? room.show_on_landing : !room.show_on_landing);
     const matchesWing = filters.wing === "all" || room.wing === filters.wing;
-    return matchesSearch && matchesStatus && matchesVisibility && matchesLanding && matchesWing;
+    const matchesType = filters.type === "all"
+      || (filters.type === "sub_room" ? Boolean(room.parent_id || knownChildParentKey(room)) : room.type === filters.type);
+    return matchesSearch && matchesType && matchesStatus && matchesVisibility && matchesLanding && matchesWing;
   };
 
   const groupedRows = useMemo(() => {
@@ -475,6 +685,8 @@ export default function FunctionRooms() {
 
   const stats = {
     total: uniqueRooms.length,
+    dining: uniqueRooms.filter((room) => room.type === "dining").length,
+    functionRooms: uniqueRooms.filter((room) => room.type === "function_room").length,
     enabled: uniqueRooms.filter((room) => room.is_active).length,
     visible: uniqueRooms.filter((room) => room.is_visible && room.show_on_landing).length,
     grouped: uniqueRooms.filter((room) => room.parent_id || knownChildParentKey(room)).length,
@@ -484,7 +696,7 @@ export default function FunctionRooms() {
     setOpenMenuId(null);
     setDrawerClosing(false);
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, availability_periods: defaultSchedulePeriods(emptyForm) });
     setImageFile(null);
     setError("");
     setDrawerOpen(true);
@@ -521,15 +733,109 @@ export default function FunctionRooms() {
         next.slug = slugify(value);
         next.display_name = value;
       }
+      if (key === "type") {
+        next.category = value === "dining" ? "dining" : "function_room";
+        next.wing = value === "dining" ? "Dining" : (current.wing === "Dining" ? "Main Wing" : current.wing);
+        next.parent_id = value === "dining" ? "" : current.parent_id;
+        next.availability_start_time = value === "dining" ? "11:00" : "08:00";
+        next.availability_end_time = value === "dining" ? "22:00" : "23:00";
+        next.availability_interval_minutes = value === "dining" ? 30 : 60;
+        next.availability_periods = defaultSchedulePeriods({ ...next, type: value });
+      }
       return next;
     });
   };
 
+  const applyDefaultSchedule = () => {
+    setForm((current) => ({
+      ...current,
+      availability_periods: defaultSchedulePeriods(current),
+    }));
+  };
+
+  const addPeriod = () => {
+    setForm((current) => ({
+      ...current,
+      availability_periods: [
+        ...normalizeSchedulePeriods(current.availability_periods, current),
+        makePeriod({
+          label: current.type === "dining" ? "Dining Service" : "Event Window",
+          service_type: current.type === "dining" ? "Reservation" : "Function reservation",
+          interval_minutes: current.type === "dining" ? 30 : 60,
+          slot_capacity: Number(current.capacity || 0),
+        }),
+      ],
+    }));
+  };
+
+  const updatePeriod = (periodId, key, value) => {
+    setForm((current) => ({
+      ...current,
+      availability_periods: normalizeSchedulePeriods(current.availability_periods, current).map((period) =>
+        period.id === periodId ? { ...period, [key]: value } : period,
+      ),
+    }));
+  };
+
+  const togglePeriodDay = (periodId, dayValue) => {
+    const day = Number(dayValue);
+    setForm((current) => ({
+      ...current,
+      availability_periods: normalizeSchedulePeriods(current.availability_periods, current).map((period) => {
+        if (period.id !== periodId) return period;
+        const days = new Set(period.days.map(Number));
+        if (days.has(day)) days.delete(day);
+        else days.add(day);
+        return { ...period, days: Array.from(days).sort((a, b) => a - b) };
+      }),
+    }));
+  };
+
+  const removePeriod = (periodId) => {
+    setForm((current) => ({
+      ...current,
+      availability_periods: normalizeSchedulePeriods(current.availability_periods, current).filter((period) => period.id !== periodId),
+    }));
+  };
+
+  const addOverride = () => {
+    setForm((current) => ({
+      ...current,
+      availability_overrides: [...normalizeScheduleOverrides(current.availability_overrides), makeOverride()],
+    }));
+  };
+
+  const updateOverride = (overrideId, key, value) => {
+    setForm((current) => ({
+      ...current,
+      availability_overrides: normalizeScheduleOverrides(current.availability_overrides).map((override) =>
+        override.id === overrideId ? { ...override, [key]: value } : override,
+      ),
+    }));
+  };
+
+  const removeOverride = (overrideId) => {
+    setForm((current) => ({
+      ...current,
+      availability_overrides: normalizeScheduleOverrides(current.availability_overrides).filter((override) => override.id !== overrideId),
+    }));
+  };
+
   const validate = () => {
-    if (!form.name.trim()) return "Room name is required.";
-    if (!form.slug.trim()) return "Room slug/code is required.";
-    if (form.parent_id && editing && String(form.parent_id) === String(editing.id)) return "A room cannot be its own parent.";
+    if (!form.name.trim()) return "Venue name is required.";
+    if (!form.slug.trim()) return "Venue slug/code is required.";
+    if (form.parent_id && editing && String(form.parent_id) === String(editing.id)) return "A venue cannot be assigned as its own parent.";
     if (Number.isNaN(Number(form.display_order))) return "Display order must be numeric.";
+    if (Number(form.availability_interval_minutes) < 15) return "Reservation interval must be at least 15 minutes.";
+    if (form.availability_start_time && form.availability_end_time && form.availability_start_time === form.availability_end_time) return "Opening and closing time cannot be the same.";
+    const periods = normalizeSchedulePeriods(form.availability_periods, form);
+    if (periods.length === 0) return "At least one reservation period is required.";
+    for (const period of periods) {
+      if (!period.days.length) return `${period.label || "A schedule period"} needs at least one day.`;
+      if (!period.start_time || !period.end_time) return `${period.label || "A schedule period"} needs start and end times.`;
+      if (period.start_time === period.end_time) return `${period.label || "A schedule period"} cannot start and end at the same time.`;
+      if (Number(period.interval_minutes) < 15) return `${period.label || "A schedule period"} interval must be at least 15 minutes.`;
+    }
     if (imageFile && !["image/jpeg", "image/png", "image/webp"].includes(imageFile.type)) return "Image must be JPG, PNG, or WEBP.";
     return "";
   };
@@ -548,16 +854,21 @@ export default function FunctionRooms() {
     try {
       const payload = {
         ...form,
-        parent_id: form.parent_id ? Number(form.parent_id) : null,
+        parent_id: form.type === "dining" ? null : (form.parent_id ? Number(form.parent_id) : null),
+        category: form.type === "dining" ? "dining" : (form.category || "function_room"),
         capacity: Number(form.capacity || 0),
         display_order: Number(form.display_order || 0),
         display_name: form.display_name || form.name,
+        metadata: {
+          ...(form.metadata || {}),
+          availability: availabilityPayload(form),
+        },
       };
       const saved = editing ? await venueAPI.update(editing.id, payload) : await venueAPI.create(payload);
       if (imageFile) await venueAPI.uploadImage(saved.id, imageFile);
       await loadRooms();
       notifyVenueConfigUpdated();
-      setToast(editing ? "Function room updated." : "Function room created.");
+      setToast(editing ? "Venue updated." : "Venue created.");
       setDrawerClosing(true);
       setDrawerOpen(false);
       window.setTimeout(() => {
@@ -569,24 +880,25 @@ export default function FunctionRooms() {
       }, 280);
     } catch (err) {
       const messages = err.data?.errors ? Object.values(err.data.errors).flat().join(" ") : "";
-      setError(messages || err.message || "Unable to save function room.");
+      setError(messages || err.message || "Unable to save venue.");
     } finally {
       setSaving(false);
     }
   };
 
   const actionCopy = (room, key, nextValue) => {
-    const name = room.display_name || room.name || "this function room";
+    const name = room.display_name || room.name || "this venue";
+    const venueKind = room.type === "dining" ? "dining outlet" : "function room";
     if (key === "is_active") {
       return nextValue
         ? {
-            title: "Enable function room?",
-            message: `${name} will appear as an enabled room and can be reserved when visibility settings allow it.`,
+            title: `Enable ${venueKind}?`,
+            message: `${name} will be enabled and can be reserved when visibility settings allow it.`,
             label: "Enable",
             tone: "green",
           }
         : {
-            title: "Disable function room?",
+            title: `Disable ${venueKind}?`,
             message: `${name} will no longer be reservable on the guest-facing venue page. Existing reservations remain preserved.`,
             label: "Disable",
             tone: "red",
@@ -595,13 +907,13 @@ export default function FunctionRooms() {
     if (key === "is_visible") {
       return nextValue
         ? {
-            title: "Show function room?",
+            title: `Show ${venueKind}?`,
             message: `${name} will become eligible to render on the guest-facing venue page when enabled and configured for landing display.`,
             label: "Show",
             tone: "green",
           }
         : {
-            title: "Hide function room?",
+            title: `Hide ${venueKind}?`,
             message: `${name} will be removed from guest-facing venue lists while remaining manageable in admin.`,
             label: "Hide",
             tone: "red",
@@ -638,12 +950,12 @@ export default function FunctionRooms() {
   const requestDelete = (room) => {
     if (!canManage) return;
     setOpenMenuId(null);
-    const name = room.display_name || room.name || "this function room";
+    const name = room.display_name || room.name || "this venue";
     setConfirmAction({
       type: "delete",
       room,
-      title: "Delete function room?",
-      message: `${name} will be removed from configuration. Use this only for mistaken records; disabling or hiding is safer for historical rooms.`,
+      title: "Delete venue?",
+      message: `${name} will be removed from configuration. Use this only for mistaken records; disabling or hiding is safer for historical venues.`,
       label: "Delete",
       tone: "red",
     });
@@ -662,9 +974,9 @@ export default function FunctionRooms() {
       setConfirmAction(null);
       await loadRooms();
       notifyVenueConfigUpdated();
-      setToast(confirmAction.type === "delete" ? "Function room deleted." : "Function room setting updated.");
+      setToast(confirmAction.type === "delete" ? "Venue deleted." : "Venue setting updated.");
     } catch (err) {
-      setError(err.message || "Unable to update function room.");
+      setError(err.message || "Unable to update venue.");
     } finally {
       setSaving(false);
     }
@@ -680,6 +992,8 @@ export default function FunctionRooms() {
   };
 
   const preview = imageFile ? URL.createObjectURL(imageFile) : imageUrl(form.image);
+  const schedulePeriods = normalizeSchedulePeriods(form.availability_periods, form);
+  const scheduleOverrides = normalizeScheduleOverrides(form.availability_overrides);
 
   return (
     <>
@@ -737,13 +1051,13 @@ export default function FunctionRooms() {
         <main style={{ flex: 1, height: "calc(100vh - 60px)", overflow: "auto", padding: "30px 32px 42px" }}>
           <AdminPageHeader
             eyebrow="Venue Configuration"
-            title="Function Room Management"
-            description="Configure function rooms, grouped sub-rooms, photos, visibility, and reservation availability."
+            title="Venue Management"
+            description="Configure dining outlets, function rooms, sub-rooms, photos, visibility, landing display, and reservation availability."
             C={C}
             F={F}
             actions={canManage && (
               <button type="button" onClick={beginCreate} style={{ ...buttonBase(), minHeight: 40, border: "none", background: C.gold, color: "#fff", padding: "0 14px" }}>
-                <Plus size={14} /> New Room
+                <Plus size={14} /> New Venue
               </button>
             )}
           />
@@ -751,25 +1065,32 @@ export default function FunctionRooms() {
           {toast && <div style={{ marginBottom: 14, padding: "9px 12px", borderRadius: 10, background: C.greenFaint, color: C.green, border: "1px solid rgba(46,122,90,0.16)", fontSize: 12.5 }}>{toast}</div>}
           {error && !drawerOpen && <div style={{ marginBottom: 14, padding: "9px 12px", borderRadius: 10, background: C.redFaint, color: C.red, border: "1px solid rgba(160,56,56,0.16)", fontSize: 12.5 }}>{error}</div>}
 
-          <div className="function-room-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12, marginBottom: 16 }}>
-            <SummaryCard icon={Layers} label="Configured Rooms" value={stats.total} />
+          <div className="function-room-stats" style={{ display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 12, marginBottom: 16 }}>
+            <SummaryCard icon={Layers} label="Configured Venues" value={stats.total} />
+            <SummaryCard icon={Camera} label="Dining Outlets" value={stats.dining} tone="gold" />
+            <SummaryCard icon={Layers} label="Function Rooms" value={stats.functionRooms} />
             <SummaryCard icon={CheckCircle2} label="Enabled" value={stats.enabled} tone="green" />
             <SummaryCard icon={Eye} label="Landing Visible" value={stats.visible} tone="gold" />
-            <SummaryCard icon={SlidersHorizontal} label="Sub-Rooms" value={stats.grouped} tone="green" />
           </div>
 
           {duplicateCount > 0 && (
             <div style={{ marginBottom: 14, padding: "9px 12px", borderRadius: 10, background: C.goldFaint, color: C.gold, border: "1px solid rgba(140,107,42,0.16)", fontSize: 12.5 }}>
-              {duplicateCount} duplicate room record{duplicateCount > 1 ? "s are" : " is"} hidden from this workspace and the guest landing renderer.
+              {duplicateCount} duplicate venue record{duplicateCount > 1 ? "s are" : " is"} hidden from this workspace and the guest landing renderer.
             </div>
           )}
 
           <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "visible" }}>
-            <div className="function-room-toolbar" style={{ display: "grid", gridTemplateColumns: "minmax(240px,1fr) repeat(5, minmax(128px, auto))", gap: 10, padding: 14, borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
+            <div className="function-room-toolbar" style={{ display: "grid", gridTemplateColumns: "minmax(240px,1fr) repeat(6, minmax(128px, auto))", gap: 10, padding: 14, borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
               <div style={{ position: "relative" }}>
                 <Search size={15} style={{ position: "absolute", left: 11, top: 12, color: C.faint }} />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search rooms, slugs, wings" style={{ ...inputStyle(), paddingLeft: 34 }} />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search venues, slugs, wings" style={{ ...inputStyle(), paddingLeft: 34 }} />
               </div>
+              <select value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))} style={inputStyle()}>
+                <option value="all">All types</option>
+                <option value="dining">Dining outlets</option>
+                <option value="function_room">Function rooms</option>
+                <option value="sub_room">Sub-rooms</option>
+              </select>
               <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} style={inputStyle()}>
                 <option value="all">All status</option>
                 <option value="enabled">Enabled</option>
@@ -787,12 +1108,13 @@ export default function FunctionRooms() {
               </select>
               <select value={filters.wing} onChange={(e) => setFilters((f) => ({ ...f, wing: e.target.value }))} style={inputStyle()}>
                 <option value="all">All wings</option>
+                <option value="Dining">Dining</option>
                 <option value="Main Wing">Main Wing</option>
                 <option value="Tower Wing">Tower Wing</option>
               </select>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={inputStyle()}>
                 <option value="display_order">Display order</option>
-                <option value="parent_first">Parent rooms first</option>
+                <option value="parent_first">Parents first</option>
                 <option value="name">Alphabetical</option>
                 <option value="newest">Newest</option>
                 <option value="oldest">Oldest</option>
@@ -804,16 +1126,16 @@ export default function FunctionRooms() {
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 940 }}>
                 <thead>
                   <tr style={{ background: C.surface, position: "sticky", top: 0, zIndex: 1 }}>
-                    {["Room Structure", "Status", "Display Settings", "Order", "Manage"].map((header) => (
+                    {["Venue Structure", "Status", "Display Settings", "Order", "Manage"].map((header) => (
                       <th key={header} style={{ padding: "11px 14px", textAlign: "left", color: C.faint, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", borderBottom: `1px solid ${C.divider}` }}>{header}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={5} style={{ padding: 22, color: C.muted }}>Loading function rooms...</td></tr>
+                    <tr><td colSpan={5} style={{ padding: 22, color: C.muted }}>Loading venues...</td></tr>
                   ) : groupedRows.length === 0 ? (
-                    <tr><td colSpan={5} style={{ padding: 22, color: C.muted }}>No function rooms match the current filters.</td></tr>
+                    <tr><td colSpan={5} style={{ padding: 22, color: C.muted }}>No venues match the current filters.</td></tr>
                   ) : groupedRows.map(({ room, level, childCount, parent }) => (
                     <tr key={`${room.id}-${level}`} className="function-room-row" style={{ background: level ? "rgba(250,248,244,0.52)" : C.surface }}>
                       <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
@@ -836,7 +1158,11 @@ export default function FunctionRooms() {
                           <div style={{ minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                               <strong style={{ color: C.text, fontSize: level ? 12.5 : 13.5, fontWeight: level ? 560 : 640, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{room.display_name || room.name}</strong>
-                              {!level && <Badge tone="gold" compact>{childCount ? `${childCount} sub-room${childCount > 1 ? "s" : ""}` : "Parent"}</Badge>}
+                              {!level && (
+                                <Badge tone={room.type === "dining" ? "gold" : "neutral"} compact>
+                                  {room.type === "dining" ? "Dining" : childCount ? `${childCount} sub-room${childCount > 1 ? "s" : ""}` : "Function"}
+                                </Badge>
+                              )}
                             </div>
                             <div style={{ marginTop: 3, color: C.muted, fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                               {level && parent ? `${parent.display_name || parent.name} · ` : ""}{room.slug || "No slug"} · {room.wing}
@@ -857,7 +1183,7 @@ export default function FunctionRooms() {
                       <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}`, color: C.text, fontWeight: 560, fontSize: 12.5 }}>{room.display_order}</td>
                       <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
                         <div style={{ display: "flex", gap: 7, justifyContent: "flex-end", position: "relative" }}>
-                          <button className="function-room-action" type="button" onClick={() => beginEdit(room)} style={{ ...buttonBase(), color: C.gold }} title="Edit room"><Edit3 size={14} /> Edit</button>
+                          <button className="function-room-action" type="button" onClick={() => beginEdit(room)} style={{ ...buttonBase(), color: C.gold }} title="Edit venue"><Edit3 size={14} /> Edit</button>
                           <button
                             className="function-room-action"
                             type="button"
@@ -878,11 +1204,11 @@ export default function FunctionRooms() {
                               onClick={(event) => event.stopPropagation()}
                               style={{ position: "absolute", top: 40, right: 0, zIndex: 20, width: 210, padding: 6, borderRadius: 12, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 18px 46px rgba(24,20,14,0.16)", display: "grid", gap: 2 }}
                             >
-                              <MenuAction icon={room.is_active ? ToggleRight : ToggleLeft} label={room.is_active ? "Disable room" : "Enable room"} onClick={() => requestToggle(room, "is_active")} />
+                              <MenuAction icon={room.is_active ? ToggleRight : ToggleLeft} label={room.is_active ? "Disable venue" : "Enable venue"} onClick={() => requestToggle(room, "is_active")} />
                               <MenuAction icon={room.is_visible ? EyeOff : Eye} label={room.is_visible ? "Hide from guests" : "Show to guests"} onClick={() => requestToggle(room, "is_visible")} />
                               <MenuAction icon={room.show_on_landing ? EyeOff : Eye} label={room.show_on_landing ? "Remove from landing" : "Add to landing"} onClick={() => requestToggle(room, "show_on_landing")} />
                               <div style={{ height: 1, background: C.divider, margin: "4px 3px" }} />
-                              <MenuAction icon={Trash2} label="Delete room" danger onClick={() => requestDelete(room)} />
+                              <MenuAction icon={Trash2} label="Delete venue" danger onClick={() => requestDelete(room)} />
                             </div>
                           )}
                         </div>
@@ -898,11 +1224,11 @@ export default function FunctionRooms() {
 
       {drawerVisible && (
         <div className={`function-room-drawer-backdrop${drawerClosing ? " is-closing" : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 7000, background: "rgba(24,20,14,0.28)", display: "flex", justifyContent: "flex-end", backdropFilter: "blur(2px)" }}>
-          <aside className="function-room-drawer" role="dialog" aria-modal="true" aria-label={editing ? "Edit function room" : "Create function room"} style={{ width: "min(520px, calc(100vw - 28px))", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column" }}>
+          <aside className="function-room-drawer" role="dialog" aria-modal="true" aria-label={editing ? "Edit venue" : "Create venue"} style={{ width: "min(520px, calc(100vw - 28px))", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "18px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
               <div>
                 <div style={{ color: C.gold, fontSize: 8.5, fontWeight: 750, letterSpacing: "0.16em", textTransform: "uppercase" }}>Configuration</div>
-                <h2 style={{ margin: "5px 0 0", color: C.text, fontSize: 21, lineHeight: 1.15, fontWeight: 640 }}>{editing ? "Edit Function Room" : "Create Function Room"}</h2>
+                <h2 style={{ margin: "5px 0 0", color: C.text, fontSize: 21, lineHeight: 1.15, fontWeight: 640 }}>{editing ? "Edit Venue" : "Create Venue"}</h2>
               </div>
               <button type="button" onClick={closeDrawer} style={{ ...buttonBase(), width: 36, padding: 0 }} aria-label="Close panel"><X size={16} /></button>
             </div>
@@ -924,25 +1250,31 @@ export default function FunctionRooms() {
                 </section>
 
                 <section style={formSectionStyle()}>
-                  <div style={sectionTitleStyle()}>Room Identity</div>
-                  <Field label="Room Name"><input value={form.name} onChange={(e) => updateForm("name", e.target.value)} style={inputStyle()} /></Field>
+                  <div style={sectionTitleStyle()}>Venue Identity</div>
+                  <Field label="Venue Type">
+                    <select value={form.type} onChange={(e) => updateForm("type", e.target.value)} style={inputStyle()}>
+                      <option value="function_room">Function Room</option>
+                      <option value="dining">Dining Outlet</option>
+                    </select>
+                  </Field>
+                  <Field label="Venue Name"><input value={form.name} onChange={(e) => updateForm("name", e.target.value)} style={inputStyle()} /></Field>
                   <Field label="Customer Display Name"><input value={form.display_name} onChange={(e) => updateForm("display_name", e.target.value)} style={inputStyle()} /></Field>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr", gap: 10 }}>
                     <Field label="Slug / Code"><input value={form.slug} onChange={(e) => updateForm("slug", slugify(e.target.value))} style={inputStyle()} /></Field>
                     <Field label="Order"><input type="number" min="0" value={form.display_order} onChange={(e) => updateForm("display_order", e.target.value)} style={inputStyle()} /></Field>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    <Field label="Wing"><select value={form.wing} onChange={(e) => updateForm("wing", e.target.value)} style={inputStyle()}><option>Main Wing</option><option>Tower Wing</option></select></Field>
+                    <Field label="Location"><select value={form.wing} onChange={(e) => updateForm("wing", e.target.value)} style={inputStyle()}><option>Dining</option><option>Main Wing</option><option>Tower Wing</option></select></Field>
                     <Field label="Capacity"><input type="number" min="0" value={form.capacity} onChange={(e) => updateForm("capacity", e.target.value)} style={inputStyle()} /></Field>
                   </div>
                 </section>
 
                 <section style={formSectionStyle()}>
                   <div style={sectionTitleStyle()}>Grouping & Reservation</div>
-                  <Field label="Parent Room" hint="Leave empty for a main room. Select a parent to create a child chip under that room.">
-                    <select value={form.parent_id} onChange={(e) => updateForm("parent_id", e.target.value)} style={inputStyle()}>
+                  <Field label="Parent Room" hint="Leave empty for a main venue. Function-room children become chips under their parent card.">
+                    <select disabled={form.type === "dining"} value={form.parent_id} onChange={(e) => updateForm("parent_id", e.target.value)} style={inputStyle()}>
                       <option value="">No parent room</option>
-                      {parentRooms.filter((room) => !editing || room.id !== editing.id).map((room) => <option key={room.id} value={room.id}>{room.display_name || room.name}</option>)}
+                      {parentRooms.filter((room) => room.type === "function_room" && (!editing || room.id !== editing.id)).map((room) => <option key={room.id} value={room.id}>{room.display_name || room.name}</option>)}
                     </select>
                   </Field>
                   <Field label="Reservation Route"><input value={form.reservation_route} onChange={(e) => updateForm("reservation_route", e.target.value)} placeholder="/tower1" style={inputStyle()} /></Field>
@@ -953,11 +1285,10 @@ export default function FunctionRooms() {
                   <div style={sectionTitleStyle()}>Availability Settings</div>
                   {[
                     ["is_active", "Enabled"],
-                    ["is_visible", "Visible in admin and guest surfaces"],
+                    ["is_visible", "Visible in guest surfaces"],
                     ["show_on_landing", "Show on landing page"],
                     ["reservations_enabled", "Allow guest reservations"],
-                    ["parent_selectable", "Parent room selectable"],
-                    ["child_selectable", "Child rooms selectable"],
+                    ...(form.type === "dining" ? [] : [["parent_selectable", "Parent room selectable"], ["child_selectable", "Child rooms selectable"]]),
                   ].map(([key, label]) => (
                     <label key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
                       {label}
@@ -965,12 +1296,131 @@ export default function FunctionRooms() {
                     </label>
                   ))}
                 </section>
+
+                <section style={formSectionStyle()}>
+                  <div style={sectionTitleStyle()}>Reservation Time Rules</div>
+                  <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
+                    Use schedule for guest reservations
+                    <input type="checkbox" checked={Boolean(form.availability_enabled)} onChange={(e) => updateForm("availability_enabled", e.target.checked)} style={{ accentColor: C.gold }} />
+                  </label>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                    <span style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+                      Add multiple service periods for breakfast, lunch, dinner, private dining, or event windows.
+                    </span>
+                    <button type="button" onClick={applyDefaultSchedule} style={{ ...buttonBase(), flexShrink: 0 }}>Apply template</button>
+                  </div>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {schedulePeriods.map((period, index) => (
+                      <div key={period.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: C.soft, display: "grid", gap: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                          <strong style={{ color: C.text, fontSize: 12.5, fontWeight: 650 }}>Service Period {index + 1}</strong>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: C.muted, fontSize: 11.5 }}>
+                              Enabled
+                              <input type="checkbox" checked={Boolean(period.enabled)} onChange={(event) => updatePeriod(period.id, "enabled", event.target.checked)} style={{ accentColor: C.gold }} />
+                            </label>
+                            <button type="button" onClick={() => removePeriod(period.id)} style={{ ...buttonBase(), minHeight: 30, color: C.red }}>Remove</button>
+                          </div>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <Field label="Label"><input value={period.label} onChange={(e) => updatePeriod(period.id, "label", e.target.value)} style={inputStyle()} /></Field>
+                          <Field label="Service Type"><input value={period.service_type} onChange={(e) => updatePeriod(period.id, "service_type", e.target.value)} placeholder="Buffet, à la carte, private dining" style={inputStyle()} /></Field>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 0.75fr", gap: 10 }}>
+                          <Field label="Start"><input type="time" value={period.start_time} onChange={(e) => updatePeriod(period.id, "start_time", e.target.value)} style={inputStyle()} /></Field>
+                          <Field label="End"><input type="time" value={period.end_time} onChange={(e) => updatePeriod(period.id, "end_time", e.target.value)} style={inputStyle()} /></Field>
+                          <Field label="Interval"><input type="number" min="15" step="15" value={period.interval_minutes} onChange={(e) => updatePeriod(period.id, "interval_minutes", e.target.value)} style={inputStyle()} /></Field>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {DAY_OPTIONS.map(([value, label]) => {
+                            const checked = period.days.map(Number).includes(Number(value));
+                            return (
+                              <button
+                                key={`${period.id}-${value}`}
+                                type="button"
+                                onClick={() => togglePeriodDay(period.id, value)}
+                                style={{
+                                  minHeight: 28,
+                                  borderRadius: 999,
+                                  border: checked ? "1px solid rgba(140,107,42,0.34)" : `1px solid ${C.border}`,
+                                  background: checked ? C.goldFaint : C.surface,
+                                  color: checked ? C.gold : C.muted,
+                                  padding: "0 9px",
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                          <Field label="Slot Capacity"><input type="number" min="0" value={period.slot_capacity} onChange={(e) => updatePeriod(period.id, "slot_capacity", e.target.value)} style={inputStyle()} /></Field>
+                          <Field label="Min Guests"><input type="number" min="0" value={period.min_guests} onChange={(e) => updatePeriod(period.id, "min_guests", e.target.value)} style={inputStyle()} /></Field>
+                          <Field label="Max Guests"><input type="number" min="0" value={period.max_guests} onChange={(e) => updatePeriod(period.id, "max_guests", e.target.value)} style={inputStyle()} /></Field>
+                        </div>
+                      </div>
+                    ))}
+                    <button type="button" onClick={addPeriod} style={{ ...buttonBase(), justifyContent: "center" }}>
+                      <Plus size={14} /> Add service period
+                    </button>
+                  </div>
+                  <Field label="Blocked Dates" hint="Comma-separated dates, for example: 2026-06-12, 2026-12-25">
+                    <textarea value={form.availability_blocked_dates} onChange={(e) => updateForm("availability_blocked_dates", e.target.value)} rows={2} style={{ ...inputStyle(), resize: "vertical" }} />
+                  </Field>
+                  <Field label="Blocked Times" hint="One date per line. Example: 2026-06-12: 18:00, 18:30">
+                    <textarea value={form.availability_blocked_times} onChange={(e) => updateForm("availability_blocked_times", e.target.value)} rows={2} style={{ ...inputStyle(), resize: "vertical" }} />
+                  </Field>
+                </section>
+
+                <section style={formSectionStyle()}>
+                  <div style={sectionTitleStyle()}>Manual Overrides</div>
+                  <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+                    Use overrides for special closures, blocked periods, special opening hours, or one-day capacity changes.
+                  </div>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {scheduleOverrides.map((override, index) => (
+                      <div key={override.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: C.soft, display: "grid", gap: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                          <strong style={{ color: C.text, fontSize: 12.5, fontWeight: 650 }}>Override {index + 1}</strong>
+                          <button type="button" onClick={() => removeOverride(override.id)} style={{ ...buttonBase(), minHeight: 30, color: C.red }}>Remove</button>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <Field label="Date"><input type="date" value={override.date} onChange={(e) => updateOverride(override.id, "date", e.target.value)} style={inputStyle()} /></Field>
+                          <Field label="Type">
+                            <select value={override.type} onChange={(e) => updateOverride(override.id, "type", e.target.value)} style={inputStyle()}>
+                              <option value="closed">Closed full day</option>
+                              <option value="block_time">Block time range</option>
+                              <option value="special_hours">Special opening hours</option>
+                              <option value="capacity">Capacity adjustment</option>
+                            </select>
+                          </Field>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <Field label="Start"><input type="time" value={override.start_time} onChange={(e) => updateOverride(override.id, "start_time", e.target.value)} style={inputStyle()} /></Field>
+                          <Field label="End"><input type="time" value={override.end_time} onChange={(e) => updateOverride(override.id, "end_time", e.target.value)} style={inputStyle()} /></Field>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <Field label="Slot Capacity"><input type="number" min="0" value={override.slot_capacity} onChange={(e) => updateOverride(override.id, "slot_capacity", e.target.value)} style={inputStyle()} /></Field>
+                          <Field label="Max Bookings"><input type="number" min="0" value={override.max_reservations_per_slot} onChange={(e) => updateOverride(override.id, "max_reservations_per_slot", e.target.value)} style={inputStyle()} /></Field>
+                        </div>
+                        <Field label="Blocked Times"><input value={override.blocked_times_text} onChange={(e) => updateOverride(override.id, "blocked_times_text", e.target.value)} placeholder="18:00, 18:30" style={inputStyle()} /></Field>
+                        <Field label="Note"><input value={override.note} onChange={(e) => updateOverride(override.id, "note", e.target.value)} placeholder="Private event, maintenance, holiday closure" style={inputStyle()} /></Field>
+                      </div>
+                    ))}
+                    <button type="button" onClick={addOverride} style={{ ...buttonBase(), justifyContent: "center" }}>
+                      <Plus size={14} /> Add manual override
+                    </button>
+                  </div>
+                </section>
               </div>
 
               <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", gap: 9 }}>
                 <button type="button" onClick={closeDrawer} disabled={saving} style={buttonBase()}>Cancel</button>
                 <button type="submit" disabled={!canManage || saving} style={{ ...buttonBase(), minWidth: 150, border: "none", background: canManage ? C.gold : C.faint, color: "#fff", cursor: canManage && !saving ? "pointer" : "not-allowed" }}>
-                  {saving ? "Saving..." : editing ? "Save Changes" : "Create Room"}
+                  {saving ? "Saving..." : editing ? "Save Changes" : "Create Venue"}
                 </button>
               </div>
             </form>

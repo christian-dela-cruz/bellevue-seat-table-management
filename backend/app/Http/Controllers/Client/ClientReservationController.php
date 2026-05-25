@@ -12,6 +12,7 @@ use App\Events\SeatReserved;
 use App\Events\TableReserved;
 use App\Mail\ReservationStatusMail;
 use App\Services\ReservationService;
+use App\Services\VenueService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,10 @@ use Illuminate\Support\Facades\Mail;
 
 class ClientReservationController extends Controller
 {
-    public function __construct(private ReservationService $reservationService)
+    public function __construct(
+        private ReservationService $reservationService,
+        private VenueService $venueService,
+    )
     {
     }
 
@@ -119,6 +123,13 @@ class ClientReservationController extends Controller
 
         $validated = $this->normalizeStandaloneReservation($validated);
 
+        if (!$this->venueService->isTimeSlotAvailable($validated)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected reservation time is no longer available for this venue.',
+            ], 422);
+        }
+
         if ($this->reservationService->hasScheduleConflict($validated)) {
             return response()->json([
                 'success' => false,
@@ -175,7 +186,11 @@ class ClientReservationController extends Controller
             return '20/20 Function Room';
         }
 
-        if (str_starts_with($normalized, 'tower ') || str_starts_with($normalized, 'grand ballroom')) {
+        if (str_starts_with($normalized, 'grand ballroom')) {
+            return 'Grand Ballroom';
+        }
+
+        if (str_starts_with($normalized, 'tower ')) {
             return 'Tower Ballroom';
         }
 
@@ -185,6 +200,10 @@ class ClientReservationController extends Controller
 
         if (str_contains($normalized, 'hanakazu')) {
             return 'Hanakazu Japanese Restaurant';
+        }
+
+        if (str_contains($normalized, 'phoenix')) {
+            return 'Phoenix Court';
         }
 
         return $room;
@@ -288,6 +307,30 @@ class ClientReservationController extends Controller
         // Status
         if (isset($validated['status'])) {
             $updateData['status'] = $validated['status'];
+        }
+
+        $candidate = array_merge($reservation->only([
+            'venue_id',
+            'room',
+            'guests_count',
+            'event_date',
+            'event_time',
+        ]), $updateData);
+        $candidate['event_date'] = $candidate['event_date'] instanceof \DateTimeInterface
+            ? $candidate['event_date']->format('Y-m-d')
+            : $candidate['event_date'];
+
+        if (
+            (array_key_exists('room', $updateData)
+                || array_key_exists('guests_count', $updateData)
+                || array_key_exists('event_date', $updateData)
+                || array_key_exists('event_time', $updateData))
+            && !$this->venueService->isTimeSlotAvailable($candidate, $reservation->id)
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected reservation time is no longer available for this venue.',
+            ], 422);
         }
 
         $reservation->update($updateData);

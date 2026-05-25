@@ -49,6 +49,31 @@ class VenueController extends Controller
         );
     }
 
+    public function timeSlots(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'venue_id' => ['nullable', 'integer', 'exists:venues,id'],
+            'room' => ['nullable', 'string', 'max:255'],
+            'date' => ['nullable', 'date'],
+            'event_date' => ['nullable', 'date'],
+            'guests' => ['nullable', 'integer', 'min:1', 'max:9999'],
+        ]);
+
+        $venue = $this->venueService->findVenueForAvailability($validated);
+        if (!$venue) {
+            return response()->json(['error' => 'Venue not found'], 404);
+        }
+
+        return response()->json(
+            $this->venueService->getReservationTimeSlots(
+                $venue,
+                $validated['date'] ?? $validated['event_date'] ?? null,
+                (int) ($validated['guests'] ?? 1),
+                $validated['room'] ?? null,
+            )
+        );
+    }
+
     /**
      * Get specific venue
      */

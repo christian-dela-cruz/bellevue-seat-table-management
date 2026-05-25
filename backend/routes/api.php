@@ -58,6 +58,7 @@ Route::prefix('admin/notifications')->group(function () {
 Route::prefix('venues')->group(function () {
     Route::get('/', [VenueController::class, 'index']);
     Route::get('/availability', [VenueController::class, 'availability']);
+    Route::get('/time-slots', [VenueController::class, 'timeSlots']);
     Route::get('/{id}', [VenueController::class, 'show']);
     Route::post('/', [VenueController::class, 'store'])->middleware(AdminAccess::class . ':manage_venues');
     Route::put('/{id}', [VenueController::class, 'update'])->middleware(AdminAccess::class . ':manage_venues');

@@ -1,28 +1,67 @@
 // src/components/admin/Sidebar.jsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, ClipboardList, Map, UserCog, BarChart3, LayoutDashboard, Settings, LogOut, ChevronUp, Building2 } from "lucide-react";
+import {
+  X,
+  ClipboardList,
+  Map,
+  UserCog,
+  BarChart3,
+  LayoutDashboard,
+  Settings,
+  LogOut,
+  ChevronUp,
+  ChevronDown,
+  Building2,
+} from "lucide-react";
 import { authAPI } from "../../services/authAPI";
 
 const F = { body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" };
 
-const NAV_ITEMS = [
-  { id: "reservations", label: "Reservations", icon: ClipboardList, iconStyle: "lucide" },
-  { id: "cancelled",    label: "Cancelled",    icon: X,           iconStyle: "lucide" },
-  { id: "outlets",      label: "Outlet Dashboard", icon: LayoutDashboard, iconStyle: "lucide", permission: "view_outlet_reports" },
-  { id: "function-rooms", label: "Function Rooms", icon: Building2, iconStyle: "lucide", permission: "view_admin" },
-  { id: "reports",      label: "Reports",      icon: BarChart3,   iconStyle: "lucide", permission: "view_outlet_reports" },
+const NAV_GROUPS = [
   {
-    id: "accounts",
-    label: "Account Manager",
-    icon: UserCog,
-    iconStyle: "lucide",
-    permission: "manage_accounts",
+    id: "reservations",
+    label: "Reservations",
+    items: [
+      { id: "reservations", label: "Reservation Queue", icon: ClipboardList, iconStyle: "lucide" },
+      { id: "cancelled", label: "Cancelled Records", icon: X, iconStyle: "lucide" },
+    ],
   },
-  { id: "seat-map", label: "Seat Map", icon: Map, iconStyle: "lucide" },
+  {
+    id: "venue-operations",
+    label: "Venue Operations",
+    items: [
+      { id: "outlets", label: "Outlet Dashboard", icon: LayoutDashboard, iconStyle: "lucide", permission: "view_outlet_reports" },
+      { id: "function-rooms", label: "Venue Management", icon: Building2, iconStyle: "lucide", permission: "view_admin" },
+      { id: "seat-map", label: "Seat Map", icon: Map, iconStyle: "lucide" },
+    ],
+  },
+  {
+    id: "analytics",
+    label: "Reports & Analytics",
+    items: [
+      { id: "reports", label: "Reports & Analytics", icon: BarChart3, iconStyle: "lucide", permission: "view_outlet_reports" },
+    ],
+  },
+  {
+    id: "administration",
+    label: "Administration",
+    items: [
+      { id: "accounts", label: "Account Manager", icon: UserCog, iconStyle: "lucide", permission: "manage_accounts" },
+    ],
+  },
 ];
 
-// ─── Hamburger Toggle Button ──────────────────────────────────────────────────
+const NAV_ROUTES = {
+  reservations: "/admin/reservations",
+  cancelled: "/admin/cancelled",
+  outlets: "/admin/outlets",
+  "function-rooms": "/admin/function-rooms",
+  reports: "/admin/reports",
+  accounts: "/admin/accounts",
+  "seat-map": "/admin/seatmap",
+};
+
 function HamburgerBtn({ onClick, isOpen }) {
   const [hovered, setHovered] = useState(false);
   return (
@@ -32,65 +71,76 @@ function HamburgerBtn({ onClick, isOpen }) {
       onMouseLeave={() => setHovered(false)}
       title={isOpen ? "Collapse sidebar" : "Expand sidebar"}
       style={{
-        width: 36, height: 36,
-        background: hovered ? "rgba(140,107,42,0.12)" : "rgba(255,255,255,0.42)",
-        border: "1px solid rgba(140,107,42,0.14)", cursor: "pointer",
-        display: "flex", flexDirection: "column",
-        justifyContent: "center", alignItems: "center",
-        gap: 5, padding: 6, borderRadius: 6,
-        transition: "background 0.2s, border-color 0.2s, transform 0.2s", flexShrink: 0,
-        boxShadow: hovered ? "0 4px 10px rgba(55,39,17,0.035)" : "none",
+        width: 34,
+        height: 34,
+        background: hovered ? "rgba(140,107,42,0.08)" : "transparent",
+        border: "1px solid rgba(140,107,42,0.10)",
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        gap: 5,
+        padding: 6,
+        borderRadius: 9,
+        transition: "background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s",
+        flexShrink: 0,
+        boxShadow: "none",
         transform: hovered ? "translateY(-1px)" : "none",
       }}
     >
-      {[0, 1, 2].map(i => (
-        <span key={i} style={{
-          display: "block",
-          width: i === 1 && isOpen ? 12 : 18,
-          height: 2, background: "#8C6B2A", borderRadius: 2,
-          transition: "width 0.2s",
-          marginLeft: i === 1 && isOpen ? "auto" : 0,
-        }} />
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          style={{
+            display: "block",
+            width: i === 1 && isOpen ? 12 : 18,
+            height: 2,
+            background: "#8C6B2A",
+            borderRadius: 2,
+            transition: "width 0.2s",
+            marginLeft: i === 1 && isOpen ? "auto" : 0,
+          }}
+        />
       ))}
     </button>
   );
 }
 
-// ─── Nav Item ─────────────────────────────────────────────────────────────────
-function NavItem({ item, isActive, isOpen, onClick }) {
+function NavItem({ item, isActive, isOpen, onClick, nested = false }) {
   const [hovered, setHovered] = useState(false);
   const navigate = useNavigate();
-
-  const isCancelled = item.id === "cancelled";
-
-  const activeColor  = isCancelled ? "#7E5E25" : "#8C6B2A";
-  const hoverColor   = isCancelled ? "#7E5E25" : "#8C6B2A";
-  const activeBg     = isCancelled ? "rgba(140,107,42,0.13)"  : "rgba(140,107,42,0.13)";
-  const hoverBg      = isCancelled ? "rgba(140,107,42,0.07)"  : "rgba(140,107,42,0.07)";
-  const borderColor  = isCancelled ? "#8C6B2A" : "#C9A84C";
+  const activeColor = "#7E5E25";
+  const hoverColor = "#8C6B2A";
+  const activeBg = "rgba(140,107,42,0.15)";
+  const hoverBg = "rgba(140,107,42,0.07)";
 
   const handleClick = () => {
-    const routes = {
-      "reservations": "/admin/reservations",
-      "cancelled":    "/admin/cancelled",
-      "outlets":      "/admin/outlets",
-      "function-rooms": "/admin/function-rooms",
-      "reports":      "/admin/reports",
-      "accounts":     "/admin/accounts",
-      "seat-map":     "/admin/seatmap",
-    };
-    navigate(routes[item.id] || "/admin/dashboard");
+    navigate(NAV_ROUTES[item.id] || "/admin/dashboard");
     onClick?.(item.id);
   };
 
-  // Lucide icon renderer
   const LucideIcon = ({ icon: Icon }) => (
-    <Icon 
-      size={14}
-      color={isActive ? activeColor : hovered ? hoverColor : "#888"}
-      strokeWidth={2.5}
-      style={{ flexShrink: 0, transition: "color 0.15s" }}
-    />
+    <span
+      style={{
+        width: isOpen ? 20 : 30,
+        height: isOpen ? 20 : 30,
+        borderRadius: 7,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        background: "transparent",
+        transition: "background 0.18s ease",
+      }}
+    >
+      <Icon
+        size={nested ? 13.25 : 14}
+        color={isActive ? activeColor : hovered ? hoverColor : "#8F8679"}
+        strokeWidth={isActive ? 2.45 : 2.1}
+        style={{ flexShrink: 0, transition: "color 0.15s, stroke-width 0.15s" }}
+      />
+    </span>
   );
 
   return (
@@ -102,22 +152,26 @@ function NavItem({ item, isActive, isOpen, onClick }) {
       <div
         onClick={handleClick}
         style={{
-          display: "flex", alignItems: "center", gap: 10,
-          margin: isOpen ? "3px 10px 3px 12px" : "4px 7px",
-          padding: isOpen ? "10px 12px" : "10px 0",
+          display: "flex",
+          alignItems: "center",
+          gap: isOpen ? 9 : 0,
+          margin: isOpen ? (nested ? "2px 10px 2px 24px" : "3px 10px") : "4px 7px",
+          padding: isOpen ? (nested ? "7px 10px 7px 10px" : "8px 11px") : "9px 0",
+          minHeight: isOpen ? (nested ? 36 : 38) : 40,
           justifyContent: isOpen ? "flex-start" : "center",
-          fontFamily: F.body, fontSize: 12.5,
+          fontFamily: F.body,
+          fontSize: nested ? 12 : 12.35,
           color: isActive ? activeColor : hovered ? hoverColor : "#5E5548",
           background: isActive
-            ? `linear-gradient(135deg, ${activeBg}, rgba(255,255,255,0.56))`
+            ? `linear-gradient(135deg, ${activeBg}, rgba(255,255,255,0.55))`
             : hovered ? hoverBg : "transparent",
-          border: `1px solid ${isActive ? "rgba(140,107,42,0.20)" : "transparent"}`,
+          border: `1px solid ${isActive ? "rgba(140,107,42,0.24)" : "transparent"}`,
           cursor: "pointer",
-          fontWeight: isActive ? 700 : 540,
+          fontWeight: isActive ? 680 : nested ? 490 : 540,
           transition: "background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease",
           userSelect: "none",
           borderRadius: 11,
-          boxShadow: isActive ? "inset 0 0 0 1px rgba(255,255,255,0.46)" : "none",
+          boxShadow: isActive ? "inset 0 0 0 1px rgba(255,255,255,0.42)" : "none",
           transform: hovered && !isActive ? "translateX(1px)" : "none",
           position: "relative",
         }}
@@ -126,65 +180,169 @@ function NavItem({ item, isActive, isOpen, onClick }) {
           aria-hidden="true"
           style={{
             position: "absolute",
-            left: isOpen ? -1 : 4,
+            left: isOpen ? (nested ? -9 : -1) : 4,
             top: "50%",
             width: 3,
-            height: isActive ? 20 : 0,
+            height: isActive ? (nested ? 18 : 22) : 0,
             borderRadius: 999,
-            background: borderColor,
+            background: "#C9A84C",
             transform: "translateY(-50%)",
             transition: "height 0.18s ease",
           }}
         />
-        {item.iconStyle === "lucide"
-          ? <LucideIcon icon={item.icon} />
-          : <span style={{ fontSize: 15, flexShrink: 0 }}>{item.icon}</span>
-        }
+        {item.iconStyle === "lucide" ? (
+          <LucideIcon icon={item.icon} />
+        ) : (
+          <span style={{ fontSize: 15, flexShrink: 0 }}>{item.icon}</span>
+        )}
         {isOpen && (
-          <span style={{ whiteSpace: "nowrap", overflow: "hidden" }}>
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {item.label}
           </span>
         )}
       </div>
-
     </div>
   );
 }
 
-// ─── Stat Row ─────────────────────────────────────────────────────────────────
-function StatRow({ label, value, color, isOpen }) {
-  if (!isOpen) return null;
+function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
+  const [expanded, setExpanded] = useState(defaultOpen);
+  const [hovered, setHovered] = useState(false);
+  const hasActiveItem = group.items.some((item) => item.id === activeNav);
+  const isSingleDestination = group.items.length === 1;
+
+  useEffect(() => {
+    if (hasActiveItem) setExpanded(true);
+  }, [hasActiveItem]);
+
+  if (isSingleDestination) {
+    const item = group.items[0];
+    return (
+      <NavItem
+        item={item}
+        isActive={activeNav === item.id}
+        isOpen={isOpen}
+        onClick={onNavChange}
+        nested={false}
+      />
+    );
+  }
+
+  if (!isOpen) {
+    return (
+      <div>
+        {group.items.map((item) => (
+          <NavItem
+            key={item.id}
+            item={item}
+            isActive={activeNav === item.id}
+            isOpen={isOpen}
+            onClick={onNavChange}
+            nested={false}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div style={{
-      display: "flex", justifyContent: "space-between", alignItems: "center",
-      padding: "6px 16px", fontFamily: F.body, fontSize: 11,
-    }}>
-      <span style={{ color: "#777" }}>{label}</span>
-      <span style={{
-        color, fontWeight: 700,
-        background: `${color}18`,
-        padding: "2px 8px", borderRadius: 10, fontSize: 11,
-        minWidth: 24, textAlign: "center",
-      }}>{value}</span>
+    <div style={{ margin: "2px 0 10px" }}>
+      <button
+        type="button"
+        onClick={() => setExpanded((open) => !open)}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        aria-expanded={expanded}
+        style={{
+          width: "calc(100% - 20px)",
+          margin: "2px 10px 4px",
+          padding: "9px 10px 9px 11px",
+          borderRadius: 11,
+          border: `1px solid ${hasActiveItem ? "rgba(140,107,42,0.16)" : "transparent"}`,
+          background: hasActiveItem
+            ? "rgba(140,107,42,0.08)"
+            : hovered ? "rgba(140,107,42,0.045)" : "transparent",
+          color: hasActiveItem ? "#7E5E25" : hovered ? "#7E5E25" : "#6D6254",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          fontFamily: F.body,
+          fontSize: 11.15,
+          fontWeight: 640,
+          letterSpacing: "0.075em",
+          textTransform: "uppercase",
+          boxShadow: "none",
+          transition: "background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease",
+        }}
+      >
+        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {group.label}
+        </span>
+        <ChevronDown
+          size={14}
+          strokeWidth={2.35}
+          style={{
+            flexShrink: 0,
+            color: hasActiveItem ? "#8C6B2A" : "#9B9285",
+            transform: expanded ? "rotate(180deg)" : "none",
+            transition: "transform 0.22s cubic-bezier(.2,.8,.2,1), color 0.18s ease",
+          }}
+        />
+      </button>
+
+      <div
+        style={{
+          marginLeft: 17,
+          paddingLeft: 7,
+          borderLeft: expanded ? "1px solid rgba(140,107,42,0.10)" : "1px solid transparent",
+          display: "grid",
+          gridTemplateRows: expanded ? "1fr" : "0fr",
+          transition: "grid-template-rows 0.24s cubic-bezier(.2,.8,.2,1), opacity 0.18s ease, border-color 0.18s ease",
+          opacity: expanded ? 1 : 0,
+        }}
+      >
+        <div style={{ overflow: "hidden" }}>
+          {group.items.map((item) => (
+            <NavItem
+              key={item.id}
+              item={item}
+              isActive={activeNav === item.id}
+              isOpen={isOpen}
+              onClick={onNavChange}
+              nested
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
-// ─── MAIN SIDEBAR COMPONENT ───────────────────────────────────────────────────
 export default function Sidebar({
   activeNav,
   onNavChange,
-  pending,
-  approved,
-  rejected,
-  cancelled,
   isOpen = true,
   onToggle = () => {},
 }) {
   const navigate = useNavigate();
+  const [pinnedOpen, setPinnedOpen] = useState(() => {
+    try {
+      const stored = localStorage.getItem("bellevue_admin_sidebar_open");
+      return stored === null ? Boolean(isOpen) : stored === "true";
+    } catch {
+      return Boolean(isOpen);
+    }
+  });
+  const [hoverPreview, setHoverPreview] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
-  const visibleItems = NAV_ITEMS.filter((item) => !item.permission || authAPI.hasPermission(item.permission));
+  const effectiveOpen = pinnedOpen || hoverPreview;
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.permission || authAPI.hasPermission(item.permission)),
+  })).filter((group) => group.items.length > 0);
   const currentUser = authAPI.getCurrentUser();
   const displayName = String(currentUser?.name || currentUser?.username || "Admin User");
   const roleLabel = String(currentUser?.role || "Administrator").replace(/_/g, " ");
@@ -217,135 +375,160 @@ export default function Sidebar({
     navigate("/login", { replace: true });
   };
 
+  const togglePinnedOpen = () => {
+    const next = !pinnedOpen;
+    setPinnedOpen(next);
+    try {
+      localStorage.setItem("bellevue_admin_sidebar_open", String(next));
+    } catch {
+      // Persistence is a convenience; the sidebar still works without storage.
+    }
+    onToggle?.(next);
+  };
+
   return (
-    <aside style={{
-      width: isOpen ? 236 : 58,
-      height: "calc(100vh - 60px)",
-      background: "linear-gradient(180deg, #FFFCF7 0%, #F7F0E5 54%, #EFE4D1 100%)",
-      borderRight: "1px solid rgba(140,107,42,0.18)",
-      display: "flex", flexDirection: "column",
-      flexShrink: 0,
-      transition: "width 0.25s ease",
-      overflow: "hidden",
-      boxShadow: "6px 0 18px rgba(55,39,17,0.035)",
-      position: "relative",
-      zIndex: 5,
-    }}>
+    <aside
+      onMouseEnter={() => {
+        if (!pinnedOpen) setHoverPreview(true);
+      }}
+      onMouseLeave={() => {
+        if (!pinnedOpen) {
+          setHoverPreview(false);
+          setAccountMenuOpen(false);
+        }
+      }}
+      style={{
+        width: effectiveOpen ? 228 : 58,
+        height: "calc(100vh - 60px)",
+        background: "linear-gradient(180deg, #FFFCF8 0%, #F7F1E8 100%)",
+        borderRight: "1px solid rgba(140,107,42,0.12)",
+        display: "flex",
+        flexDirection: "column",
+        flexShrink: 0,
+        transition: "width 0.26s cubic-bezier(.2,.8,.2,1)",
+        overflow: "hidden",
+        boxShadow: "4px 0 18px rgba(55,39,17,0.026)",
+        position: "relative",
+        zIndex: 5,
+      }}
+    >
       <style>{`
         @keyframes sidebarAccountMenuIn {
           from { opacity: 0; transform: translateY(8px) scale(0.98); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
+        .bellevue-sidebar-nav {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(140,107,42,0.22) transparent;
+        }
+        .bellevue-sidebar-nav::-webkit-scrollbar {
+          width: 6px;
+        }
+        .bellevue-sidebar-nav::-webkit-scrollbar-thumb {
+          background: rgba(140,107,42,0.18);
+          border-radius: 999px;
+        }
       `}</style>
 
-      {/* ── Top: logo area + hamburger ── */}
-      <div style={{
-        display: "flex", alignItems: "center",
-        justifyContent: isOpen ? "space-between" : "center",
-        padding: isOpen ? "18px 14px 18px 18px" : "18px 0",
-        borderBottom: "1px solid rgba(140,107,42,0.12)",
-        flexShrink: 0,
-      }}>
-        {isOpen && (
-          <div style={{
-            fontFamily: F.body, fontSize: 15, fontWeight: 800,
-            color: "#18140E", letterSpacing: 0.3, lineHeight: 1.3,
-            whiteSpace: "nowrap", overflow: "hidden",
-          }}>
-            <span style={{
-              color: "#8C6B2A", fontSize: 9.5, fontFamily: F.body,
-              letterSpacing: 2, fontWeight: 700,
-            }}>ADMIN PANEL</span>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: effectiveOpen ? "space-between" : "center",
+          padding: effectiveOpen ? "16px 12px 15px 18px" : "16px 0",
+          borderBottom: "1px solid rgba(140,107,42,0.09)",
+          flexShrink: 0,
+        }}
+      >
+        {effectiveOpen && (
+          <div
+            style={{
+              fontFamily: F.body,
+              fontSize: 15,
+              fontWeight: 800,
+              color: "#18140E",
+              letterSpacing: 0.3,
+              lineHeight: 1.3,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+            }}
+          >
+            <span
+              style={{
+                color: "#8C6B2A",
+                fontSize: 9.5,
+                fontFamily: F.body,
+                letterSpacing: 2,
+                fontWeight: 700,
+              }}
+            >
+              ADMIN PANEL
+            </span>
           </div>
         )}
-        <HamburgerBtn isOpen={isOpen} onClick={onToggle} />
+        <HamburgerBtn isOpen={effectiveOpen} onClick={togglePinnedOpen} />
       </div>
 
-      {/* ── Navigation ── */}
-      <div style={{ paddingTop: 14, flexShrink: 0 }}>
-        {isOpen && (
-          <div style={{
-            padding: "0 18px", marginBottom: 8,
-            fontSize: 9, letterSpacing: 2, color: "#9B9285",
-            fontFamily: F.body, fontWeight: 700, textTransform: "uppercase",
-          }}>
+      <div
+        className="bellevue-sidebar-nav"
+        style={{
+          paddingTop: 14,
+          paddingBottom: 12,
+          flex: "1 1 auto",
+          minHeight: 0,
+          overflowY: "auto",
+        }}
+      >
+        {effectiveOpen && (
+          <div
+            style={{
+              padding: "0 20px",
+              marginBottom: 10,
+              fontSize: 9,
+              letterSpacing: "0.24em",
+              color: "#9B9285",
+              fontFamily: F.body,
+              fontWeight: 700,
+              textTransform: "uppercase",
+            }}
+          >
             Navigation
           </div>
         )}
-        {visibleItems.map(item => (
-          <NavItem
-            key={item.id}
-            item={item}
-            isActive={activeNav === item.id}
-            isOpen={isOpen}
-            onClick={onNavChange}
+        {visibleGroups.map((group) => (
+          <NavGroup
+            key={group.id}
+            group={group}
+            activeNav={activeNav}
+            isOpen={effectiveOpen}
+            onNavChange={onNavChange}
+            defaultOpen={group.items.some((item) => item.id === activeNav)}
           />
         ))}
       </div>
 
-      {/* ── Divider ── */}
-      <div style={{ height: 1, background: "rgba(140,107,42,0.12)", margin: "18px 14px 4px" }} />
-
-      {/* ── Quick Stats ── */}
-      {isOpen && (
-        <div style={{ paddingBottom: 14 }}>
-          <div style={{
-            padding: "0 18px", marginBottom: 10,
-            fontSize: 9, letterSpacing: 2, color: "#9B9285",
-            fontFamily: F.body, fontWeight: 700, textTransform: "uppercase",
-          }}>
-            Quick Stats
-          </div>
-          <StatRow label="Pending"   value={pending}   color="#E8A838" isOpen={isOpen} />
-          <StatRow label="Approved"  value={approved}  color="#4CAF79" isOpen={isOpen} />
-          <StatRow label="Rejected"  value={rejected}  color="#8C6B2A" isOpen={isOpen} />
-          <StatRow label="Cancelled" value={cancelled} color="#8C6B2A" isOpen={isOpen} />
-        </div>
-      )}
-
-      {/* ── Collapsed: dot indicators for stats ── */}
-      {!isOpen && (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, paddingTop: 8 }}>
-          {[
-            ["#E8A838", pending],
-            ["#4CAF79", approved],
-            ["#8C6B2A", rejected],
-            ["#8C6B2A", cancelled],
-          ].map(([color, val], i) => (
-            val > 0 && (
-              <div key={i} style={{
-                width: 8, height: 8, borderRadius: "50%",
-                background: color,
-                boxShadow: `0 0 0 2px ${color}33`,
-              }} />
-            )
-          ))}
-        </div>
-      )}
-
-      <div style={{ flex: 1 }} />
-
       <div
         ref={accountMenuRef}
         style={{
-        margin: isOpen ? "0 13px 12px" : "0 7px 12px",
-        paddingTop: 10,
-        borderTop: "1px solid rgba(140,107,42,0.10)",
-        position: "relative",
-      }}>
+          margin: effectiveOpen ? "0 12px 13px" : "0 7px 13px",
+          paddingTop: 11,
+          borderTop: "1px solid rgba(140,107,42,0.10)",
+          position: "relative",
+        }}
+      >
         {accountMenuOpen && (
           <div
             style={{
               position: "absolute",
-              left: isOpen ? 0 : 48,
-              right: isOpen ? 0 : "auto",
-              bottom: "calc(100% + 7px)",
-              width: isOpen ? "auto" : 204,
-              padding: 6,
-              borderRadius: 12,
-              background: "rgba(255,252,247,0.96)",
+              left: effectiveOpen ? 0 : 46,
+              right: effectiveOpen ? 0 : "auto",
+              bottom: "calc(100% + 9px)",
+              width: effectiveOpen ? "auto" : 204,
+              padding: 7,
+              borderRadius: 14,
+              background: "rgba(255,252,247,0.98)",
               border: "1px solid rgba(140,107,42,0.14)",
-              boxShadow: "0 12px 28px rgba(55,39,17,0.10)",
+              boxShadow: "0 16px 36px rgba(55,39,17,0.12)",
               zIndex: 20,
               display: "grid",
               gap: 3,
@@ -389,54 +572,71 @@ export default function Sidebar({
           type="button"
           onClick={() => setAccountMenuOpen((open) => !open)}
           onMouseEnter={(event) => {
-            event.currentTarget.style.background = "rgba(140,107,42,0.07)";
+            event.currentTarget.style.background = "rgba(140,107,42,0.075)";
+            event.currentTarget.style.borderColor = "rgba(140,107,42,0.12)";
           }}
           onMouseLeave={(event) => {
             event.currentTarget.style.background = accountMenuOpen ? "rgba(140,107,42,0.09)" : "transparent";
+            event.currentTarget.style.borderColor = "transparent";
           }}
           aria-expanded={accountMenuOpen}
-          title={!isOpen ? `${displayName} account menu` : "Account menu"}
+          title={!effectiveOpen ? `${displayName} account menu` : "Account menu"}
           style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: isOpen ? "flex-start" : "center",
-          gap: 9,
-          padding: isOpen ? "8px 7px" : "7px 0",
-          borderRadius: 11,
-          background: accountMenuOpen ? "rgba(140,107,42,0.09)" : "transparent",
-          border: "1px solid transparent",
-          boxShadow: "none",
-          cursor: "pointer",
-          transition: "background 0.18s ease, border-color 0.18s ease, transform 0.18s ease",
-          fontFamily: F.body,
-          textAlign: "left",
-        }}>
-          <span style={{
-            width: 31,
-            height: 31,
-            borderRadius: "50%",
-            display: "inline-flex",
+            width: "100%",
+            display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            background: "linear-gradient(135deg, #C9A84C, #8C6B2A)",
-            color: "#fff",
-            fontSize: 10.5,
-            fontWeight: 850,
-            letterSpacing: "0.05em",
-            position: "relative",
-          }}>
+            justifyContent: effectiveOpen ? "flex-start" : "center",
+            gap: 10,
+            padding: effectiveOpen ? "8px 7px" : "8px 0",
+            borderRadius: 13,
+            background: accountMenuOpen ? "rgba(140,107,42,0.09)" : "transparent",
+            border: "1px solid transparent",
+            boxShadow: "none",
+            cursor: "pointer",
+            transition: "background 0.18s ease, border-color 0.18s ease, transform 0.18s ease",
+            fontFamily: F.body,
+            textAlign: "left",
+          }}
+        >
+          <span
+            style={{
+              width: 33,
+              height: 33,
+              borderRadius: "50%",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              background: "linear-gradient(135deg, #C9A84C, #8C6B2A)",
+              color: "#fff",
+              fontSize: 10.75,
+              fontWeight: 850,
+              letterSpacing: "0.05em",
+              position: "relative",
+            }}
+          >
             {initials}
-            <i aria-hidden="true" style={{ position: "absolute", right: -1, bottom: 1, width: 7, height: 7, borderRadius: "50%", background: "#4CAF79", border: "2px solid #F7F0E5" }} />
+            <i
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                right: -1,
+                bottom: 1,
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: "#4CAF79",
+                border: "2px solid #F7F0E5",
+              }}
+            />
           </span>
-          {isOpen && (
+          {effectiveOpen && (
             <span style={{ minWidth: 0, display: "grid", gap: 2, flex: 1 }}>
               <span style={{ color: "#18140E", fontSize: 12.25, fontWeight: 670, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</span>
               <span style={{ color: "#7A7060", fontSize: 9.5, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{roleLabel}</span>
             </span>
           )}
-          {isOpen && (
+          {effectiveOpen && (
             <ChevronUp
               size={14}
               color="#8C6B2A"
@@ -446,7 +646,6 @@ export default function Sidebar({
           )}
         </button>
       </div>
-
     </aside>
   );
 }

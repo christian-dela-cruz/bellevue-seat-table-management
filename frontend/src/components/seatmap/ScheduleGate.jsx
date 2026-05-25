@@ -1,4 +1,5 @@
 import React from "react";
+import { venueAPI } from "../../services/venueAPI";
 
 export const DEFAULT_EVENT_TIME = "19:00";
 const STORAGE_KEY = "seatmap:selected_schedule";
@@ -52,11 +53,18 @@ export function withSeatmapSchedule(url, schedule = {}) {
   return `${url}${url.includes("?") ? `&${query.slice(1)}` : query}`;
 }
 
-export default function ScheduleGate({ schedule, onChange, roomLabel = "this room", isDark = false }) {
+export default function ScheduleGate({ schedule, onChange, roomLabel = "this room", isDark = false, guests = 1 }) {
   const normalized = normalizeSchedule(schedule);
   const isReady = Boolean(normalized.eventDate && normalized.eventTime);
   const [draftSchedule, setDraftSchedule] = React.useState(normalized);
-  const isDraftValid = Boolean(draftSchedule.eventDate && draftSchedule.eventTime);
+  const [slots, setSlots] = React.useState([]);
+  const [slotLoading, setSlotLoading] = React.useState(false);
+  const [slotError, setSlotError] = React.useState("");
+  const [scheduleMessage, setScheduleMessage] = React.useState("");
+  const [scheduleEnforced, setScheduleEnforced] = React.useState(false);
+  const selectedSlot = slots.find((slot) => slot.time === String(draftSchedule.eventTime || "").substring(0, 5));
+  const slotAvailable = slots.length === 0 ? !scheduleEnforced : Boolean(selectedSlot?.available);
+  const isDraftValid = Boolean(draftSchedule.eventDate && draftSchedule.eventTime && slotAvailable);
   const hasChanges =
     draftSchedule.eventDate !== normalized.eventDate ||
     draftSchedule.eventTime !== normalized.eventTime;
@@ -64,6 +72,53 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
   React.useEffect(() => {
     setDraftSchedule(normalized);
   }, [normalized.eventDate, normalized.eventTime]);
+
+  React.useEffect(() => {
+    if (!draftSchedule.eventDate || !roomLabel) {
+      setSlots([]);
+      setScheduleMessage("");
+      setScheduleEnforced(false);
+      return undefined;
+    }
+
+    let active = true;
+    setSlotLoading(true);
+    setSlotError("");
+
+    venueAPI.getTimeSlots({
+      room: roomLabel,
+      date: draftSchedule.eventDate,
+      guests,
+    })
+      .then((response) => {
+        if (!active) return;
+        const nextSlots = Array.isArray(response?.slots) ? response.slots : [];
+        const enforced = Boolean(response?.schedule_enforced);
+        setSlots(nextSlots);
+        setScheduleEnforced(enforced);
+        setScheduleMessage(response?.message || "");
+        if (nextSlots.length > 0 && !nextSlots.some((slot) => slot.time === draftSchedule.eventTime && slot.available)) {
+          const firstAvailable = nextSlots.find((slot) => slot.available);
+          if (firstAvailable) {
+            setDraftSchedule((current) => ({ ...current, eventTime: firstAvailable.time }));
+          }
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        setSlotError("Unable to load configured time slots. Manual time entry is still available.");
+        setSlots([]);
+        setScheduleMessage("");
+        setScheduleEnforced(false);
+      })
+      .finally(() => {
+        if (active) setSlotLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [draftSchedule.eventDate, roomLabel, guests]);
 
   const confirmSchedule = () => {
     if (!isDraftValid) return;
@@ -106,13 +161,21 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
             onChange={(event) => setDraftSchedule({ ...draftSchedule, eventDate: event.target.value })}
             style={controlStyle(isDark)}
           />
-          <input
-            type="time"
+          <TimeSlotControl
             value={draftSchedule.eventTime}
-            onChange={(event) => setDraftSchedule({ ...draftSchedule, eventTime: event.target.value })}
+            slots={slots}
+            loading={slotLoading}
+            scheduleEnforced={scheduleEnforced}
+            emptyMessage={scheduleMessage}
+            onChange={(eventTime) => setDraftSchedule({ ...draftSchedule, eventTime })}
             style={controlStyle(isDark)}
           />
         </div>
+        {(slotError || selectedSlot?.reason || scheduleMessage) && (
+          <div style={{ fontSize: 11.5, lineHeight: 1.45, color: selectedSlot?.reason ? "#A03838" : (isDark ? "rgba(247,244,238,0.58)" : "rgba(24,20,14,0.52)") }}>
+            {selectedSlot?.reason || scheduleMessage || slotError}
+          </div>
+        )}
         <button
           type="button"
           onClick={confirmSchedule}
@@ -173,13 +236,21 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
             </label>
             <label style={labelStyle}>
               Time
-              <input
-                type="time"
+              <TimeSlotControl
                 value={draftSchedule.eventTime}
-                onChange={(event) => setDraftSchedule({ ...draftSchedule, eventTime: event.target.value })}
+                slots={slots}
+                loading={slotLoading}
+                scheduleEnforced={scheduleEnforced}
+                emptyMessage={scheduleMessage}
+                onChange={(eventTime) => setDraftSchedule({ ...draftSchedule, eventTime })}
                 style={modalInputStyle}
               />
             </label>
+            {(slotError || selectedSlot?.reason || scheduleMessage) && (
+              <div style={{ fontSize: 12, lineHeight: 1.5, color: selectedSlot?.reason ? "#A03838" : "#7A7060" }}>
+                {selectedSlot?.reason || scheduleMessage || slotError}
+              </div>
+            )}
             <button
               type="button"
               onClick={confirmSchedule}
@@ -192,6 +263,37 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
         </div>
       </div>
     </div>
+  );
+}
+
+function TimeSlotControl({ value, slots, loading, scheduleEnforced = false, emptyMessage = "", onChange, style }) {
+  if (!slots.length) {
+    if (scheduleEnforced) {
+      return (
+        <select value="" disabled style={style} aria-label={emptyMessage || "No available time slots"}>
+          <option value="">{loading ? "Loading..." : "No available times"}</option>
+        </select>
+      );
+    }
+
+    return (
+      <input
+        type="time"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        style={style}
+      />
+    );
+  }
+
+  return (
+    <select value={String(value || "").substring(0, 5)} onChange={(event) => onChange(event.target.value)} style={style} disabled={loading}>
+      {slots.map((slot) => (
+        <option key={slot.time} value={slot.time} disabled={!slot.available}>
+          {slot.label}{slot.available ? "" : ` - ${slot.reason || "Unavailable"}`}
+        </option>
+      ))}
+    </select>
   );
 }
 
