@@ -318,7 +318,8 @@ function buildEventVenuesFromConfig(rooms = []) {
       return {
         title: room.display_name || room.name,
         image: resolveRoomImage(room.image),
-        route: room.parent_selectable && room.reservations_enabled ? roomRoute(room) : roomRoute(children[0] || room),
+        route: room.parent_selectable && room.reservations_enabled ? roomRoute(room) : (children[0] ? roomRoute(children[0]) : null),
+        disabled: !(room.parent_selectable && room.reservations_enabled) && children.length === 0,
         imageFocus: room.image_position || "center 50%",
         rooms: children.map((child) => ({
           label: childLabel(child, room.name),
@@ -360,7 +361,8 @@ function buildDiningOutletsFromConfig(rooms = []) {
       if (!match.is_active || !match.is_visible || !match.show_on_landing) return null;
       return {
         title: match.display_name || outlet.title,
-        route: match.reservations_enabled ? roomRoute(match) : outlet.route,
+        route: match.reservations_enabled ? roomRoute(match) : null,
+        disabled: !match.reservations_enabled,
         logo: resolveDiningLogo(match) || outlet.logo,
         mark: match.display_name || outlet.mark,
       };
@@ -372,7 +374,8 @@ function buildDiningOutletsFromConfig(rooms = []) {
     .filter((room) => room.is_active && room.is_visible && room.show_on_landing)
     .map((room) => ({
       title: room.display_name || room.name,
-      route: roomRoute(room),
+      route: room.reservations_enabled ? roomRoute(room) : null,
+      disabled: !room.reservations_enabled,
       logo: resolveDiningLogo(room),
       mark: room.display_name || room.name,
     }));
@@ -382,10 +385,12 @@ function buildDiningOutletsFromConfig(rooms = []) {
 
 function VenueCard({ item, variant = "event", isInteractive = true }) {
   const navigate = useNavigate();
+  const disabled = item.disabled || !item.route || !isInteractive;
 
   return (
     <article
-      className={`reservation-card reservation-card--${variant}${item.rooms?.length ? " reservation-card--has-rooms" : ""}`}
+      className={`reservation-card reservation-card--${variant}${item.rooms?.length ? " reservation-card--has-rooms" : ""}${disabled ? " reservation-card--disabled" : ""}`}
+      aria-disabled={disabled}
     >
       {variant === "dining" ? (
         <span className="reservation-card__brand-surface" aria-hidden="true" />
@@ -407,9 +412,12 @@ function VenueCard({ item, variant = "event", isInteractive = true }) {
       <button
         type="button"
         className="reservation-card__hitarea"
-        onClick={() => navigate(item.route)}
-        aria-label={`Reserve ${item.title}`}
-        tabIndex={isInteractive ? 0 : -1}
+        onClick={() => {
+          if (!disabled) navigate(item.route);
+        }}
+        disabled={disabled}
+        aria-label={disabled ? `${item.title} is currently unavailable` : `Reserve ${item.title}`}
+        tabIndex={disabled ? -1 : 0}
       />
 
       {variant === "dining" && (
@@ -437,7 +445,7 @@ function VenueCard({ item, variant = "event", isInteractive = true }) {
                   className="reservation-card__room"
                   onClick={() => navigate(room.route)}
                   aria-label={`Reserve ${item.title} ${room.label}`}
-                  tabIndex={isInteractive ? 0 : -1}
+                  tabIndex={disabled ? -1 : 0}
                 >
                   {room.label}
                 </button>
@@ -1218,6 +1226,10 @@ export default function ReservationLanding() {
           cursor: pointer;
         }
 
+        .reservation-card__hitarea:disabled {
+          cursor: not-allowed;
+        }
+
         .reservation-card__brand {
           position: absolute;
           inset: 0;
@@ -1358,6 +1370,16 @@ export default function ReservationLanding() {
           display: none;
         }
 
+        .reservation-card--disabled {
+          opacity: 0.58;
+        }
+
+        .reservation-card--disabled::after {
+          content: "Unavailable";
+          opacity: 1;
+          transform: translateY(0);
+        }
+
         .reservation-card:hover,
         .reservation-card:focus-within {
           transform: translateY(-3px);
@@ -1420,6 +1442,19 @@ export default function ReservationLanding() {
             linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.68)),
             radial-gradient(circle at 22% 14%, rgba(255, 232, 182, 0.16), transparent 36%),
             linear-gradient(90deg, rgba(0,0,0,0.34), transparent 68%);
+        }
+
+        .reservation-card--disabled:hover,
+        .reservation-card--disabled:focus-within {
+          transform: none;
+          box-shadow: inset 0 0 0 1px rgba(196, 163, 90, 0.08);
+        }
+
+        .reservation-card--disabled:hover .reservation-card__image,
+        .reservation-card--disabled:focus-within .reservation-card__image,
+        .reservation-card--disabled:hover .reservation-card__logo img,
+        .reservation-card--disabled:focus-within .reservation-card__logo img {
+          transform: translateZ(0) scale(1);
         }
 
         .reservation-card__hitarea:focus-visible {

@@ -66,6 +66,7 @@ class VenueService
      */
     public function createVenue(array $data): Venue
     {
+        $data = $this->normalizeStatePayload($data);
         return Venue::create($data);
     }
 
@@ -78,7 +79,7 @@ class VenueService
         if (!$venue) {
             return null;
         }
-        
+        $data = $this->normalizeStatePayload($data);
         $venue->update($data);
         return $venue;
     }
@@ -186,7 +187,7 @@ class VenueService
 
             return [
                 'time' => $time,
-                'label' => trim(($slot['label'] ? $slot['label'] . ' · ' : '') . Carbon::createFromFormat('H:i', $time)->format('g:i A')),
+                'label' => trim(($slot['label'] ? $slot['label'] . ' - ' : '') . Carbon::createFromFormat('H:i', $time)->format('g:i A')),
                 'period' => $slot['label'],
                 'service_type' => $slot['service_type'],
                 'available' => empty($reasons),
@@ -414,6 +415,27 @@ class VenueService
         return $query->get()->toArray();
     }
 
+    private function normalizeStatePayload(array $data): array
+    {
+        if (array_key_exists('is_active', $data) && !$data['is_active']) {
+            $data['reservations_enabled'] = false;
+        }
+
+        if (array_key_exists('is_visible', $data) && !$data['is_visible']) {
+            $data['show_on_landing'] = false;
+        }
+
+        if (array_key_exists('show_on_landing', $data) && $data['show_on_landing']) {
+            $data['is_visible'] = true;
+        }
+
+        if (array_key_exists('reservations_enabled', $data) && $data['reservations_enabled']) {
+            $data['is_active'] = true;
+        }
+
+        return $data;
+    }
+
     private function hasArchiveColumn(): bool
     {
         return Schema::hasColumn('venues', 'is_archived');
@@ -470,17 +492,17 @@ class VenueService
 
         if (str_contains($name, 'hanakazu')) {
             return [
-                $this->period('Lunch', 'À la carte', [2, 3, 4, 5, 6, 0], '11:30', '14:30', 30, $capacity ?: 81),
-                $this->period('Dinner', 'À la carte', [2, 3, 4, 5, 6, 0], '17:30', '22:00', 30, $capacity ?: 81),
+                $this->period('Lunch', 'A la carte', [2, 3, 4, 5, 6, 0], '11:30', '14:30', 30, $capacity ?: 81),
+                $this->period('Dinner', 'A la carte', [2, 3, 4, 5, 6, 0], '17:30', '22:00', 30, $capacity ?: 81),
             ];
         }
 
         if (str_contains($name, 'qsina')) {
             return [
                 $this->period('Breakfast', 'Breakfast buffet', range(0, 6), '06:00', '10:00', 30, $capacity ?: 80),
-                $this->period('Lunch', 'À la carte', [1, 2, 6, 0], '11:30', '14:30', 30, $capacity ?: 80),
+                $this->period('Lunch', 'A la carte', [1, 2, 6, 0], '11:30', '14:30', 30, $capacity ?: 80),
                 $this->period('Lunch', 'Light lunch buffet', [3, 4, 5], '11:30', '14:30', 30, $capacity ?: 80),
-                $this->period('Dinner', 'À la carte', [1, 2, 3, 4], '18:00', '22:00', 30, $capacity ?: 80),
+                $this->period('Dinner', 'A la carte', [1, 2, 3, 4], '18:00', '22:00', 30, $capacity ?: 80),
                 $this->period('Dinner', 'Dinner buffet', [5, 6, 0], '18:00', '22:00', 30, $capacity ?: 80),
             ];
         }

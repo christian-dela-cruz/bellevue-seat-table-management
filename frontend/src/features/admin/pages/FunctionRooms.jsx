@@ -919,6 +919,21 @@ export default function FunctionRooms() {
             tone: "red",
           };
     }
+    if (key === "reservations_enabled") {
+      return nextValue
+        ? {
+            title: `Enable reservations for ${venueKind}?`,
+            message: `${name} will be bookable again when its schedule and capacity allow it.`,
+            label: "Enable reservations",
+            tone: "green",
+          }
+        : {
+            title: `Disable reservations for ${venueKind}?`,
+            message: `${name} may remain visible, but guests will not be able to submit new reservations. Existing reservations stay preserved.`,
+            label: "Disable reservations",
+            tone: "red",
+          };
+    }
     return nextValue
       ? {
           title: "Show on landing page?",
@@ -947,6 +962,33 @@ export default function FunctionRooms() {
     });
   };
 
+  const statePayloadForAction = (action) => {
+    if (!action || action.type !== "toggle") return {};
+    const payload = { [action.key]: action.nextValue };
+
+    if (action.key === "is_active") {
+      if (action.nextValue) {
+        payload.reservations_enabled = true;
+      } else {
+        payload.reservations_enabled = false;
+      }
+    }
+
+    if (action.key === "is_visible" && !action.nextValue) {
+      payload.show_on_landing = false;
+    }
+
+    if (action.key === "show_on_landing" && action.nextValue) {
+      payload.is_visible = true;
+    }
+
+    if (action.key === "reservations_enabled" && action.nextValue) {
+      payload.is_active = true;
+    }
+
+    return payload;
+  };
+
   const requestDelete = (room) => {
     if (!canManage) return;
     setOpenMenuId(null);
@@ -969,7 +1011,7 @@ export default function FunctionRooms() {
       if (confirmAction.type === "delete") {
         await venueAPI.delete(confirmAction.room.id);
       } else {
-        await venueAPI.update(confirmAction.room.id, { [confirmAction.key]: confirmAction.nextValue });
+        await venueAPI.update(confirmAction.room.id, statePayloadForAction(confirmAction));
       }
       setConfirmAction(null);
       await loadRooms();
@@ -1072,12 +1114,6 @@ export default function FunctionRooms() {
             <SummaryCard icon={CheckCircle2} label="Enabled" value={stats.enabled} tone="green" />
             <SummaryCard icon={Eye} label="Landing Visible" value={stats.visible} tone="gold" />
           </div>
-
-          {duplicateCount > 0 && (
-            <div style={{ marginBottom: 14, padding: "9px 12px", borderRadius: 10, background: C.goldFaint, color: C.gold, border: "1px solid rgba(140,107,42,0.16)", fontSize: 12.5 }}>
-              {duplicateCount} duplicate venue record{duplicateCount > 1 ? "s are" : " is"} hidden from this workspace and the guest landing renderer.
-            </div>
-          )}
 
           <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "visible" }}>
             <div className="function-room-toolbar" style={{ display: "grid", gridTemplateColumns: "minmax(240px,1fr) repeat(6, minmax(128px, auto))", gap: 10, padding: 14, borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
@@ -1207,6 +1243,7 @@ export default function FunctionRooms() {
                               <MenuAction icon={room.is_active ? ToggleRight : ToggleLeft} label={room.is_active ? "Disable venue" : "Enable venue"} onClick={() => requestToggle(room, "is_active")} />
                               <MenuAction icon={room.is_visible ? EyeOff : Eye} label={room.is_visible ? "Hide from guests" : "Show to guests"} onClick={() => requestToggle(room, "is_visible")} />
                               <MenuAction icon={room.show_on_landing ? EyeOff : Eye} label={room.show_on_landing ? "Remove from landing" : "Add to landing"} onClick={() => requestToggle(room, "show_on_landing")} />
+                              <MenuAction icon={room.reservations_enabled ? ToggleRight : ToggleLeft} label={room.reservations_enabled ? "Disable reservations" : "Enable reservations"} onClick={() => requestToggle(room, "reservations_enabled")} />
                               <div style={{ height: 1, background: C.divider, margin: "4px 3px" }} />
                               <MenuAction icon={Trash2} label="Delete venue" danger onClick={() => requestDelete(room)} />
                             </div>

@@ -111,11 +111,17 @@ class ClientReservationController extends Controller
             'seat_id'          => 'nullable|string|max:50',
         ]);
 
-        // Keep sub-room reservations tied to their parent venue for backend scope checks.
+        // Keep sub-room reservations tied to their parent venue for booking scope,
+        // while still letting VenueService enforce the selected child room's state.
         if (!empty($validated['room'])) {
-            $venue = Venue::where('name', $this->parentVenueNameForRoom($validated['room']))->first();
-            if ($venue) {
-                $validated['venue_id'] = $venue->id;
+            $selectedVenue = $this->venueService->findVenueForAvailability(['room' => $validated['room']]);
+            if ($selectedVenue) {
+                $validated['venue_id'] = $selectedVenue->parent_id ?: $selectedVenue->id;
+            } else {
+                $venue = Venue::where('name', $this->parentVenueNameForRoom($validated['room']))->first();
+                if ($venue) {
+                    $validated['venue_id'] = $venue->id;
+                }
             }
         } else {
             $validated['room'] = Venue::find($validated['venue_id'])?->name;
@@ -302,6 +308,10 @@ class ClientReservationController extends Controller
         // Selected room / sub-room
         if (array_key_exists('room', $validated)) {
             $updateData['room'] = $validated['room'];
+            $selectedVenue = $this->venueService->findVenueForAvailability(['room' => $validated['room']]);
+            if ($selectedVenue) {
+                $updateData['venue_id'] = $selectedVenue->parent_id ?: $selectedVenue->id;
+            }
         }
         
         // Status
