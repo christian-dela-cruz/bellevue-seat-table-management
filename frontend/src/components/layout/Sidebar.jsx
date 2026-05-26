@@ -208,7 +208,15 @@ function NavItem({ item, isActive, isOpen, onClick, nested = false }) {
 }
 
 function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
-  const [expanded, setExpanded] = useState(defaultOpen);
+  const storageKey = `bellevue_sidebar_group_${group.id}_expanded`;
+  const [expanded, setExpanded] = useState(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored === null ? defaultOpen : stored === "true";
+    } catch {
+      return defaultOpen;
+    }
+  });
   const [hovered, setHovered] = useState(false);
   const hasActiveItem = group.items.some((item) => item.id === activeNav);
   const isSingleDestination = group.items.length === 1;
@@ -219,8 +227,26 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
   const hoverBg = "rgba(140,107,42,0.07)";
 
   useEffect(() => {
-    if (hasActiveItem) setExpanded(true);
-  }, [hasActiveItem]);
+    if (!hasActiveItem) return;
+    setExpanded(true);
+    try {
+      localStorage.setItem(storageKey, "true");
+    } catch {
+      // Group persistence is a convenience; navigation still works without storage.
+    }
+  }, [hasActiveItem, storageKey]);
+
+  const toggleExpanded = () => {
+    setExpanded((open) => {
+      const next = !open;
+      try {
+        localStorage.setItem(storageKey, String(next));
+      } catch {
+        // Group persistence is a convenience; navigation still works without storage.
+      }
+      return next;
+    });
+  };
 
   if (isSingleDestination) {
     const item = group.items[0];
@@ -256,7 +282,7 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
     <div style={{ margin: "3px 0 8px" }}>
       <button
         type="button"
-        onClick={() => setExpanded((open) => !open)}
+        onClick={toggleExpanded}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         aria-expanded={expanded}
