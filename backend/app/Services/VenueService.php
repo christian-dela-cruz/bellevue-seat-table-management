@@ -355,6 +355,7 @@ class VenueService
 
         $venues = Venue::query()
             ->where('is_active', true)
+            ->where('type', '!=', 'dining')
             ->when($this->hasArchiveColumn(), fn ($query) => $query->where('is_archived', false))
             ->orderBy('wing')
             ->orderBy('name')

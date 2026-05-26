@@ -1095,24 +1095,30 @@ class ReservationService
 
     private function adminOutletCatalog(): array
     {
-        return [
-            ['name' => 'Alabang Function Room', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 100],
-            ['name' => 'Laguna Ballroom 1', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 100],
-            ['name' => 'Laguna Ballroom 2', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 100],
-            ['name' => '20/20 Function Room A', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 50],
-            ['name' => '20/20 Function Room B', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 50],
-            ['name' => '20/20 Function Room C', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 50],
-            ['name' => 'Business Center', 'wing' => 'Main Wing', 'type' => 'function_room', 'capacity' => 30],
-            ['name' => 'Tower 1', 'wing' => 'Tower Wing', 'type' => 'function_room', 'capacity' => 100],
-            ['name' => 'Tower 2', 'wing' => 'Tower Wing', 'type' => 'function_room', 'capacity' => 100],
-            ['name' => 'Tower 3', 'wing' => 'Tower Wing', 'type' => 'function_room', 'capacity' => 100],
-            ['name' => 'Grand Ballroom A', 'wing' => 'Tower Wing', 'type' => 'function_room', 'capacity' => 140],
-            ['name' => 'Grand Ballroom B', 'wing' => 'Tower Wing', 'type' => 'function_room', 'capacity' => 140],
-            ['name' => 'Grand Ballroom C', 'wing' => 'Tower Wing', 'type' => 'function_room', 'capacity' => 140],
-            ['name' => 'Qsina Restaurant', 'wing' => 'Dining', 'type' => 'dining', 'capacity' => 80],
-            ['name' => 'Hanakazu Japanese Restaurant', 'wing' => 'Dining', 'type' => 'dining', 'capacity' => 60],
-            ['name' => 'Phoenix Court', 'wing' => 'Dining', 'type' => 'dining', 'capacity' => 80],
-        ];
+        $venues = Venue::where('is_archived', false)->get();
+        $parentIdsWithChildren = $venues->whereNotNull('parent_id')->pluck('parent_id')->unique()->all();
+
+        return $venues->filter(function ($venue) use ($parentIdsWithChildren) {
+            if ($venue->parent_id !== null) {
+                return true;
+            }
+            return !in_array($venue->id, $parentIdsWithChildren);
+        })->map(function ($venue) {
+            $wing = $venue->wing;
+            if (!$wing && $venue->parent_id) {
+                $parent = Venue::find($venue->parent_id);
+                $wing = $parent?->wing;
+            }
+            if (!$wing) {
+                $wing = $venue->type === 'dining' ? 'Dining' : 'Main Wing';
+            }
+            return [
+                'name' => $venue->name,
+                'wing' => $wing,
+                'type' => $venue->type,
+                'capacity' => $venue->capacity ?: 100,
+            ];
+        })->values()->all();
     }
 
     private function catalogVenueFallback(string $outletName, $venues): ?Venue
@@ -1146,6 +1152,11 @@ class ReservationService
     {
         $name = strtolower((string) $room);
 
+        $venue = Venue::where('name', $room)->first();
+        if ($venue && $venue->wing) {
+            return $venue->wing;
+        }
+
         if (str_contains($name, 'grand ballroom') || str_contains($name, 'tower')) {
             return 'Tower Wing';
         }
@@ -1160,6 +1171,11 @@ class ReservationService
     private function reportTypeForRoom(?string $room, ?string $venueType): ?string
     {
         $name = strtolower((string) $room);
+
+        $venue = Venue::where('name', $room)->first();
+        if ($venue && $venue->type) {
+            return $venue->type;
+        }
 
         if (str_contains($name, 'qsina') || str_contains($name, 'hanakazu') || str_contains($name, 'phoenix') || str_contains($name, 'restaurant')) {
             return 'dining';

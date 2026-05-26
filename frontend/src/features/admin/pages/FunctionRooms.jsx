@@ -263,7 +263,7 @@ function legacyAvailabilityOverrides(availability = {}) {
 
 function routeFromSlug(value) {
   const slug = slugify(value);
-  return slug ? `/${slug}` : "";
+  return slug ? `/reserve/${slug}` : "";
 }
 
 function isEarlierTime(start, end) {
@@ -617,79 +617,204 @@ function SummaryCard({ icon: Icon, label, value, tone = "gold" }) {
   );
 }
 
-function VenueLandingPreview({ form, preview, childRooms = [] }) {
+const PAGE_PREVIEW_CARD = { cardHeight: 112, gap: 11, title: 12, chip: 8.5 };
+
+function isChildVenue(room) {
+  return Boolean(room?.parent_id || knownChildParentKey(room));
+}
+
+function previewImageFor(room, fallback = "") {
+  return room?._previewImage || fallback || imageUrl(room?.image);
+}
+
+function VenuePreviewCard({ room, preview = "", childRooms = [], highlighted = false, full = false }) {
+  const image = previewImageFor(room, preview);
+  const isDining = room.type === "dining";
+  const isUnavailable = !room.is_active || !room.reservations_enabled;
+  const isPublic = room.is_visible && room.show_on_landing;
+  const visibleChips = childRooms.slice(0, full ? 5 : 4);
+  const title = room.display_name || room.name || "Venue Name";
+
+  return (
+    <button
+      type="button"
+      disabled
+      style={{
+        width: "100%",
+        minHeight: full ? PAGE_PREVIEW_CARD.cardHeight : 182,
+        border: highlighted ? "1px solid rgba(201,168,76,0.82)" : "1px solid rgba(255,255,255,0.10)",
+        borderRadius: full ? 10 : 13,
+        overflow: "hidden",
+        position: "relative",
+        padding: 0,
+        background: "#211A12",
+        cursor: "default",
+        opacity: isPublic ? 1 : 0.62,
+        boxShadow: highlighted ? "0 0 0 2px rgba(201,168,76,0.18), 0 14px 28px rgba(0,0,0,0.24)" : "none",
+      }}
+    >
+      {image ? (
+        <img
+          src={image}
+          alt=""
+          draggable={false}
+          decoding="async"
+          loading="eager"
+          style={{
+            width: "100%",
+            height: "100%",
+            position: "absolute",
+            inset: 0,
+            objectFit: isDining ? "contain" : "cover",
+            objectPosition: room.image_position || "center 50%",
+            background: isDining ? "rgba(255,255,255,0.035)" : "#211A12",
+            imageRendering: "auto",
+          }}
+        />
+      ) : (
+        <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(255,255,255,0.32)" }}>
+          <Camera size={full ? 18 : 30} />
+        </span>
+      )}
+      <span style={{ position: "absolute", inset: 0, background: isDining ? "linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.42))" : "linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62))" }} />
+      {highlighted && (
+        <span style={{ position: "absolute", top: 8, left: 8, borderRadius: 999, padding: full ? "3px 6px" : "5px 8px", background: "rgba(201,168,76,0.92)", color: "#17120C", fontSize: full ? 7 : 9, fontWeight: 850, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          Editing
+        </span>
+      )}
+      {isUnavailable && (
+        <span style={{ position: "absolute", top: full ? 7 : 11, right: full ? 7 : 11, borderRadius: 999, padding: full ? "3px 6px" : "5px 8px", background: "rgba(0,0,0,0.58)", color: "#fff", fontSize: full ? 7 : 9, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          Unavailable
+        </span>
+      )}
+      <span style={{ position: "absolute", left: full ? 9 : 14, right: full ? 9 : 14, bottom: full ? 8 : 13, display: "grid", gap: full ? 5 : 8 }}>
+        <strong style={{ color: "#fff", fontSize: full ? PAGE_PREVIEW_CARD.title : 18, lineHeight: 1.12, textAlign: "left", textShadow: "0 2px 12px rgba(0,0,0,0.45)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: full ? "nowrap" : "normal" }}>
+          {title}
+        </strong>
+        {visibleChips.length > 0 && (
+          <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {visibleChips.map((child) => (
+              <span key={child.id || child.slug || child.name} style={{ borderRadius: 999, padding: full ? "3px 6px" : "4px 8px", background: "rgba(255,255,255,0.16)", color: "#fff", fontSize: full ? PAGE_PREVIEW_CARD.chip : 9, fontWeight: 800 }}>
+                {child.display_name || child.name}
+              </span>
+            ))}
+          </span>
+        )}
+      </span>
+    </button>
+  );
+}
+
+function VenueLandingPreview({ form, preview, childRooms = [], rooms = [], editingId = null, childrenByParent = new Map(), fullPage = false }) {
   const status = previewStatus(form);
   const statusColor = status.tone === "green" ? C.green : status.tone === "red" ? C.red : C.gold;
   const statusBg = status.tone === "green" ? C.greenFaint : status.tone === "red" ? C.redFaint : C.goldFaint;
-  const visibleChips = childRooms.slice(0, 4);
+  const previewRoom = useMemo(() => ({
+    ...form,
+    id: editingId || "__draft_preview__",
+    _previewImage: preview,
+    _isPreviewTarget: true,
+  }), [form, editingId, preview]);
+  const previewRoomIsChild = isChildVenue(previewRoom);
+  const hasDraftContent = Boolean(form.name || form.display_name || preview);
+
+  const pageRooms = useMemo(() => {
+    const merged = rooms.map((room) => (editingId && Number(room.id) === Number(editingId) ? previewRoom : room));
+    if (!editingId && hasDraftContent && !previewRoomIsChild) merged.push(previewRoom);
+    return merged.filter((room) => {
+      if (room._isPreviewTarget) return !previewRoomIsChild;
+      return !isChildVenue(room) && room.is_active && room.is_visible && room.show_on_landing;
+    });
+  }, [rooms, editingId, hasDraftContent, previewRoomIsChild, previewRoom]);
+
+  const sectionRooms = (type) => pageRooms
+    .filter((room) => (type === "dining" ? room.type === "dining" : room.type !== "dining"))
+    .sort(compareRooms("display_order"));
+
+  const getPreviewChildren = (room) => {
+    const existing = childrenByParent.get(Number(room.id)) || [];
+    if (!previewRoomIsChild) return existing;
+    const directParentMatch = form.parent_id && Number(form.parent_id) === Number(room.id);
+    const derivedParent = knownChildParentKey(previewRoom);
+    const parentKey = knownParentKey(room) || canonical(room.display_name || room.name);
+    if (!directParentMatch && (!derivedParent || derivedParent !== parentKey)) return existing;
+    const withoutEditing = existing.filter((child) => Number(child.id) !== Number(editingId));
+    return [...withoutEditing, previewRoom].sort(compareRooms("display_order"));
+  };
+
+  const renderPageSection = (label, title, items) => (
+    <div style={{ display: "grid", gap: 6 }}>
+      <div>
+        <div style={{ color: "#C9A84C", fontSize: 6.8, fontWeight: 850, letterSpacing: "0.22em", textTransform: "uppercase" }}>{label}</div>
+        <strong style={{ display: "block", marginTop: 2, color: "#F8F3E8", fontSize: 14, lineHeight: 1.05 }}>{title}</strong>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: PAGE_PREVIEW_CARD.gap }}>
+        {items.length ? items.map((room) => (
+          <VenuePreviewCard
+            key={room.id || room.slug || room.name}
+            room={room}
+            preview={room._isPreviewTarget ? preview : ""}
+            childRooms={getPreviewChildren(room)}
+            highlighted={Boolean(room._isPreviewTarget)}
+            full
+          />
+        )) : (
+          <div style={{ gridColumn: "1 / -1", border: "1px dashed rgba(255,255,255,0.12)", borderRadius: 10, padding: 12, color: "rgba(255,255,255,0.48)", fontSize: 10 }}>
+            No visible venues in this section.
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ display: "grid", gap: 13 }}>
-      <div>
-        <div style={sectionTitleStyle()}>Guest Landing Preview</div>
-        <p style={{ margin: "6px 0 0", color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
-          Live preview of the venue card and guest-facing availability state.
-        </p>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div>
+          <div style={sectionTitleStyle()}>{fullPage ? "Guest Page Preview" : "Card Preview"}</div>
+          <p style={{ margin: "6px 0 0", color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+            {fullPage
+              ? "Full customer-facing page context for the selected venue."
+              : "Focused card preview for quick edits. Open the Preview tab for the full guest-page context."}
+          </p>
+        </div>
       </div>
 
-      <div style={{ borderRadius: 16, padding: 12, background: "#15110C", border: "1px solid rgba(201,168,76,0.22)", boxShadow: "0 16px 36px rgba(24,20,14,0.18)" }}>
-        <button
-          type="button"
-          disabled
-          style={{
-            width: "100%",
-            minHeight: 182,
-            border: "1px solid rgba(255,255,255,0.10)",
-            borderRadius: 13,
-            overflow: "hidden",
-            position: "relative",
-            padding: 0,
-            background: "#211A12",
-            cursor: "default",
-            opacity: form.is_visible && form.show_on_landing ? 1 : 0.68,
-          }}
-        >
-          {preview ? (
-            <img
-              src={preview}
-              alt=""
-              style={{
-                width: "100%",
-                height: "100%",
-                position: "absolute",
-                inset: 0,
-                objectFit: form.type === "dining" ? "contain" : "cover",
-                objectPosition: form.image_position || "center 50%",
-                background: form.type === "dining" ? "rgba(255,255,255,0.04)" : "#211A12",
-              }}
-            />
-          ) : (
-            <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(255,255,255,0.32)" }}>
-              <Camera size={30} />
+      {!fullPage ? (
+        <div style={{ borderRadius: 16, padding: 12, background: "#15110C", border: "1px solid rgba(201,168,76,0.22)", boxShadow: "0 16px 36px rgba(24,20,14,0.18)" }}>
+          <VenuePreviewCard room={previewRoom} preview={preview} childRooms={childRooms} highlighted />
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+              Visual reference only. Save changes, then open the customer page for final live verification.
             </span>
-          )}
-          <span style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62))" }} />
-          <span style={{ position: "absolute", left: 14, right: 14, bottom: 13, display: "grid", gap: 8 }}>
-            <strong style={{ color: "#fff", fontSize: 18, lineHeight: 1.12, textAlign: "left", textShadow: "0 2px 12px rgba(0,0,0,0.45)" }}>
-              {form.display_name || form.name || "Venue Name"}
-            </strong>
-            {visibleChips.length > 0 && (
-              <span style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                {visibleChips.map((room) => (
-                  <span key={room.id || room.slug || room.name} style={{ borderRadius: 999, padding: "4px 8px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: 9, fontWeight: 800 }}>
-                    {room.display_name || room.name}
-                  </span>
-                ))}
-              </span>
-            )}
-          </span>
-          {!form.is_active || !form.reservations_enabled ? (
-            <span style={{ position: "absolute", top: 11, right: 11, borderRadius: 999, padding: "5px 8px", background: "rgba(0,0,0,0.54)", color: "#fff", fontSize: 9, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-              Unavailable
-            </span>
-          ) : null}
-        </button>
-      </div>
+          </div>
+          <div style={{ borderRadius: 16, padding: 10, background: "#100D09", border: "1px solid rgba(201,168,76,0.22)", boxShadow: "0 16px 36px rgba(24,20,14,0.18)", overflow: "hidden" }}>
+            <div style={{ minHeight: 460, borderRadius: 13, background: "radial-gradient(circle at 18% 14%, rgba(201,168,76,0.12), transparent 34%), #17120C", display: "grid", gridTemplateColumns: "30% 1fr", gap: 12, padding: 14 }}>
+              <aside style={{ borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.035)", padding: 13, display: "flex", flexDirection: "column", justifyContent: "space-between", minWidth: 0 }}>
+                <div>
+                  <div style={{ width: 30, height: 30, borderRadius: 9, border: "1px solid rgba(201,168,76,0.34)", color: "#C9A84C", display: "grid", placeItems: "center", fontSize: 14, fontFamily: "serif" }}>B</div>
+                  <div style={{ marginTop: 28, color: "#C9A84C", fontSize: 6.8, fontWeight: 850, letterSpacing: "0.2em", textTransform: "uppercase" }}>Concierge Booking</div>
+                  <strong style={{ display: "block", marginTop: 8, color: "#FFF8ED", fontSize: 23, lineHeight: 0.98, fontFamily: "Georgia, serif" }}>Seat & Table Reservations</strong>
+                  <p style={{ margin: "10px 0 0", color: "rgba(255,255,255,0.68)", fontSize: 8.5, lineHeight: 1.5 }}>
+                    A refined reservation gateway for dining outlets, function rooms, and signature hotel venues.
+                  </p>
+                </div>
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.10)", paddingTop: 12 }}>
+                  <strong style={{ color: "#FFF8ED", fontSize: 11, lineHeight: 1.2 }}>Select a venue to begin.</strong>
+                  <p style={{ margin: "5px 0 0", color: "rgba(255,255,255,0.58)", fontSize: 7.8, lineHeight: 1.45 }}>Cards remain configurable from Venue Management.</p>
+                </div>
+              </aside>
+              <main style={{ borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.025)", padding: 12, display: "grid", alignContent: "start", gap: 13, minWidth: 0 }}>
+                {renderPageSection("Dining Reservation", "Dining Outlets", sectionRooms("dining"))}
+                {renderPageSection("Event Reservation", "Events & Function Venues", sectionRooms("function_room"))}
+              </main>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ border: `1px solid ${status.tone === "red" ? "rgba(160,56,56,0.18)" : status.tone === "green" ? "rgba(46,122,90,0.18)" : "rgba(140,107,42,0.18)"}`, borderRadius: 13, padding: 12, background: statusBg }}>
         <strong style={{ display: "block", color: statusColor, fontSize: 11, letterSpacing: "0.09em", textTransform: "uppercase" }}>{status.label}</strong>
@@ -1145,6 +1270,8 @@ export default function FunctionRooms() {
         capacity: Number(form.capacity || 0),
         display_order: Number(form.display_order || 0),
         display_name: form.display_name || form.name,
+        slug: form.slug || slugify(form.name),
+        reservation_route: form.reservation_route || routeFromSlug(form.slug || form.name),
         metadata: {
           ...(form.metadata || {}),
           availability: availabilityPayload(form),
@@ -1457,11 +1584,17 @@ export default function FunctionRooms() {
             </div>
 
             <div className="function-room-table-wrap">
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 940 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1040, tableLayout: "fixed" }}>
                 <thead>
                   <tr style={{ background: C.surface, position: "sticky", top: 0, zIndex: 1 }}>
-                    {["Venue Structure", "Status", "Display Settings", "Order", "Manage"].map((header) => (
-                      <th key={header} style={{ padding: "11px 14px", textAlign: "left", color: C.faint, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", borderBottom: `1px solid ${C.divider}` }}>{header}</th>
+                    {[
+                      { label: "Venue Structure", width: "42%", align: "left" },
+                      { label: "Status", width: "11%", align: "left" },
+                      { label: "Display Settings", width: "23%", align: "left" },
+                      { label: "Order", width: "8%", align: "center" },
+                      { label: "Manage", width: "16%", align: "right" },
+                    ].map((column) => (
+                      <th key={column.label} style={{ width: column.width, padding: "11px 14px", textAlign: column.align, color: C.faint, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", borderBottom: `1px solid ${C.divider}` }}>{column.label}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1486,8 +1619,23 @@ export default function FunctionRooms() {
                               <ChevronRight size={15} />
                             </button>
                           ) : <span style={{ width: 18 }} />}
-                          <div style={{ width: level ? 48 : 58, height: level ? 34 : 40, borderRadius: 9, background: C.soft, overflow: "hidden", flexShrink: 0, border: `1px solid ${C.border}` }}>
-                            {room.image ? <img src={imageUrl(room.image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={17} style={{ margin: level ? 8 : 10, color: C.faint }} />}
+                          <div style={{ width: level ? 38 : 46, height: level ? 38 : 46, borderRadius: 10, background: room.type === "dining" ? "#15110C" : C.soft, overflow: "hidden", flexShrink: 0, border: `1px solid ${C.border}`, display: "grid", placeItems: "center" }}>
+                            {room.image ? (
+                              <img
+                                src={imageUrl(room.image)}
+                                alt=""
+                                loading="lazy"
+                                decoding="async"
+                                draggable={false}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: room.type === "dining" ? "contain" : "cover",
+                                  objectPosition: room.image_position || "center 50%",
+                                  imageRendering: "auto",
+                                }}
+                              />
+                            ) : <Camera size={17} style={{ color: C.faint }} />}
                           </div>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -1514,10 +1662,10 @@ export default function FunctionRooms() {
                           <Badge tone={room.reservations_enabled ? "green" : "red"} compact>{room.reservations_enabled ? "Reservable" : "Unavailable"}</Badge>
                         </div>
                       </td>
-                      <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}`, color: C.text, fontWeight: 560, fontSize: 12.5 }}>{room.display_order}</td>
-                      <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
-                        <div style={{ display: "flex", gap: 7, justifyContent: "flex-end", position: "relative" }}>
-                          <button className="function-room-action" type="button" onClick={() => beginEdit(room)} style={{ ...buttonBase(), color: C.gold }} title="Edit venue"><Edit3 size={14} /> Edit</button>
+                      <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}`, color: C.text, fontWeight: 560, fontSize: 12.5, textAlign: "center" }}>{room.display_order}</td>
+                      <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}`, textAlign: "right" }}>
+                        <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end", alignItems: "center", position: "relative", minWidth: 132 }}>
+                          <button className="function-room-action" type="button" onClick={() => beginEdit(room)} style={{ ...buttonBase(), minWidth: 84, color: C.gold }} title="Edit venue"><Edit3 size={14} /> Edit</button>
                           <button
                             className="function-room-action"
                             type="button"
@@ -1526,7 +1674,7 @@ export default function FunctionRooms() {
                               event.stopPropagation();
                               setOpenMenuId((current) => current === room.id ? null : room.id);
                             }}
-                            style={{ ...buttonBase(), width: 36, padding: 0 }}
+                            style={{ ...buttonBase(), width: 38, minWidth: 38, padding: 0 }}
                             aria-label={`Open actions for ${room.display_name || room.name}`}
                             aria-expanded={openMenuId === room.id}
                           >
@@ -1609,8 +1757,23 @@ export default function FunctionRooms() {
                   <>
                 <section style={formSectionStyle()}>
                   <div style={sectionTitleStyle()}>Display Photo</div>
-                  <div style={{ height: 150, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}`, background: C.soft }}>
-                    {preview ? <img src={preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ height: "100%", display: "grid", placeItems: "center", color: C.faint }}><Camera size={28} /></div>}
+                  <div style={{ width: "min(420px, 100%)", aspectRatio: "16 / 9", borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}`, background: form.type === "dining" ? "#15110C" : C.soft, display: "grid", placeItems: "center" }}>
+                    {preview ? (
+                      <img
+                        src={preview}
+                        alt=""
+                        decoding="async"
+                        loading="eager"
+                        draggable={false}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          objectPosition: form.image_position || "center 50%",
+                          imageRendering: "auto",
+                        }}
+                      />
+                    ) : <div style={{ height: "100%", display: "grid", placeItems: "center", color: C.faint }}><Camera size={28} /></div>}
                   </div>
                   <Field label="Image path or URL"><input value={form.image} onChange={(e) => updateForm("image", e.target.value)} placeholder="Image URL or public image path" style={inputStyle()} /></Field>
                   <label style={{ ...buttonBase(), justifyContent: "center", cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.55 }}>
@@ -1651,7 +1814,7 @@ export default function FunctionRooms() {
                   </Field>
                   <Field label="Reservation Page Route" hint="Public page opened when guests select this venue. Keep it unique and start with /.">
                     <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
-                      <input value={form.reservation_route} onChange={(e) => updateForm("reservation_route", e.target.value)} placeholder="/hanakazu-japanese-restaurant" style={inputStyle()} />
+                      <input value={form.reservation_route} onChange={(e) => updateForm("reservation_route", e.target.value)} placeholder="/reserve/hanakazu-japanese-restaurant" style={inputStyle()} />
                       <button type="button" onClick={() => updateForm("reservation_route", routeFromSlug(form.slug || form.name))} style={{ ...buttonBase(), minHeight: 38 }}>Use slug</button>
                     </div>
                   </Field>
@@ -1834,13 +1997,28 @@ export default function FunctionRooms() {
 
                 {editorTab === "preview" && (
                   <section style={formSectionStyle()}>
-                    <VenueLandingPreview form={form} preview={preview} childRooms={previewChildRooms} />
+                    <VenueLandingPreview
+                      form={form}
+                      preview={preview}
+                      childRooms={previewChildRooms}
+                      rooms={uniqueRooms}
+                      editingId={editing?.id}
+                      childrenByParent={childrenByParent}
+                      fullPage
+                    />
                   </section>
                 )}
                 </div>
 
                 <aside className="venue-preview-panel" style={{ position: "sticky", top: 0, alignSelf: "start", display: editorTab === "preview" ? "none" : "grid", gap: 12 }}>
-                  <VenueLandingPreview form={form} preview={preview} childRooms={previewChildRooms} />
+                  <VenueLandingPreview
+                    form={form}
+                    preview={preview}
+                    childRooms={previewChildRooms}
+                    rooms={uniqueRooms}
+                    editingId={editing?.id}
+                    childrenByParent={childrenByParent}
+                  />
                 </aside>
               </div>
 

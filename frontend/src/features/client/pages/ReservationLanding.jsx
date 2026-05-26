@@ -148,7 +148,13 @@ function resolveRoomImage(image) {
 }
 
 function roomRoute(room) {
-  return room?.reservation_route || roomRouteMap[String(room?.name || "").toLowerCase()] || "/venues";
+  const legacyRoute = roomRouteMap[String(room?.name || "").toLowerCase()];
+  const generatedRoute = room?.slug
+    ? `/reserve/${room.slug}`
+    : room?.name
+      ? `/reserve/${String(room.name).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`
+      : "/venues";
+  return room?.reservation_route || legacyRoute || generatedRoute;
 }
 
 function resolveDiningLogo(room) {

@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
+import { venueAPI } from "../../../services/venueAPI";
+import { buildOutletGroupsFromVenues } from "../../../constants/outletCatalog";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -397,6 +399,8 @@ export default function CancelledDashboard() {
   const [stats, setStats] = useState({ total: 0, today: 0, thisWeek: 0, missingReason: 0, upcoming: 0 });
   const [reasonFilter, setReasonFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState("cancelled_desc");
+  const [venues, setVenues] = useState([]);
+  const [roomFilter, setRoomFilter] = useState("ALL");
 
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   useEffect(() => {
@@ -452,6 +456,14 @@ export default function CancelledDashboard() {
   };
 
   useEffect(() => { loadReservations(); }, []);
+
+  useEffect(() => {
+    venueAPI.getAll()
+      .then(data => {
+        setVenues(Array.isArray(data) ? data : []);
+      })
+      .catch(err => console.error("[CancelledDashboard] Failed to load venues:", err));
+  }, []);
 
   // WebSocket with polling fallback
   useEffect(() => {
@@ -531,6 +543,13 @@ export default function CancelledDashboard() {
     }
     if (reasonFilter === "NO_REASON") {
       filtered = filtered.filter(r => !r.cancellation_reason);
+    }
+    if (roomFilter !== "ALL") {
+      filtered = filtered.filter(r => {
+        const resRoom = String(r.room || r.venue?.name || "").toLowerCase().trim();
+        const targetRoom = roomFilter.toLowerCase().trim();
+        return resRoom === targetRoom;
+      });
     }
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -894,7 +913,20 @@ export default function CancelledDashboard() {
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(180px,240px) minmax(160px,220px) auto", gap: 10, alignItems: "end" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(140px,200px) minmax(140px,200px) minmax(120px,160px) auto", gap: 10, alignItems: "end" }}>
+                    <label style={{ display: "grid", gap: 5 }}>
+                      <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Room / Outlet</span>
+                      <select value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)} style={{ padding: "9px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: C.surfaceInput, color: C.textPrimary, fontSize: 12 }}>
+                        <option value="ALL">All Rooms</option>
+                        {buildOutletGroupsFromVenues(venues).map((group) => (
+                          <optgroup key={group.id} label={group.label}>
+                            {group.rooms.map((room) => (
+                              <option key={room} value={room}>{room}</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </label>
                     <label style={{ display: "grid", gap: 5 }}>
                       <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Sort</span>
                       <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ padding: "9px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: C.surfaceInput, color: C.textPrimary, fontSize: 12 }}>
@@ -907,7 +939,7 @@ export default function CancelledDashboard() {
                     </label>
                     <button
                       type="button"
-                      onClick={() => { setReasonFilter("ALL"); setSearch(""); setSortBy("cancelled_desc"); }}
+                      onClick={() => { setReasonFilter("ALL"); setSearch(""); setSortBy("cancelled_desc"); setRoomFilter("ALL"); }}
                       style={{ minHeight: 37, border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: C.surfaceBase, color: C.textSecondary, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
                     >
                       Reset Review

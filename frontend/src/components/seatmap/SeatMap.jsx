@@ -141,9 +141,18 @@ const DEFAULT_LABELS = [
 
 // ─── FIX: Canonical wing resolver — single source of truth ───────────────────
 function getActualWingForRoom(room, venueStructure) {
-  if (venueStructure) {
-    for (const wing of venueStructure) {
-      if (wing.rooms.includes(room)) return wing.label;
+  let structure = venueStructure;
+  if (!structure) {
+    try {
+      const raw = localStorage.getItem("bellevue_venue_structure");
+      if (raw) {
+        structure = JSON.parse(raw);
+      }
+    } catch {}
+  }
+  if (structure && Array.isArray(structure)) {
+    for (const wing of structure) {
+      if (wing.rooms?.includes(room)) return wing.label;
     }
   }
   const roomToWingMap = {
@@ -1087,6 +1096,72 @@ export default function SeatMap({
     };
     window.addEventListener("venue:structure:changed", handler);
     return () => window.removeEventListener("venue:structure:changed", handler);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+    const loadDynamicStructure = async () => {
+      try {
+        const token = localStorage.getItem("admin_token");
+        const headers = { Accept: "application/json" };
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        const res = await fetch(`${API_BASE_URL}/venues?include_archived=false&_t=${Date.now()}`, { headers });
+        if (!res.ok) return;
+        const venues = await res.json();
+        if (!mounted || !Array.isArray(venues)) return;
+
+        const activeVenues = venues.filter(v => !v.is_archived);
+        const parentIdsWithChildren = activeVenues.filter(v => v.parent_id !== null).map(v => v.parent_id);
+
+        const selectableRooms = activeVenues.filter(v => {
+          if (v.parent_id !== null) return true;
+          return !parentIdsWithChildren.includes(v.id);
+        });
+
+        const groups = {};
+        selectableRooms.forEach(v => {
+          const isDining = String(v.type || "").toLowerCase() === "dining"
+            || String(v.wing || "").toLowerCase() === "dining"
+            || String(v.name || "").toLowerCase().includes("restaurant")
+            || String(v.name || "").toLowerCase().includes("qsina")
+            || String(v.name || "").toLowerCase().includes("hanakazu")
+            || String(v.name || "").toLowerCase().includes("phoenix");
+
+          const wingLabel = isDining ? "Dining" : (v.wing || "Main Wing");
+          const wingId = isDining ? "dining" : String(wingLabel).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+          if (!groups[wingId]) {
+            groups[wingId] = {
+              id: wingId,
+              label: wingLabel,
+              rooms: []
+            };
+          }
+
+          groups[wingId].rooms.push(v.name);
+        });
+
+        const order = { "main-wing": 0, "tower-wing": 1, "dining": 2 };
+        const sortedStructure = Object.values(groups).sort((a, b) => {
+          const oA = order[a.id] ?? 99;
+          const oB = order[b.id] ?? 99;
+          if (oA !== oB) return oA - oB;
+          return a.label.localeCompare(b.label);
+        });
+
+        if (sortedStructure.length > 0) {
+          setVenueStructure(sortedStructure);
+          localStorage.setItem("bellevue_venue_structure", JSON.stringify(sortedStructure));
+          window.dispatchEvent(new CustomEvent("venue:structure:changed", { detail: { structure: sortedStructure } }));
+        }
+      } catch (err) {
+        console.error("[SeatMap] Failed to load venues for structure:", err);
+      }
+    };
+    loadDynamicStructure();
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {

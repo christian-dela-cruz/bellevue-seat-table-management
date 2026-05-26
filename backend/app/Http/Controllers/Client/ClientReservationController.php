@@ -184,6 +184,42 @@ class ClientReservationController extends Controller
     {
         $normalized = strtolower(trim($room));
 
+        // 1. Dynamic exact name lookup
+        $venue = Venue::where('name', $room)->first();
+        if ($venue) {
+            if ($venue->parent_id) {
+                $parent = Venue::find($venue->parent_id);
+                if ($parent) {
+                    return $parent->name;
+                }
+            }
+            return $venue->name;
+        }
+
+        // 2. Dynamic slug lookup
+        $venueBySlug = Venue::where('slug', $room)->first();
+        if ($venueBySlug) {
+            if ($venueBySlug->parent_id) {
+                $parent = Venue::find($venueBySlug->parent_id);
+                if ($parent) {
+                    return $parent->name;
+                }
+            }
+            return $venueBySlug->name;
+        }
+
+        // 3. Dynamic prefix match against non-archived parent venues
+        $parentVenue = Venue::whereNull('parent_id')
+            ->get()
+            ->first(function ($v) use ($normalized) {
+                return str_contains($normalized, strtolower($v->name));
+            });
+
+        if ($parentVenue) {
+            return $parentVenue->name;
+        }
+
+        // 4. Legacy hardcoded fallbacks
         if (str_starts_with($normalized, 'laguna ballroom')) {
             return 'Laguna Ballroom';
         }

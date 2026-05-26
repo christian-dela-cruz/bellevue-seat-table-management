@@ -893,7 +893,7 @@ class AdminRejectReservationReasonTest extends TestCase
             'seat_number' => 'Seat 1, Seat 2',
             'guests_count' => 40,
             'event_date' => '2026-06-20',
-            'event_time' => '18:30',
+            'event_time' => '18:00',
             'event_area' => 'Stage side',
             'setup_tables' => 8,
             'setup_chairs' => 40,
@@ -903,6 +903,7 @@ class AdminRejectReservationReasonTest extends TestCase
         ];
 
         $this->postJson('/api/reservations', $payload)
+            ->dump()
             ->assertCreated()
             ->assertJsonPath('event_area', 'Stage side')
             ->assertJsonPath('setup_tables', 8)

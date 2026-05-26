@@ -4,8 +4,9 @@ import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { reportAPI } from "../../../services/reportAPI";
+import { venueAPI } from "../../../services/venueAPI";
 import { Building2, Download, Layers, Printer, Utensils } from "lucide-react";
-import { canAccessOutlet, canonicalOutletName } from "../../../constants/outletCatalog";
+import { ADMIN_OUTLET_GROUPS, buildOutletGroupsFromVenues, buildOutletRowsFromVenues, canAccessOutlet, canonicalOutletName } from "../../../constants/outletCatalog";
 import {
   Area,
   CartesianGrid,
@@ -197,6 +198,46 @@ function sortRows(rows, sort) {
   if (!sort?.key) return rows;
   const direction = sort.direction === "asc" ? 1 : -1;
   return [...rows].sort((a, b) => compareValues(a, b, sort.key) * direction);
+}
+
+function mergeConfiguredReportRows(reportRows = [], venues = []) {
+  const byName = new Map();
+
+  reportRows.forEach((row) => {
+    const name = canonicalOutletName(row?.name);
+    if (!name) return;
+    byName.set(name, { ...row, name });
+  });
+
+  buildOutletRowsFromVenues(venues).forEach((venue) => {
+    const name = canonicalOutletName(venue.name);
+    if (byName.has(name)) {
+      const existing = byName.get(name);
+      byName.set(name, {
+        ...existing,
+        wing: existing.wing || venue.wing,
+        type: existing.type || venue.type,
+      });
+      return;
+    }
+
+    byName.set(name, {
+      ...venue,
+      total_reservations: 0,
+      reservations: 0,
+      guests: 0,
+      reserved: 0,
+      pending: 0,
+      rejected: 0,
+      cancelled: 0,
+      acceptance_rate: 0,
+      dine_in: 0,
+      promotion_mentions: 0,
+      configured: true,
+    });
+  });
+
+  return Array.from(byName.values());
 }
 
 function csvCell(value) {
@@ -900,12 +941,21 @@ export default function Reports() {
   const [report, setReport] = useState({ summary: {}, data: [] });
   const [transactionReport, setTransactionReport] = useState({ summary: {}, data: [] });
   const [monthlyReport, setMonthlyReport] = useState({ summary: {}, months: [], outlets: [] });
+  const [venueRows, setVenueRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const canViewReports = authAPI.hasPermission("view_outlet_reports");
   const canViewTransactions = authAPI.hasPermission("view_transactions");
   const canViewGlobalReports = authAPI.hasPermission("view_global_reports");
   const currentUser = useMemo(() => authAPI.getCurrentUser(), []);
+  const outletGroups = useMemo(() => {
+    const dynamicGroups = buildOutletGroupsFromVenues(venueRows);
+    return dynamicGroups.length ? dynamicGroups : ADMIN_OUTLET_GROUPS;
+  }, [venueRows]);
+  const reportOutletRows = useMemo(
+    () => mergeConfiguredReportRows(report.data || [], venueRows),
+    [report.data, venueRows]
+  );
 
   const loadReport = async () => {
     if (!canViewReports) return;
@@ -915,16 +965,18 @@ export default function Reports() {
     try {
       const selectedYear = Number(reportYear) || Number(today().slice(0, 4));
       const selectedMonth = Number(reportMonth) || Number(today().slice(5, 7));
-      const [outletData, transactionData, monthlyData] = await Promise.all([
+      const [outletData, transactionData, monthlyData, venuesData] = await Promise.all([
         reportAPI.getOutletReports({ start_date: startDate, end_date: endDate }),
         canViewTransactions
           ? reportAPI.getTransactionReports({ start_date: startDate, end_date: endDate })
           : Promise.resolve(null),
         reportAPI.getMonthlyReports({ year: selectedYear, month: selectedMonth }),
+        venueAPI.getAll({ include_archived: false, _t: Date.now() }).catch(() => []),
       ]);
       setReport(outletData);
       if (transactionData) setTransactionReport(transactionData);
       setMonthlyReport(monthlyData);
+      setVenueRows(Array.isArray(venuesData) ? venuesData : []);
     } catch (err) {
       setError(err.message || "Failed to load outlet report.");
     } finally {
@@ -937,7 +989,7 @@ export default function Reports() {
   }, []);
 
   const filteredOutlets = useMemo(() => {
-    const rows = (report.data || []).filter((row) => canAccessOutlet(currentUser, row.name));
+    const rows = reportOutletRows.filter((row) => canAccessOutlet(currentUser, row.name, outletGroups));
     const outletFiltered = selectedOutlet === "ALL"
       ? rows
       : rows.filter((row) => String(row.name) === selectedOutlet);
@@ -945,18 +997,18 @@ export default function Reports() {
       ? outletFiltered
       : outletFiltered.filter((row) => outletGroup(row) === selectedOutletGroup);
     return sortRows(groupFiltered, outletSort);
-  }, [currentUser, report.data, selectedOutlet, selectedOutletGroup, outletSort]);
+  }, [currentUser, outletGroups, reportOutletRows, selectedOutlet, selectedOutletGroup, outletSort]);
 
   const summary = report.summary || {};
   const category = report.category_breakdown || {};
   const statuses = report.status_breakdown || {};
   const roomDetails = useMemo(
-    () => sortRows((report.room_details || []).filter((row) => canAccessOutlet(currentUser, row.room)), roomSort),
-    [currentUser, report.room_details, roomSort]
+    () => sortRows((report.room_details || []).filter((row) => canAccessOutlet(currentUser, row.room, outletGroups)), roomSort),
+    [currentUser, outletGroups, report.room_details, roomSort]
   );
   const allOutlets = useMemo(
-    () => (report.data || []).filter((row) => canAccessOutlet(currentUser, row.name)),
-    [currentUser, report.data]
+    () => reportOutletRows.filter((row) => canAccessOutlet(currentUser, row.name, outletGroups)),
+    [currentUser, outletGroups, reportOutletRows]
   );
   const roomOutletCount = allOutlets.filter((outlet) => outletGroup(outlet) === "rooms").length;
   const diningOutletCount = allOutlets.filter((outlet) => outletGroup(outlet) === "dining").length;

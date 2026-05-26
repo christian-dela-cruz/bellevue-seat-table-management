@@ -28,8 +28,9 @@ import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { reportAPI } from "../../../services/reportAPI";
+import { venueAPI } from "../../../services/venueAPI";
 import { fetchReservations } from "../../../utils/api";
-import { canonicalOutletName, outletGroupLabel } from "../../../constants/outletCatalog";
+import { buildOutletRowsFromVenues, canonicalOutletName, outletGroupLabel } from "../../../constants/outletCatalog";
 
 const C = {
   page: "#F7F4EE",
@@ -62,35 +63,94 @@ const RECONNECT_WINDOW_MS = 60000;
 const MAX_RECONNECTS_IN_WINDOW = 5;
 const WS_RECOVERY_RETRY_MS = 45000;
 
-const OUTLET_TREE = [
-  {
-    id: "main-wing",
-    label: "Main Wing",
-    sections: [
-      { label: "Alabang Function Room", items: ["Alabang Function Room"] },
-      { label: "Business Center", items: ["Business Center"] },
-      { label: "Laguna Ballroom", items: ["Laguna Ballroom 1", "Laguna Ballroom 2"] },
-      { label: "20/20 Function Room", items: ["20/20 Function Room A", "20/20 Function Room B", "20/20 Function Room C"] },
-    ],
-  },
-  {
-    id: "tower-wing",
-    label: "Tower Wing",
-    sections: [
-      { label: "Grand Ballroom", items: ["Grand Ballroom A", "Grand Ballroom B", "Grand Ballroom C"] },
-      { label: "Tower Ballroom", items: ["Tower 1", "Tower 2", "Tower 3"] },
-    ],
-  },
-  {
-    id: "dining",
-    label: "Dining",
-    sections: [
-      { label: "Hanakazu Japanese Restaurant", items: ["Hanakazu Japanese Restaurant"] },
-      { label: "Qsina Restaurant", items: ["Qsina Restaurant"] },
-      { label: "Phoenix Court", items: ["Phoenix Court"] },
-    ],
-  },
-];
+function buildDynamicOutletTree(venues = []) {
+  if (!venues || venues.length === 0) {
+    return [
+      {
+        id: "main-wing",
+        label: "Main Wing",
+        sections: [
+          { label: "Alabang Function Room", items: ["Alabang Function Room"] },
+          { label: "Business Center", items: ["Business Center"] },
+          { label: "Laguna Ballroom", items: ["Laguna Ballroom 1", "Laguna Ballroom 2"] },
+          { label: "20/20 Function Room", items: ["20/20 Function Room A", "20/20 Function Room B", "20/20 Function Room C"] },
+        ],
+      },
+      {
+        id: "tower-wing",
+        label: "Tower Wing",
+        sections: [
+          { label: "Grand Ballroom", items: ["Grand Ballroom A", "Grand Ballroom B", "Grand Ballroom C"] },
+          { label: "Tower Ballroom", items: ["Tower 1", "Tower 2", "Tower 3"] },
+        ],
+      },
+      {
+        id: "dining",
+        label: "Dining",
+        sections: [
+          { label: "Hanakazu Japanese Restaurant", items: ["Hanakazu Japanese Restaurant"] },
+          { label: "Qsina Restaurant", items: ["Qsina Restaurant"] },
+          { label: "Phoenix Court", items: ["Phoenix Court"] },
+        ],
+      },
+    ];
+  }
+
+  const activeVenues = venues.filter(v => !v.is_archived);
+  const parents = activeVenues.filter(v => v.parent_id === null);
+  const groupsMap = new Map();
+
+  parents.forEach(parent => {
+    const isDining = String(parent.type || "").toLowerCase() === "dining"
+      || String(parent.wing || "").toLowerCase() === "dining"
+      || String(parent.name || "").toLowerCase().includes("restaurant")
+      || String(parent.name || "").toLowerCase().includes("qsina")
+      || String(parent.name || "").toLowerCase().includes("hanakazu")
+      || String(parent.name || "").toLowerCase().includes("phoenix");
+
+    const wingLabel = isDining ? "Dining" : (parent.wing || "Main Wing");
+    const groupId = isDining ? "dining" : slugify(wingLabel);
+
+    if (!groupsMap.has(groupId)) {
+      groupsMap.set(groupId, {
+        id: groupId,
+        label: wingLabel,
+        sections: []
+      });
+    }
+
+    const children = activeVenues.filter(v => v.parent_id === parent.id);
+    const items = children.length > 0
+      ? children.map(c => c.name)
+      : [parent.name];
+
+    groupsMap.get(groupId).sections.push({
+      label: parent.name,
+      items,
+      display_order: parent.display_order ?? 9999
+    });
+  });
+
+  const sortedGroups = Array.from(groupsMap.values()).map(group => {
+    group.sections.sort((a, b) => {
+      if (a.display_order !== b.display_order) {
+        return a.display_order - b.display_order;
+      }
+      return a.label.localeCompare(b.label);
+    });
+    return group;
+  });
+
+  const order = { "main-wing": 0, "tower-wing": 1, "dining": 2 };
+  sortedGroups.sort((a, b) => {
+    const oA = order[a.id] ?? 99;
+    const oB = order[b.id] ?? 99;
+    if (oA !== oB) return oA - oB;
+    return a.label.localeCompare(b.label);
+  });
+
+  return sortedGroups;
+}
 
 function today() {
   const date = new Date();
@@ -141,12 +201,12 @@ function availabilityMap(outlets) {
   return new Map(outlets.map((outlet) => [String(outlet.name), outlet]));
 }
 
-function buildSelectableOutlets(outlets) {
+function buildSelectableOutlets(outlets, dynamicOutletTree = []) {
   const byName = availabilityMap(outlets);
   const rows = [];
   const pushed = new Set();
 
-  OUTLET_TREE.forEach((group) => {
+  dynamicOutletTree.forEach((group) => {
     group.sections.forEach((section) => {
       const children = section.items.filter((name) => byName.has(name));
       const parent = byName.get(section.label);
@@ -181,6 +241,52 @@ function buildSelectableOutlets(outlets) {
   });
 
   return rows;
+}
+
+function mergeConfiguredOutlets(reportOutlets = [], venues = []) {
+  const byName = new Map();
+
+  reportOutlets.forEach((outlet) => {
+    const name = canonicalOutletName(outlet?.name);
+    if (!name) return;
+    byName.set(name, {
+      ...outlet,
+      name,
+    });
+  });
+
+  buildOutletRowsFromVenues(venues).forEach((venue) => {
+    const name = canonicalOutletName(venue.name);
+    const existing = byName.get(name);
+    if (existing) {
+      byName.set(name, {
+        ...existing,
+        wing: existing.wing || venue.wing,
+        type: existing.type || venue.type,
+        slug: existing.slug || venue.slug,
+        reservation_route: existing.reservation_route || venue.reservation_route,
+        children: existing.children?.length ? existing.children : venue.children,
+      });
+      return;
+    }
+
+    byName.set(name, {
+      ...venue,
+      total_reservations: 0,
+      reservations: 0,
+      guests: 0,
+      reserved: 0,
+      pending: 0,
+      rejected: 0,
+      cancelled: 0,
+      acceptance_rate: 0,
+      dine_in: 0,
+      promotion_mentions: 0,
+      configured: true,
+    });
+  });
+
+  return Array.from(byName.values());
 }
 
 function normalizeStatus(value) {
@@ -284,13 +390,13 @@ function inputStyle(extra = {}) {
   };
 }
 
-function OutletSelector({ outlets, selectedOutlet, onSelect }) {
+function OutletSelector({ outlets, selectedOutlet, onSelect, dynamicOutletTree = [] }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const available = useMemo(() => availabilityMap(outlets), [outlets]);
   const normalizedQuery = query.trim().toLowerCase();
   const selectedName = selectedOutlet?.name || "Select outlet";
-  const fallbackOutlets = outlets.filter((outlet) => !OUTLET_TREE.some((group) =>
+  const fallbackOutlets = outlets.filter((outlet) => !dynamicOutletTree.some((group) =>
     group.sections.some((section) => section.label === outlet.name || section.items.includes(outlet.name))
   ));
 
@@ -338,7 +444,7 @@ function OutletSelector({ outlets, selectedOutlet, onSelect }) {
             </div>
           </div>
           <div style={{ maxHeight: 360, overflowY: "auto", padding: "8px 8px 10px", display: "grid", gap: 8 }}>
-            {OUTLET_TREE.map((group) => {
+            {dynamicOutletTree.map((group) => {
               const visibleSections = group.sections.map((section) => {
                 const parent = available.get(section.label);
                 const parentAvailable = Boolean(parent);
@@ -707,6 +813,7 @@ function OutletDashboard() {
   const [analyticsPeriod, setAnalyticsPeriod] = useState("monthly");
   const [reports, setReports] = useState({ data: [], summary: {} });
   const [reservations, setReservations] = useState([]);
+  const [venueRows, setVenueRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [wsStatus, setWsStatus] = useState("connecting");
@@ -729,12 +836,14 @@ function OutletDashboard() {
     else setLoading(true);
     setError("");
     try {
-      const [reportData, reservationData] = await Promise.all([
+      const [reportData, reservationData, venuesData] = await Promise.all([
         reportAPI.getOutletReports({ start_date: startDate, end_date: endDate }),
         fetchReservations(1, 9999),
+        venueAPI.getAll({ include_archived: false, _t: Date.now() }).catch(() => []),
       ]);
       setReports(reportData || { data: [] });
       setReservations(Array.isArray(reservationData?.data) ? reservationData.data : Array.isArray(reservationData) ? reservationData : []);
+      setVenueRows(Array.isArray(venuesData) ? venuesData : []);
     } catch (err) {
       setError(err.message || "Failed to load outlet dashboard.");
     } finally {
@@ -859,11 +968,15 @@ function OutletDashboard() {
   }, [canViewReports, loadDashboard]);
 
   const outlets = useMemo(() => {
-    const rows = reports.data || [];
+    const rows = mergeConfiguredOutlets(reports.data || [], venueRows);
     return [...rows].sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  }, [reports.data]);
+  }, [reports.data, venueRows]);
 
-  const selectableOutlets = useMemo(() => buildSelectableOutlets(outlets), [outlets]);
+  const dynamicOutletTree = useMemo(() => {
+    return buildDynamicOutletTree(venueRows);
+  }, [venueRows]);
+
+  const selectableOutlets = useMemo(() => buildSelectableOutlets(outlets, dynamicOutletTree), [outlets, dynamicOutletTree]);
 
   const selectedOutlet = useMemo(() => {
     if (!selectableOutlets.length) return null;
@@ -1040,7 +1153,7 @@ function OutletDashboard() {
               <Panel style={{ overflow: "visible", position: "relative", zIndex: 5 }}>
                 <div className="od-filters" style={{ padding: 13, display: "grid", gridTemplateColumns: "minmax(260px,1.5fr) 130px 130px 130px 130px 1fr 130px auto", gap: 9, alignItems: "end" }}>
                   <Field label="Outlet">
-                    <OutletSelector outlets={selectableOutlets} selectedOutlet={selectedOutlet} onSelect={(outlet) => navigate(`/admin/outlets/${slugify(outlet.name)}`)} />
+                    <OutletSelector outlets={selectableOutlets} selectedOutlet={selectedOutlet} onSelect={(outlet) => navigate(`/admin/outlets/${slugify(outlet.name)}`)} dynamicOutletTree={dynamicOutletTree} />
                   </Field>
                   <Field label="Start"><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} style={inputStyle()} /></Field>
                   <Field label="End"><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} style={inputStyle()} /></Field>

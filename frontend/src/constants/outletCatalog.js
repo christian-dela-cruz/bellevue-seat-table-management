@@ -47,6 +47,126 @@ export function canonicalOutletName(roomName) {
   return name;
 }
 
+function groupId(value) {
+  return String(value || "other")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "other";
+}
+
+function isDiningVenue(venue, name) {
+  const type = String(venue?.type || venue?.category || "").toLowerCase();
+  const wing = String(venue?.wing || "").toLowerCase();
+  const normalized = String(name || "").toLowerCase();
+
+  return type.includes("dining")
+    || type.includes("restaurant")
+    || wing.includes("dining")
+    || normalized.includes("restaurant")
+    || normalized.includes("qsina")
+    || normalized.includes("hanakazu")
+    || normalized.includes("phoenix");
+}
+
+function collectUniqueVenues(venues = []) {
+  const byKey = new Map();
+
+  const addVenue = (venue) => {
+    if (!venue) return;
+    const archived = Boolean(venue.is_archived || venue?.metadata?.archived_reason);
+    if (archived) return;
+
+    const key = venue.id ? `id:${venue.id}` : `name:${normalizedName(venue.display_name || venue.name)}`;
+    if (!byKey.has(key)) byKey.set(key, venue);
+
+    if (Array.isArray(venue.children)) {
+      venue.children.forEach(addVenue);
+    }
+  };
+
+  venues.forEach(addVenue);
+  return Array.from(byKey.values());
+}
+
+export function buildOutletGroupsFromVenues(venues = []) {
+  const groups = new Map();
+  const seenRooms = new Set();
+
+  const sortedVenues = collectUniqueVenues(venues).sort((a, b) => {
+    const orderA = Number(a?.display_order ?? 9999);
+    const orderB = Number(b?.display_order ?? 9999);
+    if (orderA !== orderB) return orderA - orderB;
+    return String(a?.display_name || a?.name || "").localeCompare(String(b?.display_name || b?.name || ""), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  });
+
+  sortedVenues.forEach((venue) => {
+    const roomName = canonicalOutletName(venue?.display_name || venue?.name);
+    if (!roomName) return;
+
+    const normalizedRoom = normalizedName(roomName);
+    if (seenRooms.has(normalizedRoom)) return;
+    seenRooms.add(normalizedRoom);
+
+    const groupLabel = isDiningVenue(venue, roomName)
+      ? "Dining"
+      : (venue?.wing || venue?.parent?.wing || outletGroupLabel(roomName) || "Other");
+    const id = groupId(groupLabel);
+
+    if (!groups.has(id)) {
+      groups.set(id, { id, label: groupLabel, rooms: [] });
+    }
+
+    groups.get(id).rooms.push(roomName);
+  });
+
+  const order = new Map([
+    ["main-wing", 0],
+    ["tower-wing", 1],
+    ["dining", 2],
+    ["other", 99],
+  ]);
+
+  return Array.from(groups.values())
+    .map((group) => ({
+      ...group,
+      rooms: Array.from(new Set(group.rooms)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })),
+    }))
+    .sort((a, b) => (order.get(a.id) ?? 50) - (order.get(b.id) ?? 50) || a.label.localeCompare(b.label));
+}
+
+export function buildOutletRowsFromVenues(venues = []) {
+  return collectUniqueVenues(venues)
+    .map((venue) => {
+      const name = canonicalOutletName(venue?.display_name || venue?.name);
+      if (!name) return null;
+
+      return {
+        id: venue.id,
+        venue_id: venue.id,
+        name,
+        wing: isDiningVenue(venue, name) ? "Dining" : (venue?.wing || venue?.parent?.wing || outletGroupLabel(name)),
+        type: venue?.type || venue?.category || (isDiningVenue(venue, name) ? "dining" : "function"),
+        slug: venue?.slug,
+        reservation_route: venue?.reservation_route,
+        display_order: venue?.display_order ?? 9999,
+        children: Array.isArray(venue?.children)
+          ? venue.children.map((child) => canonicalOutletName(child?.display_name || child?.name)).filter(Boolean)
+          : [],
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const orderA = Number(a.display_order ?? 9999);
+      const orderB = Number(b.display_order ?? 9999);
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+    });
+}
+
 export function outletGroupLabel(roomName) {
   const name = canonicalOutletName(roomName).toLowerCase();
 

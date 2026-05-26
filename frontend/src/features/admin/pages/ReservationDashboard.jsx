@@ -7,7 +7,8 @@ import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 import { fetchReservations, approveReservation, rejectReservation, revertReservation, updateReservation, getReservationStats } from "../../../utils/api";
 import { authAPI } from "../../../services/authAPI";
-import { ADMIN_OUTLET_GROUPS, ADMIN_OUTLET_ROOMS, canonicalOutletName, getScopedOutletRooms } from "../../../constants/outletCatalog";
+import { venueAPI } from "../../../services/venueAPI";
+import { ADMIN_OUTLET_GROUPS, buildOutletGroupsFromVenues, canonicalOutletName, getScopedOutletGroups, getScopedOutletRooms } from "../../../constants/outletCatalog";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -540,7 +541,7 @@ function optimisticSeatUpdate(reservation, newSeatStatus) {
 }
 
 // ─── Room Filter Dropdown ─────────────────────────────────────────────────────
-function RoomFilterDropdown({ rooms, selectedRoom, onSelect, isMobile }) {
+function RoomFilterDropdown({ rooms, groups = ADMIN_OUTLET_GROUPS, selectedRoom, onSelect, isMobile }) {
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
   const ref = useRef(null);
@@ -556,9 +557,9 @@ function RoomFilterDropdown({ rooms, selectedRoom, onSelect, isMobile }) {
   const label = selectedRoom === "ALL" ? "All Rooms" : selectedRoom;
   const hasFilter = selectedRoom !== "ALL";
   const visibleRoomSet = new Set(rooms.map(canonicalOutletName));
-  const masterRoomSet = new Set(ADMIN_OUTLET_ROOMS.map(canonicalOutletName));
+  const masterRoomSet = new Set(groups.flatMap((group) => group.rooms).map(canonicalOutletName));
   const groupedRooms = [
-    ...ADMIN_OUTLET_GROUPS.map((group) => ({
+    ...groups.map((group) => ({
       ...group,
       rooms: group.rooms.filter((room) => visibleRoomSet.has(canonicalOutletName(room))),
     })),
@@ -1960,6 +1961,7 @@ export default function ReservationDashboard() {
   const [loading,setLoading]=useState(true);
   const [selectedReservations,setSelectedReservations]=useState(new Set());
   const [searchFocused,setSearchFocused]=useState(false);
+  const [venueRows,setVenueRows]=useState([]);
 
   const pollingRef = useRef(null);
   const filterSignatureRef = useRef("");
@@ -1974,10 +1976,18 @@ export default function ReservationDashboard() {
   const isMobile=windowWidth<640;
   const isTablet=windowWidth<960;
   const currentUser = useMemo(() => authAPI.getCurrentUser(), []);
+  const outletGroups = useMemo(() => {
+    const dynamicGroups = buildOutletGroupsFromVenues(venueRows);
+    return dynamicGroups.length ? dynamicGroups : ADMIN_OUTLET_GROUPS;
+  }, [venueRows]);
+  const scopedOutletGroups = useMemo(
+    () => getScopedOutletGroups(currentUser, outletGroups),
+    [currentUser, outletGroups]
+  );
 
   // ─── Master room list + any extra rooms found in reservations ───────────────
   const roomOptions = useMemo(() => {
-    const scopedRooms = getScopedOutletRooms(currentUser);
+    const scopedRooms = getScopedOutletRooms(currentUser, outletGroups);
     const scopedRoomSet = new Set(scopedRooms.map(canonicalOutletName));
     const fromReservations = reservations
       .map(r => canonicalOutletName(r.room))
@@ -1988,7 +1998,7 @@ export default function ReservationDashboard() {
       .filter(r => !masterSet.has(r))
       .sort((a, b) => a.localeCompare(b));
     return [...scopedRooms, ...extras];
-  }, [currentUser, reservations]);
+  }, [currentUser, outletGroups, reservations]);
 
   const enrichedReservations = useMemo(
     () => reservations.map((reservation) => enrichReservation(reservation)),
@@ -1998,9 +2008,10 @@ export default function ReservationDashboard() {
   const refreshDashboardData = useCallback(async (silent = true) => {
     if (!silent) setLoading(true);
     try {
-      const [reservationsData, statsData] = await Promise.all([
+      const [reservationsData, statsData, venueData] = await Promise.all([
         fetchReservations(1, 9999),
         getReservationStats(),
+        venueAPI.getAll({ include_archived: false, _t: Date.now() }).catch(() => []),
       ]);
       const rows = Array.isArray(reservationsData)
         ? reservationsData
@@ -2009,6 +2020,7 @@ export default function ReservationDashboard() {
           : [];
       setReservations(rows);
       if (statsData) setStats(statsData);
+      setVenueRows(Array.isArray(venueData) ? venueData : []);
     } catch (err) {
       console.error("[Dashboard] Refresh error:", err);
     } finally {
@@ -2473,6 +2485,7 @@ export default function ReservationDashboard() {
                 {/* Room filter dropdown */}
                 <RoomFilterDropdown
                   rooms={roomOptions}
+                  groups={scopedOutletGroups}
                   selectedRoom={filterRoom}
                   onSelect={(room) => setFilterRoom(room)}
                   isMobile={isMobile}
@@ -2745,6 +2758,7 @@ export default function ReservationDashboard() {
                       <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Room</span>
                       <RoomFilterDropdown
                         rooms={roomOptions}
+                        groups={scopedOutletGroups}
                         selectedRoom={filterRoom}
                         onSelect={(room) => setFilterRoom(room)}
                         isMobile={isMobile}

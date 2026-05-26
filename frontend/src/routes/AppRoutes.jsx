@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Navbar from "../components/Navbar";
 import ReservationLanding from "../features/client/pages/ReservationLanding";
 import ManageBooking from "../features/client/pages/ManageBooking";
+import DynamicVenueReservation from "../features/client/pages/DynamicVenueReservation";
 import AlabangReserve from "../features/client/pages/MainWing/AlabangReserve";
 import LagunaReserv1e from "../features/client/pages/MainWing/LagunaReserv1e";
 import LagunaReserve2 from "../features/client/pages/MainWing/LagunaReserve2";
@@ -74,7 +74,7 @@ export default function AppRoutes() {
         <Route path="/grand-ballroom-a" element={<><SharedNavbar /><GrandBallroomA /></>} />
         <Route path="/grand-ballroom-b" element={<><SharedNavbar /><GrandBallroomB /></>} />
         <Route path="/grand-ballroom-c" element={<><SharedNavbar /><GrandBallroomC /></>} />
-        <Route path="/reserve/:routeId" element={<><Navbar /><div>Reserve Page - Coming Soon</div></>} />
+        <Route path="/reserve/:venueSlug" element={<><SharedNavbar /><DynamicVenueReservation /></>} />
                 <Route path="/admin" element={<AdminEntry />} />
         <Route
           path="/admin/reservations"
@@ -182,6 +182,7 @@ export default function AppRoutes() {
         />
         <Route path="/forgot-code" element={<ForgotCode />} />  
         <Route path="/login" element={<LoginPage />} />  
+        <Route path="/:venueSlug" element={<><SharedNavbar /><DynamicVenueReservation /></>} />
 
       </Routes>
     </BrowserRouter>
