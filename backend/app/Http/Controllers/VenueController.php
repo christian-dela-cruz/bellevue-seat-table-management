@@ -136,7 +136,7 @@ class VenueController extends Controller
                 'reservations_enabled' => 'sometimes|boolean',
                 'parent_selectable' => 'sometimes|boolean',
                 'child_selectable' => 'sometimes|boolean',
-                'reservation_route' => 'sometimes|nullable|string|max:255',
+                'reservation_route' => ['sometimes', 'nullable', 'string', 'max:255', 'regex:/^\//'],
                 'image_position' => 'sometimes|nullable|string|max:255',
                 'metadata' => 'sometimes|nullable|array',
             ]);

@@ -10,7 +10,6 @@ import {
   MoreHorizontal,
   Plus,
   Search,
-  SlidersHorizontal,
   Trash2,
   ToggleLeft,
   ToggleRight,
@@ -81,6 +80,7 @@ const emptyForm = {
 function normalizeRoom(room = {}) {
   const availability = room.metadata?.availability || {};
   const capacity = room.capacity ?? 0;
+  const legacyOverrides = legacyAvailabilityOverrides(availability);
   return {
     ...emptyForm,
     ...room,
@@ -99,10 +99,10 @@ function normalizeRoom(room = {}) {
     availability_interval_minutes: availability.interval_minutes ?? (room.type === "dining" ? 30 : 60),
     availability_max_reservations: availability.max_reservations_per_slot ?? 0,
     availability_slot_capacity: availability.slot_capacity ?? capacity,
-    availability_blocked_dates: Array.isArray(availability.blocked_dates) ? availability.blocked_dates.join(", ") : "",
-    availability_blocked_times: blockedTimesToText(availability.blocked_times),
+    availability_blocked_dates: "",
+    availability_blocked_times: "",
     availability_periods: normalizeSchedulePeriods(availability.periods, room),
-    availability_overrides: normalizeScheduleOverrides(availability.overrides),
+    availability_overrides: uniqueScheduleOverrides([...normalizeScheduleOverrides(availability.overrides), ...legacyOverrides]),
   };
 }
 
@@ -115,6 +115,21 @@ const DAY_OPTIONS = [
   ["5", "Fri"],
   ["6", "Sat"],
 ];
+
+const SCHEDULE_PRESETS = {
+  dining: [
+    { label: "Breakfast", service_type: "Breakfast service", days: [0, 1, 2, 3, 4, 5, 6], start_time: "06:00", end_time: "10:00", interval_minutes: 30 },
+    { label: "Lunch", service_type: "Lunch service", days: [0, 1, 2, 3, 4, 5, 6], start_time: "11:30", end_time: "14:30", interval_minutes: 30 },
+    { label: "Dinner", service_type: "Dinner service", days: [0, 1, 2, 3, 4, 5, 6], start_time: "18:00", end_time: "22:00", interval_minutes: 30 },
+    { label: "Daily Dining", service_type: "All-day dining", days: [0, 1, 2, 3, 4, 5, 6], start_time: "06:00", end_time: "22:00", interval_minutes: 30 },
+  ],
+  function_room: [
+    { label: "Event Window", service_type: "Full-day event", days: [0, 1, 2, 3, 4, 5, 6], start_time: "08:00", end_time: "23:00", interval_minutes: 60 },
+    { label: "Morning Event", service_type: "Function reservation", days: [0, 1, 2, 3, 4, 5, 6], start_time: "08:00", end_time: "12:00", interval_minutes: 60 },
+    { label: "Afternoon Event", service_type: "Function reservation", days: [0, 1, 2, 3, 4, 5, 6], start_time: "13:00", end_time: "17:00", interval_minutes: 60 },
+    { label: "Evening Event", service_type: "Function reservation", days: [0, 1, 2, 3, 4, 5, 6], start_time: "18:00", end_time: "23:00", interval_minutes: 60 },
+  ],
+};
 
 function normalizedName(value) {
   return canonical(value).replace(/\s+/g, " ");
@@ -198,6 +213,82 @@ function makeOverride(data = {}) {
 
 function normalizeScheduleOverrides(overrides) {
   return Array.isArray(overrides) ? overrides.map(makeOverride) : [];
+}
+
+function uniqueScheduleOverrides(overrides) {
+  const seen = new Set();
+  return normalizeScheduleOverrides(overrides).filter((override) => {
+    const key = [
+      override.type,
+      override.date,
+      override.start_time,
+      override.end_time,
+      override.blocked_times_text,
+      override.note,
+    ].join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function legacyAvailabilityOverrides(availability = {}) {
+  const blockedDateOverrides = Array.isArray(availability.blocked_dates)
+    ? availability.blocked_dates.map((date) => makeOverride({
+      date,
+      type: "closed",
+      label: "Blocked date",
+      note: "Migrated from legacy blocked dates",
+    }))
+    : [];
+  const blockedTimeOverrides = availability.blocked_times && typeof availability.blocked_times === "object"
+    ? Object.entries(availability.blocked_times).map(([date, times]) => makeOverride({
+      date,
+      type: "block_time",
+      label: "Blocked time",
+      blocked_times: Array.isArray(times) ? times : [],
+      note: "Migrated from legacy blocked times",
+    }))
+    : [];
+  return [...blockedDateOverrides, ...blockedTimeOverrides];
+}
+
+function routeFromSlug(value) {
+  const slug = slugify(value);
+  return slug ? `/${slug}` : "";
+}
+
+function isEarlierTime(start, end) {
+  if (!start || !end) return true;
+  return String(start).substring(0, 5) < String(end).substring(0, 5);
+}
+
+function overrideDefaults(type) {
+  const map = {
+    closed: { type: "closed", label: "Full-day closure", note: "Closed for this date" },
+    block_time: { type: "block_time", label: "Blocked time", start_time: "18:00", end_time: "20:00", note: "Blocked for private use" },
+    special_hours: { type: "special_hours", label: "Special hours", start_time: "10:00", end_time: "18:00", note: "Adjusted operating hours" },
+    capacity: { type: "capacity", label: "Capacity adjustment", start_time: "08:00", end_time: "23:00", note: "Adjusted capacity for this date" },
+  };
+  return map[type] || map.closed;
+}
+
+function overrideTitle(override) {
+  const map = {
+    closed: "Full-day closure",
+    block_time: "Blocked time range",
+    special_hours: "Special opening hours",
+    capacity: "Capacity adjustment",
+  };
+  return override.label || map[override.type] || "Manual override";
+}
+
+function overrideSummary(override) {
+  if (override.type === "closed") return "Guests cannot reserve this venue for the selected date.";
+  if (override.type === "block_time") return "Blocks selected time ranges while keeping the rest of the date available.";
+  if (override.type === "special_hours") return "Replaces the normal schedule for one selected date.";
+  if (override.type === "capacity") return "Adjusts slot capacity or maximum bookings for one selected date.";
+  return "Applies a custom one-day availability rule.";
 }
 
 function blockedTimesToText(blockedTimes) {
@@ -732,6 +823,15 @@ export default function FunctionRooms() {
       if (key === "name" && !editing) {
         next.slug = slugify(value);
         next.display_name = value;
+        if (!current.reservation_route || current.reservation_route === routeFromSlug(current.slug)) {
+          next.reservation_route = routeFromSlug(value);
+        }
+      }
+      if (key === "slug") {
+        const route = routeFromSlug(value);
+        if (!current.reservation_route || current.reservation_route === routeFromSlug(current.slug)) {
+          next.reservation_route = route;
+        }
       }
       if (key === "type") {
         next.category = value === "dining" ? "dining" : "function_room";
@@ -753,6 +853,16 @@ export default function FunctionRooms() {
     }));
   };
 
+  const setAllAvailabilityFlags = (checked) => {
+    setForm((current) => ({
+      ...current,
+      is_active: checked,
+      is_visible: checked,
+      show_on_landing: checked,
+      reservations_enabled: checked,
+    }));
+  };
+
   const addPeriod = () => {
     setForm((current) => ({
       ...current,
@@ -763,6 +873,19 @@ export default function FunctionRooms() {
           service_type: current.type === "dining" ? "Reservation" : "Function reservation",
           interval_minutes: current.type === "dining" ? 30 : 60,
           slot_capacity: Number(current.capacity || 0),
+        }),
+      ],
+    }));
+  };
+
+  const addPresetPeriod = (preset) => {
+    setForm((current) => ({
+      ...current,
+      availability_periods: [
+        ...normalizeSchedulePeriods(current.availability_periods, current),
+        makePeriod({
+          ...preset,
+          slot_capacity: Number(current.capacity || preset.slot_capacity || 0),
         }),
       ],
     }));
@@ -798,10 +921,10 @@ export default function FunctionRooms() {
     }));
   };
 
-  const addOverride = () => {
+  const addOverride = (type = "closed") => {
     setForm((current) => ({
       ...current,
-      availability_overrides: [...normalizeScheduleOverrides(current.availability_overrides), makeOverride()],
+      availability_overrides: [...normalizeScheduleOverrides(current.availability_overrides), makeOverride(overrideDefaults(type))],
     }));
   };
 
@@ -809,7 +932,11 @@ export default function FunctionRooms() {
     setForm((current) => ({
       ...current,
       availability_overrides: normalizeScheduleOverrides(current.availability_overrides).map((override) =>
-        override.id === overrideId ? { ...override, [key]: value } : override,
+        override.id === overrideId
+          ? (key === "type"
+            ? { ...makeOverride({ ...overrideDefaults(value), id: override.id, date: override.date, enabled: override.enabled }), note: override.note || overrideDefaults(value).note }
+            : { ...override, [key]: value })
+          : override,
       ),
     }));
   };
@@ -824,6 +951,13 @@ export default function FunctionRooms() {
   const validate = () => {
     if (!form.name.trim()) return "Venue name is required.";
     if (!form.slug.trim()) return "Venue slug/code is required.";
+    const duplicateSlug = uniqueRooms.find((room) => String(room.slug || "").toLowerCase() === form.slug.toLowerCase() && (!editing || Number(room.id) !== Number(editing.id)));
+    if (duplicateSlug) return "Venue slug/code must be unique.";
+    if (form.reservation_route && !String(form.reservation_route).startsWith("/")) return "Reservation route must start with /.";
+    const duplicateRoute = form.reservation_route
+      ? uniqueRooms.find((room) => String(room.reservation_route || "").toLowerCase() === form.reservation_route.toLowerCase() && (!editing || Number(room.id) !== Number(editing.id)))
+      : null;
+    if (duplicateRoute) return "Reservation route must be unique.";
     if (form.parent_id && editing && String(form.parent_id) === String(editing.id)) return "A venue cannot be assigned as its own parent.";
     if (Number.isNaN(Number(form.display_order))) return "Display order must be numeric.";
     if (Number(form.availability_interval_minutes) < 15) return "Reservation interval must be at least 15 minutes.";
@@ -834,7 +968,21 @@ export default function FunctionRooms() {
       if (!period.days.length) return `${period.label || "A schedule period"} needs at least one day.`;
       if (!period.start_time || !period.end_time) return `${period.label || "A schedule period"} needs start and end times.`;
       if (period.start_time === period.end_time) return `${period.label || "A schedule period"} cannot start and end at the same time.`;
+      if (!isEarlierTime(period.start_time, period.end_time)) return `${period.label || "A schedule period"} start time must be before end time.`;
       if (Number(period.interval_minutes) < 15) return `${period.label || "A schedule period"} interval must be at least 15 minutes.`;
+    }
+    for (const override of normalizeScheduleOverrides(form.availability_overrides)) {
+      if (!override.date) return `${overrideTitle(override)} needs a calendar date.`;
+      if (["block_time", "special_hours"].includes(override.type)) {
+        if (!override.start_time || !override.end_time) return `${overrideTitle(override)} needs start and end times.`;
+        if (!isEarlierTime(override.start_time, override.end_time)) return `${overrideTitle(override)} start time must be before end time.`;
+      }
+      if (override.type === "capacity" && Number(override.slot_capacity || 0) <= 0 && Number(override.max_reservations_per_slot || 0) <= 0) {
+        return "Capacity adjustment needs a slot capacity or max bookings value.";
+      }
+      if (override.type === "capacity" && override.start_time && override.end_time && !isEarlierTime(override.start_time, override.end_time)) {
+        return "Capacity adjustment start time must be before end time.";
+      }
     }
     if (imageFile && !["image/jpeg", "image/png", "image/webp"].includes(imageFile.type)) return "Image must be JPG, PNG, or WEBP.";
     return "";
@@ -1036,6 +1184,8 @@ export default function FunctionRooms() {
   const preview = imageFile ? URL.createObjectURL(imageFile) : imageUrl(form.image);
   const schedulePeriods = normalizeSchedulePeriods(form.availability_periods, form);
   const scheduleOverrides = normalizeScheduleOverrides(form.availability_overrides);
+  const isFullyAvailable = ["is_active", "is_visible", "show_on_landing", "reservations_enabled"].every((key) => Boolean(form[key]));
+  const schedulePresets = SCHEDULE_PRESETS[form.type === "dining" ? "dining" : "function_room"];
 
   return (
     <>
@@ -1297,7 +1447,9 @@ export default function FunctionRooms() {
                   <Field label="Venue Name"><input value={form.name} onChange={(e) => updateForm("name", e.target.value)} style={inputStyle()} /></Field>
                   <Field label="Customer Display Name"><input value={form.display_name} onChange={(e) => updateForm("display_name", e.target.value)} style={inputStyle()} /></Field>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr", gap: 10 }}>
-                    <Field label="Slug / Code"><input value={form.slug} onChange={(e) => updateForm("slug", slugify(e.target.value))} style={inputStyle()} /></Field>
+                    <Field label="Venue Code / Slug" hint="Unique internal identifier used by routing and reports. It is auto-generated from the venue name unless edited.">
+                      <input value={form.slug} onChange={(e) => updateForm("slug", slugify(e.target.value))} placeholder="hanakazu-japanese-restaurant" style={inputStyle()} />
+                    </Field>
                     <Field label="Order"><input type="number" min="0" value={form.display_order} onChange={(e) => updateForm("display_order", e.target.value)} style={inputStyle()} /></Field>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -1314,12 +1466,24 @@ export default function FunctionRooms() {
                       {parentRooms.filter((room) => room.type === "function_room" && (!editing || room.id !== editing.id)).map((room) => <option key={room.id} value={room.id}>{room.display_name || room.name}</option>)}
                     </select>
                   </Field>
-                  <Field label="Reservation Route"><input value={form.reservation_route} onChange={(e) => updateForm("reservation_route", e.target.value)} placeholder="/tower1" style={inputStyle()} /></Field>
+                  <Field label="Reservation Page Route" hint="Public page opened when guests select this venue. Keep it unique and start with /.">
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+                      <input value={form.reservation_route} onChange={(e) => updateForm("reservation_route", e.target.value)} placeholder="/hanakazu-japanese-restaurant" style={inputStyle()} />
+                      <button type="button" onClick={() => updateForm("reservation_route", routeFromSlug(form.slug || form.name))} style={{ ...buttonBase(), minHeight: 38 }}>Use slug</button>
+                    </div>
+                  </Field>
                   <Field label="Description"><textarea value={form.description || ""} onChange={(e) => updateForm("description", e.target.value)} rows={3} style={{ ...inputStyle(), resize: "vertical" }} /></Field>
                 </section>
 
                 <section style={formSectionStyle()}>
                   <div style={sectionTitleStyle()}>Availability Settings</div>
+                  <label style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, padding: 12, border: `1px solid ${isFullyAvailable ? "rgba(140,107,42,0.28)" : C.border}`, borderRadius: 12, background: isFullyAvailable ? C.goldFaint : C.surface }}>
+                    <span>
+                      <strong style={{ display: "block", color: C.text, fontSize: 12.5, fontWeight: 650 }}>Select all guest availability controls</strong>
+                      <span style={{ display: "block", marginTop: 4, color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>Turns on enabled, visible, landing display, and guest reservation access together.</span>
+                    </span>
+                    <input type="checkbox" checked={isFullyAvailable} onChange={(e) => setAllAvailabilityFlags(e.target.checked)} style={{ accentColor: C.gold, marginTop: 2 }} />
+                  </label>
                   {[
                     ["is_active", "Enabled"],
                     ["is_visible", "Visible in guest surfaces"],
@@ -1345,6 +1509,16 @@ export default function FunctionRooms() {
                       Add multiple service periods for breakfast, lunch, dinner, private dining, or event windows.
                     </span>
                     <button type="button" onClick={applyDefaultSchedule} style={{ ...buttonBase(), flexShrink: 0 }}>Apply template</button>
+                  </div>
+                  <div style={{ display: "grid", gap: 7 }}>
+                    <span style={{ color: C.faint, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>Quick add period</span>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {schedulePresets.map((preset) => (
+                        <button key={`${preset.label}-${preset.start_time}`} type="button" onClick={() => addPresetPeriod(preset)} style={{ ...buttonBase(), minHeight: 30 }}>
+                          <Plus size={12} /> {preset.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div style={{ display: "grid", gap: 10 }}>
                     {schedulePeriods.map((period, index) => (
@@ -1404,25 +1578,34 @@ export default function FunctionRooms() {
                       <Plus size={14} /> Add service period
                     </button>
                   </div>
-                  <Field label="Blocked Dates" hint="Comma-separated dates, for example: 2026-06-12, 2026-12-25">
-                    <textarea value={form.availability_blocked_dates} onChange={(e) => updateForm("availability_blocked_dates", e.target.value)} rows={2} style={{ ...inputStyle(), resize: "vertical" }} />
-                  </Field>
-                  <Field label="Blocked Times" hint="One date per line. Example: 2026-06-12: 18:00, 18:30">
-                    <textarea value={form.availability_blocked_times} onChange={(e) => updateForm("availability_blocked_times", e.target.value)} rows={2} style={{ ...inputStyle(), resize: "vertical" }} />
-                  </Field>
                 </section>
 
                 <section style={formSectionStyle()}>
-                  <div style={sectionTitleStyle()}>Manual Overrides</div>
+                  <div style={sectionTitleStyle()}>Closures & Blocked Times</div>
                   <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
-                    Use overrides for special closures, blocked periods, special opening hours, or one-day capacity changes.
+                    Add calendar-based exceptions for closures, private events, blocked slots, special hours, or one-day capacity changes.
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 8 }}>
+                    <button type="button" onClick={() => addOverride("closed")} style={{ ...buttonBase(), justifyContent: "center" }}><Plus size={14} /> Closure</button>
+                    <button type="button" onClick={() => addOverride("block_time")} style={{ ...buttonBase(), justifyContent: "center" }}><Plus size={14} /> Block time</button>
+                    <button type="button" onClick={() => addOverride("special_hours")} style={{ ...buttonBase(), justifyContent: "center" }}><Plus size={14} /> Special hours</button>
+                    <button type="button" onClick={() => addOverride("capacity")} style={{ ...buttonBase(), justifyContent: "center" }}><Plus size={14} /> Capacity</button>
                   </div>
                   <div style={{ display: "grid", gap: 10 }}>
                     {scheduleOverrides.map((override, index) => (
                       <div key={override.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: C.soft, display: "grid", gap: 10 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                          <strong style={{ color: C.text, fontSize: 12.5, fontWeight: 650 }}>Override {index + 1}</strong>
-                          <button type="button" onClick={() => removeOverride(override.id)} style={{ ...buttonBase(), minHeight: 30, color: C.red }}>Remove</button>
+                          <div>
+                            <strong style={{ color: C.text, fontSize: 12.5, fontWeight: 650 }}>{overrideTitle(override)} {index + 1}</strong>
+                            <div style={{ marginTop: 3, color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>{overrideSummary(override)}</div>
+                          </div>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: C.muted, fontSize: 11.5 }}>
+                              Active
+                              <input type="checkbox" checked={Boolean(override.enabled)} onChange={(event) => updateOverride(override.id, "enabled", event.target.checked)} style={{ accentColor: C.gold }} />
+                            </label>
+                            <button type="button" onClick={() => removeOverride(override.id)} style={{ ...buttonBase(), minHeight: 30, color: C.red }}>Remove</button>
+                          </div>
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                           <Field label="Date"><input type="date" value={override.date} onChange={(e) => updateOverride(override.id, "date", e.target.value)} style={inputStyle()} /></Field>
@@ -1435,21 +1618,26 @@ export default function FunctionRooms() {
                             </select>
                           </Field>
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                          <Field label="Start"><input type="time" value={override.start_time} onChange={(e) => updateOverride(override.id, "start_time", e.target.value)} style={inputStyle()} /></Field>
-                          <Field label="End"><input type="time" value={override.end_time} onChange={(e) => updateOverride(override.id, "end_time", e.target.value)} style={inputStyle()} /></Field>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                          <Field label="Slot Capacity"><input type="number" min="0" value={override.slot_capacity} onChange={(e) => updateOverride(override.id, "slot_capacity", e.target.value)} style={inputStyle()} /></Field>
-                          <Field label="Max Bookings"><input type="number" min="0" value={override.max_reservations_per_slot} onChange={(e) => updateOverride(override.id, "max_reservations_per_slot", e.target.value)} style={inputStyle()} /></Field>
-                        </div>
-                        <Field label="Blocked Times"><input value={override.blocked_times_text} onChange={(e) => updateOverride(override.id, "blocked_times_text", e.target.value)} placeholder="18:00, 18:30" style={inputStyle()} /></Field>
+                        {override.type !== "closed" && (
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                            <Field label={override.type === "special_hours" ? "Special Open" : "Start"}><input type="time" value={override.start_time} onChange={(e) => updateOverride(override.id, "start_time", e.target.value)} style={inputStyle()} /></Field>
+                            <Field label={override.type === "special_hours" ? "Special Close" : "End"}><input type="time" value={override.end_time} onChange={(e) => updateOverride(override.id, "end_time", e.target.value)} style={inputStyle()} /></Field>
+                          </div>
+                        )}
+                        {["special_hours", "capacity"].includes(override.type) && (
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                            <Field label="Slot Capacity"><input type="number" min="0" value={override.slot_capacity} onChange={(e) => updateOverride(override.id, "slot_capacity", e.target.value)} style={inputStyle()} /></Field>
+                            <Field label="Max Bookings"><input type="number" min="0" value={override.max_reservations_per_slot} onChange={(e) => updateOverride(override.id, "max_reservations_per_slot", e.target.value)} style={inputStyle()} /></Field>
+                          </div>
+                        )}
+                        {override.type === "block_time" && (
+                          <Field label="Blocked Slot Times" hint="Optional specific slots inside the range, for example: 18:00, 18:30">
+                            <input value={override.blocked_times_text} onChange={(e) => updateOverride(override.id, "blocked_times_text", e.target.value)} placeholder="18:00, 18:30" style={inputStyle()} />
+                          </Field>
+                        )}
                         <Field label="Note"><input value={override.note} onChange={(e) => updateOverride(override.id, "note", e.target.value)} placeholder="Private event, maintenance, holiday closure" style={inputStyle()} /></Field>
                       </div>
                     ))}
-                    <button type="button" onClick={addOverride} style={{ ...buttonBase(), justifyContent: "center" }}>
-                      <Plus size={14} /> Add manual override
-                    </button>
                   </div>
                 </section>
               </div>

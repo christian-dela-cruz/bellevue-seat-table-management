@@ -22,6 +22,7 @@ const NAV_GROUPS = [
   {
     id: "reservations",
     label: "Reservations",
+    icon: ClipboardList,
     items: [
       { id: "reservations", label: "Reservation Queue", icon: ClipboardList, iconStyle: "lucide" },
       { id: "cancelled", label: "Cancelled Records", icon: X, iconStyle: "lucide" },
@@ -30,6 +31,7 @@ const NAV_GROUPS = [
   {
     id: "venue-operations",
     label: "Venue Operations",
+    icon: Building2,
     items: [
       { id: "outlets", label: "Outlet Dashboard", icon: LayoutDashboard, iconStyle: "lucide", permission: "view_outlet_reports" },
       { id: "function-rooms", label: "Venue Management", icon: Building2, iconStyle: "lucide", permission: "view_admin" },
@@ -210,6 +212,11 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
   const [hovered, setHovered] = useState(false);
   const hasActiveItem = group.items.some((item) => item.id === activeNav);
   const isSingleDestination = group.items.length === 1;
+  const GroupIcon = group.icon || ClipboardList;
+  const activeColor = "#7E5E25";
+  const hoverColor = "#8C6B2A";
+  const activeBg = "rgba(140,107,42,0.15)";
+  const hoverBg = "rgba(140,107,42,0.07)";
 
   useEffect(() => {
     if (hasActiveItem) setExpanded(true);
@@ -246,7 +253,7 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
   }
 
   return (
-    <div style={{ margin: "2px 0 10px" }}>
+    <div style={{ margin: "3px 0 8px" }}>
       <button
         type="button"
         onClick={() => setExpanded((open) => !open)}
@@ -255,29 +262,63 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
         aria-expanded={expanded}
         style={{
           width: "calc(100% - 20px)",
-          margin: "2px 10px 4px",
-          padding: "9px 10px 9px 11px",
+          margin: "3px 10px",
+          padding: "8px 10px 8px 11px",
+          minHeight: 38,
           borderRadius: 11,
-          border: `1px solid ${hasActiveItem ? "rgba(140,107,42,0.16)" : "transparent"}`,
+          border: `1px solid ${hasActiveItem ? "rgba(140,107,42,0.24)" : "transparent"}`,
           background: hasActiveItem
-            ? "rgba(140,107,42,0.08)"
-            : hovered ? "rgba(140,107,42,0.045)" : "transparent",
-          color: hasActiveItem ? "#7E5E25" : hovered ? "#7E5E25" : "#6D6254",
+            ? `linear-gradient(135deg, ${activeBg}, rgba(255,255,255,0.55))`
+            : hovered ? hoverBg : "transparent",
+          color: hasActiveItem ? activeColor : hovered ? hoverColor : "#5E5548",
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
+          gap: 9,
           fontFamily: F.body,
-          fontSize: 11.15,
-          fontWeight: 640,
-          letterSpacing: "0.075em",
-          textTransform: "uppercase",
-          boxShadow: "none",
-          transition: "background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease",
+          fontSize: 12.35,
+          fontWeight: hasActiveItem ? 680 : 540,
+          letterSpacing: 0,
+          textTransform: "none",
+          boxShadow: hasActiveItem ? "inset 0 0 0 1px rgba(255,255,255,0.42)" : "none",
+          transition: "background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease",
+          transform: hovered && !hasActiveItem ? "translateX(1px)" : "none",
+          position: "relative",
         }}
       >
-        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <span
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            left: -1,
+            top: "50%",
+            width: 3,
+            height: hasActiveItem ? 22 : 0,
+            borderRadius: 999,
+            background: "#C9A84C",
+            transform: "translateY(-50%)",
+            transition: "height 0.18s ease",
+          }}
+        />
+        <span
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: 7,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <GroupIcon
+            size={14}
+            color={hasActiveItem ? activeColor : hovered ? hoverColor : "#8F8679"}
+            strokeWidth={hasActiveItem ? 2.45 : 2.1}
+            style={{ flexShrink: 0, transition: "color 0.15s, stroke-width 0.15s" }}
+          />
+        </span>
+        <span style={{ flex: 1, textAlign: "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {group.label}
         </span>
         <ChevronDown
@@ -285,7 +326,7 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
           strokeWidth={2.35}
           style={{
             flexShrink: 0,
-            color: hasActiveItem ? "#8C6B2A" : "#9B9285",
+            color: hasActiveItem ? "#8C6B2A" : hovered ? "#8C6B2A" : "#9B9285",
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform 0.22s cubic-bezier(.2,.8,.2,1), color 0.18s ease",
           }}

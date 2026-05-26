@@ -41,7 +41,7 @@ class VenueStoreRequest extends FormRequest
             'reservations_enabled' => 'sometimes|boolean',
             'parent_selectable' => 'sometimes|boolean',
             'child_selectable' => 'sometimes|boolean',
-            'reservation_route' => 'nullable|string|max:255',
+            'reservation_route' => ['nullable', 'string', 'max:255', 'regex:/^\//'],
             'image_position' => 'nullable|string|max:255',
             'metadata' => 'nullable|array',
         ];

@@ -242,19 +242,33 @@ function priorityForReservation(reservation, now = new Date()) {
   const eventAt = reservationEventDate(reservation);
   const submittedAt = reservationSubmittedDate(reservation);
   const isPending = status === "pending";
+  const isReserved = status === "approved" || status === "reserved";
+  const isRejected = status === "rejected";
+  const isCancelled = status === "cancelled" || status === "canceled";
   const requestAgeMs = submittedAt ? now - submittedAt : 0;
   const hoursToEvent = eventAt ? (eventAt - now) / 3600000 : Infinity;
+  const isUpcomingWindow = eventAt && hoursToEvent >= 0 && hoursToEvent <= 24;
+  const isSoonWindow = eventAt && hoursToEvent > 24 && hoursToEvent <= 72;
 
   if (isPending && requestAgeMs >= 24 * 3600000) {
     return { key: "overdue", label: "Overdue", rank: 0, color: C.red, bg: C.redFaint, border: C.redBorder };
   }
-  if (eventAt && hoursToEvent <= 24) {
+  if (isPending && isUpcomingWindow) {
     return { key: "urgent", label: "Urgent", rank: 1, color: C.red, bg: C.redFaint, border: C.redBorder };
   }
-  if (eventAt && hoursToEvent <= 72) {
+  if (isPending && isSoonWindow) {
     return { key: "soon", label: "Soon", rank: 2, color: C.gold, bg: C.goldFaint, border: C.borderAccent };
   }
-  return { key: "normal", label: "Normal", rank: 3, color: C.green, bg: C.greenFaint, border: C.greenBorder };
+  if (isReserved && isUpcomingWindow) {
+    return { key: "upcoming", label: "Upcoming", rank: 3, color: C.green, bg: C.greenFaint, border: C.greenBorder };
+  }
+  if (isRejected) {
+    return { key: "closed", label: "Closed", rank: 5, color: C.textSecondary, bg: "rgba(0,0,0,0.035)", border: C.borderDefault };
+  }
+  if (isCancelled) {
+    return { key: "cancelled", label: "Cancelled", rank: 6, color: C.textSecondary, bg: "rgba(0,0,0,0.035)", border: C.borderDefault };
+  }
+  return { key: "normal", label: "Normal", rank: 4, color: C.green, bg: C.greenFaint, border: C.greenBorder };
 }
 
 function enrichReservation(reservation, now = new Date()) {
@@ -2141,7 +2155,7 @@ export default function ReservationDashboard() {
         if(quickFilter==="tomorrow") return days===1;
         if(quickFilter==="week") return days!==null && days>=0 && days<=7;
         if(quickFilter==="awaiting") return status==="pending";
-        if(quickFilter==="urgent") return ["urgent","overdue"].includes(r._priority?.key);
+        if(quickFilter==="urgent") return r._priority?.key === "urgent";
         return true;
       });
     }
@@ -2754,6 +2768,9 @@ export default function ReservationDashboard() {
                         <option value="overdue">Overdue response</option>
                         <option value="urgent">Urgent</option>
                         <option value="soon">Soon</option>
+                        <option value="upcoming">Upcoming</option>
+                        <option value="closed">Closed</option>
+                        <option value="cancelled">Cancelled</option>
                         <option value="normal">Normal</option>
                       </select>
                     </label>
