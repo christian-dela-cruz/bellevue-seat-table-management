@@ -116,6 +116,14 @@ const DAY_OPTIONS = [
   ["6", "Sat"],
 ];
 
+const EDITOR_TABS = [
+  ["details", "Details"],
+  ["availability", "Visibility"],
+  ["schedule", "Schedule"],
+  ["exceptions", "Exceptions"],
+  ["preview", "Preview"],
+];
+
 const SCHEDULE_PRESETS = {
   dining: [
     { label: "Breakfast", service_type: "Breakfast service", days: [0, 1, 2, 3, 4, 5, 6], start_time: "06:00", end_time: "10:00", interval_minutes: 30 },
@@ -289,6 +297,29 @@ function overrideSummary(override) {
   if (override.type === "special_hours") return "Replaces the normal schedule for one selected date.";
   if (override.type === "capacity") return "Adjusts slot capacity or maximum bookings for one selected date.";
   return "Applies a custom one-day availability rule.";
+}
+
+function serializeVenueForm(form, imageFile) {
+  return JSON.stringify({
+    ...form,
+    imageFile: imageFile ? `${imageFile.name}:${imageFile.size}:${imageFile.lastModified}` : "",
+  });
+}
+
+function previewStatus(form) {
+  if (!form.is_visible) {
+    return { tone: "neutral", label: "Hidden", message: "This venue will not appear on the guest landing page." };
+  }
+  if (!form.show_on_landing) {
+    return { tone: "gold", label: "Not on landing", message: "This venue is configured but not shown as a main landing card." };
+  }
+  if (!form.is_active) {
+    return { tone: "red", label: "Disabled", message: "This venue is visible but not available for reservation." };
+  }
+  if (!form.reservations_enabled) {
+    return { tone: "red", label: "Unavailable", message: "Guests can see this venue, but reservation access is disabled." };
+  }
+  return { tone: "green", label: "Guest ready", message: "This venue will appear as a selectable guest landing card." };
 }
 
 function blockedTimesToText(blockedTimes) {
@@ -586,6 +617,102 @@ function SummaryCard({ icon: Icon, label, value, tone = "gold" }) {
   );
 }
 
+function VenueLandingPreview({ form, preview, childRooms = [] }) {
+  const status = previewStatus(form);
+  const statusColor = status.tone === "green" ? C.green : status.tone === "red" ? C.red : C.gold;
+  const statusBg = status.tone === "green" ? C.greenFaint : status.tone === "red" ? C.redFaint : C.goldFaint;
+  const visibleChips = childRooms.slice(0, 4);
+
+  return (
+    <div style={{ display: "grid", gap: 13 }}>
+      <div>
+        <div style={sectionTitleStyle()}>Guest Landing Preview</div>
+        <p style={{ margin: "6px 0 0", color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+          Live preview of the venue card and guest-facing availability state.
+        </p>
+      </div>
+
+      <div style={{ borderRadius: 16, padding: 12, background: "#15110C", border: "1px solid rgba(201,168,76,0.22)", boxShadow: "0 16px 36px rgba(24,20,14,0.18)" }}>
+        <button
+          type="button"
+          disabled
+          style={{
+            width: "100%",
+            minHeight: 182,
+            border: "1px solid rgba(255,255,255,0.10)",
+            borderRadius: 13,
+            overflow: "hidden",
+            position: "relative",
+            padding: 0,
+            background: "#211A12",
+            cursor: "default",
+            opacity: form.is_visible && form.show_on_landing ? 1 : 0.68,
+          }}
+        >
+          {preview ? (
+            <img
+              src={preview}
+              alt=""
+              style={{
+                width: "100%",
+                height: "100%",
+                position: "absolute",
+                inset: 0,
+                objectFit: form.type === "dining" ? "contain" : "cover",
+                objectPosition: form.image_position || "center 50%",
+                background: form.type === "dining" ? "rgba(255,255,255,0.04)" : "#211A12",
+              }}
+            />
+          ) : (
+            <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(255,255,255,0.32)" }}>
+              <Camera size={30} />
+            </span>
+          )}
+          <span style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62))" }} />
+          <span style={{ position: "absolute", left: 14, right: 14, bottom: 13, display: "grid", gap: 8 }}>
+            <strong style={{ color: "#fff", fontSize: 18, lineHeight: 1.12, textAlign: "left", textShadow: "0 2px 12px rgba(0,0,0,0.45)" }}>
+              {form.display_name || form.name || "Venue Name"}
+            </strong>
+            {visibleChips.length > 0 && (
+              <span style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                {visibleChips.map((room) => (
+                  <span key={room.id || room.slug || room.name} style={{ borderRadius: 999, padding: "4px 8px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: 9, fontWeight: 800 }}>
+                    {room.display_name || room.name}
+                  </span>
+                ))}
+              </span>
+            )}
+          </span>
+          {!form.is_active || !form.reservations_enabled ? (
+            <span style={{ position: "absolute", top: 11, right: 11, borderRadius: 999, padding: "5px 8px", background: "rgba(0,0,0,0.54)", color: "#fff", fontSize: 9, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              Unavailable
+            </span>
+          ) : null}
+        </button>
+      </div>
+
+      <div style={{ border: `1px solid ${status.tone === "red" ? "rgba(160,56,56,0.18)" : status.tone === "green" ? "rgba(46,122,90,0.18)" : "rgba(140,107,42,0.18)"}`, borderRadius: 13, padding: 12, background: statusBg }}>
+        <strong style={{ display: "block", color: statusColor, fontSize: 11, letterSpacing: "0.09em", textTransform: "uppercase" }}>{status.label}</strong>
+        <span style={{ display: "block", marginTop: 5, color: C.muted, fontSize: 12, lineHeight: 1.45 }}>{status.message}</span>
+      </div>
+
+      <div style={{ display: "grid", gap: 8 }}>
+        {[
+          ["Type", form.type === "dining" ? "Dining outlet" : "Function room"],
+          ["Route", form.reservation_route || "No route yet"],
+          ["Location", form.wing || "Not set"],
+          ["Order", String(form.display_order ?? 0)],
+        ].map(([label, value]) => (
+          <div key={label} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12 }}>
+            <span style={{ color: C.faint, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</span>
+            <span style={{ color: C.text, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function FunctionRooms() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rooms, setRooms] = useState([]);
@@ -593,6 +720,8 @@ export default function FunctionRooms() {
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerClosing, setDrawerClosing] = useState(false);
+  const [editorTab, setEditorTab] = useState("details");
+  const [initialEditorSignature, setInitialEditorSignature] = useState(serializeVenueForm(emptyForm, null));
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [imageFile, setImageFile] = useState(null);
@@ -787,8 +916,11 @@ export default function FunctionRooms() {
     setOpenMenuId(null);
     setDrawerClosing(false);
     setEditing(null);
-    setForm({ ...emptyForm, availability_periods: defaultSchedulePeriods(emptyForm) });
+    const draft = { ...emptyForm, availability_periods: defaultSchedulePeriods(emptyForm) };
+    setForm(draft);
     setImageFile(null);
+    setEditorTab("details");
+    setInitialEditorSignature(serializeVenueForm(draft, null));
     setError("");
     setDrawerOpen(true);
   };
@@ -797,8 +929,11 @@ export default function FunctionRooms() {
     setOpenMenuId(null);
     setDrawerClosing(false);
     setEditing(room);
-    setForm(normalizeRoom(room));
+    const draft = normalizeRoom(room);
+    setForm(draft);
     setImageFile(null);
+    setEditorTab("details");
+    setInitialEditorSignature(serializeVenueForm(draft, null));
     setError("");
     setDrawerOpen(true);
   };
@@ -806,6 +941,7 @@ export default function FunctionRooms() {
   const closeDrawer = () => {
     if (saving && drawerOpen) return;
     if (!drawerOpen) return;
+    if (hasUnsavedChanges && !window.confirm("Discard unsaved venue changes?")) return;
     setDrawerClosing(true);
     setDrawerOpen(false);
     window.setTimeout(() => {
@@ -813,6 +949,8 @@ export default function FunctionRooms() {
       setEditing(null);
       setForm(emptyForm);
       setImageFile(null);
+      setEditorTab("details");
+      setInitialEditorSignature(serializeVenueForm(emptyForm, null));
       setError("");
     }, 280);
   };
@@ -1024,6 +1162,8 @@ export default function FunctionRooms() {
         setEditing(null);
         setForm(emptyForm);
         setImageFile(null);
+        setEditorTab("details");
+        setInitialEditorSignature(serializeVenueForm(emptyForm, null));
         setError("");
       }, 280);
     } catch (err) {
@@ -1186,6 +1326,8 @@ export default function FunctionRooms() {
   const scheduleOverrides = normalizeScheduleOverrides(form.availability_overrides);
   const isFullyAvailable = ["is_active", "is_visible", "show_on_landing", "reservations_enabled"].every((key) => Boolean(form[key]));
   const schedulePresets = SCHEDULE_PRESETS[form.type === "dining" ? "dining" : "function_room"];
+  const hasUnsavedChanges = drawerVisible && serializeVenueForm(form, imageFile) !== initialEditorSignature;
+  const previewChildRooms = editing ? childrenByParent.get(Number(editing.id)) || [] : [];
 
   return (
     <>
@@ -1234,7 +1376,13 @@ export default function FunctionRooms() {
         @media (max-width: 920px) {
           .function-room-stats, .function-room-toolbar { grid-template-columns: 1fr !important; }
           .function-room-table-wrap { overflow-x: auto; }
-          .function-room-drawer { width: min(100vw, 520px) !important; }
+          .function-room-drawer { width: 100vw !important; }
+          .venue-editor-body { grid-template-columns: 1fr !important; }
+          .venue-preview-panel { position: relative !important; top: auto !important; }
+        }
+        @media (max-width: 1180px) {
+          .venue-editor-body { grid-template-columns: 1fr !important; }
+          .venue-preview-panel { position: relative !important; top: auto !important; }
         }
       `}</style>
       <AdminNavbar />
@@ -1411,19 +1559,54 @@ export default function FunctionRooms() {
 
       {drawerVisible && (
         <div className={`function-room-drawer-backdrop${drawerClosing ? " is-closing" : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 7000, background: "rgba(24,20,14,0.28)", display: "flex", justifyContent: "flex-end", backdropFilter: "blur(2px)" }}>
-          <aside className="function-room-drawer" role="dialog" aria-modal="true" aria-label={editing ? "Edit venue" : "Create venue"} style={{ width: "min(520px, calc(100vw - 28px))", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column" }}>
+          <aside className="function-room-drawer" role="dialog" aria-modal="true" aria-label={editing ? "Edit venue" : "Create venue"} style={{ width: "min(920px, calc(100vw - 28px))", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "18px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
               <div>
                 <div style={{ color: C.gold, fontSize: 8.5, fontWeight: 750, letterSpacing: "0.16em", textTransform: "uppercase" }}>Configuration</div>
-                <h2 style={{ margin: "5px 0 0", color: C.text, fontSize: 21, lineHeight: 1.15, fontWeight: 640 }}>{editing ? "Edit Venue" : "Create Venue"}</h2>
+                <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 5, flexWrap: "wrap" }}>
+                  <h2 style={{ margin: 0, color: C.text, fontSize: 21, lineHeight: 1.15, fontWeight: 640 }}>{editing ? "Edit Venue" : "Create Venue"}</h2>
+                  {hasUnsavedChanges && (
+                    <span style={{ borderRadius: 999, padding: "4px 8px", background: C.goldFaint, color: C.gold, fontSize: 9, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                      Unsaved changes
+                    </span>
+                  )}
+                </div>
               </div>
               <button type="button" onClick={closeDrawer} style={{ ...buttonBase(), width: 36, padding: 0 }} aria-label="Close panel"><X size={16} /></button>
             </div>
 
             <form onSubmit={saveRoom} style={{ minHeight: 0, flex: 1, display: "flex", flexDirection: "column" }}>
-              <div style={{ flex: 1, overflow: "auto", padding: 20, display: "grid", gap: 16 }}>
+              <div style={{ padding: "10px 20px 0", borderBottom: `1px solid ${C.divider}`, background: C.surface }}>
+                <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 10 }}>
+                  {EDITOR_TABS.map(([key, label]) => {
+                    const active = editorTab === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setEditorTab(key)}
+                        style={{
+                          ...buttonBase(),
+                          minHeight: 32,
+                          flexShrink: 0,
+                          borderColor: active ? "rgba(140,107,42,0.30)" : C.border,
+                          background: active ? C.goldFaint : C.surface,
+                          color: active ? C.gold : C.muted,
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="venue-editor-body" style={{ flex: 1, overflow: "auto", padding: 20, display: "grid", gridTemplateColumns: editorTab === "preview" ? "minmax(0,1fr)" : "minmax(0,1fr) 300px", gap: 16, alignItems: "start" }}>
+                <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
                 {error && <div style={{ padding: "9px 11px", borderRadius: 10, background: C.redFaint, color: C.red, border: "1px solid rgba(160,56,56,0.16)", fontSize: 12.5 }}>{error}</div>}
 
+                {editorTab === "details" && (
+                  <>
                 <section style={formSectionStyle()}>
                   <div style={sectionTitleStyle()}>Display Photo</div>
                   <div style={{ height: 150, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}`, background: C.soft }}>
@@ -1474,7 +1657,10 @@ export default function FunctionRooms() {
                   </Field>
                   <Field label="Description"><textarea value={form.description || ""} onChange={(e) => updateForm("description", e.target.value)} rows={3} style={{ ...inputStyle(), resize: "vertical" }} /></Field>
                 </section>
+                  </>
+                )}
 
+                {editorTab === "availability" && (
                 <section style={formSectionStyle()}>
                   <div style={sectionTitleStyle()}>Availability Settings</div>
                   <label style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, padding: 12, border: `1px solid ${isFullyAvailable ? "rgba(140,107,42,0.28)" : C.border}`, borderRadius: 12, background: isFullyAvailable ? C.goldFaint : C.surface }}>
@@ -1497,7 +1683,9 @@ export default function FunctionRooms() {
                     </label>
                   ))}
                 </section>
+                )}
 
+                {editorTab === "schedule" && (
                 <section style={formSectionStyle()}>
                   <div style={sectionTitleStyle()}>Reservation Time Rules</div>
                   <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
@@ -1579,7 +1767,9 @@ export default function FunctionRooms() {
                     </button>
                   </div>
                 </section>
+                )}
 
+                {editorTab === "exceptions" && (
                 <section style={formSectionStyle()}>
                   <div style={sectionTitleStyle()}>Closures & Blocked Times</div>
                   <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
@@ -1640,6 +1830,18 @@ export default function FunctionRooms() {
                     ))}
                   </div>
                 </section>
+                )}
+
+                {editorTab === "preview" && (
+                  <section style={formSectionStyle()}>
+                    <VenueLandingPreview form={form} preview={preview} childRooms={previewChildRooms} />
+                  </section>
+                )}
+                </div>
+
+                <aside className="venue-preview-panel" style={{ position: "sticky", top: 0, alignSelf: "start", display: editorTab === "preview" ? "none" : "grid", gap: 12 }}>
+                  <VenueLandingPreview form={form} preview={preview} childRooms={previewChildRooms} />
+                </aside>
               </div>
 
               <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", gap: 9 }}>
