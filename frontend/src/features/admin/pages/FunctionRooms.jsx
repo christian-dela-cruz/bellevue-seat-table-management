@@ -263,7 +263,7 @@ function legacyAvailabilityOverrides(availability = {}) {
 
 function routeFromSlug(value) {
   const slug = slugify(value);
-  return slug ? `/reserve/${slug}` : "";
+  return slug ? `/${slug}` : "";
 }
 
 function isEarlierTime(start, end) {
@@ -852,6 +852,8 @@ export default function FunctionRooms() {
   const [imageFile, setImageFile] = useState(null);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+  const [saveFeedback, setSaveFeedback] = useState(null);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState({ type: "all", status: "all", visibility: "all", wing: "all", landing: "all" });
   const [sortBy, setSortBy] = useState("display_order");
@@ -876,7 +878,7 @@ export default function FunctionRooms() {
   useEffect(() => { loadRooms(); }, []);
 
   useEffect(() => {
-    if (!drawerVisible || confirmAction) return undefined;
+    if (!drawerVisible || confirmAction || saveFeedback || showDiscardConfirm) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const closeOnEscape = (event) => {
@@ -887,7 +889,7 @@ export default function FunctionRooms() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [drawerVisible, confirmAction]);
+  }, [drawerVisible, confirmAction, saveFeedback, showDiscardConfirm]);
 
   useEffect(() => {
     if (!confirmAction) return undefined;
@@ -902,6 +904,34 @@ export default function FunctionRooms() {
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [confirmAction, saving]);
+
+  useEffect(() => {
+    if (!saveFeedback) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setSaveFeedback(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [saveFeedback]);
+
+  useEffect(() => {
+    if (!showDiscardConfirm) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setShowDiscardConfirm(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [showDiscardConfirm]);
 
   useEffect(() => {
     if (!openMenuId) return undefined;
@@ -956,6 +986,13 @@ export default function FunctionRooms() {
 
     return Array.from(byKey.values());
   }, [rooms]);
+
+  const isSlugTaken = useMemo(() => {
+    if (!form.slug) return false;
+    return uniqueRooms.some(
+      (room) => String(room.slug || "").toLowerCase() === form.slug.toLowerCase() && (!editing || Number(room.id) !== Number(editing.id))
+    );
+  }, [form.slug, uniqueRooms, editing]);
 
   const parentRooms = useMemo(
     () => uniqueRooms.filter((room) => !room.parent_id && !knownChildParentKey(room)),
@@ -1063,10 +1100,14 @@ export default function FunctionRooms() {
     setDrawerOpen(true);
   };
 
-  const closeDrawer = () => {
+  const closeDrawer = (forceDiscard = false) => {
     if (saving && drawerOpen) return;
     if (!drawerOpen) return;
-    if (hasUnsavedChanges && !window.confirm("Discard unsaved venue changes?")) return;
+    if (hasUnsavedChanges && !forceDiscard) {
+      setShowDiscardConfirm(true);
+      return;
+    }
+    setShowDiscardConfirm(false);
     setDrawerClosing(true);
     setDrawerOpen(false);
     window.setTimeout(() => {
@@ -1251,8 +1292,8 @@ export default function FunctionRooms() {
     return "";
   };
 
-  const saveRoom = async (event) => {
-    event.preventDefault();
+  const saveRoom = (event) => {
+    if (event) event.preventDefault();
     if (!canManage) return;
     const validationError = validate();
     if (validationError) {
@@ -1260,45 +1301,76 @@ export default function FunctionRooms() {
       return;
     }
 
-    setSaving(true);
+    setConfirmAction({
+      type: "save",
+      title: editing ? "Save changes?" : "Create venue?",
+      message: editing 
+        ? `Are you sure you want to save the changes made to "${form.display_name || form.name}"?`
+        : `Are you sure you want to create the new venue "${form.display_name || form.name}"?`,
+      label: editing ? "Save Changes" : "Create Venue",
+      tone: "green",
+    });
+  };
+
+  const createAnotherVenue = () => {
+    setSaveFeedback(null);
+    const draft = { ...emptyForm, availability_periods: defaultSchedulePeriods(emptyForm) };
+    setForm(draft);
+    setImageFile(null);
+    setEditorTab("details");
+    setInitialEditorSignature(serializeVenueForm(draft, null));
     setError("");
-    try {
-      const payload = {
-        ...form,
-        parent_id: form.type === "dining" ? null : (form.parent_id ? Number(form.parent_id) : null),
-        category: form.type === "dining" ? "dining" : (form.category || "function_room"),
-        capacity: Number(form.capacity || 0),
-        display_order: Number(form.display_order || 0),
-        display_name: form.display_name || form.name,
-        slug: form.slug || slugify(form.name),
-        reservation_route: form.reservation_route || routeFromSlug(form.slug || form.name),
-        metadata: {
-          ...(form.metadata || {}),
-          availability: availabilityPayload(form),
-        },
-      };
-      const saved = editing ? await venueAPI.update(editing.id, payload) : await venueAPI.create(payload);
-      if (imageFile) await venueAPI.uploadImage(saved.id, imageFile);
-      await loadRooms();
-      notifyVenueConfigUpdated();
-      setToast(editing ? "Venue updated." : "Venue created.");
-      setDrawerClosing(true);
-      setDrawerOpen(false);
-      window.setTimeout(() => {
-        setDrawerClosing(false);
-        setEditing(null);
-        setForm(emptyForm);
-        setImageFile(null);
-        setEditorTab("details");
-        setInitialEditorSignature(serializeVenueForm(emptyForm, null));
-        setError("");
-      }, 280);
-    } catch (err) {
-      const messages = err.data?.errors ? Object.values(err.data.errors).flat().join(" ") : "";
-      setError(messages || err.message || "Unable to save venue.");
-    } finally {
-      setSaving(false);
+  };
+
+  const continueEditingVenue = () => {
+    const updatedRoom = uniqueRooms.find((r) => Number(r.id) === Number(editing?.id));
+    if (updatedRoom) {
+      setEditing(updatedRoom);
+      const draft = normalizeRoom(updatedRoom);
+      setForm(draft);
+      setInitialEditorSignature(serializeVenueForm(draft, null));
+    } else {
+      setInitialEditorSignature(serializeVenueForm(form, imageFile));
     }
+    setSaveFeedback(null);
+    setError("");
+  };
+
+  const closeSuccessAndDrawer = () => {
+    setSaveFeedback(null);
+    setDrawerClosing(true);
+    setDrawerOpen(false);
+    window.setTimeout(() => {
+      setDrawerClosing(false);
+      setEditing(null);
+      setForm(emptyForm);
+      setImageFile(null);
+      setEditorTab("details");
+      setInitialEditorSignature(serializeVenueForm(emptyForm, null));
+      setError("");
+    }, 280);
+  };
+
+  const viewOnGuestPage = () => {
+    if (saveFeedback?.reservationRoute) {
+      window.open(saveFeedback.reservationRoute, "_blank");
+    }
+  };
+
+  const isStepCompleted = (key) => {
+    if (key === "details") {
+      return Boolean(form.name?.trim() && form.slug?.trim());
+    }
+    if (key === "availability") {
+      return true;
+    }
+    if (key === "schedule") {
+      return schedulePeriods.length > 0;
+    }
+    if (key === "exceptions") {
+      return true;
+    }
+    return false;
   };
 
   const actionCopy = (room, key, nextValue) => {
@@ -1425,15 +1497,52 @@ export default function FunctionRooms() {
     try {
       if (confirmAction.type === "delete") {
         await venueAPI.delete(confirmAction.room.id);
+        setConfirmAction(null);
+        await loadRooms();
+        notifyVenueConfigUpdated();
+        setToast("Venue deleted.");
+      } else if (confirmAction.type === "save") {
+        const payload = {
+          ...form,
+          parent_id: form.type === "dining" ? null : (form.parent_id ? Number(form.parent_id) : null),
+          category: form.type === "dining" ? "dining" : (form.category || "function_room"),
+          capacity: Number(form.capacity || 0),
+          display_order: Number(form.display_order || 0),
+          display_name: form.display_name || form.name,
+          slug: form.slug || slugify(form.name),
+          reservation_route: form.reservation_route || routeFromSlug(form.slug || form.name),
+          metadata: {
+            ...(form.metadata || {}),
+            availability: availabilityPayload(form),
+          },
+        };
+        const saved = editing ? await venueAPI.update(editing.id, payload) : await venueAPI.create(payload);
+        let finalSaved = saved;
+        if (imageFile) {
+          finalSaved = await venueAPI.uploadImage(saved.id, imageFile);
+        }
+        await loadRooms();
+        notifyVenueConfigUpdated();
+        setConfirmAction(null);
+        
+        setSaveFeedback({
+          type: editing ? "update" : "create",
+          venueName: finalSaved.display_name || finalSaved.name,
+          slug: finalSaved.slug,
+          reservationRoute: finalSaved.reservation_route,
+          venue: finalSaved,
+        });
       } else {
         await venueAPI.update(confirmAction.room.id, statePayloadForAction(confirmAction));
+        setConfirmAction(null);
+        await loadRooms();
+        notifyVenueConfigUpdated();
+        setToast("Venue setting updated.");
       }
-      setConfirmAction(null);
-      await loadRooms();
-      notifyVenueConfigUpdated();
-      setToast(confirmAction.type === "delete" ? "Venue deleted." : "Venue setting updated.");
     } catch (err) {
-      setError(err.message || "Unable to update venue.");
+      const messages = err.data?.errors ? Object.values(err.data.errors).flat().join(" ") : "";
+      setError(messages || err.message || "Unable to complete action.");
+      setConfirmAction(null);
     } finally {
       setSaving(false);
     }
@@ -1724,26 +1833,59 @@ export default function FunctionRooms() {
             </div>
 
             <form onSubmit={saveRoom} style={{ minHeight: 0, flex: 1, display: "flex", flexDirection: "column" }}>
-              <div style={{ padding: "10px 20px 0", borderBottom: `1px solid ${C.divider}`, background: C.surface }}>
-                <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 10 }}>
-                  {EDITOR_TABS.map(([key, label]) => {
+              <div style={{ padding: "12px 20px", borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
+                <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 2, alignItems: "center" }}>
+                  {EDITOR_TABS.map(([key, label], index) => {
                     const active = editorTab === key;
+                    const completed = isStepCompleted(key);
+                    const stepNum = index + 1;
                     return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setEditorTab(key)}
-                        style={{
-                          ...buttonBase(),
-                          minHeight: 32,
-                          flexShrink: 0,
-                          borderColor: active ? "rgba(140,107,42,0.30)" : C.border,
-                          background: active ? C.goldFaint : C.surface,
-                          color: active ? C.gold : C.muted,
-                        }}
-                      >
-                        {label}
-                      </button>
+                      <div key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => setEditorTab(key)}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            minHeight: 34,
+                            border: `1px solid ${active ? C.gold : "rgba(0,0,0,0.06)"}`,
+                            borderRadius: 10,
+                            background: active ? "linear-gradient(135deg, #FAF6EE, #F4ECE0)" : C.surface,
+                            color: active ? C.gold : C.text,
+                            padding: "0 14px",
+                            fontFamily: F.body,
+                            fontSize: 12.5,
+                            fontWeight: active ? 700 : 500,
+                            cursor: "pointer",
+                            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                            boxShadow: active ? "0 3px 10px rgba(140,107,42,0.11)" : "none",
+                            flexShrink: 0,
+                            outline: "none",
+                          }}
+                        >
+                          <span style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: "50%",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 9.5,
+                            fontWeight: 800,
+                            background: active ? C.gold : (completed ? C.greenFaint : "rgba(0,0,0,0.04)"),
+                            color: active ? "#FFF" : (completed ? C.green : C.muted),
+                            border: completed && !active ? `1px solid ${C.green}` : "none",
+                            transition: "all 0.2s ease",
+                          }}>
+                            {completed && !active ? "✓" : stepNum}
+                          </span>
+                          <span style={{ letterSpacing: "0.01em" }}>{label}</span>
+                        </button>
+                        {index < EDITOR_TABS.length - 1 && (
+                          <span style={{ color: "rgba(0,0,0,0.12)", fontSize: 13, userSelect: "none" }}>→</span>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -1783,21 +1925,37 @@ export default function FunctionRooms() {
                 </section>
 
                 <section style={formSectionStyle()}>
-                  <div style={sectionTitleStyle()}>Venue Identity</div>
-                  <Field label="Venue Type">
-                    <select value={form.type} onChange={(e) => updateForm("type", e.target.value)} style={inputStyle()}>
-                      <option value="function_room">Function Room</option>
-                      <option value="dining">Dining Outlet</option>
-                    </select>
+                <div style={sectionTitleStyle()}>Venue Identity</div>
+                <Field label="Venue Type">
+                  <select value={form.type} onChange={(e) => updateForm("type", e.target.value)} style={inputStyle()}>
+                    <option value="function_room">Function Room</option>
+                    <option value="dining">Dining Outlet</option>
+                  </select>
+                </Field>
+                <Field label="Venue Name"><input value={form.name} onChange={(e) => updateForm("name", e.target.value)} style={inputStyle()} /></Field>
+                <Field label="Customer Display Name"><input value={form.display_name} onChange={(e) => updateForm("display_name", e.target.value)} style={inputStyle()} /></Field>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr", gap: 10 }}>
+                  <Field 
+                    label="Venue Code / Slug" 
+                    hint="This becomes the venue’s public page URL, such as /potato-corner."
+                  >
+                    <div style={{ display: "grid", gap: 4 }}>
+                      <input value={form.slug} onChange={(e) => updateForm("slug", slugify(e.target.value))} placeholder="hanakazu-japanese-restaurant" style={{ ...inputStyle(), borderColor: isSlugTaken ? C.red : C.border }} />
+                      {isSlugTaken && (
+                        <span style={{ color: C.red, fontSize: 11.5, fontWeight: 550, display: "block", marginTop: 2 }}>
+                          ⚠️ This slug is already in use by an active venue.
+                        </span>
+                      )}
+                      {form.slug && (
+                        <div style={{ marginTop: 4, padding: "5px 8px", borderRadius: 6, background: "rgba(0,0,0,0.025)", border: `1px solid ${isSlugTaken ? "rgba(160,56,56,0.1)" : "rgba(0,0,0,0.04)"}`, display: "inline-flex", alignItems: "center", gap: 6, width: "fit-content" }}>
+                          <span style={{ fontSize: 8, fontWeight: 750, color: C.gold, letterSpacing: "0.06em", textTransform: "uppercase" }}>Public URL</span>
+                          <span style={{ fontSize: 11.5, color: C.text, fontFamily: "monospace" }}>{form.reservation_route || `/${form.slug}`}</span>
+                        </div>
+                      )}
+                    </div>
                   </Field>
-                  <Field label="Venue Name"><input value={form.name} onChange={(e) => updateForm("name", e.target.value)} style={inputStyle()} /></Field>
-                  <Field label="Customer Display Name"><input value={form.display_name} onChange={(e) => updateForm("display_name", e.target.value)} style={inputStyle()} /></Field>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr", gap: 10 }}>
-                    <Field label="Venue Code / Slug" hint="Unique internal identifier used by routing and reports. It is auto-generated from the venue name unless edited.">
-                      <input value={form.slug} onChange={(e) => updateForm("slug", slugify(e.target.value))} placeholder="hanakazu-japanese-restaurant" style={inputStyle()} />
-                    </Field>
-                    <Field label="Order"><input type="number" min="0" value={form.display_order} onChange={(e) => updateForm("display_order", e.target.value)} style={inputStyle()} /></Field>
-                  </div>
+                  <Field label="Order"><input type="number" min="0" value={form.display_order} onChange={(e) => updateForm("display_order", e.target.value)} style={inputStyle()} /></Field>
+                </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <Field label="Location"><select value={form.wing} onChange={(e) => updateForm("wing", e.target.value)} style={inputStyle()}><option>Dining</option><option>Main Wing</option><option>Tower Wing</option></select></Field>
                     <Field label="Capacity"><input type="number" min="0" value={form.capacity} onChange={(e) => updateForm("capacity", e.target.value)} style={inputStyle()} /></Field>
@@ -1814,7 +1972,7 @@ export default function FunctionRooms() {
                   </Field>
                   <Field label="Reservation Page Route" hint="Public page opened when guests select this venue. Keep it unique and start with /.">
                     <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
-                      <input value={form.reservation_route} onChange={(e) => updateForm("reservation_route", e.target.value)} placeholder="/reserve/hanakazu-japanese-restaurant" style={inputStyle()} />
+                      <input value={form.reservation_route} onChange={(e) => updateForm("reservation_route", e.target.value)} placeholder="/hanakazu-japanese-restaurant" style={inputStyle()} />
                       <button type="button" onClick={() => updateForm("reservation_route", routeFromSlug(form.slug || form.name))} style={{ ...buttonBase(), minHeight: 38 }}>Use slug</button>
                     </div>
                   </Field>
@@ -2050,6 +2208,169 @@ export default function FunctionRooms() {
               <button type="button" disabled={saving} onClick={runConfirmedAction} style={{ ...buttonBase(), minWidth: 118, border: "none", background: confirmAction.tone === "red" ? C.red : C.green, color: "#fff" }}>
                 {saving ? "Working..." : confirmAction.label}
               </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showDiscardConfirm && (
+        <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowDiscardConfirm(false); }} style={{ position: "fixed", inset: 0, zIndex: 8200, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
+          <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="discard-changes-title" style={{ width: "min(420px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", padding: 20 }}>
+            <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}>
+              <span style={{ width: 38, height: 38, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: C.redFaint, color: C.red }}>
+                <X size={18} />
+              </span>
+              <div>
+                <h2 id="discard-changes-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 650 }}>Discard unsaved changes?</h2>
+                <p style={{ margin: "8px 0 0", fontSize: 13, lineHeight: 1.6, color: C.muted }}>You have unsaved venue configuration changes. Leaving now will discard them.</p>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 18 }}>
+              <button type="button" onClick={() => setShowDiscardConfirm(false)} style={buttonBase()}>Keep Editing</button>
+              <button type="button" onClick={() => closeDrawer(true)} style={{ ...buttonBase(), minWidth: 140, border: "none", background: C.gold, color: "#fff" }}>
+                Discard Changes
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {saveFeedback && (
+        <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSuccessAndDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 8200, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
+          <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="save-feedback-title" style={{ width: "min(460px, 100%)", borderRadius: 14, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 24px 60px rgba(24,20,14,0.18)", padding: "26px 28px" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 12 }}>
+              <span style={{ width: 44, height: 44, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, rgba(46,122,90,0.08), rgba(46,122,90,0.15))", color: C.green }}>
+                <CheckCircle2 size={24} />
+              </span>
+              <div>
+                <h2 id="save-feedback-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 700, fontFamily: F.label, letterSpacing: "-0.01em" }}>
+                  {saveFeedback.type === "create" ? "Venue Created" : "Venue Updated"}
+                </h2>
+                <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.5, color: C.muted }}>
+                  Changes have been saved successfully and are now reflected in the venue directory.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 22, display: "grid", gap: 14, padding: "16px 0", borderTop: `1px solid ${C.divider}`, borderBottom: `1px solid ${C.divider}` }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 20px" }}>
+                <div>
+                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Venue Name</span>
+                  <strong style={{ display: "block", marginTop: 3, color: C.text, fontSize: 12.5, fontWeight: 650 }}>{saveFeedback.venueName}</strong>
+                </div>
+
+                <div>
+                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Venue Type</span>
+                  <span style={{ display: "block", marginTop: 3, color: C.muted, fontSize: 12.5 }}>{form.type === "dining" ? "Dining Outlet" : "Function Room"}</span>
+                </div>
+
+                <div>
+                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Location Wing</span>
+                  <span style={{ display: "block", marginTop: 3, color: C.muted, fontSize: 12.5 }}>{form.wing || "Main Wing"}</span>
+                </div>
+
+                <div>
+                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Status</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 4 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: form.is_active ? C.green : C.red }} />
+                    <span style={{ color: C.text, fontSize: 12.5, fontWeight: 600 }}>{form.is_active ? "Enabled" : "Disabled"}</span>
+                  </span>
+                </div>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Public URL Route</span>
+                  <span style={{ display: "block", marginTop: 3, color: C.text, fontFamily: "monospace", fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {saveFeedback.reservationRoute || `/${saveFeedback.slug}`}
+                  </span>
+                </div>
+
+                <div>
+                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Visibility</span>
+                  <span style={{ display: "block", marginTop: 3, color: C.muted, fontSize: 12.5 }}>{form.is_visible ? "Visible to guests" : "Hidden in concierge"}</span>
+                </div>
+
+                <div>
+                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Schedule periods</span>
+                  <span style={{ display: "block", marginTop: 3, color: C.muted, fontSize: 12.5 }}>{schedulePeriods.length} active service(s)</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 22 }}>
+              <button
+                type="button"
+                onClick={closeSuccessAndDrawer}
+                style={{
+                  ...buttonBase(),
+                  minHeight: 38,
+                  border: "none",
+                  background: C.gold,
+                  color: "#fff",
+                  width: "100%",
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  letterSpacing: "0.05em",
+                  boxShadow: "0 2px 8px rgba(140, 107, 42, 0.15)",
+                  justifyContent: "center",
+                }}
+              >
+                Done
+              </button>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {saveFeedback.type === "create" ? (
+                  <button
+                    type="button"
+                    onClick={createAnotherVenue}
+                    style={{
+                      ...buttonBase(),
+                      minHeight: 36,
+                      borderColor: "rgba(0,0,0,0.12)",
+                      background: C.surface,
+                      color: C.text,
+                      fontSize: 11,
+                      fontWeight: 650,
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Plus size={13} /> Create Another
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={continueEditingVenue}
+                    style={{
+                      ...buttonBase(),
+                      minHeight: 36,
+                      borderColor: "rgba(0,0,0,0.12)",
+                      background: C.surface,
+                      color: C.text,
+                      fontSize: 11,
+                      fontWeight: 650,
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Edit3 size={13} /> Continue Editing
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={viewOnGuestPage}
+                  style={{
+                    ...buttonBase(),
+                    minHeight: 36,
+                    border: "none",
+                    background: "transparent",
+                    color: C.gold,
+                    fontSize: 11,
+                    fontWeight: 650,
+                    justifyContent: "center",
+                  }}
+                >
+                  <Eye size={13} /> View Guest Page
+                </button>
+              </div>
             </div>
           </section>
         </div>

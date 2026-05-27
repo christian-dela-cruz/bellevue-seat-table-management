@@ -123,6 +123,11 @@ const roomRouteMap = {
   "tower 2": "/tower2",
   "tower 3": "/tower3",
   "business center": "/business-center-reserve",
+  "hanakazu": "/hanakazu",
+  "hanakazu japanese restaurant": "/hanakazu",
+  "qsina": "/qsina",
+  "qsina restaurant": "/qsina",
+  "phoenix court": "/phoenix-court",
 };
 
 const diningLogoMap = {
@@ -148,13 +153,14 @@ function resolveRoomImage(image) {
 }
 
 function roomRoute(room) {
-  const legacyRoute = roomRouteMap[String(room?.name || "").toLowerCase()];
+  const name = String(room?.name || "").toLowerCase().trim();
+  const legacyRoute = roomRouteMap[name];
   const generatedRoute = room?.slug
-    ? `/reserve/${room.slug}`
+    ? `/${room.slug}`
     : room?.name
-      ? `/reserve/${String(room.name).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`
+      ? `/${String(room.name).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`
       : "/venues";
-  return room?.reservation_route || legacyRoute || generatedRoute;
+  return legacyRoute || room?.reservation_route || generatedRoute;
 }
 
 function resolveDiningLogo(room) {

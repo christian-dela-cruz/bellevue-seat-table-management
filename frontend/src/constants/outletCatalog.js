@@ -86,6 +86,7 @@ function collectUniqueVenues(venues = []) {
   };
 
   venues.forEach(addVenue);
+  
   return Array.from(byKey.values());
 }
 

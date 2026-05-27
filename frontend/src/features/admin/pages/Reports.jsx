@@ -5,7 +5,7 @@ import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { reportAPI } from "../../../services/reportAPI";
 import { venueAPI } from "../../../services/venueAPI";
-import { Building2, Download, Layers, Printer, Utensils } from "lucide-react";
+import { Building2, Download, Layers, Printer, Utensils, Search, Activity, ChevronDown, CalendarDays, TrendingUp, Users, CheckCircle, Clock, AlertCircle, List, LayoutGrid } from "lucide-react";
 import { ADMIN_OUTLET_GROUPS, buildOutletGroupsFromVenues, buildOutletRowsFromVenues, canAccessOutlet, canonicalOutletName } from "../../../constants/outletCatalog";
 import {
   Area,
@@ -96,6 +96,95 @@ function toneColor(tone = "gold") {
   }[tone] || [C.gold, C.goldFaint];
 }
 
+function getPresetDates(presetName) {
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  
+  switch (presetName) {
+    case "today":
+      return { start: todayStr, end: todayStr };
+    case "yesterday": {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      return { start: d.toISOString().slice(0, 10), end: d.toISOString().slice(0, 10) };
+    }
+    case "this_week": {
+      const d = new Date();
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday start
+      const monday = new Date(d.setDate(diff));
+      return { start: monday.toISOString().slice(0, 10), end: todayStr };
+    }
+    case "last_7": {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      return { start: d.toISOString().slice(0, 10), end: todayStr };
+    }
+    case "this_month": {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+      return { start, end: todayStr };
+    }
+    case "last_30": {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      return { start: d.toISOString().slice(0, 10), end: todayStr };
+    }
+    case "ytd": {
+      return { start: `${now.getFullYear()}-01-01`, end: todayStr };
+    }
+    default:
+      return null;
+  }
+}
+
+function DonutChart({ counts, total }) {
+  const getStatusTone = (status) => {
+    const s = String(status || "pending").toLowerCase();
+    if (s.includes("reserved") || s.includes("approved") || s.includes("success")) return [C.green, C.greenFaint];
+    if (s.includes("pending")) return [C.gold, C.goldFaint];
+    if (s.includes("declined") || s.includes("rejected") || s.includes("red")) return [C.red, C.redFaint];
+    return [C.slate, C.slateFaint];
+  };
+
+  const items = [
+    ["Reserved", counts.reserved || 0, C.green],
+    ["Pending", counts.pending || 0, C.gold],
+    ["Declined", counts.declined || 0, C.red],
+    ["Cancelled", counts.cancelled || 0, C.slate],
+  ].filter((item) => item[1] > 0);
+
+  let offset = 25;
+  const circumference = 100;
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "130px minmax(0,1fr)", gap: 16, alignItems: "center", padding: 16 }}>
+      <svg viewBox="0 0 42 42" style={{ width: 130, height: 130, transform: "rotate(-90deg)" }}>
+        <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="rgba(0,0,0,0.06)" strokeWidth="5" />
+        {items.map(([label, value, color]) => {
+          const dash = total > 0 ? (value / total) * circumference : 0;
+          const segment = <circle key={label} cx="21" cy="21" r="15.915" fill="transparent" stroke={color} strokeWidth="5" strokeDasharray={`${dash} ${circumference - dash}`} strokeDashoffset={offset} />;
+          offset -= dash;
+          return segment;
+        })}
+        <text x="21" y="22" textAnchor="middle" fontSize="7" fontWeight="700" fill={C.text} transform="rotate(90 21 21)">{total}</text>
+      </svg>
+      <div style={{ display: "grid", gap: 9 }}>
+        {["reserved", "pending", "declined", "cancelled"].map((key) => {
+          const [color, bg] = getStatusTone(key);
+          const value = counts[key === "declined" ? "declined" : key] || 0;
+          const pct = total ? Math.round((value / total) * 100) : 0;
+          return (
+            <div key={key} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "center", fontSize: 12, color: C.muted }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8, textTransform: "capitalize" }}><i style={{ width: 8, height: 8, borderRadius: 999, background: color, boxShadow: `0 0 0 4px ${bg}` }} />{key}</span>
+              <strong style={{ color: C.text }}>{value} ({pct}%)</strong>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Section({ title, subtitle, right, children }) {
   return (
     <section style={{ display: "grid", gap: 12 }}>
@@ -139,12 +228,12 @@ function ProgressRow({ label, value, total, tone = "gold" }) {
   const pct = total > 0 ? Math.round((value / total) * 100) : 0;
 
   return (
-    <div style={{ display: "grid", gap: 6 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, color: C.muted }}>
+    <div style={{ display: "grid", gap: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11.5, color: C.muted }}>
         <span>{label}</span>
-        <span>{value} <span style={{ color: C.faint }}>({pct}%)</span></span>
+        <span>{value} <span style={{ color: C.faint, fontSize: 10.5 }}>({pct}%)</span></span>
       </div>
-      <div style={{ height: 7, borderRadius: 999, background: "rgba(0,0,0,0.05)", overflow: "hidden" }}>
+      <div style={{ height: 4, borderRadius: 999, background: "rgba(0,0,0,0.04)", overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 999 }} />
       </div>
     </div>
@@ -431,11 +520,33 @@ function ChartTooltip({ active, payload, label }) {
   );
 }
 
-function OutletCard({ outlet }) {
+function OutletCard({ outlet, onSelect }) {
   const total = outlet.total_reservations || 0;
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, display: "grid", gap: 12, minWidth: 0, overflow: "hidden" }}>
+    <div
+      onClick={onSelect}
+      style={{
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: 10,
+        padding: 16,
+        display: "grid",
+        gap: 12,
+        minWidth: 0,
+        overflow: "hidden",
+        cursor: "pointer",
+        transition: "transform 0.16s ease, border-color 0.16s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "rgba(140,107,42,0.30)";
+        e.currentTarget.style.transform = "translateY(-1px)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = C.border;
+        e.currentTarget.style.transform = "none";
+      }}
+    >
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 12, alignItems: "start" }}>
         <div style={{ minWidth: 0 }}>
           <div title={outlet.name} style={{ fontSize: 15, fontWeight: 650, color: C.text, marginBottom: 4, lineHeight: 1.25, overflowWrap: "anywhere" }}>{outlet.name}</div>
@@ -453,6 +564,55 @@ function OutletCard({ outlet }) {
         <ProgressRow label="Reserved" value={outlet.reserved || 0} total={total} tone="green" />
         <ProgressRow label="Pending" value={outlet.pending || 0} total={total} tone="gold" />
         <ProgressRow label="Rejected" value={outlet.rejected || 0} total={total} tone="red" />
+      </div>
+    </div>
+  );
+}
+
+function RoomGridCard({ room, onSelect }) {
+  const total = room.reservations || 0;
+  const acceptanceRate = total > 0 ? Math.round(((room.reserved || 0) / total) * 100) : 0;
+  
+  return (
+    <div
+      onClick={onSelect}
+      style={{
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: 10,
+        padding: 16,
+        display: "grid",
+        gap: 12,
+        minWidth: 0,
+        overflow: "hidden",
+        cursor: "pointer",
+        transition: "transform 0.16s ease, border-color 0.16s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "rgba(140,107,42,0.30)";
+        e.currentTarget.style.transform = "translateY(-1px)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = C.border;
+        e.currentTarget.style.transform = "none";
+      }}
+    >
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 12, alignItems: "start" }}>
+        <div style={{ minWidth: 0 }}>
+          <div title={room.room} style={{ fontSize: 14, fontWeight: 650, color: C.text, marginBottom: 4, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{room.room}</div>
+          <div style={{ fontSize: 11, color: C.muted }}>Latest Event: {room.latest_event_date || "-"}</div>
+        </div>
+        <span style={{ padding: "3px 7px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontSize: 9.5, fontWeight: 700, whiteSpace: "nowrap" }}>{acceptanceRate}% approved</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
+        <MiniStat label="Reservations" value={total} />
+        <MiniStat label="Guests" value={room.guests || 0} />
+        <MiniStat label="Dine-In" value={room.dine_in || 0} />
+      </div>
+      <div style={{ display: "grid", gap: 8 }}>
+        <ProgressRow label="Reserved" value={room.reserved || 0} total={total} tone="green" />
+        <ProgressRow label="Pending" value={room.pending || 0} total={total} tone="gold" />
+        <ProgressRow label="Rejected" value={room.rejected || 0} total={total} tone="red" />
       </div>
     </div>
   );
@@ -855,7 +1015,7 @@ function InsightRow({ label, value, detail, tone = "gold" }) {
   );
 }
 
-function TableCard({ title, headers, rows, renderRow, actions }) {
+function TableCard({ title, headers, rows, renderRow, actions, footer }) {
   return (
     <ReportCard style={{ overflow: "hidden", minWidth: 0 }}>
       <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -876,6 +1036,7 @@ function TableCard({ title, headers, rows, renderRow, actions }) {
           </tbody>
         </table>
       </div>
+      {footer}
     </ReportCard>
   );
 }
@@ -938,6 +1099,60 @@ export default function Reports() {
   const [outletSort, setOutletSort] = useState({ key: "total_reservations", direction: "desc" });
   const [roomSort, setRoomSort] = useState({ key: "reservations", direction: "desc" });
   const [auditSort, setAuditSort] = useState({ key: "created_at", direction: "desc" });
+  const [outletSearchQuery, setOutletSearchQuery] = useState("");
+  const [roomSearchQuery, setRoomSearchQuery] = useState("");
+  const [datePreset, setDatePreset] = useState("this_month");
+  const [roomViewMode, setRoomViewMode] = useState("list");
+  const [outletViewMode, setOutletViewMode] = useState("grid");
+  const [activeOutletDetails, setActiveOutletDetails] = useState(null);
+  const [showPrintConfig, setShowPrintConfig] = useState(false);
+  const [printReportType, setPrintReportType] = useState("general");
+  const [printSections, setPrintSections] = useState({
+    overview: true,
+    mix: true,
+    outlets: true,
+    rooms: true,
+    trends: true,
+    audit: true,
+  });
+  const [printFontScale, setPrintFontScale] = useState("medium");
+  const [printPageSize, setPrintPageSize] = useState("a4");
+  const [printOrientation, setPrintOrientation] = useState("landscape");
+  const [roomRowsPerPage, setRoomRowsPerPage] = useState(10);
+  const [roomPage, setRoomPage] = useState(1);
+
+  const handlePrintReportTypeChange = (type) => {
+    setPrintReportType(type);
+    if (type === "general") {
+      setPrintSections({
+        overview: true,
+        mix: true,
+        outlets: true,
+        rooms: true,
+        trends: true,
+        audit: true,
+      });
+    }
+  };
+
+  const handleSectionCheckboxChange = (section, checked) => {
+    setPrintSections((prev) => {
+      const next = { ...prev, [section]: checked };
+      const allChecked = Object.values(next).every(Boolean);
+      setPrintReportType(allChecked ? "general" : "custom");
+      return next;
+    });
+  };
+
+  const handleDatePresetChange = (preset) => {
+    setDatePreset(preset);
+    if (preset === "custom") return;
+    const dates = getPresetDates(preset);
+    if (dates) {
+      setStartDate(dates.start);
+      setEndDate(dates.end);
+    }
+  };
   const [report, setReport] = useState({ summary: {}, data: [] });
   const [transactionReport, setTransactionReport] = useState({ summary: {}, data: [] });
   const [monthlyReport, setMonthlyReport] = useState({ summary: {}, months: [], outlets: [] });
@@ -988,6 +1203,10 @@ export default function Reports() {
     loadReport();
   }, []);
 
+  useEffect(() => {
+    setRoomPage(1);
+  }, [roomRowsPerPage, roomSearchQuery, roomSort]);
+
   const filteredOutlets = useMemo(() => {
     const rows = reportOutletRows.filter((row) => canAccessOutlet(currentUser, row.name, outletGroups));
     const outletFiltered = selectedOutlet === "ALL"
@@ -996,16 +1215,216 @@ export default function Reports() {
     const groupFiltered = selectedOutletGroup === "all"
       ? outletFiltered
       : outletFiltered.filter((row) => outletGroup(row) === selectedOutletGroup);
-    return sortRows(groupFiltered, outletSort);
-  }, [currentUser, outletGroups, reportOutletRows, selectedOutlet, selectedOutletGroup, outletSort]);
+    const searchFiltered = !outletSearchQuery.trim()
+      ? groupFiltered
+      : groupFiltered.filter((row) =>
+          String(row.name).toLowerCase().includes(outletSearchQuery.toLowerCase()) ||
+          String(row.wing || "").toLowerCase().includes(outletSearchQuery.toLowerCase()) ||
+          String(row.type || "").toLowerCase().includes(outletSearchQuery.toLowerCase())
+        );
+    return sortRows(searchFiltered, outletSort);
+  }, [currentUser, outletGroups, reportOutletRows, selectedOutlet, selectedOutletGroup, outletSort, outletSearchQuery]);
 
   const summary = report.summary || {};
   const category = report.category_breakdown || {};
   const statuses = report.status_breakdown || {};
-  const roomDetails = useMemo(
-    () => sortRows((report.room_details || []).filter((row) => canAccessOutlet(currentUser, row.room, outletGroups)), roomSort),
-    [currentUser, outletGroups, report.room_details, roomSort]
-  );
+  const roomDetails = useMemo(() => {
+    const baseRooms = (report.room_details || []).filter((row) => canAccessOutlet(currentUser, row.room, outletGroups));
+    const searchFiltered = !roomSearchQuery.trim()
+      ? baseRooms
+      : baseRooms.filter((row) =>
+          String(row.room).toLowerCase().includes(roomSearchQuery.toLowerCase())
+        );
+    return sortRows(searchFiltered, roomSort);
+  }, [currentUser, outletGroups, report.room_details, roomSort, roomSearchQuery]);
+
+  const totalRoomPages = Math.max(1, Math.ceil(roomDetails.length / roomRowsPerPage));
+  const visibleRoomRows = useMemo(() => {
+    return roomDetails.slice((roomPage - 1) * roomRowsPerPage, roomPage * roomRowsPerPage);
+  }, [roomDetails, roomPage, roomRowsPerPage]);
+
+  const outletTransactions = useMemo(() => {
+    if (!activeOutletDetails || !transactionReport.data) return [];
+    const canonicalSelected = canonicalOutletName(activeOutletDetails);
+    return transactionReport.data.filter((row) => {
+      const room = row.reservation?.room || row.venue?.name || "";
+      return canonicalOutletName(room) === canonicalSelected;
+    });
+  }, [activeOutletDetails, transactionReport.data]);
+
+  const outletChartData = useMemo(() => {
+    if (!activeOutletDetails || !outletTransactions.length) return [];
+    const countsByDate = {};
+    outletTransactions.forEach((tx) => {
+      const dateVal = tx.created_at ? tx.created_at.slice(0, 10) : null;
+      if (!dateVal) return;
+      if (!countsByDate[dateVal]) {
+        countsByDate[dateVal] = { reservations: 0, approvals: 0, rejections: 0 };
+      }
+      countsByDate[dateVal].reservations += 1;
+      if (tx.to_status === "reserved" || tx.to_status === "approved") {
+        countsByDate[dateVal].approvals += 1;
+      } else if (tx.to_status === "rejected") {
+        countsByDate[dateVal].rejections += 1;
+      }
+    });
+
+    return Object.keys(countsByDate)
+      .sort()
+      .map((date) => ({
+        date,
+        label: readableDate(date),
+        reservations: countsByDate[date].reservations,
+        approvals: countsByDate[date].approvals,
+        rejections: countsByDate[date].rejections,
+      }));
+  }, [activeOutletDetails, outletTransactions]);
+
+  const activeOutletRow = useMemo(() => {
+    if (!activeOutletDetails) return null;
+    return reportOutletRows.find((row) => canonicalOutletName(row.name) === canonicalOutletName(activeOutletDetails));
+  }, [activeOutletDetails, reportOutletRows]);
+
+  const printStyles = `
+    @media print {
+      /* Reset and base styles */
+      html, body {
+        background: #FFFFFF !important;
+        color: #18140E !important;
+        font-family: 'Inter', Arial, sans-serif !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      
+      /* Hide all screen interfaces */
+      .print-exclude, aside, nav, header, button, .reports-filter-panel, .reports-nav-grid, main, .reports-section {
+        display: none !important;
+      }
+      
+      /* Show and format print container */
+      .print-only {
+        display: block !important;
+        padding: 2cm !important;
+        background: #FFFFFF !important;
+        font-size: \${
+          printFontScale === "small" ? "10pt" :
+          printFontScale === "large" ? "14pt" :
+          "12pt"
+        } !important;
+      }
+
+      /* Page layout settings */
+      @page {
+        size: \${printPageSize} \${printOrientation};
+        margin: 0;
+      }
+
+      /* Clean luxury headings & tables for print */
+      .print-header {
+        border-bottom: 3px solid #8C6B2A !important;
+        padding-bottom: 12px;
+        margin-bottom: 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+
+      .print-title {
+        font-size: 20pt !important;
+        font-weight: 700 !important;
+        color: #18140E !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.06em !important;
+      }
+
+      .print-section {
+        page-break-inside: avoid !important;
+        margin-bottom: 28px;
+      }
+
+      .print-section-title {
+        font-size: 11pt !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        color: #8C6B2A !important;
+        letter-spacing: 0.12em !important;
+        margin-bottom: 12px;
+        border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+        padding-bottom: 4px;
+      }
+
+      .print-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        margin-top: 8px;
+        font-size: 10pt !important;
+      }
+
+      .print-table th {
+        background: #FAF8F4 !important;
+        color: #7A7060 !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em !important;
+        font-size: 8pt !important;
+        padding: 8px 10px !important;
+        border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+        text-align: left !important;
+      }
+
+      .print-table td {
+        padding: 8px 10px !important;
+        border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+        color: #5E6470 !important;
+      }
+
+      .print-table tr:last-child td {
+        border-bottom: none !important;
+      }
+
+      .print-table td.strong {
+        color: #18140E !important;
+        font-weight: 600 !important;
+      }
+
+      .print-grid {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 12px !important;
+        margin-bottom: 16px !important;
+      }
+
+      .print-card {
+        background: #FAF8F4 !important;
+        border: 1px solid rgba(0,0,0,0.06) !important;
+        border-radius: 8px !important;
+        padding: 12px !important;
+      }
+
+      .print-card-label {
+        font-size: 8pt !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        color: #7A7060 !important;
+        letter-spacing: 0.08em !important;
+        margin-bottom: 6px;
+      }
+
+      .print-card-value {
+        font-size: 16pt !important;
+        font-weight: 700 !important;
+        color: #8C6B2A !important;
+      }
+    }
+
+    @media screen {
+      .print-only {
+        display: none !important;
+      }
+    }
+  `;
   const allOutlets = useMemo(
     () => reportOutletRows.filter((row) => canAccessOutlet(currentUser, row.name, outletGroups)),
     [currentUser, outletGroups, reportOutletRows]
@@ -1054,31 +1473,39 @@ export default function Reports() {
   const totalReservations = summary.reservations || 0;
   const handleExportCsv = () => {
     const rows = [
-      ["Report", "Outlet Performance"],
+      ["=================================================="],
+      ["BELLEVUE OUTLET & ROOM PERFORMANCE REPORT"],
+      ["Generated At", new Date().toLocaleString()],
       ["Date Range", dateRangeLabel],
+      ["=================================================="],
       [],
-      ["Summary"],
-      ["Reservations", summary.reservations || 0],
-      ["Guests", summary.guests || 0],
-      ["Outlets", summary.outlets || 0],
-      ["Transactions", transactionSummary.transactions || 0],
+      ["OVERVIEW SUMMARY"],
+      ["Reservations Total", summary.reservations || 0],
+      ["Guests Total", summary.guests || 0],
+      ["Outlets Configured", summary.outlets || 0],
+      ["Transactions Tracked", transactionSummary.transactions || 0],
       [],
-      ["Status", "Count"],
-      ["Reserved", reservedCount],
-      ["Pending", statuses.pending || 0],
-      ["Rejected", statuses.rejected || 0],
+      ["STATUS BREAKDOWN"],
+      ["Reserved/Approved", reservedCount],
+      ["Pending Coordination", statuses.pending || 0],
+      ["Rejected/Declined", statuses.rejected || 0],
       ["Cancelled", statuses.cancelled || 0],
       [],
-      ["Monthly", "Reservations", "Promotion Mentions"],
+      ["ANNUAL PERFORMANCE TRENDS"],
+      ["Month", "Reservations", "Promotion Mentions"],
       ...(monthlyReport.months || []).map((month) => [month.label, month.reservations || 0, month.promotion_mentions || 0]),
       [],
-      [`${selectedMonthLabel} ${monthlyGranularity === "weekly" ? "Weekly" : "Daily"} Activity`, "Reservations", "Promotion Mentions"],
+      [`\${selectedMonthLabel} \${monthlyGranularity === "weekly" ? "Weekly" : "Daily"} Activity`],
+      ["Label", "Reservations", "Promotion Mentions"],
       ...((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || [])
         .map((row) => [row.label, row.reservations || 0, row.promotion_mentions || 0]),
       [],
-      ["Outlet", "Reservations", "Guests", "Reserved", "Pending", "Rejected", "Cancelled", "Dine-In", "Promo"],
+      ["OUTLET PERFORMANCE DETAILS"],
+      ["Outlet", "Wing", "Type", "Reservations", "Guests", "Reserved", "Pending", "Rejected", "Cancelled", "Dine-In", "Promo"],
       ...filteredOutlets.map((outlet) => [
         outlet.name,
+        outlet.wing || "Main Wing",
+        outlet.type || "Outlet",
         outlet.total_reservations || 0,
         outlet.guests || 0,
         outlet.reserved || 0,
@@ -1088,11 +1515,26 @@ export default function Reports() {
         outlet.dine_in || 0,
         outlet.promotion_mentions || 0,
       ]),
+      [],
+      ["ROOM DETAILS PERFORMANCE"],
+      ["Room / Outlet", "Reservations", "Guests", "Pending", "Reserved", "Rejected", "Cancelled", "Dine-In", "Promo", "Latest Event"],
+      ...roomDetails.map((room) => [
+        room.room,
+        room.reservations || 0,
+        room.guests || 0,
+        room.pending || 0,
+        room.reserved || 0,
+        room.rejected || 0,
+        room.cancelled || 0,
+        room.dine_in || 0,
+        room.promotion_mentions || 0,
+        room.latest_event_date || "-",
+      ]),
     ];
     const trendName = activeTab === "monthly"
-      ? `outlet-report-${reportYear}-${String(reportMonth).padStart(2, "0")}-${monthlyGranularity}.csv`
-      : `outlet-report-${reportYear}.csv`;
-    downloadCsv(isTrendTab ? trendName : `outlet-report-${startDate}-to-${endDate}.csv`, rows);
+      ? `outlet-report-\${reportYear}-\${String(reportMonth).padStart(2, "0")}-\${monthlyGranularity}.csv`
+      : `outlet-report-\${reportYear}.csv`;
+    downloadCsv(isTrendTab ? trendName : `outlet-report-\${startDate}-to-\${endDate}.csv`, rows);
   };
   const reportGroups = [
     {
@@ -1127,12 +1569,6 @@ export default function Reports() {
   return (
     <div style={{ minHeight: "100vh", background: C.page, fontFamily: F.body }}>
       <style>{`
-        @media print {
-          body { background: #fff !important; }
-          aside, nav, header { display: none !important; }
-          main { height: auto !important; overflow: visible !important; padding: 18px !important; }
-          button, select, input { box-shadow: none !important; }
-        }
         @keyframes reportsFadeIn {
           from { opacity: 0; transform: translateY(6px); }
           to { opacity: 1; transform: translateY(0); }
@@ -1142,6 +1578,7 @@ export default function Reports() {
         }
         .reports-table-row {
           transition: background 0.14s ease;
+          cursor: pointer;
         }
         .reports-table-row:hover {
           background: rgba(140,107,42,0.035);
@@ -1151,6 +1588,7 @@ export default function Reports() {
           .reports-filter-panel { min-width: 0 !important; }
         }
       `}</style>
+      <style>{printStyles}</style>
       <AdminNavbar />
       <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0, overflow: "hidden" }}>
         <Sidebar activeNav="reports" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
@@ -1162,89 +1600,109 @@ export default function Reports() {
             C={C}
             F={F}
             actions={canViewReports && (
-              <div className="reports-filter-panel" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, display: "grid", gap: 10, minWidth: 320 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>{isTrendTab ? "Trend Filter" : "Date Range Filter"}</div>
-                    <div style={{ marginTop: 2, fontSize: 11.5, color: C.muted }}>{isTrendTab ? trendFilterDescription : "Summary, outlets, and audit trail use this date range."}</div>
-                  </div>
-                  <span style={{ borderRadius: 999, background: isTrendTab ? C.blueFaint : C.goldFaint, color: isTrendTab ? C.blue : C.gold, padding: "5px 8px", fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                    {isTrendTab ? trendFilterBadge : "Range"}
-                  </span>
-                </div>
-                <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                  {activeTab === "monthly" ? (
-                    <>
-                      <FilterField label="Month">
-                        <select value={reportMonth} onChange={(e) => setReportMonth(e.target.value)} style={{ ...filterStyle(), minWidth: 150 }}>
-                          {monthSelectOptions.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
-                        </select>
-                      </FilterField>
-                      <FilterField label="Year">
-                        <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} style={{ ...filterStyle(), minWidth: 120 }}>
-                          {yearOptions.map((year) => <option key={year} value={String(year)}>{year}</option>)}
-                        </select>
-                      </FilterField>
-                      <FilterField label="Group By">
-                        <div style={{ display: "inline-flex", height: 38, border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden", background: C.surface }}>
-                          {["daily", "weekly"].map((mode) => {
-                            const active = monthlyGranularity === mode;
-                            return (
-                              <button
-                                key={mode}
-                                type="button"
-                                onClick={() => setMonthlyGranularity(mode)}
-                                style={{
-                                  border: "none",
-                                  borderRight: mode === "daily" ? `1px solid ${C.border}` : "none",
-                                  background: active ? C.goldFaint : "transparent",
-                                  color: active ? C.gold : C.muted,
-                                  padding: "0 12px",
-                                  fontFamily: F.label,
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  letterSpacing: "0.10em",
-                                  textTransform: "uppercase",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                {mode}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </FilterField>
-                    </>
-                  ) : activeTab === "yearly" ? (
-                    <FilterField label="Report Year">
-                      <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} style={{ ...filterStyle(), minWidth: 150 }}>
+              <div className="reports-toolbar print-exclude" style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                {activeTab === "monthly" ? (
+                  <>
+                    <FilterField label="Month">
+                      <select value={reportMonth} onChange={(e) => setReportMonth(e.target.value)} style={filterStyle()}>
+                        {monthSelectOptions.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
+                      </select>
+                    </FilterField>
+                    <FilterField label="Year">
+                      <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} style={filterStyle()}>
                         {yearOptions.map((year) => <option key={year} value={String(year)}>{year}</option>)}
                       </select>
                     </FilterField>
-                  ) : (
-                    <>
-                      <FilterField label="Start">
-                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={filterStyle()} />
+                    <FilterField label="Group By">
+                      <div style={{ display: "flex", height: 34, border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden", background: C.surface }}>
+                        {["daily", "weekly"].map((mode) => {
+                          const active = monthlyGranularity === mode;
+                          return (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => setMonthlyGranularity(mode)}
+                              style={{
+                                border: "none",
+                                borderRight: mode === "daily" ? `1px solid ${C.border}` : "none",
+                                background: active ? C.goldFaint : "transparent",
+                                color: active ? C.gold : C.muted,
+                                padding: "0 10px",
+                                fontFamily: F.label,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                letterSpacing: "0.08em",
+                                textTransform: "uppercase",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {mode}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </FilterField>
+                  </>
+                ) : activeTab === "yearly" ? (
+                  <FilterField label="Report Year">
+                    <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} style={filterStyle()}>
+                      {yearOptions.map((year) => <option key={year} value={String(year)}>{year}</option>)}
+                    </select>
+                  </FilterField>
+                ) : (
+                  <>
+                    <FilterField label="Preset">
+                      <select value={datePreset} onChange={(e) => handleDatePresetChange(e.target.value)} style={filterStyle()}>
+                        <option value="custom">Custom Range</option>
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="this_week">This Week</option>
+                        <option value="last_7">Last 7 Days</option>
+                        <option value="this_month">This Month</option>
+                        <option value="last_30">Last 30 Days</option>
+                        <option value="ytd">Year to Date</option>
+                      </select>
+                    </FilterField>
+                    {showOutletFilter && (
+                      <FilterField label="Outlet">
+                        <select value={selectedOutlet} onChange={(e) => setSelectedOutlet(e.target.value)} style={filterStyle()}>
+                          <option value="ALL">All outlets</option>
+                          {allOutlets.map((outlet) => <option key={outlet.name || outlet.venue_id} value={String(outlet.name)}>{outlet.name}</option>)}
+                        </select>
                       </FilterField>
-                      <FilterField label="End">
-                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={filterStyle()} />
-                      </FilterField>
-                      {showOutletFilter && (
-                        <FilterField label="Outlet">
-                          <select value={selectedOutlet} onChange={(e) => setSelectedOutlet(e.target.value)} style={{ ...filterStyle(), minWidth: 190 }}>
-                            <option value="ALL">All outlets</option>
-                            {allOutlets.map((outlet) => <option key={outlet.name || outlet.venue_id} value={String(outlet.name)}>{outlet.name}</option>)}
-                          </select>
-                        </FilterField>
-                      )}
-                    </>
-                  )}
-                <button onClick={loadReport} disabled={loading} style={{ height: 38, padding: "0 14px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", cursor: loading ? "not-allowed" : "pointer" }}>
-                  {loading ? "Loading" : "Apply"}
+                    )}
+                    <FilterField label="Start">
+                      <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setDatePreset("custom"); }} style={filterStyle()} />
+                    </FilterField>
+                    <FilterField label="End">
+                      <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setDatePreset("custom"); }} style={filterStyle()} />
+                    </FilterField>
+                  </>
+                )}
+                
+                <button
+                  onClick={loadReport}
+                  disabled={loading}
+                  style={{
+                    height: 34,
+                    padding: "0 16px",
+                    border: "none",
+                    borderRadius: 8,
+                    background: C.gold,
+                    color: "#fff",
+                    fontFamily: F.label,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    cursor: loading ? "not-allowed" : "pointer",
+                    transition: "background 0.12s",
+                  }}
+                >
+                  {loading ? "..." : "Apply"}
                 </button>
                 <ActionButton icon={Download} label="CSV" onClick={handleExportCsv} />
-                <ActionButton icon={Printer} label="Print" onClick={() => window.print()} />
-                </div>
+                <ActionButton icon={Printer} label="Print" onClick={() => setShowPrintConfig(true)} />
               </div>
             )}
           />
@@ -1264,16 +1722,18 @@ export default function Reports() {
               <div key={activeTab} className="reports-section" style={{ display: "grid", gap: 22 }}>
               {activeTab === "summary" && (
                 <>
-                  <Section title="Overview" subtitle="High-level submission activity for the selected date range.">
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
-                      <MetricCard label="Reservations" value={summary.reservations || 0} tone="blue" />
-                      <MetricCard label="Guests" value={summary.guests || 0} tone="green" />
-                      <MetricCard label="Outlets" value={summary.outlets || 0} tone="gold" />
-                      <MetricCard label="Transactions" value={transactionSummary.transactions || 0} detail={canViewTransactions ? "read-only" : ""} tone="slate" />
-                    </div>
-                  </Section>
+                  <div className="print-overview">
+                    <Section title="Overview" subtitle="High-level submission activity for the selected date range.">
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+                        <MetricCard label="Reservations" value={summary.reservations || 0} tone="blue" />
+                        <MetricCard label="Guests" value={summary.guests || 0} tone="green" />
+                        <MetricCard label="Outlets" value={summary.outlets || 0} tone="gold" />
+                        <MetricCard label="Transactions" value={transactionSummary.transactions || 0} detail={canViewTransactions ? "read-only" : ""} tone="slate" />
+                      </div>
+                    </Section>
+                  </div>
 
-                  <div className="reports-grid" style={{ display: "grid", gridTemplateColumns: "minmax(280px,1.05fr) minmax(280px,0.95fr)", gap: 14 }}>
+                  <div className="reports-grid print-mix" style={{ display: "grid", gridTemplateColumns: "minmax(280px,1.05fr) minmax(280px,0.95fr)", gap: 14 }}>
                     <SummaryPanel title="Reservation Status">
                       <div style={{ display: "grid", gap: 12 }}>
                         <ProgressRow label="Reserved" value={reservedCount} total={totalReservations} tone="green" />
@@ -1295,83 +1755,1065 @@ export default function Reports() {
               )}
 
               {activeTab === "monthly" && (
-                <Section title="Monthly Performance" subtitle={`Showing reservation activity for ${selectedMonthLabel}. Switch between daily precision and weekly summaries for operational review.`}>
-                  <MonthlyReports monthlyReport={monthlyReport} granularity={monthlyGranularity} monthLabelText={selectedMonthLabel} />
-                </Section>
+                <div className="print-trends">
+                  <Section title="Monthly Performance" subtitle={`Showing reservation activity for ${selectedMonthLabel}. Switch between daily precision and weekly summaries for operational review.`}>
+                    <MonthlyReports monthlyReport={monthlyReport} granularity={monthlyGranularity} monthLabelText={selectedMonthLabel} />
+                  </Section>
+                </div>
               )}
 
               {activeTab === "yearly" && (
-                <Section title="Yearly Trends" subtitle={`Annual Jan-Dec overview for ${reportYear}, showing seasonality, reservation distribution, and peak business periods.`}>
-                  <YearlyReports monthlyReport={monthlyReport} transactionSummary={transactionSummary} />
-                </Section>
+                <div className="print-trends">
+                  <Section title="Yearly Trends" subtitle={`Annual Jan-Dec overview for ${reportYear}, showing seasonality, reservation distribution, and peak business periods.`}>
+                    <YearlyReports monthlyReport={monthlyReport} transactionSummary={transactionSummary} />
+                  </Section>
+                </div>
               )}
 
               {activeTab === "outlets" && (
                 <Section title="Outlet Performance" subtitle="Grouped by outlet type. Use the filters and sort dropdowns to inspect rooms, dining outlets, and exact room totals.">
                   <div style={{ display: "grid", gap: 14 }}>
                     <ReportCard style={{ padding: 12 }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,0.8fr) minmax(280px,1.2fr)", gap: 12, alignItems: "center" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: `repeat(${1 + (roomOutletCount > 0 ? 1 : 0) + (diningOutletCount > 0 ? 1 : 0)},minmax(0,1fr))`, gap: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flex: 1, minWidth: 280 }}>
                           <FilterChip icon={Layers} label="All" count={allOutlets.length} active={selectedOutletGroup === "all"} onClick={() => setSelectedOutletGroup("all")} />
                           {roomOutletCount > 0 && <FilterChip icon={Building2} label="Rooms" count={roomOutletCount} active={selectedOutletGroup === "rooms"} onClick={() => setSelectedOutletGroup("rooms")} />}
                           {diningOutletCount > 0 && <FilterChip icon={Utensils} label="Dining" count={diningOutletCount} active={selectedOutletGroup === "dining"} onClick={() => setSelectedOutletGroup("dining")} />}
                         </div>
-                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                          {/* Search */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "0 10px", height: 34 }}>
+                            <Search size={13} style={{ color: C.muted }} />
+                            <input
+                              type="text"
+                              value={outletSearchQuery}
+                              onChange={(e) => setOutletSearchQuery(e.target.value)}
+                              placeholder="Search outlets..."
+                              style={{ border: "none", outline: "none", background: "transparent", fontSize: 12, color: C.text, width: 140, fontFamily: F.body }}
+                            />
+                          </div>
+
+                          {/* Subtle integrated Grid/List view switcher */}
+                          <div style={{ display: "inline-flex", height: 34, border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden", background: C.surface }}>
+                            {[
+                              ["grid", <LayoutGrid size={15} />],
+                              ["list", <List size={15} />],
+                            ].map(([mode, icon]) => {
+                              const active = outletViewMode === mode;
+                              return (
+                                <button
+                                  key={mode}
+                                  type="button"
+                                  onClick={() => setOutletViewMode(mode)}
+                                  style={{
+                                    border: "none",
+                                    borderRight: mode === "grid" ? `1px solid ${C.border}` : "none",
+                                    background: active ? C.goldFaint : "transparent",
+                                    color: active ? C.gold : C.muted,
+                                    padding: "0 12px",
+                                    display: "grid",
+                                    placeItems: "center",
+                                    cursor: "pointer",
+                                    transition: "background 0.12s, color 0.12s",
+                                  }}
+                                >
+                                  {icon}
+                                </button>
+                              );
+                            })}
+                          </div>
+
                           <SortSelect value={outletSort} options={SORT_OPTIONS.outlets} onChange={setOutletSort} />
                         </div>
                       </div>
                     </ReportCard>
 
-                    <div style={{ display: "grid", gap: 16 }}>
-                      {outletSections.map((section) => (
-                        <div key={section.wing} style={{ display: "grid", gap: 10 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                            <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 750, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>{section.wing}</div>
-                            <div style={{ height: 1, background: C.divider, flex: 1 }} />
-                            <div style={{ color: C.faint, fontSize: 11, fontWeight: 650 }}>{section.rows.length} outlet{section.rows.length === 1 ? "" : "s"}</div>
+                    {outletViewMode === "grid" ? (
+                      <div className="print-outlets" style={{ display: "grid", gap: 16 }}>
+                        {outletSections.map((section) => (
+                          <div key={section.wing} style={{ display: "grid", gap: 10 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                              <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 750, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>{section.wing}</div>
+                              <div style={{ height: 1, background: C.divider, flex: 1 }} />
+                              <div style={{ color: C.faint, fontSize: 11, fontWeight: 650 }}>{section.rows.length} outlet{section.rows.length === 1 ? "" : "s"}</div>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%, 300px),1fr))", gap: 12 }}>
+                              {section.rows.map((outlet) => (
+                                <OutletCard
+                                  key={outlet.name || outlet.venue_id}
+                                  outlet={outlet}
+                                  onSelect={() => setActiveOutletDetails(outlet.name)}
+                                />
+                              ))}
+                            </div>
                           </div>
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%, 300px),1fr))", gap: 12 }}>
-                            {section.rows.map((outlet) => <OutletCard key={outlet.name || outlet.venue_id} outlet={outlet} />)}
+                        ))}
+                      </div>
+                    ) : (
+                      <TableCard
+                        title="Outlet Performance Ledger"
+                        headers={["Outlet Name", "Wing Location", "Venue Type", "Total Bookings", "Guests", "Reserved", "Pending", "Rejected", "Acceptance Rate"]}
+                        rows={filteredOutlets}
+                        renderRow={(outlet) => (
+                          <tr key={outlet.name || outlet.venue_id} className="reports-table-row" onClick={() => setActiveOutletDetails(outlet.name)}>
+                            <td style={cellStyle(true)}>{outlet.name}</td>
+                            <td style={cellStyle()}>{outlet.wing || "Main Wing"}</td>
+                            <td style={cellStyle()}>{outlet.type || "Outlet"}</td>
+                            <td style={cellStyle(true)}>{outlet.total_reservations || 0}</td>
+                            <td style={cellStyle()}>{outlet.guests || 0}</td>
+                            <td style={cellStyle()}><span style={{ color: C.green, fontWeight: 600 }}>{outlet.reserved || 0}</span></td>
+                            <td style={cellStyle()}><span style={{ color: C.gold, fontWeight: 600 }}>{outlet.pending || 0}</span></td>
+                            <td style={cellStyle()}><span style={{ color: C.red, fontWeight: 600 }}>{outlet.rejected || 0}</span></td>
+                            <td style={cellStyle()}>
+                              <span style={{ padding: "3px 7px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontSize: 10, fontWeight: 700 }}>
+                                {outlet.acceptance_rate}%
+                              </span>
+                            </td>
+                          </tr>
+                        )}
+                      />
+                    )}
+
+                    <div className="print-rooms" style={{ display: "grid", gap: 14, marginTop: 24 }}>
+                      {/* Section Separator */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ fontFamily: F.label, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Room Totals</div>
+                        <div style={{ height: 1, background: C.divider, flex: 1 }} />
+                        <div style={{ color: C.faint, fontSize: 11, fontWeight: 650 }}>{roomDetails.length} room record{roomDetails.length === 1 ? "" : "s"}</div>
+                      </div>
+
+                      {/* Room Totals Toolbar Card */}
+                      <ReportCard style={{ padding: 12 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", flex: 1, minWidth: 280 }}>
+                            {/* Search */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "0 10px", height: 34 }}>
+                              <Search size={13} style={{ color: C.muted }} />
+                              <input
+                                type="text"
+                                value={roomSearchQuery}
+                                onChange={(e) => setRoomSearchQuery(e.target.value)}
+                                placeholder="Search rooms..."
+                                style={{ border: "none", outline: "none", background: "transparent", fontSize: 12, color: C.text, width: 140, fontFamily: F.body }}
+                              />
+                            </div>
+
+                            {/* View switcher */}
+                            <div style={{ display: "inline-flex", height: 34, border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden", background: C.surface }}>
+                              {[
+                                ["grid", <LayoutGrid size={14} />],
+                                ["list", <List size={14} />],
+                              ].map(([mode, icon]) => {
+                                const active = roomViewMode === mode;
+                                return (
+                                  <button
+                                    key={mode}
+                                    type="button"
+                                    onClick={() => { setRoomPage(1); setRoomViewMode(mode); }}
+                                    style={{
+                                      border: "none",
+                                      borderRight: mode === "grid" ? `1px solid ${C.border}` : "none",
+                                      background: active ? C.goldFaint : "transparent",
+                                      color: active ? C.gold : C.muted,
+                                      padding: "0 12px",
+                                      display: "grid",
+                                      placeItems: "center",
+                                      cursor: "pointer",
+                                      transition: "background 0.12s, color 0.12s",
+                                    }}
+                                  >
+                                    {icon}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>
+                              Showing <strong style={{ color: C.text }}>{roomDetails.length === 0 ? 0 : (roomPage - 1) * roomRowsPerPage + 1}-{Math.min(roomPage * roomRowsPerPage, roomDetails.length)}</strong> of <strong style={{ color: C.text }}>{roomDetails.length}</strong>
+                            </span>
+                          </div>
+
+                          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                            {/* Rows Select */}
+                            <FilterField label="Show Rows">
+                              <select
+                                value={roomRowsPerPage}
+                                onChange={(e) => setRoomRowsPerPage(Number(e.target.value))}
+                                style={{ ...filterStyle(), minWidth: 110 }}
+                              >
+                                {[10, 25, 50, 100].map((val) => (
+                                  <option key={val} value={val}>{val} entries</option>
+                                ))}
+                                <option value={999999}>All entries</option>
+                              </select>
+                            </FilterField>
+
+                            {/* Sort Select */}
+                            <FilterField label="Sort By">
+                              <select
+                                value={sortValue(roomSort)}
+                                onChange={(event) => setRoomSort(sortFromValue(event.target.value))}
+                                style={{ ...filterStyle(), minWidth: 190 }}
+                              >
+                                {SORT_OPTIONS.rooms.map((option) => (
+                                  <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                              </select>
+                            </FilterField>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      </ReportCard>
 
-                    <TableCard
-                      title="Room Totals"
-                      actions={
-                        <SortSelect value={roomSort} options={SORT_OPTIONS.rooms} onChange={setRoomSort} />
-                      }
-                      headers={["Room / Outlet", "Reservations", "Guests", "Pending", "Reserved", "Rejected", "Cancelled", "Dine-In", "Promo", "Latest Event"]}
-                      rows={roomDetails}
-                      renderRow={(room) => (
-                        <tr key={room.room}>
-                          <td style={cellStyle(true)}>{room.room}</td>
-                          <td style={cellStyle()}>{room.reservations}</td>
-                          <td style={cellStyle()}>{room.guests}</td>
-                          <td style={cellStyle()}>{room.pending}</td>
-                          <td style={cellStyle()}>{room.reserved}</td>
-                          <td style={cellStyle()}>{room.rejected}</td>
-                          <td style={cellStyle()}>{room.cancelled}</td>
-                          <td style={cellStyle()}>{room.dine_in}</td>
-                          <td style={cellStyle()}>{room.promotion_mentions}</td>
-                          <td style={cellStyle()}>{room.latest_event_date || "-"}</td>
-                        </tr>
+                      {/* Content block: List or Grid */}
+                      {roomViewMode === "list" ? (
+                        <TableCard
+                          title="Room Registry"
+                          headers={["Room / Outlet", "Reservations", "Guests", "Pending", "Reserved", "Rejected", "Cancelled", "Dine-In", "Promo", "Latest Event"]}
+                          rows={visibleRoomRows}
+                          renderRow={(room) => (
+                            <tr key={room.room} className="reports-table-row" onClick={() => setActiveOutletDetails(room.room)}>
+                              <td style={cellStyle(true)}>{room.room}</td>
+                              <td style={cellStyle()}>{room.reservations}</td>
+                              <td style={cellStyle()}>{room.guests}</td>
+                              <td style={cellStyle()}><span style={{ color: C.gold, fontWeight: 600 }}>{room.pending}</span></td>
+                              <td style={cellStyle()}><span style={{ color: C.green, fontWeight: 600 }}>{room.reserved}</span></td>
+                              <td style={cellStyle()}><span style={{ color: C.red, fontWeight: 600 }}>{room.rejected}</span></td>
+                              <td style={cellStyle()}>{room.cancelled}</td>
+                              <td style={cellStyle()}>{room.dine_in}</td>
+                              <td style={cellStyle()}>{room.promotion_mentions}</td>
+                              <td style={cellStyle()}>{room.latest_event_date || "-"}</td>
+                            </tr>
+                          )}
+                          footer={
+                            <div style={{ padding: "11px 14px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", color: C.muted, fontSize: 12 }}>
+                              <span>
+                                Page {roomPage} of {totalRoomPages}
+                              </span>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setRoomPage((current) => Math.max(1, current - 1))}
+                                  disabled={roomPage === 1}
+                                  style={{ ...pagerButtonStyle(), height: 30, opacity: roomPage === 1 ? 0.45 : 1, cursor: roomPage === 1 ? "not-allowed" : "pointer" }}
+                                >
+                                  Previous
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setRoomPage((current) => Math.min(totalRoomPages, current + 1))}
+                                  disabled={roomPage === totalRoomPages}
+                                  style={{ ...pagerButtonStyle(), height: 30, opacity: roomPage === totalRoomPages ? 0.45 : 1, cursor: roomPage === totalRoomPages ? "not-allowed" : "pointer" }}
+                                >
+                                  Next
+                                </button>
+                              </div>
+                            </div>
+                          }
+                        />
+                      ) : (
+                        <ReportCard style={{ overflow: "hidden", minWidth: 0 }}>
+                          <div style={{ padding: 16 }}>
+                            {roomDetails.length === 0 ? (
+                              <div style={{ padding: "16px 12px", color: C.muted, fontSize: 12.5 }}>No records found.</div>
+                            ) : (
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%, 300px),1fr))", gap: 12 }}>
+                                {visibleRoomRows.map((room) => (
+                                  <RoomGridCard key={room.room} room={room} onSelect={() => setActiveOutletDetails(room.room)} />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ padding: "11px 14px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", color: C.muted, fontSize: 12 }}>
+                            <span>
+                              Page {roomPage} of {totalRoomPages}
+                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <button
+                                type="button"
+                                onClick={() => setRoomPage((current) => Math.max(1, current - 1))}
+                                disabled={roomPage === 1}
+                                style={{ ...pagerButtonStyle(), height: 30, opacity: roomPage === 1 ? 0.45 : 1, cursor: roomPage === 1 ? "not-allowed" : "pointer" }}
+                              >
+                                Previous
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRoomPage((current) => Math.min(totalRoomPages, current + 1))}
+                                disabled={roomPage === totalRoomPages}
+                                style={{ ...pagerButtonStyle(), height: 30, opacity: roomPage === totalRoomPages ? 0.45 : 1, cursor: roomPage === totalRoomPages ? "not-allowed" : "pointer" }}
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        </ReportCard>
                       )}
-                    />
+                    </div>
                   </div>
                 </Section>
               )}
 
               {activeTab === "audit" && canViewTransactions && (
-                <Section title="Audit Trail" subtitle="Read-only status changes for operational review.">
-                  <TransactionMonitor transactionReport={transactionReport} isGlobal={canViewGlobalReports} sort={auditSort} onSort={setAuditSort} />
-                </Section>
+                <div className="print-audit">
+                  <Section title="Audit Trail" subtitle="Read-only status changes for operational review.">
+                    <TransactionMonitor transactionReport={transactionReport} isGlobal={canViewGlobalReports} sort={auditSort} onSort={setAuditSort} />
+                  </Section>
+                </div>
               )}
               </div>
             </div>
           )}
         </main>
+      </div>
+
+      {/* 1. Print Config Customizer Panel with Live Preview */}
+      {showPrintConfig && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(24,20,14,0.42)", backdropFilter: "blur(4px)", display: "grid", placeItems: "center", padding: 20 }} className="print-exclude">
+          <section style={{ width: "min(1200px, 95vw)", height: "calc(100vh - 40px)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: F.body }}>
+            {/* Header */}
+            <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+              <div>
+                <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>Interactive Print & PDF Suite</div>
+                <div style={{ marginTop: 4, fontSize: 12.5, color: C.muted }}>Configure pagination, scale factors, and orientations with live document layout preview.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPrintConfig(false)}
+                style={{ border: "none", background: "transparent", color: C.muted, fontSize: 20, cursor: "pointer", fontWeight: 300, padding: 8 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Split Content Area */}
+            <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+              {/* Left Config Column */}
+              <div style={{ width: 380, borderRight: `1px solid ${C.divider}`, padding: "20px 24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 20, minWidth: 380 }}>
+                {/* General or Custom selector */}
+                <div style={{ display: "grid", gap: 14 }}>
+                  <FilterField label="Report Type">
+                    <select value={printReportType} onChange={(e) => handlePrintReportTypeChange(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                      <option value="general">General Executive Report (All Sections)</option>
+                      <option value="custom">Custom Report (Choose below)</option>
+                    </select>
+                  </FilterField>
+                </div>
+
+                <div style={{ height: 1, background: C.divider }} />
+
+                {/* Sections to Print */}
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Select Sections to Include</div>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {Object.keys(printSections).map((sec) => (
+                      <label key={sec} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: C.text, cursor: "pointer", padding: "4px 0" }}>
+                        <input
+                          type="checkbox"
+                          checked={printSections[sec]}
+                          onChange={(e) => handleSectionCheckboxChange(sec, e.target.checked)}
+                          style={{ width: 17, height: 17, accentColor: C.gold }}
+                        />
+                        <span style={{ textTransform: "capitalize", fontWeight: 550 }}>
+                          {sec === "mix" ? "Distribution & status mix" : sec === "trends" ? "Granular trends & charts" : sec}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ height: 1, background: C.divider }} />
+
+                {/* Sizing & Layout Options */}
+                <div style={{ display: "grid", gap: 14 }}>
+                  <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Document Layout Settings</div>
+                  
+                  <FilterField label="Orientation style">
+                    <select value={printOrientation} onChange={(e) => setPrintOrientation(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                      <option value="portrait">Portrait (Vertical)</option>
+                      <option value="landscape">Landscape (Horizontal)</option>
+                    </select>
+                  </FilterField>
+
+                  <FilterField label="Paper size standard">
+                    <select value={printPageSize} onChange={(e) => setPrintPageSize(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                      <option value="a4">A4 (210mm x 297mm)</option>
+                      <option value="letter">US Letter (8.5" x 11")</option>
+                    </select>
+                  </FilterField>
+
+                  <FilterField label="Typography font scale size">
+                    <select value={printFontScale} onChange={(e) => setPrintFontScale(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                      <option value="small">Small size (85% scaling)</option>
+                      <option value="medium">Medium size (100% standard)</option>
+                      <option value="large">Large size (115% high-readability)</option>
+                    </select>
+                  </FilterField>
+                </div>
+              </div>
+
+              {/* Right Live Preview Column */}
+              <div style={{ flex: 1, background: "#FAF8F4", borderLeft: `1px solid ${C.border}`, padding: "30px 20px", overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0 }}>
+                <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold, marginBottom: 16 }}>Live Layout Preview</div>
+                
+                {/* Paper sheet container */}
+                <div
+                  style={{
+                    background: C.surface,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 8,
+                    boxShadow: "0 8px 30px rgba(24,20,14,0.06)",
+                    padding: "30px 24px",
+                    width: printOrientation === "landscape" ? "100%" : "min(580px, 100%)",
+                    maxWidth: printOrientation === "landscape" ? "800px" : "580px",
+                    aspectRatio: printOrientation === "landscape" ? "1.414 / 1" : "1 / 1.414",
+                    minHeight: printOrientation === "landscape" ? "540px" : "760px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 16,
+                    overflowY: "auto",
+                    fontSize: printFontScale === "small" ? 11 : printFontScale === "large" ? 13.5 : 12,
+                    boxSizing: "border-box",
+                  }}
+                >
+                  {/* Preview Paper Header */}
+                  <div style={{ borderBottom: `2px solid ${C.gold}`, paddingBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexShrink: 0 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: C.text, letterSpacing: "0.06em", textTransform: "uppercase" }}>Bellevue Resort & Luxury Outlets</div>
+                      <div style={{ fontSize: 9.5, color: C.muted, marginTop: 2 }}>Performance & Operational Report summary</div>
+                    </div>
+                    <div style={{ fontSize: 9.5, color: C.gold, fontWeight: 700 }}>{dateRangeLabel}</div>
+                  </div>
+
+                  {/* Preview Paper Content Blocks */}
+                  <div style={{ display: "grid", gap: 14, flex: 1, overflowY: "auto", paddingRight: 4 }}>
+                    {/* Mock Overview */}
+                    {printSections.overview && (
+                      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, padding: 10, background: C.soft }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>Overview Metrics</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                          {[
+                            ["Reservations", summary.reservations || 0],
+                            ["Guests", summary.guests || 0],
+                            ["Outlets", summary.outlets || 0],
+                            ["Transactions", transactionSummary.transactions || 0],
+                          ].map(([lbl, val]) => (
+                            <div key={lbl} style={{ background: C.surface, padding: 6, borderRadius: 6, border: `1px solid ${C.divider}` }}>
+                              <div style={{ fontSize: 8, color: C.faint, textTransform: "uppercase" }}>{lbl}</div>
+                              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2, color: C.text }}>{val}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Mock Status Breakdown */}
+                    {printSections.mix && (
+                      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, padding: 10 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Reservation status distribution</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <div style={{ display: "grid", gap: 4 }}>
+                            <ProgressRow label="Reserved" value={reservedCount} total={totalReservations} tone="green" />
+                            <ProgressRow label="Pending" value={statuses.pending || 0} total={totalReservations} tone="gold" />
+                          </div>
+                          <div style={{ display: "grid", gap: 4 }}>
+                            <ProgressRow label="Rejected" value={statuses.rejected || 0} total={totalReservations} tone="red" />
+                            <ProgressRow label="Cancelled" value={statuses.cancelled || 0} total={totalReservations} tone="slate" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Mock Outlets */}
+                    {printSections.outlets && (
+                      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, padding: 10 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>Venue Performance Deck</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                          {filteredOutlets.slice(0, 3).map((out) => (
+                            <div key={out.name} style={{ background: C.soft, border: `1px solid ${C.divider}`, borderRadius: 6, padding: 6 }}>
+                              <div style={{ fontSize: 9.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{out.name}</div>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 8.5, color: C.muted }}>
+                                <span>Bookings: {out.total_reservations || 0}</span>
+                                <span>{out.acceptance_rate}% approved</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {filteredOutlets.length > 3 && (
+                          <div style={{ fontSize: 8.5, color: C.faint, marginTop: 4, textAlign: "right" }}>+ {filteredOutlets.length - 3} more outlets will print in full document page...</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Mock Rooms */}
+                    {printSections.rooms && (
+                      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, padding: 10 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>Room totals performance listing</div>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 9.5 }}>
+                          <thead>
+                            <tr style={{ background: C.soft, color: C.faint, textTransform: "uppercase", fontSize: 8 }}>
+                              <th style={{ textAlign: "left", padding: "4px" }}>Room</th>
+                              <th style={{ textAlign: "left", padding: "4px" }}>Bookings</th>
+                              <th style={{ textAlign: "left", padding: "4px" }}>Guests</th>
+                              <th style={{ textAlign: "left", padding: "4px" }}>Reserved</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {roomDetails.slice(0, 3).map((r) => (
+                              <tr key={r.room} style={{ borderBottom: `1px solid ${C.divider}` }}>
+                                <td style={{ padding: "4px", fontWeight: 650 }}>{r.room}</td>
+                                <td style={{ padding: "4px" }}>{r.reservations}</td>
+                                <td style={{ padding: "4px" }}>{r.guests}</td>
+                                <td style={{ padding: "4px" }}>{r.reserved}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {roomDetails.length > 3 && (
+                          <div style={{ fontSize: 8.5, color: C.faint, marginTop: 4, textAlign: "right" }}>+ {roomDetails.length - 3} more rooms will print in full document list...</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Mock Trend Chart */}
+                    {printSections.trends && (
+                      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, padding: 10 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>Reservation density trends</div>
+                        <div style={{ height: 40, border: `1px dashed ${C.border}`, borderRadius: 6, display: "grid", placeItems: "center", background: C.soft, color: C.muted, fontSize: 10 }}>
+                          📊 Composed trend line visualization will render in full high-resolution printout
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Mock Audit */}
+                    {printSections.audit && (
+                      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, padding: 10 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>Audit trail transaction monitor logs</div>
+                        <div style={{ fontSize: 9, color: C.muted }}>Transaction record logs (Time, Reference code, Coordinator action) will print as structured list pages at the end of the report document.</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Preview Footer */}
+                  <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 6, display: "flex", justifyContent: "space-between", fontSize: 8.5, color: C.faint, flexShrink: 0 }}>
+                    <span>Report size standard: {printPageSize.toUpperCase()} · {printOrientation.toUpperCase()}</span>
+                    <span>Document Page 1 of 1 (Preview)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Actions Bar */}
+            <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", gap: 12, flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => setShowPrintConfig(false)}
+                style={{ height: 38, padding: "0 16px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, color: C.muted, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPrintConfig(false);
+                  setTimeout(() => window.print(), 150);
+                }}
+                style={{ height: 38, padding: "0 22px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+              >
+                Print Report Document
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* 2. Outlet Detailed Modal Report */}
+      {activeOutletDetails && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(24,20,14,0.42)", backdropFilter: "blur(4px)", display: "grid", placeItems: "center", padding: 20 }} className="print-exclude">
+          <section style={{ width: "min(1060px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 40px)", overflow: "hidden", fontFamily: F.body }}>
+            {/* Header */}
+            <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+              <div>
+                <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>Outlet Performance Report</div>
+                <div style={{ marginTop: 4, fontSize: 16, fontWeight: 700, color: C.text }}>{activeOutletDetails}</div>
+                <div style={{ marginTop: 2, fontSize: 12.5, color: C.muted }}>
+                  Wing: {activeOutletRow?.wing || "No Wing"} · Type: {activeOutletRow?.type || "Outlet"} · Range: {dateRangeLabel}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveOutletDetails(null)}
+                style={{ border: "none", background: "transparent", color: C.muted, fontSize: 20, cursor: "pointer", fontWeight: 300, padding: 8 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: 24, overflowY: "auto", display: "grid", gap: 20 }}>
+              {/* KPI Mini Grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12 }}>
+                <MetricCard label="Total Bookings" value={activeOutletRow?.total_reservations || activeOutletRow?.reservations || outletTransactions.length} tone="blue" />
+                <MetricCard label="Approval Rate" value={`${activeOutletRow?.acceptance_rate || 0}%`} detail={`${activeOutletRow?.reserved || 0} reserved`} tone="green" />
+                <MetricCard label="Total Guests" value={activeOutletRow?.guests || 0} tone="gold" />
+                <MetricCard label="Promo mentions" value={activeOutletRow?.promotion_mentions || 0} tone="slate" />
+              </div>
+
+              {/* Charts Section */}
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1.2fr) minmax(280px, 0.8fr)", gap: 14 }}>
+                {/* Daily Transaction Rhythm */}
+                <SummaryPanel title="Daily Transaction Rhythm">
+                  {outletChartData.length === 0 ? (
+                    <div style={{ display: "grid", placeItems: "center", height: 260, color: C.muted, fontSize: 12.5 }}>
+                      No active audit records found for this outlet in the selected date range.
+                    </div>
+                  ) : (
+                    <div style={{ width: "100%", minHeight: 260, borderRadius: 14, background: "linear-gradient(135deg,#FFFFFF 0%,#FAF8F4 58%,#F1ECE1 100%)", border: `1px solid ${C.divider}`, padding: "16px 12px 8px" }}>
+                      <ResponsiveContainer width="100%" height={235}>
+                        <ComposedChart data={outletChartData} margin={{ top: 12, right: 26, bottom: 8, left: -8 }}>
+                          <defs>
+                            <linearGradient id="modalOutletReservationFill" x1="0" x2="0" y1="0" y2="1">
+                              <stop offset="0%" stopColor={C.blue} stopOpacity="0.22" />
+                              <stop offset="54%" stopColor={C.blue} stopOpacity="0.08" />
+                              <stop offset="100%" stopColor={C.blue} stopOpacity="0.01" />
+                            </linearGradient>
+                            <filter id="modalOutletLineShadow" x="-20%" y="-20%" width="140%" height="140%">
+                              <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#3B6FA8" floodOpacity="0.16" />
+                            </filter>
+                          </defs>
+                          <CartesianGrid stroke="rgba(24,20,14,0.07)" vertical={false} />
+                          <XAxis
+                            dataKey="label"
+                            tick={{ fill: C.muted, fontSize: 10 }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            allowDecimals={false}
+                            tick={{ fill: C.faint, fontSize: 10 }}
+                            axisLine={false}
+                            tickLine={false}
+                            width={30}
+                          />
+                          <Tooltip content={<ChartTooltip />} cursor={{ stroke: "rgba(140,107,42,0.22)", strokeDasharray: "4 4" }} wrapperStyle={{ outline: "none" }} />
+                          <Legend
+                            verticalAlign="top"
+                            align="right"
+                            iconType="plainline"
+                            wrapperStyle={{ fontSize: 10, color: C.muted, paddingBottom: 8 }}
+                            payload={[
+                              { value: "Audit transactions", type: "plainline", color: C.blue },
+                              { value: "Approvals", type: "plainline", color: C.green },
+                            ]}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="reservations"
+                            fill="url(#modalOutletReservationFill)"
+                            stroke="Monotone"
+                            dot={false}
+                            activeDot={false}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="reservations"
+                            name="Audit transactions"
+                            stroke={C.blue}
+                            strokeWidth={3}
+                            dot={false}
+                            activeDot={{ r: 5, strokeWidth: 2, stroke: C.surface, fill: C.blue }}
+                            filter="url(#modalOutletLineShadow)"
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="approvals"
+                            name="Approvals"
+                            stroke={C.green}
+                            strokeWidth={2}
+                            dot={false}
+                            activeDot={{ r: 4, strokeWidth: 2, stroke: C.surface, fill: C.green }}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </SummaryPanel>
+
+                {/* Donut Chart breakdown */}
+                <SummaryPanel title="Status Distribution">
+                  <DonutChart
+                    counts={{
+                      reserved: activeOutletRow?.reserved || 0,
+                      pending: activeOutletRow?.pending || 0,
+                      declined: activeOutletRow?.rejected || 0,
+                      cancelled: activeOutletRow?.cancelled || 0,
+                    }}
+                    total={activeOutletRow?.total_reservations || activeOutletRow?.reservations || 0}
+                  />
+                </SummaryPanel>
+              </div>
+
+              {/* Audit Transaction Rows */}
+              <SummaryPanel title="Outlet Audit Logs">
+                <div style={{ border: `1px solid ${C.divider}`, borderRadius: 12, overflow: "hidden", background: C.surface }}>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                      <thead>
+                        <tr style={{ background: C.soft, color: C.faint, textTransform: "uppercase", letterSpacing: "0.10em", fontSize: 10 }}>
+                          {["Time", "Reference", "Guest", "Action", "Status change", "Notes"].map((header) => (
+                            <th key={header} style={tableHeadStyle()}>{header}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {outletTransactions.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} style={{ padding: "16px 12px", color: C.muted }}>No recent audit records found for this outlet.</td>
+                          </tr>
+                        ) : (
+                          outletTransactions.slice(0, 10).map((row) => (
+                            <tr key={row.id} className="reports-table-row">
+                              <td style={cellStyle()}>{readableDateTime(row.created_at)}</td>
+                              <td style={cellStyle(true)}>{row.reservation?.reference_code || "-"}</td>
+                              <td style={cellStyle()}>{row.reservation?.name || "-"}</td>
+                              <td style={cellStyle()}>{actionLabel(row.action)}</td>
+                              <td style={cellStyle()}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                                  {row.from_status && row.to_status && row.from_status !== row.to_status ? (
+                                    <>
+                                      <StatusPill value={row.from_status} />
+                                      <span style={{ color: C.faint }}>to</span>
+                                      <StatusPill value={row.to_status} />
+                                    </>
+                                  ) : (
+                                    <StatusPill value={row.to_status || row.from_status || row.reservation?.status} />
+                                  )}
+                                </div>
+                              </td>
+                              <td style={{ ...cellStyle(), whiteSpace: "normal", minWidth: 200 }}>{row.notes || "-"}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </SummaryPanel>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: "14px 24px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => setActiveOutletDetails(null)}
+                style={{ height: 38, padding: "0 22px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", cursor: "pointer" }}
+              >
+                Close Report
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* 3. High-fidelity print-only view */}
+      <div className="print-only">
+        {/* Printable Paper Header */}
+        <div className="print-header">
+          <div>
+            <div className="print-title">Bellevue Resort & Luxury Outlets</div>
+            <div style={{ fontSize: "10pt", color: C.muted, marginTop: 4 }}>
+              Executive Performance & Operational Report · Scoped by {currentUser?.name || currentUser?.email || "Administrator"}
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: "10pt", fontWeight: 700, color: C.gold }}>{dateRangeLabel}</div>
+            <div style={{ fontSize: "8pt", color: C.muted, marginTop: 2 }}>Printed on {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</div>
+          </div>
+        </div>
+
+        {/* Section 1: Overview Summary */}
+        {printSections.overview && (
+          <div className="print-section">
+            <div className="print-section-title">I. Executive Summary</div>
+            <div className="print-grid">
+              <div className="print-card">
+                <div className="print-card-label">Total Reservations</div>
+                <div className="print-card-value">{summary.reservations || 0}</div>
+              </div>
+              <div className="print-card">
+                <div className="print-card-label">Total Guests</div>
+                <div className="print-card-value">{summary.guests || 0}</div>
+              </div>
+              <div className="print-card">
+                <div className="print-card-label">Active Outlets</div>
+                <div className="print-card-value">{summary.outlets || 0}</div>
+              </div>
+              <div className="print-card">
+                <div className="print-card-label">Audit Logs Tracked</div>
+                <div className="print-card-value">{transactionSummary.transactions || 0}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Section 2: Status & Distribution Mix */}
+        {printSections.mix && (
+          <div className="print-section">
+            <div className="print-section-title">II. Distribution & Booking Status Mix</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              <div>
+                <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Reservation Status Allocation</div>
+                <table className="print-table">
+                  <thead>
+                    <tr>
+                      <th>Status Name</th>
+                      <th>Bookings count</th>
+                      <th>Percentage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="strong">Reserved / Approved</td>
+                      <td>{reservedCount}</td>
+                      <td>{totalReservations ? Math.round((reservedCount / totalReservations) * 100) : 0}%</td>
+                    </tr>
+                    <tr>
+                      <td className="strong">Pending Coordination</td>
+                      <td>{statuses.pending || 0}</td>
+                      <td>{totalReservations ? Math.round(((statuses.pending || 0) / totalReservations) * 100) : 0}%</td>
+                    </tr>
+                    <tr>
+                      <td className="strong">Rejected / Declined</td>
+                      <td>{statuses.rejected || 0}</td>
+                      <td>{totalReservations ? Math.round(((statuses.rejected || 0) / totalReservations) * 100) : 0}%</td>
+                    </tr>
+                    <tr>
+                      <td className="strong">Cancelled By User</td>
+                      <td>{statuses.cancelled || 0}</td>
+                      <td>{totalReservations ? Math.round(((statuses.cancelled || 0) / totalReservations) * 100) : 0}%</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Reservation Category Mix</div>
+                <table className="print-table">
+                  <thead>
+                    <tr>
+                      <th>Category Type</th>
+                      <th>Bookings count</th>
+                      <th>Guests count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="strong">Dine-In Outlets</td>
+                      <td>{category.dine_in?.reservations || 0}</td>
+                      <td>{category.dine_in?.guests || 0} guests</td>
+                    </tr>
+                    <tr>
+                      <td className="strong">Room Service / Tables</td>
+                      <td>{category.room_reservations?.reservations || 0}</td>
+                      <td>{category.room_reservations?.guests || 0} guests</td>
+                    </tr>
+                    <tr>
+                      <td className="strong">Promotions Mentioned</td>
+                      <td>{category.promotion_mentions?.reservations || 0}</td>
+                      <td>-</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Section 3: Outlet Performance */}
+        {printSections.outlets && (
+          <div className="print-section">
+            <div className="print-section-title">III. Detailed Venue Performance Listing</div>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>Outlet / Venue Name</th>
+                  <th>Wing Location</th>
+                  <th>Type</th>
+                  <th>Bookings</th>
+                  <th>Guests</th>
+                  <th>Approved</th>
+                  <th>Pending</th>
+                  <th>Rejected</th>
+                  <th>Cancelled</th>
+                  <th>Dine-In</th>
+                  <th>Promo Mentions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredOutlets.map((outlet) => (
+                  <tr key={outlet.name || outlet.venue_id}>
+                    <td className="strong">{outlet.name}</td>
+                    <td>{outlet.wing || "Main Wing"}</td>
+                    <td>{outlet.type || "Outlet"}</td>
+                    <td className="strong">{outlet.total_reservations || 0}</td>
+                    <td>{outlet.guests || 0}</td>
+                    <td>{outlet.reserved || 0} ({outlet.acceptance_rate}%)</td>
+                    <td>{outlet.pending || 0}</td>
+                    <td>{outlet.rejected || 0}</td>
+                    <td>{outlet.cancelled || 0}</td>
+                    <td>{outlet.dine_in || 0}</td>
+                    <td>{outlet.promotion_mentions || 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Section 4: Room Totals */}
+        {printSections.rooms && (
+          <div className="print-section">
+            <div className="print-section-title">IV. Room Totals & Location Performance</div>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>Room / Outlet Name</th>
+                  <th>Total Reservations</th>
+                  <th>Total Guests</th>
+                  <th>Pending</th>
+                  <th>Reserved / Approved</th>
+                  <th>Rejected / Declined</th>
+                  <th>Cancelled</th>
+                  <th>Dine-In</th>
+                  <th>Promo Mentions</th>
+                  <th>Latest Active Event</th>
+                </tr>
+              </thead>
+              <tbody>
+                {roomDetails.map((room) => (
+                  <tr key={room.room}>
+                    <td className="strong">{room.room}</td>
+                    <td className="strong">{room.reservations || 0}</td>
+                    <td>{room.guests || 0}</td>
+                    <td>{room.pending || 0}</td>
+                    <td>{room.reserved || 0}</td>
+                    <td>{room.rejected || 0}</td>
+                    <td>{room.cancelled || 0}</td>
+                    <td>{room.dine_in || 0}</td>
+                    <td>{room.promotion_mentions || 0}</td>
+                    <td>{room.latest_event_date || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Section 5: Seasonality Trends */}
+        {printSections.trends && (
+          <div className="print-section">
+            <div className="print-section-title">V. Seasonality Trends & Activity Ledger</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              {monthlyReport.months && monthlyReport.months.length > 0 && (
+                <div>
+                  <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Annual Month-by-Month Trend</div>
+                  <table className="print-table">
+                    <thead>
+                      <tr>
+                        <th>Month Period</th>
+                        <th>Reservations count</th>
+                        <th>Promo Mentions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyReport.months.map((m) => (
+                        <tr key={m.label || m.month}>
+                          <td className="strong">{m.label || m.month}</td>
+                          <td>{m.reservations || 0}</td>
+                          <td>{m.promotion_mentions || 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).length > 0 && (
+                <div>
+                  <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                    {selectedMonthLabel} {monthlyGranularity === "weekly" ? "Weekly" : "Daily"} Density
+                  </div>
+                  <table className="print-table">
+                    <thead>
+                      <tr>
+                        <th>Date / Period</th>
+                        <th>Reservations count</th>
+                        <th>Promo Mentions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).slice(0, 15).map((row) => (
+                        <tr key={row.label}>
+                          <td className="strong">{row.label}</td>
+                          <td>{row.reservations || 0}</td>
+                          <td>{row.promotion_mentions || 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).length > 15 && (
+                    <div style={{ fontSize: "8pt", color: C.muted, marginTop: 6, textAlign: "right" }}>* Density ledger continues for all days in selected month...</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Section 6: Audit Logs */}
+        {printSections.audit && canViewTransactions && (
+          <div className="print-section">
+            <div className="print-section-title">VI. Audit Trail Transaction Ledger</div>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Reference Code</th>
+                  <th>Guest Name</th>
+                  <th>Venue / Location</th>
+                  <th>Change Description</th>
+                  <th>Action taken</th>
+                  <th>Coordinator notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(transactionReport.data || []).map((row) => {
+                  const reservation = row.reservation || {};
+                  const venue = row.venue || {};
+                  return (
+                    <tr key={row.id}>
+                      <td>{readableDateTime(row.created_at)}</td>
+                      <td className="strong">{reservation.reference_code || "-"}</td>
+                      <td>{reservation.name || "-"}</td>
+                      <td>{venue.name || reservation.room || "-"}</td>
+                      <td>
+                        {row.from_status && row.to_status && row.from_status !== row.to_status 
+                          ? `${row.from_status.toUpperCase()} ➔ ${row.to_status.toUpperCase()}`
+                          : (row.to_status || row.from_status || reservation.status || "-").toUpperCase()
+                        }
+                      </td>
+                      <td>{actionLabel(row.action)}</td>
+                      <td style={{ fontSize: "8.5pt" }}>{row.notes || "-"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Print Footer */}
+        <div style={{ borderTop: "1px solid #8C6B2A", marginTop: 40, paddingTop: 10, display: "flex", justifyContent: "space-between", fontSize: "8pt", color: C.muted }}>
+          <span>Bellevue Luxury Hotel Group · Confidential Management Report</span>
+          <span>End of Document</span>
+        </div>
       </div>
     </div>
   );
@@ -1379,8 +2821,8 @@ export default function Reports() {
 
 function FilterField({ label, children }) {
   return (
-    <label style={{ display: "grid", gap: 5 }}>
-      <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.faint }}>{label}</span>
+    <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 750, letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted }}>{label}</span>
       {children}
     </label>
   );
@@ -1388,8 +2830,8 @@ function FilterField({ label, children }) {
 
 function filterStyle() {
   return {
-    height: 38,
-    border: `1px solid ${C.border}`,
+    height: 34,
+    border: `1px solid rgba(0,0,0,0.08)`,
     borderRadius: 8,
     background: C.surface,
     color: C.text,
@@ -1397,12 +2839,13 @@ function filterStyle() {
     fontFamily: F.body,
     fontSize: 12,
     outline: "none",
+    transition: "border-color 0.12s",
   };
 }
 
 function pagerButtonStyle() {
   return {
-    height: 34,
+    height: 30,
     border: `1px solid ${C.border}`,
     borderRadius: 8,
     background: C.surface,
@@ -1419,20 +2862,27 @@ function pagerButtonStyle() {
 function tableHeadStyle() {
   return {
     textAlign: "left",
-    padding: "10px 12px",
-    borderBottom: `1px solid ${C.divider}`,
-    color: C.faint,
+    padding: "12px 16px",
+    borderBottom: `1px solid rgba(140,107,42,0.15)`,
+    color: C.muted,
+    fontFamily: F.label,
+    fontSize: 9.5,
     fontWeight: 750,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
     whiteSpace: "nowrap",
+    background: "#FAF8F4",
   };
 }
 
 function cellStyle(strong = false) {
   return {
-    padding: "11px 12px",
-    borderBottom: `1px solid ${C.divider}`,
+    padding: "14px 16px",
+    borderBottom: `1px solid rgba(0,0,0,0.04)`,
     color: strong ? C.text : C.muted,
     fontWeight: strong ? 650 : 550,
+    fontSize: 12.5,
     whiteSpace: "nowrap",
+    transition: "background 0.12s",
   };
 }

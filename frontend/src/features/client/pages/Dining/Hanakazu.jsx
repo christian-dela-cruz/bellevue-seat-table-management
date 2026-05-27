@@ -91,7 +91,19 @@ function layoutKey(wing, room) { return `seatmap_layout:${wing}:${room}`; }
 
 function loadLayoutForClient(wing, room) {
   try {
-    const raw = localStorage.getItem(layoutKey(wing, room));
+    const key = layoutKey(wing, room);
+    let raw = localStorage.getItem(key);
+    if (!raw) {
+      const canonicalRoom = room === "Hanakazu" ? "Hanakazu" : room === "Qsina" ? "Qsina" : room;
+      const fullRoom = canonicalRoom === "Hanakazu" ? "Hanakazu Japanese Restaurant" : canonicalRoom === "Qsina" ? "Qsina Restaurant" : room;
+      raw = localStorage.getItem(`seatmap_layout:Dining:${fullRoom}`)
+         || localStorage.getItem(`seatmap_layout:Main Wing:${fullRoom}`)
+         || localStorage.getItem(`seatmap_layout:Dining:${room}`)
+         || localStorage.getItem(`seatmap_layout:Main Wing:${room}`);
+      if (raw) {
+        localStorage.setItem(key, raw);
+      }
+    }
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed?.v === 2) return parsed;
@@ -991,7 +1003,7 @@ export default function Hanakazu() {
   const fetchAndMerge = useCallback(async () => {
     try {
       const res = await fetch(
-        withSeatmapSchedule(`${API_BASE_URL}/reservations?room=${encodeURIComponent(ROOM)}&wing=${encodeURIComponent(WING)}&venue_id=1`),
+        withSeatmapSchedule(`${API_BASE_URL}/reservations?room=${encodeURIComponent(ROOM)}&wing=${encodeURIComponent(WING)}`),
         { headers: { Accept: "application/json" } }
       );
       if (!res.ok) return;

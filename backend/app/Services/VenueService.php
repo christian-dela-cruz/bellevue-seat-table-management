@@ -67,6 +67,12 @@ class VenueService
     public function createVenue(array $data): Venue
     {
         $data = $this->normalizeStatePayload($data);
+        if (!empty($data['slug'])) {
+            $this->resolveArchivedSlugConflict($data['slug']);
+        }
+        if (!empty($data['reservation_route'])) {
+            $this->resolveArchivedRouteConflict($data['reservation_route']);
+        }
         return Venue::create($data);
     }
 
@@ -80,6 +86,12 @@ class VenueService
             return null;
         }
         $data = $this->normalizeStatePayload($data);
+        if (!empty($data['slug']) && $data['slug'] !== $venue->slug) {
+            $this->resolveArchivedSlugConflict($data['slug']);
+        }
+        if (!empty($data['reservation_route']) && $data['reservation_route'] !== $venue->reservation_route) {
+            $this->resolveArchivedRouteConflict($data['reservation_route']);
+        }
         $venue->update($data);
         return $venue;
     }
@@ -301,6 +313,7 @@ class VenueService
         }
         
         if ($this->hasArchiveColumn()) {
+            $suffix = '-archived-' . $venue->id . '-' . time();
             return $venue->update([
                 'is_archived' => true,
                 'archived_at' => Carbon::now(),
@@ -308,6 +321,8 @@ class VenueService
                 'is_visible' => false,
                 'show_on_landing' => false,
                 'reservations_enabled' => false,
+                'slug' => Str::limit($venue->slug, 180) . $suffix,
+                'reservation_route' => $venue->reservation_route ? Str::limit($venue->reservation_route, 180) . $suffix : null,
             ]);
         }
 
@@ -756,5 +771,33 @@ class VenueService
         }
 
         return $room;
+    }
+
+    private function resolveArchivedSlugConflict(string $slug): void
+    {
+        $conflicting = Venue::where('slug', $slug)
+            ->where('is_archived', true)
+            ->get();
+
+        foreach ($conflicting as $venue) {
+            $suffix = '-archived-' . $venue->id . '-' . time();
+            $venue->update([
+                'slug' => Str::limit($venue->slug, 180) . $suffix,
+            ]);
+        }
+    }
+
+    private function resolveArchivedRouteConflict(string $route): void
+    {
+        $conflicting = Venue::where('reservation_route', $route)
+            ->where('is_archived', true)
+            ->get();
+
+        foreach ($conflicting as $venue) {
+            $suffix = '-archived-' . $venue->id . '-' . time();
+            $venue->update([
+                'reservation_route' => Str::limit($venue->reservation_route, 180) . $suffix,
+            ]);
+        }
     }
 }

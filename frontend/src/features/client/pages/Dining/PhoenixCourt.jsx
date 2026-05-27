@@ -91,7 +91,19 @@ function layoutKey(wing, room) { return `seatmap_layout:${wing}:${room}`; }
 
 function loadLayoutForClient(wing, room) {
   try {
-    const raw = localStorage.getItem(layoutKey(wing, room));
+    const key = layoutKey(wing, room);
+    let raw = localStorage.getItem(key);
+    if (!raw) {
+      const canonicalRoom = room === "Hanakazu" ? "Hanakazu" : room === "Qsina" ? "Qsina" : room === "Phoenix Court" ? "Phoenix Court" : room;
+      const fullRoom = canonicalRoom === "Hanakazu" ? "Hanakazu Japanese Restaurant" : canonicalRoom === "Qsina" ? "Qsina Restaurant" : canonicalRoom;
+      raw = localStorage.getItem(`seatmap_layout:Dining:${fullRoom}`)
+         || localStorage.getItem(`seatmap_layout:Main Wing:${fullRoom}`)
+         || localStorage.getItem(`seatmap_layout:Dining:${canonicalRoom}`)
+         || localStorage.getItem(`seatmap_layout:Main Wing:${canonicalRoom}`);
+      if (raw) {
+        localStorage.setItem(key, raw);
+      }
+    }
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     // Accept v2 layouts OR any object with a tables array
@@ -996,7 +1008,7 @@ export default function PhoenixCourt() {
       // CRITICAL FIX: Use /reservations endpoint to get actual reservation statuses
       // NOT /seatmap endpoint which only returns layout structure
       const res = await fetch(
-        withSeatmapSchedule(`${API_BASE_URL}/reservations?room=${encodeURIComponent(ROOM)}&wing=${encodeURIComponent(WING)}&venue_id=1`),
+        withSeatmapSchedule(`${API_BASE_URL}/reservations?room=${encodeURIComponent(ROOM)}&wing=${encodeURIComponent(WING)}`),
         { headers: { Accept: "application/json" } }
       );
       if (!res.ok) return;

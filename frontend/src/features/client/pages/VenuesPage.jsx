@@ -661,7 +661,7 @@ export default function VenuesPage() {
       "hanakazu":         "/hanakazu",
       "phoenix-court":    "/phoenix-court",
     };
-    navigate(routes[id] ?? `/reserve/${id}`, { state: { openRoomId: id, ...roomState } });
+    navigate(routes[id] ?? `/${id}`, { state: { openRoomId: id, ...roomState } });
   };
 
   const NAV_H = 58;

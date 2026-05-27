@@ -74,7 +74,7 @@ export default function AppRoutes() {
         <Route path="/grand-ballroom-a" element={<><SharedNavbar /><GrandBallroomA /></>} />
         <Route path="/grand-ballroom-b" element={<><SharedNavbar /><GrandBallroomB /></>} />
         <Route path="/grand-ballroom-c" element={<><SharedNavbar /><GrandBallroomC /></>} />
-        <Route path="/reserve/:venueSlug" element={<><SharedNavbar /><DynamicVenueReservation /></>} />
+        <Route path="/reserve/:venueSlug" element={<DynamicVenueReservation />} />
                 <Route path="/admin" element={<AdminEntry />} />
         <Route
           path="/admin/reservations"
@@ -182,7 +182,7 @@ export default function AppRoutes() {
         />
         <Route path="/forgot-code" element={<ForgotCode />} />  
         <Route path="/login" element={<LoginPage />} />  
-        <Route path="/:venueSlug" element={<><SharedNavbar /><DynamicVenueReservation /></>} />
+        <Route path="/:venueSlug" element={<DynamicVenueReservation />} />
 
       </Routes>
     </BrowserRouter>

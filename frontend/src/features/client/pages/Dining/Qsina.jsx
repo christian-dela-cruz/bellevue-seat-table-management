@@ -134,7 +134,18 @@ function mergeApiStatusIntoLayout(localLayout, apiData) {
 
 function loadLayoutForClient(wing, room) {
   try {
-    const raw = localStorage.getItem(layoutKey(wing, room));
+    const key = layoutKey(wing, room);
+    let raw = localStorage.getItem(key);
+    if (!raw) {
+      const fullRoom = room === "Hanakazu" ? "Hanakazu Japanese Restaurant" : room === "Qsina" ? "Qsina Restaurant" : room;
+      raw = localStorage.getItem(`seatmap_layout:Dining:${fullRoom}`)
+         || localStorage.getItem(`seatmap_layout:Main Wing:${fullRoom}`)
+         || localStorage.getItem(`seatmap_layout:Dining:${room}`)
+         || localStorage.getItem(`seatmap_layout:Main Wing:${room}`);
+      if (raw) {
+        localStorage.setItem(key, raw);
+      }
+    }
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed?.v === 2) return parsed;

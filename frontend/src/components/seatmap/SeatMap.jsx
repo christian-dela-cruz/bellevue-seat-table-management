@@ -139,22 +139,20 @@ const DEFAULT_LABELS = [
   { id: "exit", type: "exit", label: "EXIT", x: 16, y: 630 },
 ];
 
+function getCanonicalRoomName(room) {
+  const r = String(room || "").trim();
+  if (r.toLowerCase() === "qsina restaurant" || r.toLowerCase() === "qsina") {
+    return "Qsina";
+  }
+  if (r.toLowerCase() === "hanakazu japanese restaurant" || r.toLowerCase() === "hanakazu") {
+    return "Hanakazu";
+  }
+  return r;
+}
+
 // ─── FIX: Canonical wing resolver — single source of truth ───────────────────
 function getActualWingForRoom(room, venueStructure) {
-  let structure = venueStructure;
-  if (!structure) {
-    try {
-      const raw = localStorage.getItem("bellevue_venue_structure");
-      if (raw) {
-        structure = JSON.parse(raw);
-      }
-    } catch {}
-  }
-  if (structure && Array.isArray(structure)) {
-    for (const wing of structure) {
-      if (wing.rooms?.includes(room)) return wing.label;
-    }
-  }
+  const canonicalRoom = getCanonicalRoomName(room);
   const roomToWingMap = {
     "Alabang Function Room": "Main Wing",
     "Business Center": "Main Wing",
@@ -173,7 +171,25 @@ function getActualWingForRoom(room, venueStructure) {
     "Hanakazu": "Dining",
     "Phoenix Court": "Dining",
   };
-  return roomToWingMap[room] || "Main Wing";
+  if (roomToWingMap[canonicalRoom]) {
+    return roomToWingMap[canonicalRoom];
+  }
+
+  let structure = venueStructure;
+  if (!structure) {
+    try {
+      const raw = localStorage.getItem("bellevue_venue_structure");
+      if (raw) {
+        structure = JSON.parse(raw);
+      }
+    } catch {}
+  }
+  if (structure && Array.isArray(structure)) {
+    for (const wing of structure) {
+      if (wing.rooms?.includes(room) || wing.rooms?.includes(canonicalRoom)) return wing.label;
+    }
+  }
+  return "Main Wing";
 }
 
 // ─── FIX: layoutKey always derived from room name, never from caller's wing ──
@@ -195,7 +211,18 @@ function saveLayout(wing, room, { tables, labels, standaloneSeats }) {
 
 function loadLayout(wing, room) {
   try {
-    const raw = localStorage.getItem(layoutKey(wing, room));
+    const key = layoutKey(wing, room);
+    let raw = localStorage.getItem(key);
+    if (!raw) {
+      const canonicalRoom = getCanonicalRoomName(room);
+      const fullRoom = canonicalRoom === "Hanakazu" ? "Hanakazu Japanese Restaurant" : canonicalRoom === "Qsina" ? "Qsina Restaurant" : room;
+      const actualWing = getActualWingForRoom(canonicalRoom);
+      raw = localStorage.getItem(`seatmap_layout:${actualWing}:${fullRoom}`)
+         || localStorage.getItem(`seatmap_layout:Main Wing:${fullRoom}`)
+         || localStorage.getItem(`seatmap_layout:Dining:${fullRoom}`)
+         || localStorage.getItem(`seatmap_layout:${actualWing}:${canonicalRoom}`)
+         || localStorage.getItem(`seatmap_layout:Main Wing:${canonicalRoom}`);
+    }
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed && parsed.v === 2) return parsed;
@@ -1120,17 +1147,40 @@ export default function SeatMap({
           return !parentIdsWithChildren.includes(v.id);
         });
 
+        const staticWings = {
+          "Alabang Function Room": "Main Wing",
+          "Business Center": "Main Wing",
+          "Laguna Ballroom 1": "Main Wing",
+          "Laguna Ballroom 2": "Main Wing",
+          "20/20 Function Room A": "Main Wing",
+          "20/20 Function Room B": "Main Wing",
+          "20/20 Function Room C": "Main Wing",
+          "Grand Ballroom A": "Grand Ballroom",
+          "Grand Ballroom B": "Grand Ballroom",
+          "Grand Ballroom C": "Grand Ballroom",
+          "Tower 1": "Tower Wing",
+          "Tower 2": "Tower Wing",
+          "Tower 3": "Tower Wing",
+          "Qsina": "Dining",
+          "Hanakazu": "Dining",
+          "Phoenix Court": "Dining",
+        };
+
         const groups = {};
         selectableRooms.forEach(v => {
-          const isDining = String(v.type || "").toLowerCase() === "dining"
-            || String(v.wing || "").toLowerCase() === "dining"
-            || String(v.name || "").toLowerCase().includes("restaurant")
-            || String(v.name || "").toLowerCase().includes("qsina")
-            || String(v.name || "").toLowerCase().includes("hanakazu")
-            || String(v.name || "").toLowerCase().includes("phoenix");
+          let wingLabel = staticWings[v.name];
+          if (!wingLabel) {
+            const isDining = String(v.type || "").toLowerCase() === "dining"
+              || String(v.wing || "").toLowerCase() === "dining"
+              || String(v.name || "").toLowerCase().includes("restaurant")
+              || String(v.name || "").toLowerCase().includes("qsina")
+              || String(v.name || "").toLowerCase().includes("hanakazu")
+              || String(v.name || "").toLowerCase().includes("phoenix");
 
-          const wingLabel = isDining ? "Dining" : (v.wing || "Main Wing");
-          const wingId = isDining ? "dining" : String(wingLabel).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+            wingLabel = isDining ? "Dining" : (v.wing || "Main Wing");
+          }
+
+          const wingId = String(wingLabel).toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
           if (!groups[wingId]) {
             groups[wingId] = {
@@ -1143,7 +1193,7 @@ export default function SeatMap({
           groups[wingId].rooms.push(v.name);
         });
 
-        const order = { "main-wing": 0, "tower-wing": 1, "dining": 2 };
+        const order = { "main-wing": 0, "grand-ballroom": 1, "tower-wing": 2, "dining": 3 };
         const sortedStructure = Object.values(groups).sort((a, b) => {
           const oA = order[a.id] ?? 99;
           const oB = order[b.id] ?? 99;

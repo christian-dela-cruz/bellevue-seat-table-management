@@ -101,7 +101,7 @@ class VenueController extends Controller
             $validated = $request->validated();
             $validated['slug'] = $validated['slug'] ?? Str::slug($validated['name']);
             $validated['display_name'] = $validated['display_name'] ?? $validated['name'];
-            $validated['reservation_route'] = $validated['reservation_route'] ?? '/reserve/' . $validated['slug'];
+            $validated['reservation_route'] = $validated['reservation_route'] ?? '/' . $validated['slug'];
             $this->guardParentConfiguration($validated);
             $venue = $this->venueService->createVenue($validated);
             return response()->json($this->venueService->formatVenue($venue->load(['parent', 'children'])), 201);
@@ -148,7 +148,7 @@ class VenueController extends Controller
                 $validated['display_name'] = $validated['name'];
             }
             if (empty($validated['reservation_route']) && !empty($validated['slug'])) {
-                $validated['reservation_route'] = '/reserve/' . $validated['slug'];
+                $validated['reservation_route'] = '/' . $validated['slug'];
             }
             $this->guardParentConfiguration($validated, $id);
 

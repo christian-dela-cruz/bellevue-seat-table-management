@@ -22,7 +22,7 @@ export default function MainWingNavbar({ active, wsConnected }) {
     if (venueId === "alabang") {
       navigate("/alabang-reserve");
     } else {
-      navigate(`/reserve/${venueId}`);
+      navigate(`/${venueId}`);
     }
   };
 
