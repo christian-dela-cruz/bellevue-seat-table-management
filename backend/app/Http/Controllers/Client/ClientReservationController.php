@@ -129,6 +129,86 @@ class ClientReservationController extends Controller
             $validated['room'] = Venue::find($validated['venue_id'])?->name;
         }
 
+        $requestedVenue = Venue::find($validated['venue_id']);
+        if ($requestedVenue) {
+            if ($requestedVenue->parent_id !== null && !$requestedVenue->child_selectable) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Manual selection of this subroom is not allowed.',
+                ], 422);
+            }
+
+            // Tie to parent venue
+            $parentVenue = $requestedVenue->parent_id ? Venue::find($requestedVenue->parent_id) : $requestedVenue;
+            $validated['venue_id'] = $parentVenue->id;
+            $validated['room'] = $parentVenue->name;
+            $validated['public_room_name'] = $parentVenue->name;
+
+            // If it's a parent room (i.e. has children)
+            $children = $parentVenue->children()
+                ->where('is_active', true)
+                ->where('is_archived', false)
+                ->where('reservations_enabled', true)
+                ->get();
+
+            if ($children->isNotEmpty()) {
+                $allocationMode = $parentVenue->metadata['allocation_mode'] ?? 'admin_assign';
+                
+                // Perform dynamic availability check for parent venue
+                $slots = $this->venueService->getReservationTimeSlots(
+                    $parentVenue,
+                    $validated['event_date'],
+                    (int) ($validated['guests_count'] ?? 1),
+                    $parentVenue->name
+                );
+                
+                $slotTime = substr((string) $validated['event_time'], 0, 5);
+                $isAvailable = false;
+                foreach ($slots['slots'] as $slot) {
+                    if (substr($slot['time'], 0, 5) === $slotTime) {
+                        $isAvailable = (bool) $slot['available'];
+                        break;
+                    }
+                }
+                
+                if (!$isAvailable) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "{$parentVenue->display_name} is fully booked for the selected schedule. Please choose another date or time.",
+                    ], 422);
+                }
+
+                // If available, perform allocation
+                if ($allocationMode === 'auto_assign' && $validated['type'] !== 'whole') {
+                    $availableSubrooms = $this->venueService->getAvailableSubrooms(
+                        $parentVenue,
+                        $validated['event_date'],
+                        $validated['event_time'],
+                        (int) ($validated['guests_count'] ?? 1)
+                    );
+                    
+                    if (!empty($availableSubrooms)) {
+                        $assigned = $availableSubrooms[0];
+                        $validated['assigned_room_id'] = $assigned['id'] ?? $assigned->id;
+                        $validated['internal_room_name'] = $assigned['name'] ?? $assigned->name;
+                        $validated['assignment_status'] = 'auto_assigned';
+                    } else {
+                        $validated['assigned_room_id'] = null;
+                        $validated['internal_room_name'] = null;
+                        $validated['assignment_status'] = 'pending_assignment';
+                    }
+                } elseif ($allocationMode === 'whole_booking' || $validated['type'] === 'whole') {
+                    $validated['assigned_room_id'] = null;
+                    $validated['internal_room_name'] = 'Whole Venue';
+                    $validated['assignment_status'] = 'auto_assigned';
+                } else {
+                    $validated['assigned_room_id'] = null;
+                    $validated['internal_room_name'] = null;
+                    $validated['assignment_status'] = 'pending_assignment';
+                }
+            }
+        }
+
         $validated = $this->normalizeStandaloneReservation($validated);
 
         if (!$this->venueService->isTimeSlotAvailable($validated)) {

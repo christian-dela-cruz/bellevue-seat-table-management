@@ -525,9 +525,12 @@ class ReservationService
                         'handoff_notes' => $reservation->handoff_notes,
                         'seen_by' => $reservation->seen_by,
                         'last_handled_by_id' => $reservation->last_handled_by_id,
-                        'last_handled_by_name' => $reservation->last_handled_by_name,
                         'last_operational_action' => $reservation->last_operational_action,
                         'last_operational_at' => optional($reservation->last_operational_at)->toISOString(),
+                        'assigned_room_id' => $reservation->assigned_room_id,
+                        'public_room_name' => $reservation->public_room_name,
+                        'internal_room_name' => $reservation->internal_room_name,
+                        'assignment_status' => $reservation->assignment_status,
                     ];
                 }
             );
@@ -578,6 +581,10 @@ class ReservationService
                     'last_handled_by_name' => $reservation->last_handled_by_name,
                     'last_operational_action' => $reservation->last_operational_action,
                     'last_operational_at' => optional($reservation->last_operational_at)->toISOString(),
+                    'assigned_room_id' => $reservation->assigned_room_id,
+                    'public_room_name' => $reservation->public_room_name,
+                    'internal_room_name' => $reservation->internal_room_name,
+                    'assignment_status' => $reservation->assignment_status,
                 ];
             })
             ->toArray();

@@ -1970,6 +1970,37 @@ export default function FunctionRooms() {
                       {parentRooms.filter((room) => room.type === "function_room" && (!editing || room.id !== editing.id)).map((room) => <option key={room.id} value={room.id}>{room.display_name || room.name}</option>)}
                     </select>
                   </Field>
+                  {!form.parent_id && form.type === "function_room" && (
+                    <>
+                      <Field label="Allocation Mode" hint="Configure how subrooms are internally assigned.">
+                        <select
+                          value={form.metadata?.allocation_mode || "admin_assign"}
+                          onChange={(e) => {
+                            const mode = e.target.value;
+                            updateForm("metadata", {
+                              ...form.metadata,
+                              allocation_mode: mode,
+                              requires_admin_assignment: mode === "admin_assign",
+                            });
+                          }}
+                          style={inputStyle()}
+                        >
+                          <option value="admin_assign">Admin assigns after request</option>
+                          <option value="auto_assign">Auto-assign available subroom</option>
+                          <option value="whole_booking">Whole parent booking</option>
+                        </select>
+                      </Field>
+                      <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text, marginTop: 4, marginBottom: 12 }}>
+                        <span>Requires Admin Assignment</span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean((form.metadata?.allocation_mode || "admin_assign") === "admin_assign")}
+                          disabled
+                          style={{ accentColor: C.gold }}
+                        />
+                      </label>
+                    </>
+                  )}
                   <Field label="Reservation Page Route" hint="Public page opened when guests select this venue. Keep it unique and start with /.">
                     <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
                       <input value={form.reservation_route} onChange={(e) => updateForm("reservation_route", e.target.value)} placeholder="/hanakazu-japanese-restaurant" style={inputStyle()} />
@@ -1993,16 +2024,33 @@ export default function FunctionRooms() {
                   </label>
                   {[
                     ["is_active", "Enabled"],
-                    ["is_visible", "Visible in guest surfaces"],
+                    ["is_visible", "Show to Guests"],
                     ["show_on_landing", "Show on landing page"],
-                    ["reservations_enabled", "Allow guest reservations"],
-                    ...(form.type === "dining" ? [] : [["parent_selectable", "Parent room selectable"], ["child_selectable", "Child rooms selectable"]]),
+                    ["reservations_enabled", "Allow Guest Booking"],
                   ].map(([key, label]) => (
                     <label key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
                       {label}
                       <input type="checkbox" checked={Boolean(form[key])} onChange={(e) => updateForm(key, e.target.checked)} style={{ accentColor: C.gold }} />
                     </label>
                   ))}
+                  {form.type !== "dining" && form.parent_id && (
+                    <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
+                      <span>Internal Subroom (Only Admin Assignable)</span>
+                      <input type="checkbox" checked={!form.child_selectable} onChange={(e) => updateForm("child_selectable", !e.target.checked)} style={{ accentColor: C.gold }} />
+                    </label>
+                  )}
+                  {form.type !== "dining" && !form.parent_id && (
+                    <>
+                      <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
+                        <span>Parent room selectable</span>
+                        <input type="checkbox" checked={Boolean(form.parent_selectable)} onChange={(e) => updateForm("parent_selectable", e.target.checked)} style={{ accentColor: C.gold }} />
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
+                        <span>Child rooms selectable</span>
+                        <input type="checkbox" checked={Boolean(form.child_selectable)} onChange={(e) => updateForm("child_selectable", e.target.checked)} style={{ accentColor: C.gold }} />
+                      </label>
+                    </>
+                  )}
                 </section>
                 )}
 

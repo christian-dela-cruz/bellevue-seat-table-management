@@ -108,6 +108,28 @@ class VenueController extends Controller
         );
     }
 
+    public function availableSubrooms(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'time' => ['required', 'string'],
+            'guests_count' => ['nullable', 'integer', 'min:1'],
+            'ignore_reservation_id' => ['nullable', 'integer'],
+        ]);
+
+        $parentVenue = Venue::findOrFail($id);
+
+        $available = $this->venueService->getAvailableSubrooms(
+            $parentVenue,
+            $validated['date'],
+            $validated['time'],
+            (int) ($validated['guests_count'] ?? 1),
+            $validated['ignore_reservation_id'] ?? null
+        );
+
+        return response()->json($available);
+    }
+
     /**
      * Get specific venue
      */

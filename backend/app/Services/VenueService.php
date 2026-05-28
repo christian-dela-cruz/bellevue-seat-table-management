@@ -152,12 +152,19 @@ class VenueService
             ->get()
             ->groupBy(fn (Reservation $reservation) => substr((string) $reservation->event_time, 0, 5));
 
+        $children = $venue->children()
+            ->where('is_active', true)
+            ->where('is_archived', false)
+            ->where('reservations_enabled', true)
+            ->get();
+        $hasChildren = $children->isNotEmpty();
+
         $blockedTimes = $this->blockedTimesForDate($config, $dateKey, $overrides);
         $maxReservations = (int) ($config['max_reservations_per_slot'] ?? 0);
         $slotCapacity = (int) ($config['slot_capacity'] ?? 0);
         $requestedGuests = max(1, $requestedGuests);
 
-        $items = collect($slots)->map(function (array $slot) use ($bookings, $blockedTimes, $overrides, $isVenueReservable, $isVisible, $isAvailabilityEnabled, $isBlockedDate, $maxReservations, $slotCapacity, $requestedGuests, $closedOverride) {
+        $items = collect($slots)->map(function (array $slot) use ($bookings, $blockedTimes, $overrides, $isVenueReservable, $isVisible, $isAvailabilityEnabled, $isBlockedDate, $maxReservations, $slotCapacity, $requestedGuests, $closedOverride, $children, $hasChildren, $venue) {
             $time = $slot['time'];
             $slotBookings = $bookings->get($time, collect());
             $bookedReservations = $slotBookings->count();
@@ -190,11 +197,36 @@ class VenueService
             if ($maxGuests > 0 && $requestedGuests > $maxGuests) {
                 $reasons[] = "Maximum party size is {$maxGuests} guests.";
             }
-            if ($effectiveMaxReservations > 0 && $bookedReservations >= $effectiveMaxReservations) {
-                $reasons[] = 'This time slot is full.';
-            }
-            if ($effectiveSlotCapacity > 0 && ($bookedGuests + $requestedGuests) > $effectiveSlotCapacity) {
-                $reasons[] = 'Guest capacity is full for this time.';
+            if ($hasChildren) {
+                $validChildren = $children->filter(fn ($child) => $child->capacity === 0 || $requestedGuests <= $child->capacity);
+                if ($validChildren->isEmpty()) {
+                    $reasons[] = 'Guest capacity exceeds available subroom size.';
+                } else {
+                    $allocationMode = $venue->metadata['allocation_mode'] ?? 'admin_assign';
+                    $hasWholeBooking = $slotBookings->contains(fn ($res) => $res->type === 'whole') || ($allocationMode === 'whole_booking' && $slotBookings->isNotEmpty());
+                    
+                    if ($hasWholeBooking) {
+                        $reasons[] = $venue->display_name . ' is fully booked (whole venue reservation).';
+                    } else {
+                        $assignedCount = $slotBookings->filter(fn ($res) => $res->assigned_room_id !== null && $validChildren->contains('id', $res->assigned_room_id))->count();
+                        $assignedByNameCount = $slotBookings->filter(fn ($res) => $res->assigned_room_id === null && $res->room !== null && $validChildren->contains('name', $res->room))->count();
+                        $totalAssigned = $assignedCount + $assignedByNameCount;
+                        
+                        $pendingCount = $slotBookings->filter(fn ($res) => $res->assigned_room_id === null && $res->type !== 'whole' && !$validChildren->contains('name', $res->room))->count();
+                        
+                        $availableCount = $validChildren->count() - $totalAssigned - $pendingCount;
+                        if ($availableCount <= 0) {
+                            $reasons[] = $venue->display_name . ' is fully booked for the selected schedule. Please choose another date or time.';
+                        }
+                    }
+                }
+            } else {
+                if ($effectiveMaxReservations > 0 && $bookedReservations >= $effectiveMaxReservations) {
+                    $reasons[] = 'This time slot is full.';
+                }
+                if ($effectiveSlotCapacity > 0 && ($bookedGuests + $requestedGuests) > $effectiveSlotCapacity) {
+                    $reasons[] = 'Guest capacity is full for this time.';
+                }
             }
 
             return [
@@ -217,6 +249,7 @@ class VenueService
             $noSlotsMessage = $closedOverrideNote
                 ?: ($isBlockedDate ? 'This date is closed.' : 'This venue is closed on the selected day.');
         }
+
 
         return [
             'venue_id' => $venue->id,
@@ -799,5 +832,49 @@ class VenueService
                 'reservation_route' => Str::limit($venue->reservation_route, 180) . $suffix,
             ]);
         }
+    }
+
+    public function getAvailableSubrooms(Venue $parentVenue, string $date, string $time, int $guestsCount = 1, ?int $ignoreReservationId = null): array
+    {
+        $children = $parentVenue->children()
+            ->where('is_active', true)
+            ->where('is_archived', false)
+            ->where('reservations_enabled', true)
+            ->get();
+
+        $activeStatuses = ['pending', 'approved', 'reserved'];
+        $bookings = Reservation::query()
+            ->where('venue_id', $parentVenue->id)
+            ->whereDate('event_date', $date)
+            ->where(function ($query) use ($time) {
+                $query->where('event_time', $time)
+                    ->orWhere('event_time', $time . ':00');
+            })
+            ->whereIn('status', $activeStatuses)
+            ->when($ignoreReservationId, fn ($query) => $query->whereKeyNot($ignoreReservationId))
+            ->get();
+
+        $hasWholeBooking = $bookings->contains(fn ($res) => $res->type === 'whole')
+            || ($parentVenue->metadata['allocation_mode'] ?? 'admin_assign') === 'whole_booking' && $bookings->isNotEmpty();
+
+        if ($hasWholeBooking) {
+            return [];
+        }
+
+        $assignedRoomIds = $bookings->pluck('assigned_room_id')->filter()->all();
+        $assignedRoomNames = $bookings->pluck('room')->filter()->all();
+
+        return $children->filter(function ($child) use ($guestsCount, $assignedRoomIds, $assignedRoomNames) {
+            if ($child->capacity > 0 && $guestsCount > $child->capacity) {
+                return false;
+            }
+            if (in_array($child->id, $assignedRoomIds, true)) {
+                return false;
+            }
+            if (in_array($child->name, $assignedRoomNames, true)) {
+                return false;
+            }
+            return true;
+        })->values()->toArray();
     }
 }

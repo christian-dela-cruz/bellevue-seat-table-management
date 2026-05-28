@@ -1087,7 +1087,7 @@ function editInputStyle(focused = false) {
   };
 }
 
-function ReservationEditForm({ form, setForm, disabled }) {
+function ReservationEditForm({ form, setForm, disabled, hasChildren, availableSubrooms, loadingSubrooms }) {
   const [focused,setFocused]=useState(null);
   const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -1123,6 +1123,28 @@ function ReservationEditForm({ form, setForm, disabled }) {
       <EditField label="Room">
         <input disabled={disabled} value={form.room} onChange={(e)=>update("room",e.target.value)} onFocus={()=>setFocused("room")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="room")}/>
       </EditField>
+      {hasChildren && (
+        <EditField label="Assigned Subroom">
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <select
+              disabled={disabled || loadingSubrooms}
+              value={form.assigned_room_id || ""}
+              onChange={(e) => update("assigned_room_id", e.target.value ? Number(e.target.value) : "")}
+              style={editInputStyle(focused === "assigned_room_id")}
+              onFocus={() => setFocused("assigned_room_id")}
+              onBlur={() => setFocused(null)}
+            >
+              <option value="">-- Needs Room Assignment (Pending) --</option>
+              {availableSubrooms.map(sub => (
+                <option key={sub.id} value={sub.id}>
+                  {sub.display_name || sub.name} (Cap: {sub.capacity || "N/A"})
+                </option>
+              ))}
+            </select>
+            {loadingSubrooms && <Spinner />}
+          </div>
+        </EditField>
+      )}
       <EditField label="Type">
         <select disabled={disabled} value={form.type} onChange={(e)=>update("type",e.target.value)} onFocus={()=>setFocused("type")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="type")}>
           <option value="whole">Whole Table</option>
@@ -1207,7 +1229,7 @@ function SaveChangesConfirmModal({ reservation, changes, onConfirm, onCancel, lo
   );
 }
 
-function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUpdate, canManage, canAdjust }) {
+function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUpdate, canManage, canAdjust, venueRows }) {
   const [actionLoading,setActionLoading]=useState(null);
   const [showRejectModal,setShowRejectModal]=useState(false);
   const [showRevertModal,setShowRevertModal]=useState(false);
@@ -1215,6 +1237,18 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
   const [isEditing,setIsEditing]=useState(false);
   const [showSaveModal,setShowSaveModal]=useState(false);
   const [editError,setEditError]=useState("");
+  
+  const [availableSubrooms, setAvailableSubrooms] = useState([]);
+  const [loadingSubrooms, setLoadingSubrooms] = useState(false);
+
+  const parentVenue = useMemo(() => {
+    return venueRows?.find(v => v.name === reservation.room || v.display_name === reservation.room);
+  }, [venueRows, reservation.room]);
+
+  const hasChildren = useMemo(() => {
+    return parentVenue && (parentVenue.children?.length > 0 || venueRows?.some(v => v.parent_id === parentVenue.id));
+  }, [parentVenue, venueRows]);
+
   const [form,setForm]=useState({
     name: reservation.name || "",
     email: reservation.email || "",
@@ -1231,7 +1265,52 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
     setup_requirements: reservation.setup_requirements || reservation.setupRequirements || "",
     special_requests: reservation.special_requests || "",
     type: reservation.type || "whole",
+    assigned_room_id: reservation.assigned_room_id || "",
   });
+
+  useEffect(() => {
+    if (!hasChildren || !parentVenue) return;
+
+    const fetchAvailableSubrooms = async () => {
+      setLoadingSubrooms(true);
+      try {
+        const date = form.event_date || (reservation.event_date ? String(reservation.event_date).slice(0, 10) : "");
+        const time = form.event_time || reservation.event_time || "";
+        const guests = form.guests_count || reservation.guests_count || reservation.guests || 1;
+        const ignoreId = reservation.db_id || reservation.id;
+
+        const token = localStorage.getItem("admin_token");
+        const url = `${API_BASE_URL}/venues/${parentVenue.id}/available-subrooms?date=${date}&time=${time}&guests_count=${guests}&ignore_reservation_id=${ignoreId}`;
+        const response = await fetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableSubrooms(Array.isArray(data) ? data : data.subrooms || []);
+        }
+      } catch (err) {
+        console.error("Error fetching available subrooms:", err);
+      } finally {
+        setLoadingSubrooms(false);
+      }
+    };
+
+    fetchAvailableSubrooms();
+  }, [parentVenue, hasChildren, form.event_date, form.event_time, form.guests_count, reservation.event_date, reservation.event_time, reservation.guests_count, reservation.db_id, reservation.id]);
+
+  const currentAssignedId = Number(reservation.assigned_room_id);
+  const options = useMemo(() => {
+    const opts = [...availableSubrooms];
+    if (currentAssignedId && !opts.some(sub => Number(sub.id) === currentAssignedId)) {
+      const assignedName = reservation.internal_room_name || "Currently Assigned Room";
+      opts.push({
+        id: currentAssignedId,
+        name: assignedName,
+        display_name: assignedName,
+      });
+    }
+    return opts;
+  }, [availableSubrooms, currentAssignedId, reservation.internal_room_name]);
 
   const fmtDate=(d)=>{
     if(!d)return"—";
@@ -1290,6 +1369,7 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
     special_requests: form.special_requests.trim(),
     type: form.type,
     is_standalone: form.type === "standalone",
+    assigned_room_id: form.assigned_room_id ? Number(form.assigned_room_id) : null,
   });
 
   const getChangedFields = () => {
@@ -1311,6 +1391,7 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
       special_requests: reservation.special_requests || "",
       type: reservation.type || "whole",
       is_standalone: reservation.type === "standalone" || reservation.is_standalone === true || reservation.is_standalone === 1,
+      assigned_room_id: reservation.assigned_room_id || null,
     };
 
     return Object.entries(payload).filter(([field,value]) => String(value ?? "") !== String(current[field] ?? ""));
@@ -1483,7 +1564,14 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
               <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 280px",gap:18,alignItems:"start"}}>
                 <div>
                   <SectionLabel>Update Reservation Details</SectionLabel>
-                  <ReservationEditForm form={form} setForm={setForm} disabled={!!actionLoading}/>
+                  <ReservationEditForm
+                    form={form}
+                    setForm={setForm}
+                    disabled={!!actionLoading}
+                    hasChildren={hasChildren}
+                    availableSubrooms={availableSubrooms}
+                    loadingSubrooms={loadingSubrooms}
+                  />
                   {editError && (
                     <div style={{marginTop:12,padding:"9px 12px",borderRadius:8,background:C.redFaint,border:`1px solid ${C.redBorder}`,fontFamily:F.body,fontSize:12,color:C.red,lineHeight:1.5}}>
                       {editError}
@@ -1534,6 +1622,83 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
                 <span style={{fontFamily:F.body,fontSize:12.5,color:label==="Reference"?C.gold:C.textPrimary,fontWeight:label==="Reference"?700:500,textAlign:"right",maxWidth:280,lineHeight:1.5,letterSpacing:label==="Reference"?"0.06em":"normal"}}>{value}</span>
               </div>
             ))}
+
+            {hasChildren && (
+              <>
+                <SectionLabel style={{marginTop:18}}>Internal Room Allocation</SectionLabel>
+                <div style={{
+                  background: C.goldFaintest,
+                  border: `1.5px solid ${C.borderAccent}`,
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  display: "grid",
+                  gap: 10,
+                  marginBottom: 18,
+                }}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.gold}}>
+                      Allocation Status
+                    </span>
+                    <span style={{
+                      fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.10em",textTransform:"uppercase",
+                      padding:"3px 8px",
+                      borderRadius:12,
+                      background: (reservation.assigned_room_id || reservation.internal_room_name === 'Whole Venue') ? C.greenFaint : C.badgePending.bg,
+                      color: (reservation.assigned_room_id || reservation.internal_room_name === 'Whole Venue') ? C.green : C.badgePending.color,
+                      border: `1px solid ${(reservation.assigned_room_id || reservation.internal_room_name === 'Whole Venue') ? C.greenBorder : C.borderAccent}`,
+                    }}>
+                      {reservation.internal_room_name === 'Whole Venue' ? 'whole parent booking' : (reservation.assignment_status ? reservation.assignment_status.replace(/_/g," ") : (reservation.assigned_room_id ? "manually assigned" : "pending assignment"))}
+                    </span>
+                  </div>
+
+                  <div style={{display:"grid",gap:6}}>
+                    <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>
+                      Assigned Subroom
+                    </span>
+                    {reservation.internal_room_name === 'Whole Venue' ? (
+                      <div style={{fontFamily:F.body,fontSize:13,fontWeight:600,color:C.textPrimary}}>
+                        Whole Parent Venue Blocked (No child assignment needed)
+                      </div>
+                    ) : canManage ? (
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <select
+                          disabled={loadingSubrooms || actionLoading === "save_subroom"}
+                          value={reservation.assigned_room_id || ""}
+                          onChange={async (e) => {
+                            const val = e.target.value ? Number(e.target.value) : null;
+                            setActionLoading("save_subroom");
+                            await onUpdate(reservation, {
+                              assigned_room_id: val
+                            });
+                            setActionLoading(null);
+                          }}
+                          style={{
+                            ...editInputStyle(false),
+                            cursor: (loadingSubrooms || actionLoading === "save_subroom") ? "not-allowed" : "pointer",
+                            padding: "8px 12px",
+                            fontSize: 12.5,
+                            border: `1.5px solid ${C.borderAccent}`,
+                            background: C.surfaceBase,
+                          }}
+                        >
+                          <option value="">-- Needs Room Assignment (Pending) --</option>
+                          {options.map(sub => (
+                            <option key={sub.id} value={sub.id}>
+                              {sub.display_name || sub.name} (Cap: {sub.capacity || "N/A"})
+                            </option>
+                          ))}
+                        </select>
+                        {loadingSubrooms && <Spinner />}
+                      </div>
+                    ) : (
+                      <div style={{fontFamily:F.body,fontSize:13,fontWeight:600,color:C.textPrimary}}>
+                        {reservation.internal_room_name || "Not assigned (Pending)"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
 
             <SectionLabel style={{marginTop:18}}>Guest Information</SectionLabel>
             {guestRows.map(([label,value],i,arr)=>(
@@ -1699,7 +1864,9 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
           reservation={reservation}
           changes={getChangedFields().map(([field,value])=>[
             field.replace(/_/g," "),
-            field === "is_standalone" ? (value ? "Yes" : "No") : String(value || "-")
+            field === "is_standalone" ? (value ? "Yes" : "No") : 
+            field === "assigned_room_id" ? (value ? (availableSubrooms.find(s=>s.id===Number(value))?.display_name || availableSubrooms.find(s=>s.id===Number(value))?.name || `Subroom #${value}`) : "Unassigned") :
+            String(value || "-")
           ])}
           onConfirm={handleSaveConfirm}
           onCancel={()=>setShowSaveModal(false)}
@@ -2848,6 +3015,49 @@ export default function ReservationDashboard() {
                                   {reservation.room&&(
                                     <span style={{fontFamily:F.body,fontSize:11,color:C.textTertiary}}>{reservation.room}</span>
                                   )}
+                                  {(() => {
+                                    const cardParentVenue = venueRows?.find(v => v.name === reservation.room || v.display_name === reservation.room);
+                                    const cardHasChildren = cardParentVenue && (cardParentVenue.children?.length > 0 || venueRows?.some(v => v.parent_id === cardParentVenue.id));
+                                    if (cardHasChildren) {
+                                      return (
+                                        <>
+                                          <span style={{color: C.textTertiary, fontSize: 11}}>·</span>
+                                          {reservation.assigned_room_id || reservation.internal_room_name === "Whole Venue" ? (
+                                            <span style={{
+                                              fontFamily: F.body,
+                                              fontSize: 11,
+                                              color: C.green,
+                                              fontWeight: 600,
+                                              display: "inline-flex",
+                                              alignItems: "center",
+                                              gap: 4
+                                            }}>
+                                              <span style={{width: 5, height: 5, borderRadius: "50%", background: C.green}} />
+                                              Assigned: {reservation.internal_room_name}
+                                            </span>
+                                          ) : (
+                                            <span style={{
+                                              fontFamily: F.body,
+                                              fontSize: 11,
+                                              color: C.red,
+                                              fontWeight: 700,
+                                              background: C.redFaint,
+                                              border: `1px solid ${C.redBorder}`,
+                                              padding: "1px 6px",
+                                              borderRadius: 4,
+                                              display: "inline-flex",
+                                              alignItems: "center",
+                                              gap: 4
+                                            }}>
+                                              <span style={{width: 5, height: 5, borderRadius: "50%", background: C.red}} />
+                                              Needs room assignment
+                                            </span>
+                                          )}
+                                        </>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                   {reservation.table_number&&(
                                     <>
                                       <span style={{color:C.textTertiary,fontSize:11}}>·</span>
@@ -2927,6 +3137,7 @@ export default function ReservationDashboard() {
             onUpdate={handleUpdateDetails}
             canManage={canManageReservations}
             canAdjust={canAdjustReservations}
+            venueRows={venueRows}
           />
         )}
       </div>

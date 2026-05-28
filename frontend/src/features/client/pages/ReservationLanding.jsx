@@ -330,13 +330,10 @@ function buildEventVenuesFromConfig(rooms = []) {
       return {
         title: room.display_name || room.name,
         image: resolveRoomImage(room.image),
-        route: room.parent_selectable && room.reservations_enabled ? roomRoute(room) : (children[0] ? roomRoute(children[0]) : null),
-        disabled: !(room.parent_selectable && room.reservations_enabled) && children.length === 0,
+        route: roomRoute(room),
+        disabled: !(room.is_active && room.is_visible && room.reservations_enabled),
         imageFocus: room.image_position || "center 50%",
-        rooms: children.map((child) => ({
-          label: childLabel(child, room.name),
-          route: roomRoute(child),
-        })),
+        rooms: [], // Do NOT show child/subrooms as selectable links
       };
     });
 }

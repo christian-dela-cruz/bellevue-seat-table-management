@@ -60,6 +60,7 @@ Route::prefix('venues')->group(function () {
     Route::get('/availability', [VenueController::class, 'availability']);
     Route::get('/time-slots', [VenueController::class, 'timeSlots']);
     Route::get('/{id}', [VenueController::class, 'show']);
+    Route::get('/{id}/available-subrooms', [VenueController::class, 'availableSubrooms']);
     Route::post('/', [VenueController::class, 'store'])->middleware(AdminAccess::class . ':manage_venues');
     Route::put('/{id}', [VenueController::class, 'update'])->middleware(AdminAccess::class . ':manage_venues');
     Route::post('/{id}/image', [VenueController::class, 'uploadImage'])->middleware(AdminAccess::class . ':manage_venues');

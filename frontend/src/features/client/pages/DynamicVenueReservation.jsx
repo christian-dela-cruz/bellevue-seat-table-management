@@ -1001,6 +1001,9 @@ export default function DynamicVenueReservation() {
 
   const roomChoices = useMemo(() => {
     if (!venue) return [];
+    if (venue.type === "function_room") {
+      return venue.parent_selectable !== false ? [venue] : [];
+    }
     const activeChildren = (venue.children || [])
       .filter((child) => child.is_active && child.is_visible && child.reservations_enabled && child.child_selectable !== false)
       .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0));

@@ -47,7 +47,10 @@ class Reservation extends Model
         'last_handled_by_id',
         'last_handled_by_name',
         'last_operational_action',
-        'last_operational_at',
+        'assigned_room_id',
+        'public_room_name',
+        'internal_room_name',
+        'assignment_status',
     ];
 
     protected $casts = [
@@ -103,6 +106,11 @@ class Reservation extends Model
     public function venue(): BelongsTo
     {
         return $this->belongsTo(Venue::class);
+    }
+
+    public function assignedRoom(): BelongsTo
+    {
+        return $this->belongsTo(Venue::class, 'assigned_room_id');
     }
 
     public function transactions(): HasMany

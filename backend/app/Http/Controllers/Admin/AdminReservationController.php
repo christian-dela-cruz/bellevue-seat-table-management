@@ -191,13 +191,61 @@ class AdminReservationController extends Controller
             'special_requests' => 'sometimes|nullable|string',
             'type'             => 'sometimes|required|in:whole,individual,standalone',
             'is_standalone'    => 'sometimes|boolean',
+            'assigned_room_id' => 'sometimes|nullable|exists:venues,id',
+            'assignment_status' => 'sometimes|required|string|in:pending_assignment,auto_assigned,manually_assigned',
         ]);
 
         $targetVenueId = (int) ($validated['venue_id'] ?? $reservation->venue_id);
         $targetRoom = array_key_exists('room', $validated) ? $validated['room'] : $reservation->room;
+        $targetDate = $validated['event_date'] ?? $reservation->event_date;
+        $targetTime = $validated['event_time'] ?? $reservation->event_time;
+        $targetGuests = (int) ($validated['guests_count'] ?? $reservation->guests_count);
 
         if (!$this->reservationService->canAccessVenue($admin, $targetVenueId, $targetRoom)) {
             return $this->scopeDeniedResponse();
+        }
+
+        if (array_key_exists('assigned_room_id', $validated)) {
+            $assignedRoomId = $validated['assigned_room_id'];
+            if ($assignedRoomId) {
+                $childRoom = Venue::find($assignedRoomId);
+                if (!$childRoom) {
+                    return response()->json(['success' => false, 'message' => 'The selected subroom does not exist.'], 422);
+                }
+                if ((int) $childRoom->parent_id !== $targetVenueId) {
+                    return response()->json(['success' => false, 'message' => 'The selected subroom does not belong to the selected parent venue.'], 422);
+                }
+                
+                if (!$childRoom->is_active || $childRoom->is_archived || !$childRoom->reservations_enabled) {
+                    return response()->json(['success' => false, 'message' => 'The selected subroom is not active or reservable.'], 422);
+                }
+
+                if ($childRoom->capacity > 0 && $targetGuests > $childRoom->capacity) {
+                    return response()->json(['success' => false, 'message' => "Subroom capacity ({$childRoom->capacity}) is too small for {$targetGuests} guests."], 422);
+                }
+
+                $parentVenue = Venue::find($targetVenueId);
+                $availableSubrooms = $this->venueService->getAvailableSubrooms(
+                    $parentVenue,
+                    $targetDate instanceof \DateTimeInterface ? $targetDate->format('Y-m-d') : $targetDate,
+                    $targetTime,
+                    $targetGuests,
+                    $reservation->id
+                );
+                
+                $isAvailable = collect($availableSubrooms)->contains(fn ($sub) => (int) ($sub['id'] ?? $sub->id) === (int) $assignedRoomId);
+                if (!$isAvailable) {
+                    return response()->json(['success' => false, 'message' => 'The selected subroom is already booked or unavailable for this schedule.'], 422);
+                }
+                
+                $validated['assigned_room_id'] = $childRoom->id;
+                $validated['internal_room_name'] = $childRoom->name;
+                $validated['assignment_status'] = 'manually_assigned';
+            } else {
+                $validated['assigned_room_id'] = null;
+                $validated['internal_room_name'] = null;
+                $validated['assignment_status'] = 'pending_assignment';
+            }
         }
 
         $merged = array_merge($reservation->only([
@@ -209,6 +257,7 @@ class AdminReservationController extends Controller
             'event_time',
             'type',
             'is_standalone',
+            'assigned_room_id',
         ]), $validated);
 
         if ($this->reservationService->hasScheduleConflict($merged, $reservation->id)) {
