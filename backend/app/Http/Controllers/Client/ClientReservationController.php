@@ -90,6 +90,8 @@ class ClientReservationController extends Controller
     {
         \Log::info('Store called, email: ' . $request->email);
 
+        $this->resolveAndMergeVenueId($request);
+
         $validated = $request->validate([
             'name'             => 'required|string|max:255',
             'email'            => 'required|email|max:255',
@@ -571,6 +573,82 @@ class ClientReservationController extends Controller
         } catch (\Exception $e) {
             \Log::error('[ClientReservationController::notify] Mail failed: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Mail failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Resolves the venue ID dynamically based on room name, slug or metadata,
+     * ensuring complete self-healing backward compatibility for legacy frontend clients.
+     */
+    private function resolveAndMergeVenueId(Request $request): void
+    {
+        $roomName = $request->input('room');
+        $venueId = $request->input('venue_id');
+
+        if (!empty($roomName)) {
+            $selectedVenue = Venue::where('is_active', true)
+                ->where('is_archived', false)
+                ->where(function ($query) use ($roomName) {
+                    $query->where('name', $roomName)
+                        ->orWhere('slug', $roomName);
+                })
+                ->first();
+
+            if (!$selectedVenue) {
+                // Try case-insensitive matching
+                $selectedVenue = Venue::where('is_active', true)
+                    ->where('is_archived', false)
+                    ->where(function ($query) use ($roomName) {
+                        $query->whereRaw('lower(name) = ?', [strtolower(trim($roomName))])
+                            ->orWhereRaw('lower(slug) = ?', [strtolower(trim($roomName))]);
+                    })
+                    ->first();
+            }
+
+            if (!$selectedVenue) {
+                // Try parent matching using parentVenueNameForRoom
+                $parentName = $this->parentVenueNameForRoom($roomName);
+                $selectedVenue = Venue::where('is_active', true)
+                    ->where('is_archived', false)
+                    ->where('name', $parentName)
+                    ->first();
+            }
+
+            if ($selectedVenue) {
+                $targetVenueId = $selectedVenue->parent_id ?: $selectedVenue->id;
+                $request->merge(['venue_id' => $targetVenueId]);
+                return;
+            }
+        }
+
+        if (!empty($venueId)) {
+            $venue = Venue::find($venueId);
+            if (!$venue || !$venue->is_active || $venue->is_archived) {
+                // Check metadata canonical ID
+                if ($venue && !empty($venue->metadata) && is_array($venue->metadata) && isset($venue->metadata['canonical_venue_id'])) {
+                    $canonicalId = $venue->metadata['canonical_venue_id'];
+                    $canonicalVenue = Venue::where('is_active', true)->where('is_archived', false)->find($canonicalId);
+                    if ($canonicalVenue) {
+                        $request->merge(['venue_id' => $canonicalVenue->id]);
+                        return;
+                    }
+                }
+
+                // Match active venue by same name/slug
+                if ($venue) {
+                    $matchedVenue = Venue::where('is_active', true)
+                        ->where('is_archived', false)
+                        ->where(function ($query) use ($venue) {
+                            $query->where('name', $venue->name)
+                                ->orWhere('slug', $venue->slug);
+                        })
+                        ->first();
+                    if ($matchedVenue) {
+                        $request->merge(['venue_id' => $matchedVenue->id]);
+                        return;
+                    }
+                }
+            }
         }
     }
 }

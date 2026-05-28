@@ -30,7 +30,7 @@ import { authAPI } from "../../../services/authAPI";
 import { reportAPI } from "../../../services/reportAPI";
 import { venueAPI } from "../../../services/venueAPI";
 import { fetchReservations } from "../../../utils/api";
-import { buildOutletRowsFromVenues, canonicalOutletName, outletGroupLabel } from "../../../constants/outletCatalog";
+import { buildOutletRowsFromVenues, canonicalOutletName, outletGroupLabel, buildDynamicOutletTree } from "../../../constants/outletCatalog";
 
 const C = {
   page: "#F7F4EE",
@@ -63,94 +63,7 @@ const RECONNECT_WINDOW_MS = 60000;
 const MAX_RECONNECTS_IN_WINDOW = 5;
 const WS_RECOVERY_RETRY_MS = 45000;
 
-function buildDynamicOutletTree(venues = []) {
-  if (!venues || venues.length === 0) {
-    return [
-      {
-        id: "main-wing",
-        label: "Main Wing",
-        sections: [
-          { label: "Alabang Function Room", items: ["Alabang Function Room"] },
-          { label: "Business Center", items: ["Business Center"] },
-          { label: "Laguna Ballroom", items: ["Laguna Ballroom 1", "Laguna Ballroom 2"] },
-          { label: "20/20 Function Room", items: ["20/20 Function Room A", "20/20 Function Room B", "20/20 Function Room C"] },
-        ],
-      },
-      {
-        id: "tower-wing",
-        label: "Tower Wing",
-        sections: [
-          { label: "Grand Ballroom", items: ["Grand Ballroom A", "Grand Ballroom B", "Grand Ballroom C"] },
-          { label: "Tower Ballroom", items: ["Tower 1", "Tower 2", "Tower 3"] },
-        ],
-      },
-      {
-        id: "dining",
-        label: "Dining",
-        sections: [
-          { label: "Hanakazu Japanese Restaurant", items: ["Hanakazu Japanese Restaurant"] },
-          { label: "Qsina Restaurant", items: ["Qsina Restaurant"] },
-          { label: "Phoenix Court", items: ["Phoenix Court"] },
-        ],
-      },
-    ];
-  }
 
-  const activeVenues = venues.filter(v => !v.is_archived);
-  const parents = activeVenues.filter(v => v.parent_id === null);
-  const groupsMap = new Map();
-
-  parents.forEach(parent => {
-    const isDining = String(parent.type || "").toLowerCase() === "dining"
-      || String(parent.wing || "").toLowerCase() === "dining"
-      || String(parent.name || "").toLowerCase().includes("restaurant")
-      || String(parent.name || "").toLowerCase().includes("qsina")
-      || String(parent.name || "").toLowerCase().includes("hanakazu")
-      || String(parent.name || "").toLowerCase().includes("phoenix");
-
-    const wingLabel = isDining ? "Dining" : (parent.wing || "Main Wing");
-    const groupId = isDining ? "dining" : slugify(wingLabel);
-
-    if (!groupsMap.has(groupId)) {
-      groupsMap.set(groupId, {
-        id: groupId,
-        label: wingLabel,
-        sections: []
-      });
-    }
-
-    const children = activeVenues.filter(v => v.parent_id === parent.id);
-    const items = children.length > 0
-      ? children.map(c => c.name)
-      : [parent.name];
-
-    groupsMap.get(groupId).sections.push({
-      label: parent.name,
-      items,
-      display_order: parent.display_order ?? 9999
-    });
-  });
-
-  const sortedGroups = Array.from(groupsMap.values()).map(group => {
-    group.sections.sort((a, b) => {
-      if (a.display_order !== b.display_order) {
-        return a.display_order - b.display_order;
-      }
-      return a.label.localeCompare(b.label);
-    });
-    return group;
-  });
-
-  const order = { "main-wing": 0, "tower-wing": 1, "dining": 2 };
-  sortedGroups.sort((a, b) => {
-    const oA = order[a.id] ?? 99;
-    const oB = order[b.id] ?? 99;
-    if (oA !== oB) return oA - oB;
-    return a.label.localeCompare(b.label);
-  });
-
-  return sortedGroups;
-}
 
 function today() {
   const date = new Date();
@@ -207,6 +120,23 @@ function buildSelectableOutlets(outlets, dynamicOutletTree = []) {
   const pushed = new Set();
 
   dynamicOutletTree.forEach((group) => {
+    const wingChildren = [];
+    group.sections.forEach((s) => {
+      s.items.forEach((name) => {
+        if (byName.has(name)) wingChildren.push(name);
+      });
+    });
+    if (wingChildren.length > 0) {
+      rows.push({
+        name: group.label,
+        display_name: group.label,
+        wing: group.label,
+        type: "wing",
+        aggregate: true,
+        children: wingChildren,
+      });
+    }
+
     group.sections.forEach((section) => {
       const children = section.items.filter((name) => byName.has(name));
       const parent = byName.get(section.label);
@@ -264,6 +194,7 @@ function mergeConfiguredOutlets(reportOutlets = [], venues = []) {
         wing: existing.wing || venue.wing,
         type: existing.type || venue.type,
         slug: existing.slug || venue.slug,
+        display_name: venue.display_name,
         reservation_route: existing.reservation_route || venue.reservation_route,
         children: existing.children?.length ? existing.children : venue.children,
       });
@@ -455,13 +386,46 @@ function OutletSelector({ outlets, selectedOutlet, onSelect, dynamicOutletTree =
               if (!visibleSections.length) return null;
               return (
                 <div key={group.id} style={{ border: `1px solid ${C.divider}`, borderRadius: 10, overflow: "hidden", background: C.soft }}>
-                  <div style={{ padding: "8px 10px", fontFamily: F.label, fontSize: 9, fontWeight: 850, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, background: "rgba(140,107,42,0.045)" }}>{group.label}</div>
+                  <button
+                    type="button"
+                    onClick={() => selectOutlet(group.label)}
+                    style={{
+                      width: "100%",
+                      border: "none",
+                      padding: "8px 10px",
+                      fontFamily: F.label,
+                      fontSize: 9,
+                      fontWeight: 850,
+                      letterSpacing: "0.16em",
+                      textTransform: "uppercase",
+                      color: C.gold,
+                      background: "rgba(140,107,42,0.045)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      transition: "background 0.16s, color 0.16s",
+                    }}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.background = "rgba(140,107,42,0.09)";
+                      event.currentTarget.style.color = C.text;
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.background = "rgba(140,107,42,0.045)";
+                      event.currentTarget.style.color = C.gold;
+                    }}
+                  >
+                    <span>{group.label}</span>
+                    <span style={{ fontSize: 8, opacity: 0.85, fontWeight: 700 }}>Select entire wing ➔</span>
+                  </button>
                   <div style={{ display: "grid", background: C.surface }}>
                     {visibleSections.map((section) => (
                       <div key={section.label} style={{ borderTop: `1px solid ${C.divider}` }}>
                         {section.showParent && (
                           <OutletOption
                             name={section.label}
+                            displayName={section.parent?.display_name || section.label}
                             active={selectedName === section.label}
                             onClick={() => selectOutlet(section.label)}
                             depth={0}
@@ -471,9 +435,20 @@ function OutletSelector({ outlets, selectedOutlet, onSelect, dynamicOutletTree =
                         {!section.showParent && section.visibleItems.length > 0 && (
                           <div style={{ padding: "8px 10px 4px", fontSize: 11, fontWeight: 750, color: C.text }}>{section.label}</div>
                         )}
-                        {section.visibleItems.filter((name) => name !== section.label).map((name) => (
-                          <OutletOption key={name} name={name} active={selectedName === name} onClick={() => selectOutlet(name)} depth={section.items.length > 1 || section.label !== name ? 1 : 0} badge="Sub-room" />
-                        ))}
+                        {section.visibleItems.filter((name) => name !== section.label).map((name) => {
+                          const childObj = available.get(name);
+                          return (
+                            <OutletOption
+                              key={name}
+                              name={name}
+                              displayName={childObj?.display_name || name}
+                              active={selectedName === name}
+                              onClick={() => selectOutlet(name)}
+                              depth={section.items.length > 1 || section.label !== name ? 1 : 0}
+                              badge="Sub-room"
+                            />
+                          );
+                        })}
                       </div>
                     ))}
                   </div>
@@ -484,7 +459,7 @@ function OutletSelector({ outlets, selectedOutlet, onSelect, dynamicOutletTree =
               <div style={{ border: `1px solid ${C.divider}`, borderRadius: 10, overflow: "hidden", background: C.surface }}>
                 <div style={{ padding: "8px 10px", fontFamily: F.label, fontSize: 9, fontWeight: 850, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, background: C.soft }}>Other Outlets</div>
                 {fallbackOutlets.filter((outlet) => matches(outlet.name)).map((outlet) => (
-                  <OutletOption key={outlet.name} name={outlet.name} active={selectedName === outlet.name} onClick={() => selectOutlet(outlet.name)} depth={0} />
+                  <OutletOption key={outlet.name} name={outlet.name} displayName={outlet.display_name} active={selectedName === outlet.name} onClick={() => selectOutlet(outlet.name)} depth={0} />
                 ))}
               </div>
             )}
@@ -495,7 +470,7 @@ function OutletSelector({ outlets, selectedOutlet, onSelect, dynamicOutletTree =
   );
 }
 
-function OutletOption({ name, active, onClick, depth, badge }) {
+function OutletOption({ name, active, onClick, depth, badge, displayName }) {
   return (
     <button
       type="button"
@@ -518,7 +493,7 @@ function OutletOption({ name, active, onClick, depth, badge }) {
       onMouseEnter={(event) => { if (!active) event.currentTarget.style.background = "rgba(140,107,42,0.045)"; }}
       onMouseLeave={(event) => { if (!active) event.currentTarget.style.background = "transparent"; }}
     >
-      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: active ? 750 : 500 }}>{name}</span>
+      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: active ? 750 : 500 }}>{displayName || name}</span>
       {badge && <span style={{ fontSize: 9, color: active ? C.gold : C.faint, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>{badge}</span>}
     </button>
   );

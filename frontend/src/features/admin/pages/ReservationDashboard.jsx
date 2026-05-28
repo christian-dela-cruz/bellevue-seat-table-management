@@ -8,7 +8,8 @@ import Sidebar from "../../../components/layout/Sidebar";
 import { fetchReservations, approveReservation, rejectReservation, revertReservation, updateReservation, getReservationStats } from "../../../utils/api";
 import { authAPI } from "../../../services/authAPI";
 import { venueAPI } from "../../../services/venueAPI";
-import { ADMIN_OUTLET_GROUPS, buildOutletGroupsFromVenues, canonicalOutletName, getScopedOutletGroups, getScopedOutletRooms } from "../../../constants/outletCatalog";
+import { ADMIN_OUTLET_GROUPS, buildOutletGroupsFromVenues, canonicalOutletName, getScopedOutletGroups, getScopedOutletRooms, buildDynamicOutletTree, resolveOutletChildren } from "../../../constants/outletCatalog";
+import RoomFilterDropdown from "../components/RoomFilterDropdown";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -430,6 +431,105 @@ function getSeatStatusWeight(status) {
   return ["approved", "reserved", "rejected", "cancelled", "pending"].includes(s) ? 700 : 400;
 }
 
+/*
+  try {
+    const wing = String(reservation.wing ?? DEFAULT_WING).trim();
+    const room = String(reservation.room ?? "").trim();
+
+    if (!room) {
+      console.warn("[Dashboard] optimisticSeatUpdate: no room field", reservation);
+      return;
+    }
+
+    const key = layoutKey(wing, room);
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const layout = JSON.parse(raw);
+    if (!layout) return;
+
+    const isStandalone =
+      String(reservation.table_number || "").toUpperCase() === "STANDALONE" ||
+      reservation.type === "standalone" ||
+      reservation.is_standalone === 1 ||
+      reservation.is_standalone === true;
+
+    const rawSeatField = String(reservation.seat ?? reservation.seat_number ?? "").trim();
+    const seatNums = new Set(
+      rawSeatField.split(",").map(s => s.trim()).filter(Boolean)
+    );
+    const guestsCount = parseInt(reservation.guests_count ?? reservation.guests ?? 0, 10);
+    const reservationType = String(reservation.type ?? "").toLowerCase();
+
+    const persist = (updated) => {
+      const payload = JSON.stringify(updated);
+      localStorage.setItem(key, payload);
+      window.dispatchEvent(new StorageEvent("storage", {
+        key, newValue: payload, storageArea: localStorage,
+      }));
+      window.dispatchEvent(new CustomEvent("seatmap:saved", {
+        detail: { wing, room, payload },
+      }));
+    };
+
+    if (isStandalone) {
+      const updatedStandaloneSeats = (layout.standaloneSeats || []).map(s => {
+        const num = String(s.num ?? s.label ?? s.id ?? "").trim();
+        if (seatNums.has(num) || seatNums.has(String(s.id).trim())) {
+          return { ...s, status: newSeatStatus };
+        }
+        return s;
+      });
+      persist({ ...layout, standaloneSeats: updatedStandaloneSeats });
+      return;
+    }
+
+    const tableId = String(reservation.table_number ?? "").trim();
+
+    const updatedTables = (layout.tables || []).map(t => {
+      const tId = String(t.id ?? "").trim();
+      const tLabel = String(t.label ?? "").trim();
+      const normalizedTableId = tableId.replace(/^T/i, "");
+      const normalizedTId = tId.replace(/^T/i, "");
+      const normalizedTLabel = tLabel.replace(/^T/i, "");
+
+      const tableMatches =
+        tId === tableId ||
+        tLabel === tableId ||
+        normalizedTId === normalizedTableId ||
+        normalizedTLabel === normalizedTableId;
+
+      if (!tableMatches) return t;
+
+      const isWholeTable = reservationType === "whole" || seatNums.size > 1;
+
+      if (isWholeTable) {
+        if (seatNums.size > 0) {
+          return {
+            ...t,
+            seats: t.seats.map(s => {
+              const num = String(s.num ?? s.label ?? s.id ?? "").trim();
+              return seatNums.has(num) ? { ...s, status: newSeatStatus } : s;
+            }),
+          };
+        } else {
+          let marked = 0;
+          return {
+            ...t,
+            seats: t.seats.map(s => {
+              if (marked < guestsCount && (s.status === "available" || s.status === "pending")) {
+                marked++;
+  const s = (status || "").toLowerCase();
+  if (s === "approved" || s === "reserved") return C.red;
+  if (s === "rejected" || s === "cancelled") return C.green;
+  if (s === "pending") return C.gold;
+  return C.textTertiary;
+}
+
+
+
+
+*/
+
 function optimisticSeatUpdate(reservation, newSeatStatus) {
   try {
     const wing = String(reservation.wing ?? DEFAULT_WING).trim();
@@ -524,7 +624,6 @@ function optimisticSeatUpdate(reservation, newSeatStatus) {
           };
         }
       }
-
       return {
         ...t,
         seats: t.seats.map(s => {
@@ -538,203 +637,6 @@ function optimisticSeatUpdate(reservation, newSeatStatus) {
   } catch (err) {
     console.warn("[Dashboard] optimisticSeatUpdate error:", err);
   }
-}
-
-// ─── Room Filter Dropdown ─────────────────────────────────────────────────────
-function RoomFilterDropdown({ rooms, groups = ADMIN_OUTLET_GROUPS, selectedRoom, onSelect, isMobile }) {
-  const [open, setOpen] = useState(false);
-  const [focused, setFocused] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const label = selectedRoom === "ALL" ? "All Rooms" : selectedRoom;
-  const hasFilter = selectedRoom !== "ALL";
-  const visibleRoomSet = new Set(rooms.map(canonicalOutletName));
-  const masterRoomSet = new Set(groups.flatMap((group) => group.rooms).map(canonicalOutletName));
-  const groupedRooms = [
-    ...groups.map((group) => ({
-      ...group,
-      rooms: group.rooms.filter((room) => visibleRoomSet.has(canonicalOutletName(room))),
-    })),
-    {
-      id: "other",
-      label: "Other",
-      rooms: rooms.filter(room => !masterRoomSet.has(canonicalOutletName(room))),
-    },
-  ].filter(group => group.rooms.length > 0);
-
-  return (
-    <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "7px 11px",
-          background: hasFilter ? C.goldFaint : C.surfaceBase,
-          border: `1.5px solid ${open || focused ? C.borderAccent : hasFilter ? C.gold + "55" : C.borderDefault}`,
-          borderRadius: 8,
-          fontFamily: F.label,
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: "0.10em",
-          textTransform: "uppercase",
-          color: hasFilter ? C.gold : C.textSecondary,
-          cursor: "pointer",
-          transition: "all 0.18s",
-          whiteSpace: "nowrap",
-          boxShadow: open ? C.inputFocusShadow : "none",
-          minWidth: isMobile ? 120 : 148,
-        }}
-        onMouseEnter={(e) => {
-          if (!open) {
-            e.currentTarget.style.borderColor = C.borderAccent;
-            e.currentTarget.style.color = C.gold;
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!open && !focused) {
-            e.currentTarget.style.borderColor = hasFilter ? C.gold + "55" : C.borderDefault;
-            e.currentTarget.style.color = hasFilter ? C.gold : C.textSecondary;
-          }
-        }}
-      >
-        {/* Room icon */}
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-          <polyline points="9 22 9 12 15 12 15 22"/>
-        </svg>
-        <span style={{ flex: 1, textAlign: "left", maxWidth: isMobile ? 80 : 100, overflow: "hidden", textOverflow: "ellipsis" }}>
-          {label}
-        </span>
-        {/* Chevron */}
-        <svg
-          width="9" height="9" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"
-          style={{ transition: "transform 0.18s", transform: open ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}
-        >
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </button>
-
-      {open && (
-        <div style={{
-          position: "absolute",
-          top: "calc(100% + 6px)",
-          left: 0,
-          zIndex: 500,
-          background: C.surfaceBase,
-          border: `1px solid ${C.borderDefault}`,
-          borderRadius: 10,
-          boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-          minWidth: 200,
-          maxWidth: 280,
-          maxHeight: 320,
-          overflowY: "auto",
-          animation: "dropdownIn 0.16s cubic-bezier(0.16,1,0.3,1)",
-          padding: "6px 0",
-        }}>
-          {/* All Rooms option */}
-          <button
-            onClick={() => { onSelect("ALL"); setOpen(false); }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              width: "100%",
-              padding: "8px 14px",
-              background: selectedRoom === "ALL" ? C.goldFaint : "transparent",
-              border: "none",
-              textAlign: "left",
-              fontFamily: F.label,
-              fontSize: 10,
-              fontWeight: selectedRoom === "ALL" ? 700 : 600,
-              letterSpacing: "0.10em",
-              textTransform: "uppercase",
-              color: selectedRoom === "ALL" ? C.gold : C.textSecondary,
-              cursor: "pointer",
-              transition: "background 0.12s",
-            }}
-            onMouseEnter={(e) => { if (selectedRoom !== "ALL") e.currentTarget.style.background = "rgba(0,0,0,0.03)"; }}
-            onMouseLeave={(e) => { if (selectedRoom !== "ALL") e.currentTarget.style.background = "transparent"; }}
-          >
-            {selectedRoom === "ALL" && (
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            )}
-            {selectedRoom !== "ALL" && <span style={{ width: 9 }} />}
-            All Rooms
-          </button>
-
-          {rooms.length > 0 && (
-            <div style={{ height: 1, background: C.divider, margin: "4px 10px" }} />
-          )}
-
-          {groupedRooms.map((group) => (
-            <div key={group.id}>
-              <div style={{ padding: "9px 14px 5px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>{group.label}</span>
-                <span style={{ fontFamily: F.label, fontSize: 10, color: C.textTertiary }}>{group.rooms.length}</span>
-              </div>
-              {group.rooms.map((room) => (
-                <button
-                  key={room}
-                  onClick={() => { onSelect(room); setOpen(false); }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    width: "100%",
-                    padding: "8px 14px 8px 22px",
-                    background: selectedRoom === room ? C.goldFaint : "transparent",
-                    border: "none",
-                    textAlign: "left",
-                    fontFamily: F.body,
-                    fontSize: 12,
-                    fontWeight: selectedRoom === room ? 600 : 400,
-                    color: selectedRoom === room ? C.gold : C.textPrimary,
-                    cursor: "pointer",
-                    transition: "background 0.12s",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                  onMouseEnter={(e) => { if (selectedRoom !== room) e.currentTarget.style.background = "rgba(0,0,0,0.03)"; }}
-                  onMouseLeave={(e) => { if (selectedRoom !== room) e.currentTarget.style.background = "transparent"; }}
-                >
-                  {selectedRoom === room ? (
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                  ) : (
-                    <span style={{ width: 9 }} />
-                  )}
-                  {room}
-                </button>
-              ))}
-            </div>
-          ))}
-
-          {rooms.length === 0 && (
-            <div style={{ padding: "10px 14px", fontFamily: F.body, fontSize: 12, color: C.textTertiary }}>
-              No rooms found
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
 }
 
 // ─── Reject Reason Modal ──────────────────────────────────────────────────────
@@ -1985,6 +1887,7 @@ export default function ReservationDashboard() {
     [currentUser, outletGroups]
   );
 
+
   // ─── Master room list + any extra rooms found in reservations ───────────────
   const roomOptions = useMemo(() => {
     const scopedRooms = getScopedOutletRooms(currentUser, outletGroups);
@@ -2112,6 +2015,38 @@ export default function ReservationDashboard() {
     };
   }, [refreshDashboardData]);
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   useEffect(()=>{
     return () => {
       if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
@@ -2139,9 +2074,12 @@ export default function ReservationDashboard() {
 
     // ← NEW: room filter
     if(filterRoom!=="ALL"){
-      filtered=filtered.filter((r)=>
-        canonicalOutletName(r.room)===filterRoom
-      );
+      const children = resolveOutletChildren(filterRoom, venueRows);
+      const childrenSet = new Set(children.map(canonicalOutletName));
+      filtered=filtered.filter((r)=>{
+        const resRoom = canonicalOutletName(r.room);
+        return resRoom && (resRoom === filterRoom || childrenSet.has(resRoom));
+      });
     }
 
     if(filterPriority!=="ALL"){
@@ -2485,7 +2423,7 @@ export default function ReservationDashboard() {
                 {/* Room filter dropdown */}
                 <RoomFilterDropdown
                   rooms={roomOptions}
-                  groups={scopedOutletGroups}
+                  venues={venueRows}
                   selectedRoom={filterRoom}
                   onSelect={(room) => setFilterRoom(room)}
                   isMobile={isMobile}
@@ -2607,7 +2545,7 @@ export default function ReservationDashboard() {
                 <OperationalMetricCard label="Notifications" value={operationalStats.notificationIssues} helper="Delivery issues" tone={operationalStats.notificationIssues ? "red" : "green"} />
               </div>
 
-              <div style={{background:C.cardBg,borderRadius:12,border:`1px solid ${C.cardBorder}`,overflow:"hidden",boxShadow:"0 1px 4px rgba(24,20,14,0.03)"}}>
+              <div style={{background:C.cardBg,borderRadius:12,border:`1px solid ${C.cardBorder}`,overflow:"visible",boxShadow:"0 1px 4px rgba(24,20,14,0.03)"}}>
 
                 {/* Table toolbar */}
                 <div style={{
@@ -2758,7 +2696,7 @@ export default function ReservationDashboard() {
                       <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Room</span>
                       <RoomFilterDropdown
                         rooms={roomOptions}
-                        groups={scopedOutletGroups}
+                        venues={venueRows}
                         selectedRoom={filterRoom}
                         onSelect={(room) => setFilterRoom(room)}
                         isMobile={isMobile}

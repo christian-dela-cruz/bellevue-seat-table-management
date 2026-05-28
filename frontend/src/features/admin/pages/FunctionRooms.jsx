@@ -1695,7 +1695,7 @@ export default function FunctionRooms() {
             <div className="function-room-table-wrap">
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1040, tableLayout: "fixed" }}>
                 <thead>
-                  <tr style={{ background: C.surface, position: "sticky", top: 0, zIndex: 1 }}>
+                  <tr style={{ background: C.surface }}>
                     {[
                       { label: "Venue Structure", width: "42%", align: "left" },
                       { label: "Status", width: "11%", align: "left" },

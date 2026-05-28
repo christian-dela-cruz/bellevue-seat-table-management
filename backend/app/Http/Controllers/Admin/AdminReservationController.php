@@ -96,6 +96,8 @@ class AdminReservationController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->resolveAndMergeVenueId($request);
+
         $validated = $request->validate([
             'name'             => 'required|string|max:255',
             'email'            => 'required|email|max:255',
@@ -167,6 +169,8 @@ class AdminReservationController extends Controller
         if (!$this->reservationService->canAccessReservation($admin, $reservation)) {
             return $this->scopeDeniedResponse();
         }
+
+        $this->resolveAndMergeVenueId($request);
 
         $validated = $request->validate([
             'name'             => 'sometimes|required|string|max:255',
@@ -668,5 +672,152 @@ class AdminReservationController extends Controller
             'success' => false,
             'message' => 'You are not authorized to access this outlet.',
         ], 403);
+    }
+
+    /**
+     * Resolves the venue ID dynamically based on room name, slug or metadata,
+     * ensuring complete self-healing backward compatibility for legacy frontend clients.
+     */
+    private function resolveAndMergeVenueId(Request $request): void
+    {
+        $roomName = $request->input('room');
+        $venueId = $request->input('venue_id');
+
+        if (!empty($roomName)) {
+            $selectedVenue = Venue::where('is_active', true)
+                ->where('is_archived', false)
+                ->where(function ($query) use ($roomName) {
+                    $query->where('name', $roomName)
+                        ->orWhere('slug', $roomName);
+                })
+                ->first();
+
+            if (!$selectedVenue) {
+                // Try case-insensitive matching
+                $selectedVenue = Venue::where('is_active', true)
+                    ->where('is_archived', false)
+                    ->where(function ($query) use ($roomName) {
+                        $query->whereRaw('lower(name) = ?', [strtolower(trim($roomName))])
+                            ->orWhereRaw('lower(slug) = ?', [strtolower(trim($roomName))]);
+                    })
+                    ->first();
+            }
+
+            if (!$selectedVenue) {
+                // Try parent matching using parentVenueNameForRoom
+                $parentName = $this->parentVenueNameForRoom($roomName);
+                $selectedVenue = Venue::where('is_active', true)
+                    ->where('is_archived', false)
+                    ->where('name', $parentName)
+                    ->first();
+            }
+
+            if ($selectedVenue) {
+                $targetVenueId = $selectedVenue->parent_id ?: $selectedVenue->id;
+                $request->merge(['venue_id' => $targetVenueId]);
+                return;
+            }
+        }
+
+        if (!empty($venueId)) {
+            $venue = Venue::find($venueId);
+            if (!$venue || !$venue->is_active || $venue->is_archived) {
+                // Check metadata canonical ID
+                if ($venue && !empty($venue->metadata) && is_array($venue->metadata) && isset($venue->metadata['canonical_venue_id'])) {
+                    $canonicalId = $venue->metadata['canonical_venue_id'];
+                    $canonicalVenue = Venue::where('is_active', true)->where('is_archived', false)->find($canonicalId);
+                    if ($canonicalVenue) {
+                        $request->merge(['venue_id' => $canonicalVenue->id]);
+                        return;
+                    }
+                }
+
+                // Match active venue by same name/slug
+                if ($venue) {
+                    $matchedVenue = Venue::where('is_active', true)
+                        ->where('is_archived', false)
+                        ->where(function ($query) use ($venue) {
+                            $query->where('name', $venue->name)
+                                ->orWhere('slug', $venue->slug);
+                        })
+                        ->first();
+                    if ($matchedVenue) {
+                        $request->merge(['venue_id' => $matchedVenue->id]);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    private function parentVenueNameForRoom(string $room): string
+    {
+        $normalized = strtolower(trim($room));
+
+        // 1. Dynamic exact name lookup
+        $venue = Venue::where('name', $room)->first();
+        if ($venue) {
+            if ($venue->parent_id) {
+                $parent = Venue::find($venue->parent_id);
+                if ($parent) {
+                    return $parent->name;
+                }
+            }
+            return $venue->name;
+        }
+
+        // 2. Dynamic slug lookup
+        $venueBySlug = Venue::where('slug', $room)->first();
+        if ($venueBySlug) {
+            if ($venueBySlug->parent_id) {
+                $parent = Venue::find($venueBySlug->parent_id);
+                if ($parent) {
+                    return $parent->name;
+                }
+            }
+            return $venueBySlug->name;
+        }
+
+        // 3. Dynamic prefix match against non-archived parent venues
+        $parentVenue = Venue::whereNull('parent_id')
+            ->get()
+            ->first(function ($v) use ($normalized) {
+                return str_contains($normalized, strtolower($v->name));
+            });
+
+        if ($parentVenue) {
+            return $parentVenue->name;
+        }
+
+        // 4. Legacy hardcoded fallbacks
+        if (str_starts_with($normalized, 'laguna ballroom')) {
+            return 'Laguna Ballroom';
+        }
+
+        if (str_starts_with($normalized, '20/20 function room')) {
+            return '20/20 Function Room';
+        }
+
+        if (str_starts_with($normalized, 'grand ballroom')) {
+            return 'Grand Ballroom';
+        }
+
+        if (str_starts_with($normalized, 'tower ')) {
+            return 'Tower Ballroom';
+        }
+
+        if (str_contains($normalized, 'qsina')) {
+            return 'Qsina Restaurant';
+        }
+
+        if (str_contains($normalized, 'hanakazu')) {
+            return 'Hanakazu Japanese Restaurant';
+        }
+
+        if (str_contains($normalized, 'phoenix')) {
+            return 'Phoenix Court';
+        }
+
+        return $room;
     }
 }

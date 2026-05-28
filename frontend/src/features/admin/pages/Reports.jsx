@@ -6,7 +6,7 @@ import { authAPI } from "../../../services/authAPI";
 import { reportAPI } from "../../../services/reportAPI";
 import { venueAPI } from "../../../services/venueAPI";
 import { Building2, Download, Layers, Printer, Utensils, Search, Activity, ChevronDown, CalendarDays, TrendingUp, Users, CheckCircle, Clock, AlertCircle, List, LayoutGrid } from "lucide-react";
-import { ADMIN_OUTLET_GROUPS, buildOutletGroupsFromVenues, buildOutletRowsFromVenues, canAccessOutlet, canonicalOutletName } from "../../../constants/outletCatalog";
+import { ADMIN_OUTLET_GROUPS, buildOutletGroupsFromVenues, buildOutletRowsFromVenues, canAccessOutlet, canonicalOutletName, buildDynamicOutletTree, resolveOutletChildren } from "../../../constants/outletCatalog";
 import {
   Area,
   CartesianGrid,
@@ -1209,9 +1209,14 @@ export default function Reports() {
 
   const filteredOutlets = useMemo(() => {
     const rows = reportOutletRows.filter((row) => canAccessOutlet(currentUser, row.name, outletGroups));
+    const children = selectedOutlet !== "ALL" ? resolveOutletChildren(selectedOutlet, venueRows) : [];
+    const childrenSet = new Set(children.map(canonicalOutletName));
     const outletFiltered = selectedOutlet === "ALL"
       ? rows
-      : rows.filter((row) => String(row.name) === selectedOutlet);
+      : rows.filter((row) => {
+          const canonicalRowName = canonicalOutletName(row.name);
+          return canonicalRowName === selectedOutlet || childrenSet.has(canonicalRowName);
+        });
     const groupFiltered = selectedOutletGroup === "all"
       ? outletFiltered
       : outletFiltered.filter((row) => outletGroup(row) === selectedOutletGroup);
@@ -1297,6 +1302,11 @@ export default function Reports() {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
+
+      .reports-main-container {
+        background: transparent !important;
+        min-height: auto !important;
+      }
       
       /* Hide all screen interfaces */
       .print-exclude, aside, nav, header, button, .reports-filter-panel, .reports-nav-grid, main, .reports-section {
@@ -1306,19 +1316,19 @@ export default function Reports() {
       /* Show and format print container */
       .print-only {
         display: block !important;
-        padding: 2cm !important;
+        padding: 0 !important;
         background: #FFFFFF !important;
-        font-size: \${
-          printFontScale === "small" ? "10pt" :
-          printFontScale === "large" ? "14pt" :
-          "12pt"
+        font-size: ${
+          printFontScale === "small" ? "9pt" :
+          printFontScale === "large" ? "13pt" :
+          "11pt"
         } !important;
       }
 
       /* Page layout settings */
       @page {
-        size: \${printPageSize} \${printOrientation};
-        margin: 0;
+        size: ${printPageSize} ${printOrientation};
+        margin: 1.5cm !important;
       }
 
       /* Clean luxury headings & tables for print */
@@ -1341,7 +1351,7 @@ export default function Reports() {
 
       .print-section {
         page-break-inside: avoid !important;
-        margin-bottom: 28px;
+        margin-bottom: 38px !important;
       }
 
       .print-section-title {
@@ -1358,8 +1368,9 @@ export default function Reports() {
       .print-table {
         width: 100% !important;
         border-collapse: collapse !important;
-        margin-top: 8px;
-        font-size: 10pt !important;
+        margin-top: 12px;
+        font-size: 8.5pt !important;
+        line-height: 1.45 !important;
       }
 
       .print-table th {
@@ -1367,17 +1378,18 @@ export default function Reports() {
         color: #7A7060 !important;
         font-weight: 700 !important;
         text-transform: uppercase !important;
-        letter-spacing: 0.08em !important;
-        font-size: 8pt !important;
-        padding: 8px 10px !important;
-        border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+        letter-spacing: 0.06em !important;
+        font-size: 7.5pt !important;
+        padding: 10px 8px !important;
+        border-bottom: 2px solid #8C6B2A !important;
         text-align: left !important;
       }
 
       .print-table td {
-        padding: 8px 10px !important;
-        border-bottom: 1px solid rgba(0,0,0,0.05) !important;
-        color: #5E6470 !important;
+        padding: 10px 8px !important;
+        border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+        color: #4A505E !important;
+        font-size: 8.5pt !important;
       }
 
       .print-table tr:last-child td {
@@ -1386,21 +1398,22 @@ export default function Reports() {
 
       .print-table td.strong {
         color: #18140E !important;
-        font-weight: 600 !important;
+        font-weight: 700 !important;
+        white-space: nowrap !important;
       }
 
       .print-grid {
         display: grid !important;
         grid-template-columns: repeat(4, 1fr) !important;
-        gap: 12px !important;
-        margin-bottom: 16px !important;
+        gap: 16px !important;
+        margin-bottom: 24px !important;
       }
 
       .print-card {
         background: #FAF8F4 !important;
-        border: 1px solid rgba(0,0,0,0.06) !important;
+        border: 1px solid rgba(140,107,42,0.12) !important;
         border-radius: 8px !important;
-        padding: 12px !important;
+        padding: 14px 16px !important;
       }
 
       .print-card-label {
@@ -1425,6 +1438,7 @@ export default function Reports() {
       }
     }
   `;
+
   const allOutlets = useMemo(
     () => reportOutletRows.filter((row) => canAccessOutlet(currentUser, row.name, outletGroups)),
     [currentUser, outletGroups, reportOutletRows]
@@ -1448,10 +1462,16 @@ export default function Reports() {
 
   useEffect(() => {
     if (selectedOutlet === "ALL") return;
-    if (!outletOptions.includes(canonicalOutletName(selectedOutlet))) {
+    const tree = buildDynamicOutletTree(venueRows);
+    const validParents = new Set([
+      ...tree.map((g) => g.label.toLowerCase()),
+      ...tree.flatMap((g) => g.sections.map((s) => s.label.toLowerCase())),
+    ]);
+    const normalizedSelected = canonicalOutletName(selectedOutlet).toLowerCase();
+    if (!outletOptions.includes(canonicalOutletName(selectedOutlet)) && !validParents.has(normalizedSelected)) {
       setSelectedOutlet("ALL");
     }
-  }, [outletOptions, selectedOutlet]);
+  }, [outletOptions, selectedOutlet, venueRows]);
 
   useEffect(() => {
     if (selectedOutletGroup === "dining" && diningOutletCount === 0) setSelectedOutletGroup("all");
@@ -1567,7 +1587,7 @@ export default function Reports() {
     : isTrendTab ? `${reportYear} annual trend reporting` : `${dateRangeLabel} date range`;
 
   return (
-    <div style={{ minHeight: "100vh", background: C.page, fontFamily: F.body }}>
+    <div className="reports-main-container" style={{ minHeight: "100vh", background: C.page, fontFamily: F.body }}>
       <style>{`
         @keyframes reportsFadeIn {
           from { opacity: 0; transform: translateY(6px); }
@@ -1589,10 +1609,11 @@ export default function Reports() {
         }
       `}</style>
       <style>{printStyles}</style>
-      <AdminNavbar />
-      <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0, overflow: "hidden" }}>
-        <Sidebar activeNav="reports" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
-        <main style={{ flex: 1, height: "calc(100vh - 60px)", overflow: "auto", padding: "30px 32px 42px" }}>
+      <div className="print-exclude" style={{ display: "flex", flexDirection: "column", height: "100vh", minHeight: 0, overflow: "hidden" }}>
+        <AdminNavbar />
+        <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0, overflow: "hidden" }}>
+          <Sidebar activeNav="reports" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+          <main style={{ flex: 1, height: "calc(100vh - 60px)", overflow: "auto", padding: "30px 32px 42px" }}>
           <AdminPageHeader
             eyebrow="Reports"
             title="Outlet Performance"
@@ -1667,7 +1688,52 @@ export default function Reports() {
                       <FilterField label="Outlet">
                         <select value={selectedOutlet} onChange={(e) => setSelectedOutlet(e.target.value)} style={filterStyle()}>
                           <option value="ALL">All outlets</option>
-                          {allOutlets.map((outlet) => <option key={outlet.name || outlet.venue_id} value={String(outlet.name)}>{outlet.name}</option>)}
+                          {buildDynamicOutletTree(venueRows).flatMap((group) => {
+                            const groupOptions = [];
+                            const groupAccessible = group.sections.some((sec) =>
+                              sec.items.some((item) => allOutlets.some((out) => canonicalOutletName(out.name) === canonicalOutletName(item)))
+                            );
+                            if (!groupAccessible) return [];
+
+                            groupOptions.push(
+                              <option key={group.id} value={group.label} style={{ fontWeight: "bold", color: "#8C6B2A" }}>
+                                -- {group.label} (All) --
+                              </option>
+                            );
+
+                            group.sections.forEach((section) => {
+                              const children = section.items.filter((item) =>
+                                allOutlets.some((out) => canonicalOutletName(out.name) === canonicalOutletName(item))
+                              );
+                              if (children.length === 0) return;
+
+                              const hasChildren = section.items.length > 1;
+                              if (hasChildren) {
+                                groupOptions.push(
+                                  <option key={section.label} value={section.label} style={{ fontWeight: "600" }}>
+                                    {section.label} (All)
+                                  </option>
+                                );
+                                children.forEach((item) => {
+                                  if (item !== section.label) {
+                                    groupOptions.push(
+                                      <option key={item} value={item}>
+                                        {"\u00A0\u00A0\u00A0\u00A0" + item}
+                                      </option>
+                                    );
+                                  }
+                                });
+                              } else {
+                                groupOptions.push(
+                                  <option key={section.label} value={section.label}>
+                                    {section.label}
+                                  </option>
+                                );
+                              }
+                            });
+
+                            return groupOptions;
+                          })}
                         </select>
                       </FilterField>
                     )}
@@ -2064,6 +2130,7 @@ export default function Reports() {
             </div>
           )}
         </main>
+      </div>
       </div>
 
       {/* 1. Print Config Customizer Panel with Live Preview */}

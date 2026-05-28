@@ -5,8 +5,9 @@ import AdminNavbar from "../../../components/layout/AdminNavbar";
 import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 import { venueAPI } from "../../../services/venueAPI";
-import { buildOutletGroupsFromVenues } from "../../../constants/outletCatalog";
+import { buildOutletGroupsFromVenues, buildDynamicOutletTree, resolveOutletChildren } from "../../../constants/outletCatalog";
 
+import RoomFilterDropdown from "../components/RoomFilterDropdown";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
@@ -545,10 +546,12 @@ export default function CancelledDashboard() {
       filtered = filtered.filter(r => !r.cancellation_reason);
     }
     if (roomFilter !== "ALL") {
+      const children = resolveOutletChildren(roomFilter, venues);
+      const childrenSet = new Set(children.map(c => c.toLowerCase().trim()));
       filtered = filtered.filter(r => {
         const resRoom = String(r.room || r.venue?.name || "").toLowerCase().trim();
         const targetRoom = roomFilter.toLowerCase().trim();
-        return resRoom === targetRoom;
+        return resRoom === targetRoom || childrenSet.has(resRoom);
       });
     }
     if (search.trim()) {
@@ -808,7 +811,7 @@ export default function CancelledDashboard() {
               </div>
 
               {/* Table card */}
-              <div style={{ background: C.cardBg, borderRadius: 12, border: `1px solid ${C.cardBorder}`, overflow: "hidden", boxShadow: "0 1px 4px rgba(24,20,14,0.03)" }}>
+              <div style={{ background: C.cardBg, borderRadius: 12, border: `1px solid ${C.cardBorder}`, overflow: "visible", boxShadow: "0 1px 4px rgba(24,20,14,0.03)" }}>
 
                 {/* Card header */}
                 <div style={{
@@ -916,16 +919,13 @@ export default function CancelledDashboard() {
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(140px,200px) minmax(140px,200px) minmax(120px,160px) auto", gap: 10, alignItems: "end" }}>
                     <label style={{ display: "grid", gap: 5 }}>
                       <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Room / Outlet</span>
-                      <select value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)} style={{ padding: "9px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: C.surfaceInput, color: C.textPrimary, fontSize: 12 }}>
-                        <option value="ALL">All Rooms</option>
-                        {buildOutletGroupsFromVenues(venues).map((group) => (
-                          <optgroup key={group.id} label={group.label}>
-                            {group.rooms.map((room) => (
-                              <option key={room} value={room}>{room}</option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
+                      <RoomFilterDropdown
+                        rooms={[]} 
+                        venues={venues}
+                        selectedRoom={roomFilter}
+                        onSelect={(r) => setRoomFilter(r)}
+                        isMobile={isMobile}
+                      />
                     </label>
                     <label style={{ display: "grid", gap: 5 }}>
                       <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Sort</span>

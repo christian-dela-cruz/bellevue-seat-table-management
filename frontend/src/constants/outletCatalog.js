@@ -77,7 +77,7 @@ function collectUniqueVenues(venues = []) {
     const archived = Boolean(venue.is_archived || venue?.metadata?.archived_reason);
     if (archived) return;
 
-    const key = venue.id ? `id:${venue.id}` : `name:${normalizedName(venue.display_name || venue.name)}`;
+    const key = venue.id ? `id:${venue.id}` : `name:${normalizedName(venue.name)}`;
     if (!byKey.has(key)) byKey.set(key, venue);
 
     if (Array.isArray(venue.children)) {
@@ -98,14 +98,14 @@ export function buildOutletGroupsFromVenues(venues = []) {
     const orderA = Number(a?.display_order ?? 9999);
     const orderB = Number(b?.display_order ?? 9999);
     if (orderA !== orderB) return orderA - orderB;
-    return String(a?.display_name || a?.name || "").localeCompare(String(b?.display_name || b?.name || ""), undefined, {
+    return String(a?.name || "").localeCompare(String(b?.name || ""), undefined, {
       numeric: true,
       sensitivity: "base",
     });
   });
 
   sortedVenues.forEach((venue) => {
-    const roomName = canonicalOutletName(venue?.display_name || venue?.name);
+    const roomName = canonicalOutletName(venue?.name);
     if (!roomName) return;
 
     const normalizedRoom = normalizedName(roomName);
@@ -142,20 +142,21 @@ export function buildOutletGroupsFromVenues(venues = []) {
 export function buildOutletRowsFromVenues(venues = []) {
   return collectUniqueVenues(venues)
     .map((venue) => {
-      const name = canonicalOutletName(venue?.display_name || venue?.name);
+      const name = canonicalOutletName(venue?.name);
       if (!name) return null;
 
       return {
         id: venue.id,
         venue_id: venue.id,
         name,
+        display_name: venue?.display_name || venue?.name,
         wing: isDiningVenue(venue, name) ? "Dining" : (venue?.wing || venue?.parent?.wing || outletGroupLabel(name)),
         type: venue?.type || venue?.category || (isDiningVenue(venue, name) ? "dining" : "function"),
         slug: venue?.slug,
         reservation_route: venue?.reservation_route,
         display_order: venue?.display_order ?? 9999,
         children: Array.isArray(venue?.children)
-          ? venue.children.map((child) => canonicalOutletName(child?.display_name || child?.name)).filter(Boolean)
+          ? venue.children.map((child) => canonicalOutletName(child?.name)).filter(Boolean)
           : [],
       };
     })
@@ -243,3 +244,112 @@ export function canAccessOutlet(user, outletName, groups = ADMIN_OUTLET_GROUPS) 
   const allowed = new Set(getScopedOutletRooms(user, groups).map((room) => normalizedName(room)));
   return allowed.has(normalizedName(outletName));
 }
+
+export function buildDynamicOutletTree(venues = []) {
+  if (!venues || venues.length === 0) {
+    return [
+      {
+        id: "main-wing",
+        label: "Main Wing",
+        sections: [
+          { label: "Alabang Function Room", items: ["Alabang Function Room"] },
+          { label: "Business Center", items: ["Business Center"] },
+          { label: "Laguna Ballroom", items: ["Laguna Ballroom 1", "Laguna Ballroom 2"] },
+          { label: "20/20 Function Room", items: ["20/20 Function Room A", "20/20 Function Room B", "20/20 Function Room C"] },
+        ],
+      },
+      {
+        id: "tower-wing",
+        label: "Tower Wing",
+        sections: [
+          { label: "Grand Ballroom", items: ["Grand Ballroom A", "Grand Ballroom B", "Grand Ballroom C"] },
+          { label: "Tower Ballroom", items: ["Tower 1", "Tower 2", "Tower 3"] },
+        ],
+      },
+      {
+        id: "dining",
+        label: "Dining",
+        sections: [
+          { label: "Hanakazu Japanese Restaurant", items: ["Hanakazu Japanese Restaurant"] },
+          { label: "Qsina Restaurant", items: ["Qsina Restaurant"] },
+          { label: "Phoenix Court", items: ["Phoenix Court"] },
+        ],
+      },
+    ];
+  }
+
+  const activeVenues = venues.filter(v => !v.is_archived);
+  const parents = activeVenues.filter(v => v.parent_id === null);
+  const groupsMap = new Map();
+
+  parents.forEach(parent => {
+    const wingLabel = isDiningVenue(parent, parent.name) ? "Dining" : (parent.wing || "Main Wing");
+    const id = groupId(wingLabel);
+
+    if (!groupsMap.has(id)) {
+      groupsMap.set(id, {
+        id,
+        label: wingLabel,
+        sections: []
+      });
+    }
+
+    const children = activeVenues.filter(v => v.parent_id === parent.id);
+    const items = children.length > 0
+      ? children.map(c => c.name)
+      : [parent.name];
+
+    groupsMap.get(id).sections.push({
+      label: parent.name,
+      items,
+      display_order: parent.display_order ?? 9999
+    });
+  });
+
+  const sortedGroups = Array.from(groupsMap.values()).map(group => {
+    group.sections.sort((a, b) => {
+      if (a.display_order !== b.display_order) {
+        return a.display_order - b.display_order;
+      }
+      return a.label.localeCompare(b.label);
+    });
+    return group;
+  });
+
+  const order = { "main-wing": 0, "tower-wing": 1, "dining": 2 };
+  sortedGroups.sort((a, b) => {
+    const oA = order[a.id] ?? 99;
+    const oB = order[b.id] ?? 99;
+    if (oA !== oB) return oA - oB;
+    return a.label.localeCompare(b.label);
+  });
+
+  return sortedGroups;
+}
+
+export function resolveOutletChildren(filterRoom, venues = []) {
+  if (!filterRoom || filterRoom === "ALL") return [];
+
+  const tree = buildDynamicOutletTree(venues);
+
+  // 1. If it's a wing group
+  if (filterRoom === "Main Wing" || filterRoom === "Tower Wing" || filterRoom === "Dining") {
+    const group = tree.find(g => g.label.toLowerCase() === filterRoom.toLowerCase());
+    if (group) {
+      return group.sections.flatMap(s => s.items);
+    }
+  }
+
+  // 2. If it is a parent section in the tree
+  for (const group of tree) {
+    const section = group.sections.find(s => s.label.toLowerCase() === filterRoom.toLowerCase());
+    if (section) {
+      return section.items;
+    }
+  }
+
+  // 3. Fallback/exact
+  return [filterRoom];
+}
+
+

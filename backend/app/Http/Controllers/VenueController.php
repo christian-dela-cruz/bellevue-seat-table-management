@@ -51,6 +51,40 @@ class VenueController extends Controller
 
     public function timeSlots(Request $request): JsonResponse
     {
+        if ($request->filled('room')) {
+            $roomName = $request->input('room');
+            $selectedVenue = Venue::where('is_active', true)
+                ->where('is_archived', false)
+                ->where(function ($query) use ($roomName) {
+                    $query->where('name', $roomName)
+                        ->orWhere('slug', $roomName);
+                })
+                ->first();
+                
+            if (!$selectedVenue) {
+                // Try case-insensitive matching
+                $selectedVenue = Venue::where('is_active', true)
+                    ->where('is_archived', false)
+                    ->where(function ($query) use ($roomName) {
+                        $query->whereRaw('lower(name) = ?', [strtolower(trim($roomName))])
+                            ->orWhereRaw('lower(slug) = ?', [strtolower(trim($roomName))]);
+                    })
+                    ->first();
+            }
+
+            if ($selectedVenue) {
+                $request->merge(['venue_id' => $selectedVenue->id]);
+            }
+        } elseif ($request->filled('venue_id')) {
+            $venueId = $request->input('venue_id');
+            $venue = Venue::find($venueId);
+            if (!$venue || !$venue->is_active || $venue->is_archived) {
+                if ($venue && !empty($venue->metadata) && is_array($venue->metadata) && isset($venue->metadata['canonical_venue_id'])) {
+                    $request->merge(['venue_id' => $venue->metadata['canonical_venue_id']]);
+                }
+            }
+        }
+
         $validated = $request->validate([
             'venue_id' => ['nullable', 'integer', 'exists:venues,id'],
             'room' => ['nullable', 'string', 'max:255'],
