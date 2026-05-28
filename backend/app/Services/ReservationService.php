@@ -546,6 +546,7 @@ class ReservationService
             ->map(function ($reservation) {
                 return [
                     'id'               => $reservation->reference_code,
+                    'db_id'            => $reservation->id,
                     'name'             => $reservation->name,
                     'email'            => $reservation->email,
                     'phone'            => $reservation->phone,

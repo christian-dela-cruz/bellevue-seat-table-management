@@ -1268,6 +1268,28 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
     assigned_room_id: reservation.assigned_room_id || "",
   });
 
+  // Keep form state in sync with reservation prop updates (e.g. read-only assignments)
+  useEffect(() => {
+    setForm({
+      name: reservation.name || "",
+      email: reservation.email || "",
+      phone: reservation.phone || "",
+      room: reservation.room || "",
+      table_number: reservation.table_number || "",
+      seat_number: reservation.seat_number || reservation.seat || "",
+      guests_count: reservation.guests_count || reservation.guests || 1,
+      event_date: reservation.event_date ? String(reservation.event_date).slice(0,10) : "",
+      event_time: reservation.event_time || "",
+      event_area: reservation.event_area || reservation.eventArea || "",
+      setup_tables: reservation.setup_tables ?? reservation.setupTables ?? "",
+      setup_chairs: reservation.setup_chairs ?? reservation.setupChairs ?? "",
+      setup_requirements: reservation.setup_requirements || reservation.setupRequirements || "",
+      special_requests: reservation.special_requests || "",
+      type: reservation.type || "whole",
+      assigned_room_id: reservation.assigned_room_id || "",
+    });
+  }, [reservation]);
+
   useEffect(() => {
     if (!hasChildren || !parentVenue) return;
 
@@ -1277,10 +1299,13 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
         const date = form.event_date || (reservation.event_date ? String(reservation.event_date).slice(0, 10) : "");
         const time = form.event_time || reservation.event_time || "";
         const guests = form.guests_count || reservation.guests_count || reservation.guests || 1;
-        const ignoreId = reservation.db_id || reservation.id;
+        
+        // Strictly use integer DB ID. Fallback only if reservation.id is an integer.
+        // Never send string reference code (e.g. "2026-1031") as ignore_reservation_id.
+        const ignoreId = reservation.db_id || (Number.isInteger(Number(reservation.id)) ? Number(reservation.id) : null);
 
         const token = localStorage.getItem("admin_token");
-        const url = `${API_BASE_URL}/venues/${parentVenue.id}/available-subrooms?date=${date}&time=${time}&guests_count=${guests}&ignore_reservation_id=${ignoreId}`;
+        const url = `${API_BASE_URL}/venues/${parentVenue.id}/available-subrooms?date=${date}&time=${time}&guests_count=${guests}${ignoreId ? `&ignore_reservation_id=${ignoreId}` : ""}`;
         const response = await fetch(url, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
