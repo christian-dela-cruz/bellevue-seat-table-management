@@ -229,6 +229,9 @@ function normalizeStatus(value) {
 }
 
 function outletNameForReservation(reservation) {
+  if (reservation?.internal_room_name && reservation.internal_room_name !== "Whole Venue") {
+    return canonicalOutletName(reservation.internal_room_name);
+  }
   return canonicalOutletName(reservation?.room || reservation?.venue?.name || reservation?.venue || "Unassigned Outlet");
 }
 
@@ -755,9 +758,14 @@ function PriorityBadge({ reservation }) {
 }
 
 function ReservationRow({ reservation, showPriority = false }) {
+  const navigate = useNavigate();
   const outlet = outletNameForReservation(reservation);
   return (
-    <div style={{ padding: "11px 12px", borderBottom: `1px solid ${C.divider}`, display: "grid", gridTemplateColumns: showPriority ? "minmax(180px,1fr) 120px 88px 116px 92px" : "minmax(180px,1fr) 120px 88px 92px", gap: 12, alignItems: "center" }} className="od-row">
+    <div
+      onClick={() => navigate(`/admin/reservations?id=${reservation.id}`)}
+      style={{ padding: "11px 12px", borderBottom: `1px solid ${C.divider}`, display: "grid", gridTemplateColumns: showPriority ? "minmax(180px,1fr) 120px 88px 116px 92px" : "minmax(180px,1fr) 120px 88px 92px", gap: 12, alignItems: "center" }}
+      className="od-row"
+    >
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reservation.name || reservation.guest_name || "Guest"}</div>
         <div style={{ marginTop: 3, fontSize: 11.5, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reservation.reference_code || reservation.reference || "-"} - {outlet}</div>
@@ -1082,6 +1090,23 @@ function OutletDashboard() {
         .od-area { opacity: 0; animation: odFadeArea 0.65s ease 0.18s forwards; }
         .od-donut { transition: stroke-dasharray 0.35s ease; }
         .od-bar { animation: odGrow 0.55s ease both; }
+        .od-row {
+          transition: background 0.16s ease, transform 0.16s ease;
+          cursor: pointer;
+        }
+        .od-row:hover {
+          background: rgba(140, 107, 42, 0.04) !important;
+        }
+        .od-interactive-card {
+          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+          cursor: pointer;
+        }
+        .od-interactive-card:hover {
+          border-color: rgba(140, 107, 42, 0.28) !important;
+          background: rgba(140, 107, 42, 0.03) !important;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(140, 107, 42, 0.06);
+        }
         @media (max-width: 980px) {
           .od-top, .od-two, .od-filters { grid-template-columns: 1fr !important; }
           .od-row { grid-template-columns: 1fr !important; }
@@ -1198,7 +1223,11 @@ function OutletDashboard() {
                       <MetricCard icon={TrendingUp} label="Acceptance" value={`${acceptanceRate}%`} detail="approved" color={C.green} bg={C.greenFaint} />
                       <MetricCard icon={AlertCircle} label="Response Watch" value={urgentPending.length + reviewSoon.length} detail="needs attention" color={urgentPending.length ? C.red : C.gold} bg={urgentPending.length ? C.redFaint : C.goldFaint} />
                     </div>
-                    <div style={{ padding: 13, borderRadius: 10, background: C.soft, border: `1px solid ${C.border}` }}>
+                    <div
+                      className={nextReservation ? "od-interactive-card" : ""}
+                      onClick={() => nextReservation && navigate(`/admin/reservations?id=${nextReservation.id}`)}
+                      style={{ padding: 13, borderRadius: 10, background: C.soft, border: `1px solid ${C.border}` }}
+                    >
                       <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.gold, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 8 }}><AlertCircle size={14} />Next Activity</div>
                       {nextReservation ? (
                         <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>

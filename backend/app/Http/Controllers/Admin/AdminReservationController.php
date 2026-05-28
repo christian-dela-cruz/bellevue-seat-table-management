@@ -7,6 +7,7 @@ use App\Models\Admin;
 use App\Models\Reservation;
 use App\Models\Venue;
 use App\Services\ReservationService;
+use App\Services\VenueService;
 use App\Services\WebsocketBroadcaster;
 use App\Events\ReservationCreated;
 use App\Events\ReservationUpdated;
@@ -21,10 +22,12 @@ use Illuminate\Validation\ValidationException;
 class AdminReservationController extends Controller
 {
     protected $reservationService;
+    protected $venueService;
 
-    public function __construct(ReservationService $reservationService)
+    public function __construct(ReservationService $reservationService, VenueService $venueService)
     {
         $this->reservationService = $reservationService;
+        $this->venueService = $venueService;
     }
 
     /**

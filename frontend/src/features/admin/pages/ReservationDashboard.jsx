@@ -1,7 +1,7 @@
 // src/features/admin/pages/ReservationDashboard.jsx
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
@@ -1111,15 +1111,6 @@ function ReservationEditForm({ form, setForm, disabled, hasChildren, availableSu
       <EditField label="Event Time">
         <input disabled={disabled} type="time" value={form.event_time} onChange={(e)=>update("event_time",e.target.value)} onFocus={()=>setFocused("event_time")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="event_time")}/>
       </EditField>
-      <EditField label="Event Area">
-        <input disabled={disabled} value={form.event_area} onChange={(e)=>update("event_area",e.target.value)} onFocus={()=>setFocused("event_area")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="event_area")}/>
-      </EditField>
-      <EditField label="Tables Needed">
-        <input disabled={disabled} type="number" min="0" value={form.setup_tables} onChange={(e)=>update("setup_tables",e.target.value)} onFocus={()=>setFocused("setup_tables")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="setup_tables")}/>
-      </EditField>
-      <EditField label="Chairs Needed">
-        <input disabled={disabled} type="number" min="0" value={form.setup_chairs} onChange={(e)=>update("setup_chairs",e.target.value)} onFocus={()=>setFocused("setup_chairs")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="setup_chairs")}/>
-      </EditField>
       <EditField label="Room">
         <input disabled={disabled} value={form.room} onChange={(e)=>update("room",e.target.value)} onFocus={()=>setFocused("room")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="room")}/>
       </EditField>
@@ -1158,11 +1149,6 @@ function ReservationEditForm({ form, setForm, disabled, hasChildren, availableSu
       <EditField label="Seat">
         <input disabled={disabled} value={form.seat_number} onChange={(e)=>update("seat_number",e.target.value)} onFocus={()=>setFocused("seat_number")} onBlur={()=>setFocused(null)} style={editInputStyle(focused==="seat_number")}/>
       </EditField>
-      <div style={{gridColumn:"1 / -1"}}>
-        <EditField label="Setup Requirements">
-          <textarea disabled={disabled} rows={3} value={form.setup_requirements} onChange={(e)=>update("setup_requirements",e.target.value)} onFocus={()=>setFocused("setup_requirements")} onBlur={()=>setFocused(null)} style={{...editInputStyle(focused==="setup_requirements"),resize:"vertical",minHeight:78}}/>
-        </EditField>
-      </div>
       <div style={{gridColumn:"1 / -1"}}>
         <EditField label="Special Requests">
           <textarea disabled={disabled} rows={3} value={form.special_requests} onChange={(e)=>update("special_requests",e.target.value)} onFocus={()=>setFocused("special_requests")} onBlur={()=>setFocused(null)} style={{...editInputStyle(focused==="special_requests"),resize:"vertical",minHeight:78}}/>
@@ -1523,7 +1509,7 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
       >
         <div style={{
           background:C.surfaceBase,borderRadius:14,
-          width:"100%",maxWidth:isEditing?980:760,
+          width:"100%",maxWidth:isEditing?980:880,
           maxHeight:"92vh",
           boxShadow:"0 24px 80px rgba(0,0,0,0.16)",
           border:`1px solid ${C.borderDefault}`,
@@ -1635,226 +1621,307 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
                 </aside>
               </div>
             ) : (
-              <>
-            <SectionLabel>Reservation Details</SectionLabel>
-            {resRows.map(([label,value],i,arr)=>(
-              <div key={label} style={{
-                display:"flex",justifyContent:"space-between",alignItems:"flex-start",
-                padding:"8px 0",
-                borderBottom:i<arr.length-1?`1px solid ${C.divider}`:"none",
-              }}>
-                <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary,minWidth:100,flexShrink:0}}>{label}</span>
-                <span style={{fontFamily:F.body,fontSize:12.5,color:label==="Reference"?C.gold:C.textPrimary,fontWeight:label==="Reference"?700:500,textAlign:"right",maxWidth:280,lineHeight:1.5,letterSpacing:label==="Reference"?"0.06em":"normal"}}>{value}</span>
-              </div>
-            ))}
+              <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 300px",gap:20,alignItems:"start"}}>
+                {/* Left Column: Core Data cards */}
+                <div style={{display:"flex",flexDirection:"column",gap:16}}>
+                  
+                  {/* Reservation Details Card */}
+                  <div style={{
+                    background: C.surfaceInput,
+                    border: `1px solid ${C.borderDefault}`,
+                    borderRadius: 12,
+                    padding: "16px 18px",
+                  }}>
+                    <SectionLabel style={{marginTop: 0, marginBottom: 12}}>Reservation Details</SectionLabel>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(2, 1fr)",gap:"10px 20px"}}>
+                      {resRows.filter(([label]) => label !== "Setup Requirements").map(([label,value]) => (
+                        <div key={label} style={{
+                          display:"flex",flexDirection:"column",gap:4,
+                          padding:"6px 0",
+                          borderBottom:`1px solid ${C.divider}`,
+                        }}>
+                          <span style={{fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>{label}</span>
+                          <span style={{fontFamily:F.body,fontSize:12.5,color:label==="Reference"?C.gold:C.textPrimary,fontWeight:label==="Reference"?700:500,lineHeight:1.4}}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
 
-            {hasChildren && (
-              <>
-                <SectionLabel style={{marginTop:18}}>Internal Room Allocation</SectionLabel>
-                <div style={{
-                  background: C.goldFaintest,
-                  border: `1.5px solid ${C.borderAccent}`,
-                  borderRadius: 10,
-                  padding: "12px 14px",
-                  display: "grid",
-                  gap: 10,
-                  marginBottom: 18,
-                }}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <span style={{fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.gold}}>
-                      Allocation Status
-                    </span>
-                    <span style={{
-                      fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.10em",textTransform:"uppercase",
-                      padding:"3px 8px",
-                      borderRadius:12,
-                      background: (reservation.assigned_room_id || reservation.internal_room_name === 'Whole Venue') ? C.greenFaint : C.badgePending.bg,
-                      color: (reservation.assigned_room_id || reservation.internal_room_name === 'Whole Venue') ? C.green : C.badgePending.color,
-                      border: `1px solid ${(reservation.assigned_room_id || reservation.internal_room_name === 'Whole Venue') ? C.greenBorder : C.borderAccent}`,
-                    }}>
-                      {reservation.internal_room_name === 'Whole Venue' ? 'whole parent booking' : (reservation.assignment_status ? reservation.assignment_status.replace(/_/g," ") : (reservation.assigned_room_id ? "manually assigned" : "pending assignment"))}
-                    </span>
+                    {/* Setup Requirements (Full Width below details grid if present) */}
+                    {(reservation.setup_requirements || reservation.setupRequirements) ? (
+                      <div style={{
+                        display:"flex",flexDirection:"column",gap:4,
+                        padding:"10px 0 0",
+                        marginTop: 12,
+                        borderTop: `1.5px dashed ${C.divider}`,
+                      }}>
+                        <span style={{fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Setup Requirements</span>
+                        <div style={{
+                          fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.55,
+                          background: C.surfaceBase, padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.borderDefault}`,
+                          whiteSpace: "pre-wrap"
+                        }}>
+                          {reservation.setup_requirements || reservation.setupRequirements}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
-                  <div style={{display:"grid",gap:6}}>
-                    <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>
-                      Assigned Subroom
-                    </span>
-                    {reservation.internal_room_name === 'Whole Venue' ? (
-                      <div style={{fontFamily:F.body,fontSize:13,fontWeight:600,color:C.textPrimary}}>
-                        Whole Parent Venue Blocked (No child assignment needed)
+                  {/* Guest Information Card */}
+                  <div style={{
+                    background: C.surfaceInput,
+                    border: `1px solid ${C.borderDefault}`,
+                    borderRadius: 12,
+                    padding: "16px 18px",
+                  }}>
+                    <SectionLabel style={{marginTop: 0, marginBottom: 12}}>Guest Information</SectionLabel>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(2, 1fr)",gap:"10px 20px"}}>
+                      {guestRows.filter(([label]) => label !== "Special Requests").map(([label,value]) => (
+                        <div key={label} style={{
+                          display:"flex",flexDirection:"column",gap:4,
+                          padding:"6px 0",
+                          borderBottom:`1px solid ${C.divider}`,
+                        }}>
+                          <span style={{fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>{label}</span>
+                          <span style={{fontFamily:F.body,fontSize:12.5,color:C.textPrimary,fontWeight:500,lineHeight:1.4}}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Special Requests (Full Width below) */}
+                    <div style={{
+                      display:"flex",flexDirection:"column",gap:4,
+                      padding:"10px 0 0",
+                      marginTop: 12,
+                      borderTop: `1.5px dashed ${C.divider}`,
+                    }}>
+                      <span style={{fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Special Requests</span>
+                      <div style={{
+                        fontFamily:F.body,fontSize:12,color:reservation.special_requests ? C.textPrimary : C.textTertiary,lineHeight:1.55,
+                        background: C.surfaceBase, padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.borderDefault}`,
+                        fontStyle: reservation.special_requests ? "normal" : "italic"
+                      }}>
+                        {reservation.special_requests || "None specified"}
                       </div>
-                    ) : canManage ? (
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <select
-                          disabled={loadingSubrooms || actionLoading === "save_subroom"}
-                          value={reservation.assigned_room_id || ""}
-                          onChange={async (e) => {
-                            const val = e.target.value ? Number(e.target.value) : null;
-                            setActionLoading("save_subroom");
-                            await onUpdate(reservation, {
-                              assigned_room_id: val
-                            });
-                            setActionLoading(null);
-                          }}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Right Column: Actions, Allocation, History */}
+                <aside style={{position:"sticky",top:0,display:"flex",flexDirection:"column",gap:16}}>
+                  
+                  {/* Room Allocation Panel */}
+                  {hasChildren && (
+                    <div style={{
+                      background: C.goldFaintest,
+                      border: `1.5px solid ${C.borderAccent}`,
+                      borderRadius: 12,
+                      padding: "14px 16px",
+                      display: "grid",
+                      gap: 12,
+                    }}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.gold}}>
+                          Allocation Status
+                        </span>
+                        <span style={{
+                          fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.10em",textTransform:"uppercase",
+                          padding:"3px 8px",
+                          borderRadius:12,
+                          background: (reservation.assigned_room_id || reservation.internal_room_name === 'Whole Venue') ? C.greenFaint : C.badgePending.bg,
+                          color: (reservation.assigned_room_id || reservation.internal_room_name === 'Whole Venue') ? C.green : C.badgePending.color,
+                          border: `1px solid ${(reservation.assigned_room_id || reservation.internal_room_name === 'Whole Venue') ? C.greenBorder : C.borderAccent}`,
+                        }}>
+                          {reservation.internal_room_name === 'Whole Venue' ? 'whole parent' : (reservation.assignment_status ? reservation.assignment_status.replace(/_/g," ") : (reservation.assigned_room_id ? "assigned" : "pending"))}
+                        </span>
+                      </div>
+
+                      <div style={{display:"grid",gap:6}}>
+                        <span style={{fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>
+                          Assigned Subroom
+                        </span>
+                        {reservation.internal_room_name === 'Whole Venue' ? (
+                          <div style={{fontFamily:F.body,fontSize:12.5,fontWeight:600,color:C.textPrimary}}>
+                            Whole Parent Venue Blocked (No child assignment needed)
+                          </div>
+                        ) : canManage ? (
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <select
+                              disabled={loadingSubrooms || actionLoading === "save_subroom"}
+                              value={reservation.assigned_room_id || ""}
+                              onChange={async (e) => {
+                                const val = e.target.value ? Number(e.target.value) : null;
+                                setActionLoading("save_subroom");
+                                await onUpdate(reservation, {
+                                  assigned_room_id: val
+                                });
+                                setActionLoading(null);
+                              }}
+                              style={{
+                                ...editInputStyle(false),
+                                cursor: (loadingSubrooms || actionLoading === "save_subroom") ? "not-allowed" : "pointer",
+                                padding: "6px 10px",
+                                fontSize: 12,
+                                border: `1.5px solid ${C.borderAccent}`,
+                                background: C.surfaceBase,
+                              }}
+                            >
+                              <option value="">-- Needs Room Assignment --</option>
+                              {options.map(sub => (
+                                <option key={sub.id} value={sub.id}>
+                                  {sub.display_name || sub.name} (Cap: {sub.capacity || "N/A"})
+                                </option>
+                              ))}
+                            </select>
+                            {loadingSubrooms && <Spinner />}
+                          </div>
+                        ) : (
+                          <div style={{fontFamily:F.body,fontSize:12.5,fontWeight:600,color:C.textPrimary}}>
+                            {reservation.internal_room_name || "Not assigned (Pending)"}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions & Controls */}
+                  <div style={{
+                    background: C.surfaceInput,
+                    border: `1px solid ${C.borderDefault}`,
+                    borderRadius: 12,
+                    padding: "14px 16px",
+                  }}>
+                    <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary,display:"block",marginBottom:10}}>
+                      Reservation Controls
+                    </span>
+                    {isPending && canManage ? (
+                      <div style={{display:"grid",gap:8}}>
+                        <button
+                          onClick={()=>setShowApproveModal(true)}
+                          disabled={!!actionLoading}
                           style={{
-                            ...editInputStyle(false),
-                            cursor: (loadingSubrooms || actionLoading === "save_subroom") ? "not-allowed" : "pointer",
-                            padding: "8px 12px",
-                            fontSize: 12.5,
-                            border: `1.5px solid ${C.borderAccent}`,
-                            background: C.surfaceBase,
+                            width:"100%",padding:"9px",border:"none",borderRadius:8,
+                            background:actionLoading?"rgba(46,122,90,0.45)":C.green,
+                            color:"#fff",fontFamily:F.label,fontSize:9,fontWeight:700,
+                            letterSpacing:"0.14em",textTransform:"uppercase",
+                            cursor:actionLoading?"not-allowed":"pointer",transition:"all 0.18s",
+                            display:"flex",alignItems:"center",justifyContent:"center",gap:7,
                           }}
+                          onMouseEnter={(e)=>{if(!actionLoading)e.currentTarget.style.background="#256648";}}
+                          onMouseLeave={(e)=>{if(!actionLoading)e.currentTarget.style.background=C.green;}}
                         >
-                          <option value="">-- Needs Room Assignment (Pending) --</option>
-                          {options.map(sub => (
-                            <option key={sub.id} value={sub.id}>
-                              {sub.display_name || sub.name} (Cap: {sub.capacity || "N/A"})
-                            </option>
-                          ))}
-                        </select>
-                        {loadingSubrooms && <Spinner />}
+                          {actionLoading==="approve"?<><Spinner/>Approving…</>:"Approve & Notify"}
+                        </button>
+                        <button
+                          onClick={()=>setShowRejectModal(true)}
+                          disabled={!!actionLoading}
+                          style={{
+                            width:"100%",padding:"9px",
+                            background:"transparent",border:`1px solid ${C.redBorder}`,
+                            borderRadius:8,fontFamily:F.label,fontSize:9,fontWeight:700,
+                            letterSpacing:"0.14em",textTransform:"uppercase",
+                            color:C.red,cursor:actionLoading?"not-allowed":"pointer",
+                            transition:"all 0.18s",
+                            display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+                          }}
+                          onMouseEnter={(e)=>{if(!actionLoading)e.currentTarget.style.background=C.redFaint;}}
+                          onMouseLeave={(e)=>{if(!actionLoading)e.currentTarget.style.background="transparent";}}
+                        >
+                          {actionLoading==="reject"?<><Spinner/>Rejecting…</>:"Reject"}
+                        </button>
                       </div>
                     ) : (
-                      <div style={{fontFamily:F.body,fontSize:13,fontWeight:600,color:C.textPrimary}}>
-                        {reservation.internal_room_name || "Not assigned (Pending)"}
+                      <div style={{display:"grid",gap:8}}>
+                        {(!canManage || isRejected) && (
+                          <div style={{
+                            padding:"8px 10px",borderRadius:6,
+                            background:C.statusNote[(reservation.status||"pending").toLowerCase()]||C.goldFaintest,
+                            border:`1px solid ${C.statusNoteBorder[(reservation.status||"pending").toLowerCase()]||C.borderAccent}`,
+                            fontFamily:F.body,fontSize:11,color:C.textSecondary,lineHeight:1.5,
+                          }}>
+                            {canManage
+                              ? <>This reservation is <strong style={{color:C.textPrimary}}>{(reservation.status||"").toLowerCase()}</strong>.</>
+                              : <>Your account is in read-only mode for this record.</>}
+                          </div>
+                        )}
+                        {isRejected && canManage && (
+                          <button
+                            onClick={()=>setShowRevertModal(true)}
+                            disabled={!!actionLoading}
+                            style={{
+                              width:"100%",padding:"9px",
+                              border:"none",borderRadius:8,
+                              background:actionLoading?"rgba(140,107,42,0.45)":C.gold,
+                              color:"#fff",fontFamily:F.label,fontSize:9,fontWeight:700,
+                              letterSpacing:"0.14em",textTransform:"uppercase",
+                              cursor:actionLoading?"not-allowed":"pointer",transition:"all 0.18s",
+                              display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+                            }}
+                            onMouseEnter={(e)=>{if(!actionLoading)e.currentTarget.style.background=C.goldLight;}}
+                            onMouseLeave={(e)=>{if(!actionLoading)e.currentTarget.style.background=C.gold;}}
+                          >
+                            {actionLoading==="revert"?<><Spinner/>Reverting...</>:"Revert to Pending"}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {canAdjust && (
+                      <button
+                        onClick={()=>setIsEditing(true)}
+                        disabled={!!actionLoading}
+                        style={{
+                          width:"100%",marginTop:8,padding:"9px",
+                          background:"transparent",border:`1px solid ${C.borderAccent}`,
+                          borderRadius:8,fontFamily:F.label,fontSize:9,fontWeight:700,
+                          letterSpacing:"0.14em",textTransform:"uppercase",
+                          color:C.gold,cursor:actionLoading?"not-allowed":"pointer"
+                        }}
+                      >
+                        Modify Details
+                      </button>
+                    )}
+                  </div>
+
+                  {/* History & Tracking */}
+                  <div style={{
+                    background: C.surfaceInput,
+                    border: `1px solid ${C.borderDefault}`,
+                    borderRadius: 12,
+                    padding: "14px 16px",
+                    maxHeight: 240,
+                    overflowY: "auto",
+                  }}>
+                    <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary,display:"block",marginBottom:10}}>
+                      History & Tracking Logs
+                    </span>
+                    {historyItems.length ? (
+                      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                        {historyItems.map((item,i)=>(
+                          <div key={item.id || `${item.action}-${i}`} style={{
+                            paddingBottom:i<historyItems.length-1?8:0,
+                            borderBottom:i<historyItems.length-1?`1px solid ${C.divider}`:"none",
+                          }}>
+                            <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}>
+                              <span style={{fontFamily:F.body,fontSize:11.5,fontWeight:700,color:C.textPrimary,lineHeight:1.3}}>{formatHistoryAction(item.action)}</span>
+                              <span style={{fontFamily:F.body,fontSize:9.5,color:C.textTertiary,whiteSpace:"nowrap"}}>{fmtDateTime(item.created_at)}</span>
+                            </div>
+                            <div style={{fontFamily:F.body,fontSize:10.5,color:C.textSecondary,lineHeight:1.4,marginTop:2}}>
+                              {(item.from_status || item.to_status) && (
+                                <span style={{textTransform:"capitalize"}}>{item.from_status || "-"} {"->"} {item.to_status || "-"}</span>
+                              )}
+                              {item.notes ? <span>{item.from_status || item.to_status ? " - " : ""}{item.notes}</span> : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{fontFamily:F.body,fontSize:11,color:C.textSecondary}}>
+                        No transaction history recorded yet.
                       </div>
                     )}
                   </div>
-                </div>
-              </>
-            )}
 
-            <SectionLabel style={{marginTop:18}}>Guest Information</SectionLabel>
-            {guestRows.map(([label,value],i,arr)=>(
-              <div key={label} style={{
-                display:"flex",justifyContent:"space-between",alignItems:"flex-start",
-                padding:"8px 0",
-                borderBottom:i<arr.length-1?`1px solid ${C.divider}`:"none",
-              }}>
-                <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary,minWidth:100,flexShrink:0}}>{label}</span>
-                <span style={{fontFamily:F.body,fontSize:12.5,color:C.textPrimary,fontWeight:500,textAlign:"right",maxWidth:280,lineHeight:1.5}}>{value}</span>
+                </aside>
               </div>
-            ))}
-
-            <SectionLabel style={{marginTop:18}}>Status Tracking</SectionLabel>
-            {trackingRows.map(([label,value],i,arr)=>(
-              <div key={label} style={{
-                display:"flex",justifyContent:"space-between",alignItems:"flex-start",
-                padding:"8px 0",
-                borderBottom:i<arr.length-1?`1px solid ${C.divider}`:"none",
-              }}>
-                <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary,minWidth:120,flexShrink:0}}>{label}</span>
-                <span style={{fontFamily:F.body,fontSize:12.5,color:C.textPrimary,fontWeight:500,textAlign:"right",maxWidth:260,lineHeight:1.5,textTransform:label==="Previous Status"&&value!=="—"?"capitalize":"none"}}>{value}</span>
-              </div>
-            ))}
-
-            <SectionLabel style={{marginTop:18}}>Reservation History</SectionLabel>
-            {historyItems.length ? historyItems.map((item,i)=>(
-              <div key={item.id || `${item.action}-${i}`} style={{
-                padding:"9px 0",
-                borderBottom:i<historyItems.length-1?`1px solid ${C.divider}`:"none",
-              }}>
-                <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}>
-                  <span style={{fontFamily:F.body,fontSize:12.5,fontWeight:700,color:C.textPrimary,lineHeight:1.4}}>{formatHistoryAction(item.action)}</span>
-                  <span style={{fontFamily:F.body,fontSize:11,color:C.textSecondary,textAlign:"right",whiteSpace:"nowrap"}}>{fmtDateTime(item.created_at)}</span>
-                </div>
-                <div style={{fontFamily:F.body,fontSize:11.5,color:C.textSecondary,lineHeight:1.5,marginTop:3}}>
-                  {(item.from_status || item.to_status) && (
-                    <span style={{textTransform:"capitalize"}}>{item.from_status || "-"} {"->"} {item.to_status || "-"}</span>
-                  )}
-                  {item.notes ? <span>{item.from_status || item.to_status ? " - " : ""}{item.notes}</span> : null}
-                </div>
-              </div>
-            )) : (
-              <div style={{fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.5}}>
-                No transaction history recorded yet.
-              </div>
-            )}
-
-            {canAdjust && (
-              <button
-                onClick={()=>setIsEditing(true)}
-                disabled={!!actionLoading}
-                style={{width:"100%",marginTop:18,padding:"11px",background:"transparent",border:`1px solid ${C.borderAccent}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.gold,cursor:actionLoading?"not-allowed":"pointer"}}
-              >
-                Modify Reservation Details
-              </button>
-            )}
-
-            {isPending && canManage ? (
-              <div style={{display:"flex",gap:8,marginTop:22}}>
-                <button
-                  onClick={()=>setShowRejectModal(true)}
-                  disabled={!!actionLoading}
-                  style={{
-                    flex:1,padding:"11px",
-                    background:"transparent",border:`1px solid ${C.redBorder}`,
-                    borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,
-                    letterSpacing:"0.14em",textTransform:"uppercase",
-                    color:C.red,cursor:actionLoading?"not-allowed":"pointer",
-                    transition:"all 0.18s",
-                    display:"flex",alignItems:"center",justifyContent:"center",gap:7,
-                    opacity:actionLoading==="approve"?0.5:1,
-                  }}
-                  onMouseEnter={(e)=>{if(!actionLoading)e.currentTarget.style.background=C.redFaint;}}
-                  onMouseLeave={(e)=>{if(!actionLoading)e.currentTarget.style.background="transparent";}}
-                >
-                  {actionLoading==="reject"?<><Spinner/>Rejecting…</>:"Reject"}
-                </button>
-                <button
-                  onClick={()=>setShowApproveModal(true)}
-                  disabled={!!actionLoading}
-                  style={{
-                    flex:2,padding:"11px",border:"none",borderRadius:8,
-                    background:actionLoading?"rgba(46,122,90,0.45)":C.green,
-                    color:"#fff",fontFamily:F.label,fontSize:10,fontWeight:700,
-                    letterSpacing:"0.14em",textTransform:"uppercase",
-                    cursor:actionLoading?"not-allowed":"pointer",transition:"all 0.18s",
-                    display:"flex",alignItems:"center",justifyContent:"center",gap:7,
-                  }}
-                  onMouseEnter={(e)=>{if(!actionLoading)e.currentTarget.style.background="#256648";}}
-                  onMouseLeave={(e)=>{if(!actionLoading)e.currentTarget.style.background=C.green;}}
-                >
-                  {actionLoading==="approve"?<><Spinner/>Approving…</>:"Approve & Notify"}
-                </button>
-              </div>
-            ) : (
-              <>
-                {(!canManage || isRejected) && (
-                  <div style={{
-                    marginTop:18,padding:"10px 14px",borderRadius:8,
-                    background:C.statusNote[(reservation.status||"pending").toLowerCase()]||C.goldFaintest,
-                    border:`1px solid ${C.statusNoteBorder[(reservation.status||"pending").toLowerCase()]||C.borderAccent}`,
-                    fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.6,
-                  }}>
-                    {canManage
-                      ? <>This reservation has been <strong style={{color:C.textPrimary}}>{(reservation.status||"").toLowerCase()}</strong> and can be reverted to pending review.</>
-                      : <>Your account can view this reservation, but cannot modify it.</>}
-                  </div>
-                )}
-                {isRejected&&canManage&&(
-                  <button
-                    onClick={()=>setShowRevertModal(true)}
-                    disabled={!!actionLoading}
-                    style={{
-                      width:"100%",marginTop:10,padding:"11px",
-                      border:"none",borderRadius:8,
-                      background:actionLoading?"rgba(140,107,42,0.45)":C.gold,
-                      color:"#fff",fontFamily:F.label,fontSize:10,fontWeight:700,
-                      letterSpacing:"0.14em",textTransform:"uppercase",
-                      cursor:actionLoading?"not-allowed":"pointer",transition:"all 0.18s",
-                      display:"flex",alignItems:"center",justifyContent:"center",gap:7,
-                    }}
-                    onMouseEnter={(e)=>{if(!actionLoading)e.currentTarget.style.background=C.goldLight;}}
-                    onMouseLeave={(e)=>{if(!actionLoading)e.currentTarget.style.background=C.gold;}}
-                  >
-                    {actionLoading==="revert"?<><Spinner/>Reverting...</>:"Revert to Pending"}
-                  </button>
-                )}
-              </>
-            )}
-              </>
             )}
           </div>
         </div>
@@ -2034,6 +2101,8 @@ function PaginationControls({ pagination, onPageChange, onRowsChange, filteredCo
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function ReservationDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const canManageReservations = authAPI.hasPermission("manage_reservations");
   const canAdjustReservations = authAPI.hasPermission("adjust_reservation_details");
   const canDeleteReservations = authAPI.hasPermission("delete_reservations");
@@ -2066,6 +2135,21 @@ export default function ReservationDashboard() {
     window.addEventListener("resize",h);
     return()=>window.removeEventListener("resize",h);
   },[]);
+
+  // Deep-linking helper to auto-open details modal when loaded via ?id=... or ?reservationId=...
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const resId = params.get("id") || params.get("reservationId");
+    if (resId && reservations.length > 0) {
+      const found = reservations.find((r) => String(r.id) === String(resId));
+      if (found) {
+        setSelectedReservation(found);
+        setShowModal(true);
+        // Clear query parameters from URL history for a clean UX
+        navigate(location.pathname, { replace: true });
+      }
+    }
+  }, [location.search, reservations, navigate, location.pathname]);
 
   const isMobile=windowWidth<640;
   const isTablet=windowWidth<960;
@@ -2445,16 +2529,23 @@ export default function ReservationDashboard() {
     try {
       const result = await approveReservation(reservation.db_id);
       if (result.success) {
+        const updatedFields = {
+          status: result.status || "reserved",
+          reservation_state: "active",
+          previous_status: result.previous_status || reservation.status,
+          status_last_changed_at: result.status_last_changed_at || new Date().toISOString(),
+          transaction_history: result.transaction_history || reservation.transaction_history
+        };
         setReservations(prev =>
           prev.map(r => r.id === reservation.id ? {
             ...r,
-            status: result.status || "reserved",
-            reservation_state: "active",
-            previous_status: result.previous_status || reservation.status,
-            status_last_changed_at: result.status_last_changed_at || new Date().toISOString(),
-            transaction_history: result.transaction_history || r.transaction_history
+            ...updatedFields
           } : r)
         );
+        setSelectedReservation(prev => prev && prev.id === reservation.id ? {
+          ...prev,
+          ...updatedFields
+        } : prev);
         optimisticSeatUpdate(reservation, "reserved");
         setToast({ message: `Approved! Confirmation email sent to ${reservation.email}.`, type: "success" });
       } else {
@@ -2470,18 +2561,25 @@ export default function ReservationDashboard() {
       const result = await rejectReservation(reservation.db_id, reason);
       if (result.success) {
         const now = new Date().toISOString();
+        const updatedFields = {
+          status: "rejected",
+          reservation_state: "inactive",
+          previous_status: reservation.status,
+          status_last_changed_at: result.status_last_changed_at || now,
+          rejected_at: result.rejected_at || now,
+          rejection_reason: reason,
+          transaction_history: result.transaction_history || reservation.transaction_history
+        };
         setReservations(prev =>
           prev.map(r => r.id === reservation.id ? {
             ...r,
-            status: "rejected",
-            reservation_state: "inactive",
-            previous_status: reservation.status,
-            status_last_changed_at: result.status_last_changed_at || now,
-            rejected_at: result.rejected_at || now,
-            rejection_reason: reason,
-            transaction_history: result.transaction_history || r.transaction_history
+            ...updatedFields
           } : r)
         );
+        setSelectedReservation(prev => prev && prev.id === reservation.id ? {
+          ...prev,
+          ...updatedFields
+        } : prev);
         optimisticSeatUpdate(reservation, "available");
         setToast({ message: `Rejected. Notification email sent to ${reservation.email}.`, type: "success" });
       } else {
@@ -2497,17 +2595,24 @@ export default function ReservationDashboard() {
       const result = await revertReservation(reservation.db_id);
       if (result.success) {
         const now = new Date().toISOString();
+        const updatedFields = {
+          status: "pending",
+          reservation_state: "active",
+          previous_status: reservation.status,
+          status_last_changed_at: result.status_last_changed_at || now,
+          reverted_at: result.reverted_at || now,
+          transaction_history: result.transaction_history || reservation.transaction_history
+        };
         setReservations(prev =>
           prev.map(r => r.id === reservation.id ? {
             ...r,
-            status: "pending",
-            reservation_state: "active",
-            previous_status: reservation.status,
-            status_last_changed_at: result.status_last_changed_at || now,
-            reverted_at: result.reverted_at || now,
-            transaction_history: result.transaction_history || r.transaction_history
+            ...updatedFields
           } : r)
         );
+        setSelectedReservation(prev => prev && prev.id === reservation.id ? {
+          ...prev,
+          ...updatedFields
+        } : prev);
         optimisticSeatUpdate(reservation, "pending");
         setToast({ message: "Reservation reverted to pending review.", type: "success" });
       } else {
@@ -2532,6 +2637,13 @@ export default function ReservationDashboard() {
             transaction_history: result.transaction_history || updated.transaction_history || r.transaction_history,
           } : r)
         );
+        setSelectedReservation(prev => prev && prev.id === reservation.id ? {
+          ...prev,
+          ...updated,
+          id: prev.id,
+          db_id: prev.db_id || updated.id,
+          transaction_history: result.transaction_history || updated.transaction_history || prev.transaction_history,
+        } : prev);
         setToast({ message: "Reservation details updated.", type: "success" });
         return { success: true };
       }

@@ -5,6 +5,7 @@ import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { reportAPI } from "../../../services/reportAPI";
 import { venueAPI } from "../../../services/venueAPI";
+import { fetchReservations } from "../../../utils/api";
 import { Building2, Download, Layers, Printer, Utensils, Search, Activity, ChevronDown, CalendarDays, TrendingUp, Users, CheckCircle, Clock, AlertCircle, List, LayoutGrid } from "lucide-react";
 import { ADMIN_OUTLET_GROUPS, buildOutletGroupsFromVenues, buildOutletRowsFromVenues, canAccessOutlet, canonicalOutletName, buildDynamicOutletTree, resolveOutletChildren } from "../../../constants/outletCatalog";
 import {
@@ -334,8 +335,8 @@ function csvCell(value) {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function downloadCsv(filename, rows) {
-  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+function downloadCsv(filename, rows, delimiter = ",") {
+  const csv = rows.map((row) => row.map(csvCell).join(delimiter)).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -1121,6 +1122,21 @@ export default function Reports() {
   const [roomRowsPerPage, setRoomRowsPerPage] = useState(10);
   const [roomPage, setRoomPage] = useState(1);
 
+  // CSV Configuration States (RPT-005)
+  const [showCsvConfig, setShowCsvConfig] = useState(false);
+  const [csvFilename, setCsvFilename] = useState("");
+  const [csvExportType, setCsvExportType] = useState("unified"); // "unified" or "raw"
+  const [csvDelimiter, setCsvDelimiter] = useState(",");
+  const [csvIncludeHeaders, setCsvIncludeHeaders] = useState(true);
+  const [csvSections, setCsvSections] = useState({
+    summary: true,
+    status: true,
+    trends: true,
+    outlets: true,
+    rooms: true,
+  });
+  const [reservations, setReservations] = useState([]);
+
   const handlePrintReportTypeChange = (type) => {
     setPrintReportType(type);
     if (type === "general") {
@@ -1180,18 +1196,20 @@ export default function Reports() {
     try {
       const selectedYear = Number(reportYear) || Number(today().slice(0, 4));
       const selectedMonth = Number(reportMonth) || Number(today().slice(5, 7));
-      const [outletData, transactionData, monthlyData, venuesData] = await Promise.all([
+      const [outletData, transactionData, monthlyData, venuesData, reservationData] = await Promise.all([
         reportAPI.getOutletReports({ start_date: startDate, end_date: endDate }),
         canViewTransactions
           ? reportAPI.getTransactionReports({ start_date: startDate, end_date: endDate })
           : Promise.resolve(null),
         reportAPI.getMonthlyReports({ year: selectedYear, month: selectedMonth }),
         venueAPI.getAll({ include_archived: false, _t: Date.now() }).catch(() => []),
+        fetchReservations(1, 9999).catch(() => []),
       ]);
       setReport(outletData);
       if (transactionData) setTransactionReport(transactionData);
       setMonthlyReport(monthlyData);
       setVenueRows(Array.isArray(venuesData) ? venuesData : []);
+      setReservations(Array.isArray(reservationData?.data) ? reservationData.data : Array.isArray(reservationData) ? reservationData : []);
     } catch (err) {
       setError(err.message || "Failed to load outlet report.");
     } finally {
@@ -1491,70 +1509,158 @@ export default function Reports() {
   const trendFilterBadge = activeTab === "monthly" ? "Month" : "Year";
   const reservedCount = (statuses.reserved || 0) + (statuses.approved || 0);
   const totalReservations = summary.reservations || 0;
+  const compileCsvData = () => {
+    if (csvExportType === "raw") {
+      // Flat spreadsheet of reservations matching date/outlet filters (Excel BI style)
+      const headers = [
+        "Reference Code", 
+        "Guest Name", 
+        "Email", 
+        "Phone", 
+        "Outlet (Parent)", 
+        "Assigned Subroom (Child)", 
+        "Allocation Status", 
+        "Event Date", 
+        "Event Time", 
+        "Guests Count", 
+        "Status", 
+        "Type", 
+        "Table Number", 
+        "Seat Number", 
+        "Special Requests", 
+        "Submitted At"
+      ];
+      
+      const filteredRes = reservations.filter(r => {
+        if (startDate && r.event_date < startDate) return false;
+        if (endDate && r.event_date > endDate) return false;
+        if (selectedOutlet !== "ALL") {
+          const canonicalSelected = canonicalOutletName(selectedOutlet);
+          const resRoom = r.internal_room_name || r.room || r.venue?.name || "";
+          const children = resolveOutletChildren(selectedOutlet, venueRows);
+          const childrenSet = new Set(children.map(canonicalOutletName));
+          const canonicalResRoom = canonicalOutletName(resRoom);
+          if (canonicalResRoom !== canonicalSelected && !childrenSet.has(canonicalResRoom)) return false;
+        }
+        return true;
+      });
+
+      const dataRows = filteredRes.map(r => [
+        r.reference_code || "-",
+        r.name || r.guest_name || "-",
+        r.email || "-",
+        r.phone || "-",
+        r.room || r.venue?.name || "-",
+        r.internal_room_name || "Whole Venue",
+        r.assignment_status || "pending",
+        r.event_date || "-",
+        r.event_time || "-",
+        r.guests_count || 0,
+        r.status || "pending",
+        r.type || "Room/Table",
+        r.table_number || "-",
+        r.seat_number || "-",
+        r.special_requests || "-",
+        r.submitted_at || r.created_at || "-"
+      ]);
+
+      return csvIncludeHeaders ? [headers, ...dataRows] : dataRows;
+    } else {
+      // Unified executive multi-table view
+      const rows = [];
+      
+      if (csvIncludeHeaders) {
+        rows.push(["=================================================="]);
+        rows.push(["BELLEVUE OUTLET & ROOM PERFORMANCE REPORT"]);
+        rows.push(["Generated At", new Date().toLocaleString()]);
+        rows.push(["Date Range", dateRangeLabel]);
+        rows.push(["Format Style", "Unified Executive View"]);
+        rows.push(["=================================================="]);
+        rows.push([]);
+      }
+
+      if (csvSections.summary) {
+        rows.push(["OVERVIEW SUMMARY"]);
+        rows.push(["Reservations Total", summary.reservations || 0]);
+        rows.push(["Guests Total", summary.guests || 0]);
+        rows.push(["Outlets Configured", summary.outlets || 0]);
+        rows.push(["Transactions Tracked", transactionSummary.transactions || 0]);
+        rows.push([]);
+      }
+
+      if (csvSections.status) {
+        rows.push(["STATUS BREAKDOWN"]);
+        rows.push(["Reserved/Approved", reservedCount]);
+        rows.push(["Pending Coordination", statuses.pending || 0]);
+        rows.push(["Rejected/Declined", statuses.rejected || 0]);
+        rows.push(["Cancelled", statuses.cancelled || 0]);
+        rows.push([]);
+      }
+
+      if (csvSections.trends) {
+        rows.push(["ANNUAL PERFORMANCE TRENDS"]);
+        rows.push(["Month", "Reservations", "Promotion Mentions"]);
+        (monthlyReport.months || []).forEach((month) => {
+          rows.push([month.label, month.reservations || 0, month.promotion_mentions || 0]);
+        });
+        rows.push([]);
+        
+        rows.push([`${selectedMonthLabel} ${monthlyGranularity === "weekly" ? "Weekly" : "Daily"} Activity`]);
+        rows.push(["Label", "Reservations", "Promotion Mentions"]);
+        ((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).forEach((row) => {
+          rows.push([row.label, row.reservations || 0, row.promotion_mentions || 0]);
+        });
+        rows.push([]);
+      }
+
+      if (csvSections.outlets) {
+        rows.push(["OUTLET PERFORMANCE DETAILS"]);
+        rows.push(["Outlet", "Wing", "Type", "Reservations", "Guests", "Reserved", "Pending", "Rejected", "Cancelled", "Dine-In", "Promo"]);
+        filteredOutlets.forEach((outlet) => {
+          rows.push([
+            outlet.name,
+            outlet.wing || "Main Wing",
+            outlet.type || "Outlet",
+            outlet.total_reservations || 0,
+            outlet.guests || 0,
+            outlet.reserved || 0,
+            outlet.pending || 0,
+            outlet.rejected || 0,
+            outlet.cancelled || 0,
+            outlet.dine_in || 0,
+            outlet.promotion_mentions || 0,
+          ]);
+        });
+        rows.push([]);
+      }
+
+      if (csvSections.rooms) {
+        rows.push(["ROOM DETAILS PERFORMANCE"]);
+        rows.push(["Room / Outlet", "Reservations", "Guests", "Pending", "Reserved", "Rejected", "Cancelled", "Dine-In", "Promo", "Latest Event"]);
+        roomDetails.forEach((room) => {
+          rows.push([
+            room.room,
+            room.reservations || 0,
+            room.guests || 0,
+            room.pending || 0,
+            room.reserved || 0,
+            room.rejected || 0,
+            room.cancelled || 0,
+            room.dine_in || 0,
+            room.promotion_mentions || 0,
+            room.latest_event_date || "-",
+          ]);
+        });
+        rows.push([]);
+      }
+
+      return rows;
+    }
+  };
+
   const handleExportCsv = () => {
-    const rows = [
-      ["=================================================="],
-      ["BELLEVUE OUTLET & ROOM PERFORMANCE REPORT"],
-      ["Generated At", new Date().toLocaleString()],
-      ["Date Range", dateRangeLabel],
-      ["=================================================="],
-      [],
-      ["OVERVIEW SUMMARY"],
-      ["Reservations Total", summary.reservations || 0],
-      ["Guests Total", summary.guests || 0],
-      ["Outlets Configured", summary.outlets || 0],
-      ["Transactions Tracked", transactionSummary.transactions || 0],
-      [],
-      ["STATUS BREAKDOWN"],
-      ["Reserved/Approved", reservedCount],
-      ["Pending Coordination", statuses.pending || 0],
-      ["Rejected/Declined", statuses.rejected || 0],
-      ["Cancelled", statuses.cancelled || 0],
-      [],
-      ["ANNUAL PERFORMANCE TRENDS"],
-      ["Month", "Reservations", "Promotion Mentions"],
-      ...(monthlyReport.months || []).map((month) => [month.label, month.reservations || 0, month.promotion_mentions || 0]),
-      [],
-      [`\${selectedMonthLabel} \${monthlyGranularity === "weekly" ? "Weekly" : "Daily"} Activity`],
-      ["Label", "Reservations", "Promotion Mentions"],
-      ...((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || [])
-        .map((row) => [row.label, row.reservations || 0, row.promotion_mentions || 0]),
-      [],
-      ["OUTLET PERFORMANCE DETAILS"],
-      ["Outlet", "Wing", "Type", "Reservations", "Guests", "Reserved", "Pending", "Rejected", "Cancelled", "Dine-In", "Promo"],
-      ...filteredOutlets.map((outlet) => [
-        outlet.name,
-        outlet.wing || "Main Wing",
-        outlet.type || "Outlet",
-        outlet.total_reservations || 0,
-        outlet.guests || 0,
-        outlet.reserved || 0,
-        outlet.pending || 0,
-        outlet.rejected || 0,
-        outlet.cancelled || 0,
-        outlet.dine_in || 0,
-        outlet.promotion_mentions || 0,
-      ]),
-      [],
-      ["ROOM DETAILS PERFORMANCE"],
-      ["Room / Outlet", "Reservations", "Guests", "Pending", "Reserved", "Rejected", "Cancelled", "Dine-In", "Promo", "Latest Event"],
-      ...roomDetails.map((room) => [
-        room.room,
-        room.reservations || 0,
-        room.guests || 0,
-        room.pending || 0,
-        room.reserved || 0,
-        room.rejected || 0,
-        room.cancelled || 0,
-        room.dine_in || 0,
-        room.promotion_mentions || 0,
-        room.latest_event_date || "-",
-      ]),
-    ];
-    const trendName = activeTab === "monthly"
-      ? `outlet-report-\${reportYear}-\${String(reportMonth).padStart(2, "0")}-\${monthlyGranularity}.csv`
-      : `outlet-report-\${reportYear}.csv`;
-    downloadCsv(isTrendTab ? trendName : `outlet-report-\${startDate}-to-\${endDate}.csv`, rows);
+    downloadCsv(csvFilename, compileCsvData(), csvDelimiter);
+    setShowCsvConfig(false);
   };
   const reportGroups = [
     {
@@ -1767,7 +1873,18 @@ export default function Reports() {
                 >
                   {loading ? "..." : "Apply"}
                 </button>
-                <ActionButton icon={Download} label="CSV" onClick={handleExportCsv} />
+                <ActionButton
+                  icon={Download}
+                  label="CSV"
+                  onClick={() => {
+                    const trendName = activeTab === "monthly"
+                      ? `outlet-report-${reportYear}-${String(reportMonth).padStart(2, "0")}-${monthlyGranularity}.csv`
+                      : `outlet-report-${reportYear}.csv`;
+                    const defaultFilename = isTrendTab ? trendName : `outlet-report-${startDate}-to-${endDate}.csv`;
+                    setCsvFilename(defaultFilename);
+                    setShowCsvConfig(true);
+                  }}
+                />
                 <ActionButton icon={Printer} label="Print" onClick={() => setShowPrintConfig(true)} />
               </div>
             )}
@@ -2389,6 +2506,287 @@ export default function Reports() {
                 Print Report Document
               </button>
             </div>
+          </section>
+        </div>
+      )}
+
+      {/* CSV/Excel Export Customizer Panel with Live Preview (RPT-005) */}
+      {showCsvConfig && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(24,20,14,0.42)", backdropFilter: "blur(4px)", display: "grid", placeItems: "center", padding: 20 }} className="print-exclude">
+          <section style={{ width: "min(1200px, 95vw)", height: "calc(100vh - 40px)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: F.body }}>
+            
+            {/* Header */}
+            <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+              <div>
+                <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>Interactive Excel & CSV Export Suite</div>
+                <div style={{ marginTop: 4, fontSize: 12.5, color: C.muted }}>Configure spreadsheet structure, delimiters, and target sections with real-time importable preview.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCsvConfig(false)}
+                style={{ border: "none", background: "transparent", color: C.muted, fontSize: 20, cursor: "pointer", fontWeight: 300, padding: 8 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Split Content Area */}
+            <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+              
+              {/* Left Config Column */}
+              <div style={{ width: 380, borderRight: `1px solid ${C.divider}`, padding: "20px 24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 20, minWidth: 380 }}>
+                
+                {/* Filename Customizer */}
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Target File Name</div>
+                  <input
+                    type="text"
+                    value={csvFilename}
+                    onChange={(e) => setCsvFilename(e.target.value)}
+                    style={{
+                      height: 36,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 8,
+                      padding: "0 12px",
+                      fontSize: 12,
+                      fontFamily: F.body,
+                      color: C.text,
+                      background: C.surfaceInput,
+                      outline: "none",
+                      width: "100%",
+                      boxSizing: "border-box"
+                    }}
+                    placeholder="Enter file name"
+                  />
+                  <div style={{ fontSize: 10.5, color: C.muted }}>Pre-filled with date range parameter for Bellevue audits.</div>
+                </div>
+
+                <div style={{ height: 1, background: C.divider }} />
+
+                {/* Export Style */}
+                <div style={{ display: "grid", gap: 14 }}>
+                  <FilterField label="Export Data Structure Style">
+                    <select value={csvExportType} onChange={(e) => setCsvExportType(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                      <option value="unified">Unified Executive View (Combined reports)</option>
+                      <option value="raw">Raw BI Spreadsheet Flat-Grid (Pivot ready)</option>
+                    </select>
+                  </FilterField>
+                  <div style={{ fontSize: 11, color: C.muted, marginTop: -4, lineHeight: 1.4 }}>
+                    {csvExportType === "unified" 
+                      ? "Consolidates overview stats, status, trends, and outlet lists into a clean, human-readable document view." 
+                      : "Exports a perfect single flat table of all matching reservation records, ideal for Excel Pivot Tables, Google Sheets, or PowerBI imports."}
+                  </div>
+                </div>
+
+                <div style={{ height: 1, background: C.divider }} />
+
+                {/* Delimiter Selector */}
+                <div style={{ display: "grid", gap: 14 }}>
+                  <FilterField label="Excel Delimiter Character">
+                    <select value={csvDelimiter} onChange={(e) => setCsvDelimiter(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                      <option value=",">Comma ( , ) – Standard US format</option>
+                      <option value=";">Semicolon ( ; ) – European Excel standard</option>
+                    </select>
+                  </FilterField>
+                </div>
+
+                <div style={{ height: 1, background: C.divider }} />
+
+                {/* Include Metadata Headers */}
+                <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: C.text, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={csvIncludeHeaders}
+                    onChange={(e) => setCsvIncludeHeaders(e.target.checked)}
+                    style={{ width: 17, height: 17, accentColor: C.gold }}
+                  />
+                  <span style={{ fontWeight: 550 }}>Include Document Headers & Titles</span>
+                </label>
+
+                {csvExportType === "unified" && (
+                  <>
+                    <div style={{ height: 1, background: C.divider }} />
+
+                    {/* Section Selector */}
+                    <div style={{ display: "grid", gap: 10 }}>
+                      <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Sections to Compile</div>
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {Object.keys(csvSections).map((sec) => (
+                          <label key={sec} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: C.text, cursor: "pointer", padding: "2px 0" }}>
+                            <input
+                              type="checkbox"
+                              checked={csvSections[sec]}
+                              onChange={(e) => setCsvSections((prev) => ({ ...prev, [sec]: e.target.checked }))}
+                              style={{ width: 17, height: 17, accentColor: C.gold }}
+                            />
+                            <span style={{ textTransform: "capitalize", fontWeight: 550 }}>
+                              {sec === "summary" ? "Overview summary details" 
+                               : sec === "status" ? "Status breakdown mix" 
+                               : sec === "trends" ? "Annual & monthly trends" 
+                               : sec}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+              </div>
+
+              {/* Right Live Preview Column */}
+              <div style={{ flex: 1, background: "#FAF8F4", borderLeft: `1px solid ${C.border}`, padding: "24px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+                
+                {/* Header Stats */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+                  <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold }}>Spreadsheet Preview Grid</div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <span style={{ background: C.goldFaint, color: C.gold, padding: "3px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700 }}>
+                      Estimated Columns: {csvExportType === "raw" ? 16 : "Dynamic"}
+                    </span>
+                    <span style={{ background: "rgba(46,122,90,0.08)", color: C.green, padding: "3px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700 }}>
+                      Estimated Rows: {compileCsvData().length}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Paper sheet spreadsheet preview container */}
+                <div
+                  style={{
+                    background: C.surface,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 12,
+                    boxShadow: "0 8px 30px rgba(24,20,14,0.04)",
+                    padding: 20,
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 14,
+                    boxSizing: "border-box",
+                    flexShrink: 0,
+                    overflowX: "auto"
+                  }}
+                >
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5, minWidth: 600 }}>
+                    <thead>
+                      <tr style={{ background: C.soft, color: C.faint, borderBottom: `2px solid ${C.gold}` }}>
+                        {csvExportType === "raw" ? (
+                          <>
+                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Ref Code</th>
+                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Guest Name</th>
+                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Email</th>
+                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Outlet (Parent)</th>
+                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Subroom (Child)</th>
+                          </>
+                        ) : (
+                          <>
+                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", width: "40%" }}>Section / Label</th>
+                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Spreadsheet Output Values Preview</th>
+                          </>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvExportType === "raw" ? (
+                        <>
+                          <tr style={{ borderBottom: `1px solid ${C.divider}` }}>
+                            <td style={{ padding: "8px 6px", fontWeight: 700, color: C.text }}>Bellevue-5812</td>
+                            <td style={{ padding: "8px 6px" }}>Christian Dela Cruz</td>
+                            <td style={{ padding: "8px 6px" }}>christian@example.com</td>
+                            <td style={{ padding: "8px 6px" }}>20/20 Function Room</td>
+                            <td style={{ padding: "8px 6px", color: C.green, fontWeight: 650 }}>20/20 Function Room A</td>
+                          </tr>
+                          <tr style={{ borderBottom: `1px solid ${C.divider}` }}>
+                            <td style={{ padding: "8px 6px", fontWeight: 700, color: C.text }}>Bellevue-3421</td>
+                            <td style={{ padding: "8px 6px" }}>John Doe</td>
+                            <td style={{ padding: "8px 6px" }}>john.doe@example.com</td>
+                            <td style={{ padding: "8px 6px" }}>Grand Ballroom</td>
+                            <td style={{ padding: "8px 6px", color: C.green, fontWeight: 650 }}>Grand Ballroom B</td>
+                          </tr>
+                          <tr style={{ borderBottom: `1px solid ${C.divider}` }}>
+                            <td style={{ padding: "8px 6px", fontWeight: 700, color: C.text }}>Bellevue-9856</td>
+                            <td style={{ padding: "8px 6px" }}>Jane Smith</td>
+                            <td style={{ padding: "8px 6px" }}>jane.smith@example.com</td>
+                            <td style={{ padding: "8px 6px" }}>Laguna Ballroom</td>
+                            <td style={{ padding: "8px 6px", color: C.green, fontWeight: 650 }}>Laguna Ballroom 2</td>
+                          </tr>
+                        </>
+                      ) : (
+                        <>
+                          {csvIncludeHeaders && (
+                            <tr style={{ borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
+                              <td style={{ padding: "8px 6px", fontWeight: 700, color: C.gold }}>[HEADER]</td>
+                              <td style={{ padding: "8px 6px", fontStyle: "italic", color: C.muted }}>BELLEVUE OUTLET & ROOM PERFORMANCE REPORT · Date: {dateRangeLabel}</td>
+                            </tr>
+                          )}
+                          {csvSections.summary && (
+                            <tr style={{ borderBottom: `1px solid ${C.divider}` }}>
+                              <td style={{ padding: "8px 6px", fontWeight: 700 }}>OVERVIEW SUMMARY</td>
+                              <td style={{ padding: "8px 6px" }}>Reservations Total: {summary.reservations || 0} · Guests Total: {summary.guests || 0}</td>
+                            </tr>
+                          )}
+                          {csvSections.status && (
+                            <tr style={{ borderBottom: `1px solid ${C.divider}` }}>
+                              <td style={{ padding: "8px 6px", fontWeight: 700 }}>STATUS BREAKDOWN</td>
+                              <td style={{ padding: "8px 6px" }}>Approved: {reservedCount} · Pending: {statuses.pending || 0} · Rejected: {statuses.rejected || 0}</td>
+                            </tr>
+                          )}
+                        </>
+                      )}
+                      <tr>
+                        <td colSpan={csvExportType === "raw" ? 5 : 2} style={{ padding: "10px 6px", textTransform: "uppercase", fontSize: 9, color: C.faint, fontWeight: 800, textAlign: "center" }}>
+                          + {Math.max(0, compileCsvData().length - 3)} additional rows will export into spreadsheet document
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Raw CSV Text Preview */}
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 180 }}>
+                  <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Raw CSV File Stream Output (First 8 lines)</div>
+                  <pre
+                    style={{
+                      flex: 1,
+                      margin: 0,
+                      background: "#18140E",
+                      color: "#FAF8F4",
+                      fontFamily: "monospace",
+                      fontSize: 11,
+                      padding: 14,
+                      borderRadius: 10,
+                      overflow: "auto",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      lineHeight: 1.5,
+                      boxSizing: "border-box"
+                    }}
+                  >
+                    {compileCsvData().slice(0, 8).map(row => row.map(csvCell).join(csvDelimiter)).join("\n")}
+                  </pre>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* Bottom Actions Bar */}
+            <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", gap: 12, flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => setShowCsvConfig(false)}
+                style={{ height: 38, padding: "0 16px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, color: C.muted, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                style={{ height: 38, padding: "0 22px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+              >
+                Export Spreadsheet File
+              </button>
+            </div>
+
           </section>
         </div>
       )}

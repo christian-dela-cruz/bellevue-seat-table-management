@@ -1344,7 +1344,12 @@ class ReservationService
 
     private function roomLabel(Reservation $reservation): string
     {
-        return $this->canonicalRoomLabel($reservation->room
+        $room = $reservation->room;
+        if (!empty($reservation->internal_room_name) && $reservation->internal_room_name !== 'Whole Venue') {
+            $room = $reservation->internal_room_name;
+        }
+
+        return $this->canonicalRoomLabel($room
             ?: $reservation->venue?->name
             ?: 'Unassigned Room');
     }
