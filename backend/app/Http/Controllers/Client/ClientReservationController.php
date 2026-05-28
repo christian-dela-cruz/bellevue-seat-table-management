@@ -197,7 +197,7 @@ class ClientReservationController extends Controller
                         $validated['internal_room_name'] = null;
                         $validated['assignment_status'] = 'pending_assignment';
                     }
-                } elseif ($allocationMode === 'whole_booking' || $validated['type'] === 'whole') {
+                } elseif ($allocationMode === 'whole_booking') {
                     $validated['assigned_room_id'] = null;
                     $validated['internal_room_name'] = 'Whole Venue';
                     $validated['assignment_status'] = 'auto_assigned';
