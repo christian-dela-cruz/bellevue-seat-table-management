@@ -89,6 +89,7 @@ function HamburgerBtn({ onClick, isOpen }) {
         flexShrink: 0,
         boxShadow: "none",
         transform: hovered ? "translateY(-1px)" : "none",
+        outline: "none",
       }}
     >
       {[0, 1, 2].map((i) => (
@@ -114,8 +115,8 @@ function NavItem({ item, isActive, isOpen, onClick, nested = false }) {
   const navigate = useNavigate();
   const activeColor = "#7E5E25";
   const hoverColor = "#8C6B2A";
-  const activeBg = "rgba(140,107,42,0.15)";
-  const hoverBg = "rgba(140,107,42,0.07)";
+  const activeBg = "rgba(140,107,42,0.10)";
+  const hoverBg = "rgba(140,107,42,0.04)";
 
   const handleClick = () => {
     navigate(NAV_ROUTES[item.id] || "/admin/dashboard");
@@ -165,15 +166,15 @@ function NavItem({ item, isActive, isOpen, onClick, nested = false }) {
           fontSize: nested ? 12 : 12.35,
           color: isActive ? activeColor : hovered ? hoverColor : "#5E5548",
           background: isActive
-            ? `linear-gradient(135deg, ${activeBg}, rgba(255,255,255,0.55))`
+            ? activeBg
             : hovered ? hoverBg : "transparent",
-          border: `1px solid ${isActive ? "rgba(140,107,42,0.24)" : "transparent"}`,
+          border: `1px solid ${isActive ? "rgba(140,107,42,0.18)" : "transparent"}`,
           cursor: "pointer",
           fontWeight: isActive ? 680 : nested ? 490 : 540,
           transition: "background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease",
           userSelect: "none",
           borderRadius: 11,
-          boxShadow: isActive ? "inset 0 0 0 1px rgba(255,255,255,0.42)" : "none",
+          boxShadow: "none",
           transform: hovered && !isActive ? "translateX(1px)" : "none",
           position: "relative",
         }}
@@ -223,8 +224,8 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
   const GroupIcon = group.icon || ClipboardList;
   const activeColor = "#7E5E25";
   const hoverColor = "#8C6B2A";
-  const activeBg = "rgba(140,107,42,0.15)";
-  const hoverBg = "rgba(140,107,42,0.07)";
+  const activeBg = "rgba(140,107,42,0.10)";
+  const hoverBg = "rgba(140,107,42,0.04)";
 
   useEffect(() => {
     if (!hasActiveItem) return;
@@ -292,9 +293,9 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
           padding: "8px 10px 8px 11px",
           minHeight: 38,
           borderRadius: 11,
-          border: `1px solid ${hasActiveItem ? "rgba(140,107,42,0.24)" : "transparent"}`,
+          border: `1px solid ${hasActiveItem ? "rgba(140,107,42,0.18)" : "transparent"}`,
           background: hasActiveItem
-            ? `linear-gradient(135deg, ${activeBg}, rgba(255,255,255,0.55))`
+            ? activeBg
             : hovered ? hoverBg : "transparent",
           color: hasActiveItem ? activeColor : hovered ? hoverColor : "#5E5548",
           cursor: "pointer",
@@ -306,10 +307,11 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
           fontWeight: hasActiveItem ? 680 : 540,
           letterSpacing: 0,
           textTransform: "none",
-          boxShadow: hasActiveItem ? "inset 0 0 0 1px rgba(255,255,255,0.42)" : "none",
+          boxShadow: "none",
           transition: "background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease",
           transform: hovered && !hasActiveItem ? "translateX(1px)" : "none",
           position: "relative",
+          outline: "none",
         }}
       >
         <span
@@ -663,6 +665,7 @@ export default function Sidebar({
             transition: "background 0.18s ease, border-color 0.18s ease, transform 0.18s ease",
             fontFamily: F.body,
             textAlign: "left",
+            outline: "none",
           }}
         >
           <span
