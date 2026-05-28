@@ -39,13 +39,12 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
 
   useEffect(() => {
     const openAccountSettings = () => {
-      resetProfileForm();
-      setSettingsOpen(true);
+      navigate('/admin/settings');
     };
 
     window.addEventListener("bellevue:open-account-settings", openAccountSettings);
     return () => window.removeEventListener("bellevue:open-account-settings", openAccountSettings);
-  }, []);
+  }, [navigate]);
 
   const isNotifActive = location.pathname === "/admin/notifications";
   const roleLabel = roleLabels[currentUser.role] || currentUser.role || "Admin";
@@ -206,67 +205,6 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
         </button>
 
       </div>
-
-      {settingsOpen && (
-        <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.38)",zIndex:6000,display:"flex",alignItems:"center",justifyContent:"center",padding:20 }} onClick={(event)=>{ if(event.target === event.currentTarget) closeSettings(); }}>
-          <div style={{ width:"100%",maxWidth:480,background:"#FFFFFF",borderRadius:12,border:"1px solid rgba(0,0,0,0.10)",boxShadow:"0 20px 60px rgba(0,0,0,0.22)",overflow:"hidden",fontFamily:"'Inter','Helvetica Neue',Arial,sans-serif" }}>
-            <div style={{ padding:"18px 20px",borderBottom:"1px solid rgba(0,0,0,0.06)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12 }}>
-              <div>
-                <div style={{ fontSize:9,fontWeight:800,letterSpacing:"0.18em",textTransform:"uppercase",color:"#8C6B2A",marginBottom:5 }}>Personal Account</div>
-                <div style={{ fontSize:20,fontWeight:800,color:"#18140E" }}>{editingProfile ? "Update Account" : "Account Details"}</div>
-              </div>
-              <button onClick={closeSettings} style={{ width:32,height:32,borderRadius:"50%",border:"1px solid rgba(0,0,0,0.08)",background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center" }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A7060" strokeWidth="2.4" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-              </button>
-            </div>
-            <div style={{ padding:20,display:"grid",gap:12 }}>
-              {profileMessage && (
-                <div style={{ padding:"10px 12px",borderRadius:8,fontSize:13,background:profileMessage.type==="error"?"rgba(160,56,56,0.08)":"rgba(46,122,90,0.08)",color:profileMessage.type==="error"?"#A03838":"#2E7A5A",border:`1px solid ${profileMessage.type==="error"?"rgba(160,56,56,0.18)":"rgba(46,122,90,0.18)"}` }}>
-                  {profileMessage.text}
-                </div>
-              )}
-
-              {!editingProfile ? (
-                <>
-                  <div style={{ display:"grid",gap:10 }}>
-                    <div style={{ display:"flex",alignItems:"center",gap:12,padding:"12px",border:"1px solid rgba(140,107,42,0.14)",borderRadius:10,background:"rgba(140,107,42,0.04)" }}>
-                      <div style={{ width:42,height:42,borderRadius:"50%",background:"#FFFFFF",border:"1px solid rgba(140,107,42,0.24)",color:"#8C6B2A",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,flexShrink:0 }}>{initials || "A"}</div>
-                      <div style={{ minWidth:0 }}>
-                        <div style={{ fontSize:15,fontWeight:800,color:"#18140E",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{displayName}</div>
-                        <div style={{ fontSize:12,color:"#7A7060",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{currentUser.email || currentUser.username || "Account"}</div>
-                      </div>
-                    </div>
-                    <AccountDetailRow label="Name" value={currentUser.name || "-"} />
-                    <AccountDetailRow label="Email" value={currentUser.email || "-"} />
-                    <AccountDetailRow label="Username" value={currentUser.username || "-"} />
-                    <AccountDetailRow label="Role" value={roleLabel} />
-                  </div>
-                  <div style={{ display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4 }}>
-                    <button type="button" onClick={closeSettings} style={{ padding:"10px 14px",border:"1px solid rgba(0,0,0,0.10)",borderRadius:8,background:"transparent",color:"#7A7060",fontSize:10,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer" }}>Close</button>
-                    <button type="button" onClick={(event)=>{ event.preventDefault(); event.stopPropagation(); setProfileMessage(null); setEditingProfile(true); }} style={{ padding:"10px 16px",border:"none",borderRadius:8,background:"#8C6B2A",color:"#fff",fontSize:10,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer" }}>Update Account</button>
-                  </div>
-                </>
-              ) : (
-                <form onSubmit={submitProfile} style={{ display:"grid",gap:12 }}>
-                  <ProfileField label="Name"><input value={profile.name} onChange={(event)=>setProfile({...profile,name:event.target.value})} style={profileInputStyle()} /></ProfileField>
-                  <ProfileField label="Email"><input type="email" value={profile.email} onChange={(event)=>setProfile({...profile,email:event.target.value})} style={profileInputStyle()} /></ProfileField>
-                  <ProfileField label="Username"><input value={profile.username} onChange={(event)=>setProfile({...profile,username:event.target.value})} style={profileInputStyle()} /></ProfileField>
-                  <div style={{ height:1,background:"rgba(0,0,0,0.06)",margin:"2px 0" }} />
-                  <ProfileField label="Current Password"><input type="password" value={profile.current_password} onChange={(event)=>setProfile({...profile,current_password:event.target.value})} placeholder="Required only when changing password" style={profileInputStyle()} /></ProfileField>
-                  <ProfileField label="New Password"><input type="password" value={profile.password} onChange={(event)=>setProfile({...profile,password:event.target.value})} style={profileInputStyle()} /></ProfileField>
-                  <ProfileField label="Confirm Password"><input type="password" value={profile.password_confirmation} onChange={(event)=>setProfile({...profile,password_confirmation:event.target.value})} style={profileInputStyle()} /></ProfileField>
-                  <div style={{ display:"flex",gap:8,justifyContent:"flex-end",paddingTop:4 }}>
-                    <button type="button" onClick={()=>{ resetProfileForm(); setEditingProfile(false); }} style={{ padding:"10px 14px",border:"1px solid rgba(0,0,0,0.10)",borderRadius:8,background:"transparent",color:"#7A7060",fontSize:10,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer" }}>Cancel</button>
-                    <button type="submit" disabled={savingProfile} style={{ padding:"10px 16px",border:"none",borderRadius:8,background:"#8C6B2A",color:"#fff",fontSize:10,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",cursor:savingProfile?"not-allowed":"pointer" }}>
-                      {savingProfile ? "Saving..." : "Save Account"}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </nav>
   );
 }
@@ -282,37 +220,5 @@ const roleLabels = {
   viewer: "Viewer",
   view_only: "Viewer",
 };
-
-function ProfileField({ label, children }) {
-  return (
-    <label style={{ display:"grid",gap:6 }}>
-      <span style={{ fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:"rgba(24,20,14,0.42)" }}>{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function AccountDetailRow({ label, value }) {
-  return (
-    <div style={{ display:"grid",gridTemplateColumns:"110px minmax(0,1fr)",gap:12,alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,0.06)" }}>
-      <span style={{ fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:"rgba(24,20,14,0.42)" }}>{label}</span>
-      <span style={{ fontSize:13,fontWeight:700,color:"#18140E",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{value}</span>
-    </div>
-  );
-}
-
-function profileInputStyle() {
-  return {
-    width:"100%",
-    minHeight:40,
-    border:"1px solid rgba(0,0,0,0.10)",
-    borderRadius:7,
-    padding:"9px 11px",
-    fontSize:13,
-    color:"#18140E",
-    background:"#FFFFFF",
-    outline:"none",
-  };
-}
 
 export default AdminNavbar;
