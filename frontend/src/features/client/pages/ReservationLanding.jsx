@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import bellevueLogo from "../../../assets/bellevue-logo.png";
-import hanakazuLogo from "../../../assets/hanakazu-card-logo.png";
-import qsinaLogo from "../../../assets/qsina-card-logo.png";
-import phoenixCourtLogo from "../../../assets/phoenix-court-card-logo.png";
+import hanakazuLogo from "../../../assets/hanakazu-landing-logo.png";
+import qsinaLogo from "../../../assets/qsina-landing-logo.png";
+import phoenixCourtLogo from "../../../assets/phoenix-landing-logo.png";
+import johnnyLogo from "../../../assets/johnny-landing-logo.png";
+import pastryCornerLogo from "../../../assets/pastrycorner-landing-logo.png";
+import vueBarLogo from "../../../assets/vuebar-landing-logo.png";
 import alabangImg from "../../../assets/alabang-function-hires.jpg";
 import lagunaImg from "../../../assets/laguna-ballroom-hires.jpg";
 import twentyTwentyImg from "../../../assets/twenty-twenty-function-hires.jpg";
@@ -139,6 +142,15 @@ const diningLogoMap = {
   "qsinarestaurant": qsinaLogo,
   "phoenix court": phoenixCourtLogo,
   "phoenixcourt": phoenixCourtLogo,
+  "johnnys steak and grill": johnnyLogo,
+  "johnnys steak grill": johnnyLogo,
+  "johnny steak and grill": johnnyLogo,
+  "johnnys": johnnyLogo,
+  "johnny": johnnyLogo,
+  "pastry corner": pastryCornerLogo,
+  "pastrycorner": pastryCornerLogo,
+  "vue bar": vueBarLogo,
+  "vuebar": vueBarLogo,
 };
 
 function resolveRoomImage(image) {
@@ -165,8 +177,11 @@ function roomRoute(room) {
 
 function resolveDiningLogo(room) {
   const key = canonicalRoomName(room?.display_name || room?.name);
+  const slugKey = canonicalRoomName(String(room?.slug || "").replace(/-/g, " "));
+  const mappedLogo = diningLogoMap[key] || diningLogoMap[slugKey];
+  if (mappedLogo) return mappedLogo;
   if (room?.image && /^(https?:|data:|blob:|\/)/i.test(String(room.image))) return resolveRoomImage(room.image);
-  return diningLogoMap[key] || fallbackDiningOutlets.find((outlet) => canonicalRoomName(outlet.title) === key)?.logo || null;
+  return fallbackDiningOutlets.find((outlet) => canonicalRoomName(outlet.title) === key)?.logo || null;
 }
 
 function childLabel(child, parentName) {
@@ -219,6 +234,15 @@ const diningAliases = {
   "qsinarestaurant": "qsina restaurant",
   "phoenix court": "phoenix court",
   "phoenixcourt": "phoenix court",
+  "johnnys steak and grill": "johnnys steak and grill",
+  "johnnys steak grill": "johnnys steak and grill",
+  "johnny steak and grill": "johnnys steak and grill",
+  "johnnys": "johnnys steak and grill",
+  "johnny": "johnnys steak and grill",
+  "pastry corner": "pastry corner",
+  "pastrycorner": "pastry corner",
+  "vue bar": "vue bar",
+  "vuebar": "vue bar",
 };
 
 function isArchivedRoom(room) {
@@ -365,7 +389,7 @@ function buildDiningOutletsFromConfig(rooms = []) {
       const match = configuredByKey.get(outletKey)
         || configuredByKey.get(canonicalRoomName(outlet.title))
         || configuredByKey.get(canonicalRoomName(outlet.route));
-      if (!match) return outlet;
+      if (!match) return null;
       usedIds.add(match.id);
       if (!match.is_active || !match.is_visible || !match.show_on_landing) return null;
       return {
@@ -634,24 +658,27 @@ export default function ReservationLanding() {
           --paper: rgba(255, 252, 246, 0.94);
           --paper-strong: rgba(255, 255, 255, 0.98);
           --muted: rgba(74, 60, 39, 0.72);
-          --radius-panel: 22px;
-          --radius-card: 14px;
+          --radius-panel: 28px;
+          --radius-card: 18px;
           --brand-logo-size: clamp(46px, 4vw, 58px);
           --brand-mark-size: clamp(34px, 3.05vw, 42px);
-          --outlet-logo-size: clamp(92px, 6.9vw, 132px);
+          --dining-card-max: 220px;
           min-height: 100vh;
           min-height: 100svh;
           height: 100vh;
           height: 100svh;
           overflow: hidden;
+          position: relative;
+          isolation: isolate;
           display: grid;
           grid-template-rows: 52px minmax(0, 1fr);
           gap: 14px;
           padding: 16px clamp(18px, 2.5vw, 34px) clamp(16px, 2vw, 26px);
-          background-color: #18140f;
+          background-color: #17130f;
           background-image:
-            radial-gradient(circle at 16% 12%, rgba(196, 163, 90, 0.08), transparent 28%),
-            radial-gradient(circle at 84% 88%, rgba(255, 250, 241, 0.08), transparent 34%);
+            radial-gradient(circle at 14% 10%, rgba(196, 163, 90, 0.13), transparent 28%),
+            radial-gradient(circle at 74% 24%, rgba(255, 236, 198, 0.08), transparent 30%),
+            radial-gradient(circle at 88% 86%, rgba(255, 250, 241, 0.08), transparent 34%);
           color: var(--cream);
           font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
           box-sizing: border-box;
@@ -661,14 +688,52 @@ export default function ReservationLanding() {
         }
 
         .reservation-launcher[data-theme="light"] {
-          background-color: #f4eee3;
+          background-color: #f2eadf;
           background-image:
-            radial-gradient(circle at 12% 12%, rgba(164, 120, 33, 0.08), transparent 30%),
-            radial-gradient(circle at 84% 88%, rgba(255, 255, 255, 0.74), transparent 36%);
+            radial-gradient(circle at 14% 12%, rgba(164, 120, 33, 0.11), transparent 30%),
+            radial-gradient(circle at 74% 18%, rgba(255, 255, 255, 0.82), transparent 32%),
+            radial-gradient(circle at 86% 86%, rgba(216, 189, 120, 0.11), transparent 36%);
           color: var(--ink);
         }
 
+        .reservation-launcher::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          z-index: -2;
+          background:
+            linear-gradient(90deg, rgba(0,0,0,0.18), transparent 34%),
+            radial-gradient(ellipse at 78% 52%, rgba(196, 163, 90, 0.08), transparent 45%);
+          opacity: 0.84;
+          pointer-events: none;
+        }
+
+        .reservation-launcher::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          z-index: -1;
+          background-image:
+            linear-gradient(120deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 100%),
+            radial-gradient(circle at 92% 94%, rgba(255, 250, 241, 0.12), transparent 14%);
+          background-size: 140px 140px, auto;
+          opacity: 0.16;
+          pointer-events: none;
+        }
+
+        .reservation-launcher[data-theme="light"]::before {
+          background:
+            linear-gradient(90deg, rgba(255,255,255,0.52), transparent 42%),
+            radial-gradient(ellipse at 80% 48%, rgba(164, 120, 33, 0.08), transparent 48%);
+        }
+
+        .reservation-launcher[data-theme="light"]::after {
+          opacity: 0.23;
+        }
+
         .reservation-topbar {
+          position: relative;
+          z-index: 1;
           display: flex;
           align-items: center;
           justify-content: flex-end;
@@ -840,10 +905,12 @@ export default function ReservationLanding() {
         }
 
         .reservation-shell {
+          position: relative;
+          z-index: 1;
           min-height: 0;
           display: grid;
-          grid-template-columns: minmax(clamp(280px, 32vw, 430px), 0.68fr) minmax(0, 1.42fr);
-          gap: clamp(18px, 2vw, 32px);
+          grid-template-columns: minmax(clamp(300px, 27vw, 486px), 0.56fr) minmax(0, 1.44fr);
+          gap: clamp(22px, 2.5vw, 42px);
           animation: reservationRiseIn 0.62s ease 0.14s both;
         }
 
@@ -854,18 +921,18 @@ export default function ReservationLanding() {
           flex-direction: column;
           justify-content: space-between;
           min-height: 0;
-          padding: clamp(26px, 3.2vw, 44px);
+          padding: clamp(30px, 3.2vw, 54px);
           border-radius: var(--radius-panel);
-          background: rgba(16, 13, 10, 0.96);
-          border: 1px solid rgba(255, 250, 241, 0.09);
-          box-shadow: 0 24px 70px rgba(16, 10, 4, 0.32);
+          background: linear-gradient(180deg, rgba(25, 22, 18, 0.98), rgba(12, 10, 8, 0.985));
+          border: 1px solid rgba(255, 250, 241, 0.08);
+          box-shadow: 0 30px 82px rgba(16, 10, 4, 0.34), inset 0 1px 0 rgba(255, 250, 241, 0.045);
           isolation: isolate;
           animation: reservationPanelIn 0.7s ease 0.18s both;
         }
 
         .reservation-launcher[data-theme="light"] .reservation-hero {
           color: var(--cream);
-          background: rgba(20, 16, 12, 0.94);
+          background: linear-gradient(180deg, rgba(28, 25, 21, 0.96), rgba(15, 13, 11, 0.985));
         }
 
         .reservation-hero::before {
@@ -873,9 +940,19 @@ export default function ReservationLanding() {
           position: absolute;
           inset: -20% -18%;
           background:
-            radial-gradient(circle at 88% 12%, rgba(196, 163, 90, 0.13), transparent 34%),
-            radial-gradient(circle at 12% 82%, rgba(255, 250, 241, 0.04), transparent 30%);
+            radial-gradient(circle at 82% 10%, rgba(196, 163, 90, 0.12), transparent 34%),
+            radial-gradient(circle at 18% 78%, rgba(255, 250, 241, 0.055), transparent 30%);
           z-index: -1;
+        }
+
+        .reservation-hero::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          z-index: -1;
+          background: linear-gradient(115deg, transparent 0 58%, rgba(255, 250, 241, 0.05) 58.2% 60.2%, transparent 60.6% 100%);
+          opacity: 0.9;
+          pointer-events: none;
         }
 
         .reservation-hero__content {
@@ -891,7 +968,7 @@ export default function ReservationLanding() {
           height: var(--brand-logo-size);
           margin-bottom: clamp(24px, 4vh, 46px);
           border: 1px solid rgba(196, 163, 90, 0.48);
-          border-radius: 14px;
+          border-radius: 18px;
           background: rgba(255, 250, 241, 0.055);
           box-shadow: 0 18px 32px rgba(0,0,0,0.22), inset 0 0 0 1px rgba(255, 250, 241, 0.035);
           cursor: pointer;
@@ -936,7 +1013,7 @@ export default function ReservationLanding() {
         .reservation-hero h1 {
           margin: 0;
           font-family: "Playfair Display", Georgia, serif;
-          font-size: clamp(44px, 3.75vw, 64px);
+          font-size: clamp(46px, 4vw, 72px);
           line-height: 1;
           letter-spacing: 0;
           font-weight: 600;
@@ -947,9 +1024,9 @@ export default function ReservationLanding() {
         .reservation-hero p {
           margin: clamp(18px, 2.4vh, 28px) 0 0;
           max-width: 360px;
-          color: rgba(255, 248, 236, 0.9);
-          font-size: clamp(13.5px, 0.88vw, 15px);
-          line-height: 1.72;
+          color: rgba(255, 248, 236, 0.86);
+          font-size: clamp(14px, 0.9vw, 16px);
+          line-height: 1.78;
           font-weight: 450;
         }
 
@@ -957,15 +1034,15 @@ export default function ReservationLanding() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          min-height: 38px;
+          min-height: 48px;
           margin-top: clamp(18px, 2.4vh, 26px);
           border: 1px solid rgba(196, 163, 90, 0.42);
-          border-radius: 10px;
-          padding: 0 16px;
+          border-radius: 14px;
+          padding: 0 20px;
           background: rgba(255, 250, 241, 0.07);
           color: rgba(255, 250, 241, 0.94);
           font: inherit;
-          font-size: 10px;
+          font-size: 10.5px;
           font-weight: 760;
           letter-spacing: 0.13em;
           text-transform: uppercase;
@@ -1010,22 +1087,23 @@ export default function ReservationLanding() {
           min-height: 0;
           display: grid;
           grid-template-rows: auto minmax(0, 1fr);
-          gap: clamp(24px, 2.6vh, 34px);
-          padding: clamp(18px, 2vw, 28px);
+          gap: clamp(26px, 3vh, 40px);
+          padding: clamp(18px, 2.2vw, 32px);
           container-type: inline-size;
           border-radius: var(--radius-panel);
-          background: rgba(255, 252, 246, 0.94);
-          border: 1px solid rgba(164, 120, 33, 0.12);
-          box-shadow: 0 22px 64px rgba(42, 31, 18, 0.14);
+          background: rgba(255, 252, 246, 0.34);
+          border: 1px solid rgba(164, 120, 33, 0.09);
+          box-shadow: none;
+          backdrop-filter: blur(10px);
           color: var(--ink);
           animation: reservationPanelIn 0.7s ease 0.24s both;
         }
 
         .reservation-launcher[data-theme="dark"] .reservation-directory {
-          background: rgba(26, 22, 16, 0.96);
+          background: rgba(12, 10, 8, 0.28);
           color: var(--cream);
-          border-color: rgba(255, 250, 241, 0.08);
-          box-shadow: 0 24px 70px rgba(8, 6, 4, 0.26);
+          border-color: rgba(255, 250, 241, 0.055);
+          box-shadow: none;
         }
 
         .reservation-section {
@@ -1046,14 +1124,14 @@ export default function ReservationLanding() {
           align-items: flex-end;
           justify-content: space-between;
           gap: 16px;
-          margin-bottom: 10px;
+          margin-bottom: clamp(12px, 1.3vw, 18px);
         }
 
         .reservation-section__kicker {
           color: var(--muted);
-          font-size: 8.5px;
+          font-size: 10px;
           font-weight: 700;
-          letter-spacing: 0.2em;
+          letter-spacing: 0.18em;
           text-transform: uppercase;
           white-space: nowrap;
         }
@@ -1066,10 +1144,10 @@ export default function ReservationLanding() {
 
         .reservation-section__header h2 {
           margin: 0;
-          font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
-          font-size: clamp(20px, 1.35vw, 27px);
-          line-height: 1.05;
-          font-weight: 720;
+          font-family: "Playfair Display", Georgia, serif;
+          font-size: clamp(26px, 2.1vw, 40px);
+          line-height: 1.03;
+          font-weight: 620;
           letter-spacing: 0;
           color: var(--ink);
         }
@@ -1080,11 +1158,13 @@ export default function ReservationLanding() {
 
         .reservation-grid {
           display: grid;
-          gap: clamp(10px, 1vw, 16px);
+          gap: clamp(14px, 1.25vw, 24px);
         }
 
         .reservation-grid--dining {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          justify-content: start;
+          align-items: start;
         }
 
         .reservation-grid--events {
@@ -1119,14 +1199,15 @@ export default function ReservationLanding() {
         .reservation-card:nth-child(6) { animation-delay: 0.6s; }
 
         .reservation-card--dining {
-          aspect-ratio: 2.08 / 1;
-          min-height: 112px;
-          max-height: 154px;
+          aspect-ratio: 4 / 3;
+          min-height: 0;
+          max-height: none;
           background:
-            radial-gradient(circle at 50% 34%, rgba(196, 163, 90, 0.11), transparent 50%),
-            rgba(18, 15, 11, 0.98);
-          border: 1px solid rgba(196, 163, 90, 0.18);
-          box-shadow: 0 18px 40px rgba(10, 8, 6, 0.22), inset 0 0 0 1px rgba(255, 250, 241, 0.045);
+            radial-gradient(circle at 52% 34%, rgba(196, 163, 90, 0.12), transparent 56%),
+            linear-gradient(180deg, rgba(255, 250, 241, 0.06), rgba(255, 250, 241, 0.015)),
+            rgba(18, 16, 14, 0.96);
+          border: 1px solid rgba(255, 250, 241, 0.12);
+          box-shadow: 0 18px 40px rgba(10, 8, 6, 0.22), inset 0 0 0 1px rgba(196, 163, 90, 0.055);
         }
 
         .reservation-card--event {
@@ -1135,10 +1216,11 @@ export default function ReservationLanding() {
 
         .reservation-launcher[data-theme="light"] .reservation-card--dining {
           background:
-            radial-gradient(circle at 50% 34%, rgba(164, 120, 33, 0.09), transparent 50%),
-            rgba(255, 252, 246, 0.96);
-          border-color: rgba(164, 120, 33, 0.18);
-          box-shadow: 0 16px 34px rgba(42, 31, 18, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.58);
+            radial-gradient(circle at 52% 34%, rgba(164, 120, 33, 0.10), transparent 54%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 250, 241, 0.62)),
+            rgba(255, 252, 246, 0.92);
+          border-color: rgba(164, 120, 33, 0.13);
+          box-shadow: 0 18px 38px rgba(42, 31, 18, 0.11), inset 0 0 0 1px rgba(255, 255, 255, 0.72);
         }
 
         .reservation-empty-state {
@@ -1203,7 +1285,7 @@ export default function ReservationLanding() {
             linear-gradient(180deg, rgba(255, 250, 241, 0.035), transparent 42%),
             radial-gradient(circle at 50% 50%, rgba(255, 250, 241, 0.055), transparent 56%),
             linear-gradient(0deg, rgba(0, 0, 0, 0.13), transparent 38%);
-          opacity: 0.72;
+          opacity: 0.42;
           transition: opacity 0.26s ease;
         }
 
@@ -1275,6 +1357,7 @@ export default function ReservationLanding() {
           image-rendering: auto;
           transform: translateZ(0) scale(1);
           backface-visibility: hidden;
+          transition: transform 0.28s ease, filter 0.28s ease;
         }
 
         .reservation-card__logo span {
@@ -1379,6 +1462,10 @@ export default function ReservationLanding() {
           display: none;
         }
 
+        .reservation-card--dining::after {
+          display: none;
+        }
+
         .reservation-card--disabled {
           opacity: 0.58;
         }
@@ -1398,8 +1485,8 @@ export default function ReservationLanding() {
 
         .reservation-card--dining:hover,
         .reservation-card--dining:focus-within {
-          transform: translateY(-3px);
-          box-shadow: 0 24px 54px rgba(10, 8, 6, 0.28), 0 0 0 1px rgba(196, 163, 90, 0.18), inset 0 0 0 1px rgba(255, 250, 241, 0.07);
+          transform: translateY(-4px);
+          box-shadow: 0 24px 54px rgba(10, 8, 6, 0.30), 0 0 0 1px rgba(196, 163, 90, 0.2), inset 0 0 0 1px rgba(255, 250, 241, 0.08);
         }
 
         .reservation-launcher[data-theme="light"] .reservation-card--dining:hover,
@@ -1426,7 +1513,8 @@ export default function ReservationLanding() {
 
         .reservation-card--dining:hover .reservation-card__logo img,
         .reservation-card--dining:focus-within .reservation-card__logo img {
-          transform: translateZ(0) scale(1.015);
+          transform: translateZ(0) scale(1.018);
+          filter: saturate(1.035) contrast(1.02);
         }
 
         .reservation-card:hover .reservation-card__shade,
@@ -1547,7 +1635,7 @@ export default function ReservationLanding() {
           .reservation-launcher {
             --brand-logo-size: 50px;
             --brand-mark-size: 36px;
-            --outlet-logo-size: clamp(82px, 6.8vw, 112px);
+            --dining-card-max: 196px;
             grid-template-rows: 46px minmax(0, 1fr);
             gap: 10px;
             padding: 10px 22px 12px;
@@ -1587,12 +1675,12 @@ export default function ReservationLanding() {
 
         @media (max-width: 1280px) {
           .reservation-launcher {
-            --outlet-logo-size: clamp(84px, 7.6vw, 118px);
+            --dining-card-max: 204px;
           }
 
           .reservation-shell {
-            grid-template-columns: minmax(clamp(260px, 32vw, 390px), 0.72fr) minmax(0, 1.28fr);
-            gap: 18px;
+            grid-template-columns: minmax(clamp(270px, 30vw, 410px), 0.66fr) minmax(0, 1.34fr);
+            gap: 22px;
           }
 
           .reservation-directory {
@@ -1604,7 +1692,7 @@ export default function ReservationLanding() {
           .reservation-launcher {
             --brand-logo-size: 54px;
             --brand-mark-size: 39px;
-            --outlet-logo-size: clamp(82px, 14vw, 118px);
+            --dining-card-max: 210px;
             height: auto;
             min-height: 100vh;
             min-height: 100svh;
@@ -1626,8 +1714,15 @@ export default function ReservationLanding() {
 
           .reservation-grid--dining,
           .reservation-grid--events {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
             height: auto;
+          }
+
+          .reservation-grid--dining {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+
+          .reservation-grid--events {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
           .reservation-card--event {
@@ -1641,26 +1736,27 @@ export default function ReservationLanding() {
             --radius-card: 12px;
             --brand-logo-size: 48px;
             --brand-mark-size: 34px;
-            --outlet-logo-size: clamp(78px, 28vw, 112px);
+            --dining-card-max: 1fr;
             padding: 12px;
             gap: 12px;
           }
 
           .reservation-topbar {
-            align-items: flex-start;
+            align-items: center;
+            justify-content: flex-end;
             border-radius: 16px;
-            flex-direction: column;
+            flex-direction: row;
             padding: 12px;
           }
 
           .reservation-topbar__nav {
-            width: 100%;
+            width: auto;
             flex-wrap: wrap;
           }
 
           .reservation-topbar__nav button {
-            flex: 1;
-            min-width: 132px;
+            flex: 0 0 auto;
+            min-width: 58px;
           }
 
           .reservation-hero,
@@ -1688,25 +1784,26 @@ export default function ReservationLanding() {
             grid-template-columns: 1fr;
           }
 
-          .reservation-card--dining,
           .reservation-card--event {
             aspect-ratio: 1.62 / 1;
+          }
+
+          .reservation-grid--dining {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .reservation-card--dining {
+            aspect-ratio: 4 / 3;
           }
         }
 
         @media (max-width: 460px) {
           .reservation-launcher {
-            --outlet-logo-size: clamp(74px, 26vw, 104px);
             padding: 10px;
           }
 
           .reservation-directory {
             padding: 14px;
-          }
-
-          .reservation-card__logo {
-            top: 10px;
-            left: 10px;
           }
 
           .reservation-card__title {
