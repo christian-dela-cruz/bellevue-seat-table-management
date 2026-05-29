@@ -84,7 +84,7 @@ function normaliseApiStatus(raw) {
   const s = (raw || "available").toLowerCase();
   if (s === "approved" || s === "reserved") return "reserved";
   if (s === "rejected") return "rejected";
-  if (s === "pending") return "unavailable";
+  if (s === "pending") return "pending";
   return "available";
 }
 
@@ -1451,7 +1451,7 @@ export default function BusinessCenterReserve() {
                       <div style={{ padding: "14px 16px" }}>
                         <div style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.20em", color: C.gold, fontWeight: 700, textTransform: "uppercase", marginBottom: 12, paddingBottom: 8, borderBottom: `1px solid ${C.divider}` }}>Status Legend</div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                          {Object.entries(STATUS_COLORS).filter(([key]) => ["available", "unavailable"].includes(key)).map(([key, color]) => (
+                          {Object.entries(STATUS_COLORS).filter(([key]) => ["available", "pending", "unavailable"].includes(key)).map(([key, color]) => (
                             <div key={key} style={{ display: "flex", alignItems: "center", gap: 9, padding: "4px 0" }}>
                               <span style={{ width: 10, height: 10, borderRadius: 3, background: color, flexShrink: 0, display: "inline-block" }} />
                               <span style={{ fontFamily: F.body, fontSize: 12, color: C.textSecondary, fontWeight: 500 }}>{key.charAt(0).toUpperCase() + key.slice(1)}</span>

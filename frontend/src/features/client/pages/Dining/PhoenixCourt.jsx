@@ -75,14 +75,14 @@ const F = {
   label:   "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
-const LEGEND_STATUSES = ["available", "unavailable"];
+const LEGEND_STATUSES = ["available", "pending", "unavailable"];
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 function normaliseApiStatus(raw) {
   const s = (raw || "available").toLowerCase().trim();
   if (s === "approved" || s === "reserved") return "reserved";
   if (s === "rejected") return "rejected";
-  if (s === "pending") return "unavailable";
+  if (s === "pending") return "pending";
   return "available";
 }
 

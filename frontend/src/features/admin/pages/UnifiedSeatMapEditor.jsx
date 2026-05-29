@@ -166,105 +166,12 @@ export default function UnifiedSeatMapEditor() {
           display: "flex",
           flexDirection: "column",
         }}>
-
-          {/* Top bar */}
-          <div style={{
-            flexShrink: 0,
-            position: "sticky",
-            top: 0,
-            zIndex: 100,
-            background: config.theme === "dark" ? C.surfaceBase : C.navBg,
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            borderBottom: `1px solid ${config.theme === "dark" ? C.borderDefault : C.navBorder}`,
-            height: 66,
-            display: "flex",
-            alignItems: "center",
-            padding: "0 28px",
-            justifyContent: "space-between",
-            gap: 18,
-          }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                <span style={{ display: "inline-block", width: 20, height: 1, background: C.gold, opacity: 0.55 }} />
-                <span style={{
-                  fontFamily: F.label || F.body,
-                  fontSize: 9,
-                  letterSpacing: "0.20em",
-                  color: C.gold,
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                }}>
-                  Seat Map Editor
-                </span>
-              </div>
-              <div style={{
-                fontFamily: F.heading || F.display || F.body,
-                fontSize: config.theme === "dark" ? 18 : 19,
-                fontWeight: 700,
-                color: C.textPrimary,
-                lineHeight: 1.1,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}>
-                {config.title}
-              </div>
-            </div>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "7px 10px",
-              borderRadius: 999,
-              border: `1px solid ${config.theme === "dark" ? C.borderDefault : C.borderAccent}`,
-              background: config.theme === "dark" ? "rgba(255,255,255,0.035)" : "rgba(255,255,255,0.58)",
-              color: C.textSecondary,
-              fontFamily: F.label || F.body,
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              flexShrink: 0,
-            }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.gold, boxShadow: `0 0 0 3px ${C.goldFaint || "rgba(140,107,42,0.10)"}` }} />
-              Layout Workspace
-            </div>
-            {/* Breadcrumb */}
-            <span style={{
-              display: "none",
-              fontFamily: F.label || F.body,
-              fontSize: 9,
-              letterSpacing: "0.20em",
-              color: C.gold,
-              fontWeight: 700,
-              textTransform: "uppercase",
-            }}>
-              Seat Map Editor
-            </span>
-            <span style={{ display: "none", color: C.textTertiary, fontSize: 11 }}>·</span>
-            <span style={{
-              display: "none",
-              fontFamily: F.label || F.body,
-              fontSize: 9,
-              letterSpacing: "0.14em",
-              color: C.textSecondary,
-              fontWeight: 600,
-              textTransform: "uppercase",
-            }}>
-              {config.title}
-            </span>
-
-          </div>
-
           {/*
             SeatMap editor canvas.
             We pass wing + room so SeatMap initialises its internal activeWing /
             activeRoom state to the correct room on first render.  When the admin
             uses the internal WingRoomSidebar to switch rooms, SeatMap manages
             that state itself — no need for UnifiedSeatMapEditor to track it.
-
-            height is: full viewport - AdminNavbar (60px) - top bar (66px).
           */}
           <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden" }}>
             <SeatMap

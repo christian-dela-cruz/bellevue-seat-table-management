@@ -177,7 +177,7 @@ class VenueController extends Controller
             $validated = $request->validate([
                 'parent_id' => 'sometimes|nullable|exists:venues,id',
                 'name' => 'sometimes|required|string|max:255',
-                'slug' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('venues', 'slug')->ignore($id)],
+                'slug' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('venues', 'slug')->ignore($id)->where('is_archived', false)],
                 'display_name' => 'sometimes|nullable|string|max:255',
                 'wing' => 'sometimes|required|string|max:255',
                 'type' => 'sometimes|required|string|max:255',

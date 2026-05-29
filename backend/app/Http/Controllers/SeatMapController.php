@@ -252,7 +252,7 @@ class SeatMapController extends Controller
     private function publicSeatStatus(?string $status): string
     {
         return match ($status) {
-            'pending' => 'unavailable',
+            'pending' => 'pending',
             'approved', 'reserved' => 'reserved',
             default => $status ?: 'available',
         };

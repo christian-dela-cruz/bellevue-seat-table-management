@@ -122,7 +122,7 @@ const F = {
   label:   "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
-const LEGEND_STATUSES = ["available", "unavailable"];
+const LEGEND_STATUSES = ["available", "pending", "unavailable"];
 
 // ─── Persistence helpers ──────────────────────────────────────────────────────
 function layoutKey(wing, room) {
@@ -134,7 +134,7 @@ function normaliseApiStatus(raw) {
   const s = (raw || "available").toLowerCase();
   if (s === "approved" || s === "reserved") return "reserved";
   if (s === "rejected") return "rejected";
-  if (s === "pending") return "unavailable";
+  if (s === "pending") return "pending";
   return "available";
 }
 

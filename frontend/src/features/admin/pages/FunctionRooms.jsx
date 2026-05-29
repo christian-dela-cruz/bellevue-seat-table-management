@@ -498,18 +498,20 @@ function notifyVenueConfigUpdated() {
   }
 }
 
-function inputStyle() {
+function inputStyle(disabled = false) {
   return {
     width: "100%",
     minHeight: 38,
     border: `1px solid ${C.border}`,
     borderRadius: 9,
-    background: C.surface,
-    color: C.text,
+    background: disabled ? C.soft : C.surface,
+    color: disabled ? C.muted : C.text,
     padding: "8px 11px",
     fontFamily: F.body,
     fontSize: 12.5,
     outline: "none",
+    cursor: disabled ? "not-allowed" : "text",
+    transition: "all 0.16s ease",
   };
 }
 
@@ -1832,7 +1834,47 @@ export default function FunctionRooms() {
               <button type="button" onClick={closeDrawer} style={{ ...buttonBase(), width: 36, padding: 0 }} aria-label="Close panel"><X size={16} /></button>
             </div>
 
-            <form onSubmit={saveRoom} style={{ minHeight: 0, flex: 1, display: "flex", flexDirection: "column" }}>
+            <form onSubmit={saveRoom} style={{ minHeight: 0, flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
+              {error && (
+                <div style={{
+                  padding: "11px 20px",
+                  background: "rgba(160, 56, 56, 0.08)",
+                  borderBottom: `1px solid rgba(160, 56, 56, 0.20)`,
+                  color: C.red,
+                  fontSize: 12.5,
+                  fontWeight: 560,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  animation: "fadeIn 0.2s ease",
+                  flexShrink: 0
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13 }}>⚠️</span>
+                    <span>{error}</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setError("")} 
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: C.red,
+                      cursor: "pointer",
+                      fontSize: 13,
+                      padding: "2px 6px",
+                      opacity: 0.75,
+                      fontWeight: "bold",
+                      outline: "none"
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                    onMouseLeave={e => e.currentTarget.style.opacity = 0.75}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
               <div style={{ padding: "12px 20px", borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
                 <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 2, alignItems: "center" }}>
                   {EDITOR_TABS.map(([key, label], index) => {
@@ -1893,7 +1935,6 @@ export default function FunctionRooms() {
 
               <div className="venue-editor-body" style={{ flex: 1, overflow: "auto", padding: 20, display: "grid", gridTemplateColumns: editorTab === "preview" ? "minmax(0,1fr)" : "minmax(0,1fr) 300px", gap: 16, alignItems: "start" }}>
                 <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
-                {error && <div style={{ padding: "9px 11px", borderRadius: 10, background: C.redFaint, color: C.red, border: "1px solid rgba(160,56,56,0.16)", fontSize: 12.5 }}>{error}</div>}
 
                 {editorTab === "details" && (
                   <>
@@ -1934,7 +1975,7 @@ export default function FunctionRooms() {
                 </Field>
                 <Field label="Venue Name"><input value={form.name} onChange={(e) => updateForm("name", e.target.value)} style={inputStyle()} /></Field>
                 <Field label="Customer Display Name"><input value={form.display_name} onChange={(e) => updateForm("display_name", e.target.value)} style={inputStyle()} /></Field>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr", gap: 10, alignItems: "start" }}>
                   <Field 
                     label="Venue Code / Slug" 
                     hint="This becomes the venue’s public page URL, such as /potato-corner."
@@ -1965,7 +2006,7 @@ export default function FunctionRooms() {
                 <section style={formSectionStyle()}>
                   <div style={sectionTitleStyle()}>Grouping & Reservation</div>
                   <Field label="Parent Room" hint="Leave empty for a main venue. Function-room children become chips under their parent card.">
-                    <select disabled={form.type === "dining"} value={form.parent_id} onChange={(e) => updateForm("parent_id", e.target.value)} style={inputStyle()}>
+                    <select disabled={form.type === "dining"} value={form.parent_id} onChange={(e) => updateForm("parent_id", e.target.value)} style={inputStyle(form.type === "dining")}>
                       <option value="">No parent room</option>
                       {parentRooms.filter((room) => room.type === "function_room" && (!editing || room.id !== editing.id)).map((room) => <option key={room.id} value={room.id}>{room.display_name || room.name}</option>)}
                     </select>
@@ -2057,84 +2098,96 @@ export default function FunctionRooms() {
                 {editorTab === "schedule" && (
                 <section style={formSectionStyle()}>
                   <div style={sectionTitleStyle()}>Reservation Time Rules</div>
-                  <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
-                    Use schedule for guest reservations
+                  <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text, padding: "10px 12px", border: `1px solid ${form.availability_enabled ? "rgba(140,107,42,0.28)" : C.border}`, borderRadius: 10, background: form.availability_enabled ? C.goldFaint : C.surface, transition: "all 0.2s ease", cursor: "pointer" }}>
+                    <span style={{ fontWeight: 600 }}>Use schedule for guest reservations</span>
                     <input type="checkbox" checked={Boolean(form.availability_enabled)} onChange={(e) => updateForm("availability_enabled", e.target.checked)} style={{ accentColor: C.gold }} />
                   </label>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                    <span style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
-                      Add multiple service periods for breakfast, lunch, dinner, private dining, or event windows.
-                    </span>
-                    <button type="button" onClick={applyDefaultSchedule} style={{ ...buttonBase(), flexShrink: 0 }}>Apply template</button>
-                  </div>
-                  <div style={{ display: "grid", gap: 7 }}>
-                    <span style={{ color: C.faint, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>Quick add period</span>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      {schedulePresets.map((preset) => (
-                        <button key={`${preset.label}-${preset.start_time}`} type="button" onClick={() => addPresetPeriod(preset)} style={{ ...buttonBase(), minHeight: 30 }}>
-                          <Plus size={12} /> {preset.label}
+                  
+                  {form.availability_enabled ? (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: "10px 0", borderTop: `1px solid ${C.divider}` }}>
+                        <span style={{ color: C.muted, fontSize: 12, lineHeight: 1.5, flex: 1 }}>
+                          Add multiple service periods for breakfast, lunch, dinner, private dining, or event windows.
+                        </span>
+                        <button type="button" onClick={applyDefaultSchedule} style={{ ...buttonBase(), flexShrink: 0, padding: "8px 14px", border: `1px solid ${C.gold}`, color: C.gold, background: "transparent", transition: "all 0.2s" }} onMouseEnter={e => { e.currentTarget.style.background = C.goldFaint; }} onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+                          Apply Template
                         </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {schedulePeriods.map((period, index) => (
-                      <div key={period.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: C.soft, display: "grid", gap: 10 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                          <strong style={{ color: C.text, fontSize: 12.5, fontWeight: 650 }}>Service Period {index + 1}</strong>
-                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: C.muted, fontSize: 11.5 }}>
-                              Enabled
-                              <input type="checkbox" checked={Boolean(period.enabled)} onChange={(event) => updatePeriod(period.id, "enabled", event.target.checked)} style={{ accentColor: C.gold }} />
-                            </label>
-                            <button type="button" onClick={() => removePeriod(period.id)} style={{ ...buttonBase(), minHeight: 30, color: C.red }}>Remove</button>
-                          </div>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                          <Field label="Label"><input value={period.label} onChange={(e) => updatePeriod(period.id, "label", e.target.value)} style={inputStyle()} /></Field>
-                          <Field label="Service Type"><input value={period.service_type} onChange={(e) => updatePeriod(period.id, "service_type", e.target.value)} placeholder="Buffet, à la carte, private dining" style={inputStyle()} /></Field>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 0.75fr", gap: 10 }}>
-                          <Field label="Start"><input type="time" value={period.start_time} onChange={(e) => updatePeriod(period.id, "start_time", e.target.value)} style={inputStyle()} /></Field>
-                          <Field label="End"><input type="time" value={period.end_time} onChange={(e) => updatePeriod(period.id, "end_time", e.target.value)} style={inputStyle()} /></Field>
-                          <Field label="Interval"><input type="number" min="15" step="15" value={period.interval_minutes} onChange={(e) => updatePeriod(period.id, "interval_minutes", e.target.value)} style={inputStyle()} /></Field>
-                        </div>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {DAY_OPTIONS.map(([value, label]) => {
-                            const checked = period.days.map(Number).includes(Number(value));
-                            return (
-                              <button
-                                key={`${period.id}-${value}`}
-                                type="button"
-                                onClick={() => togglePeriodDay(period.id, value)}
-                                style={{
-                                  minHeight: 28,
-                                  borderRadius: 999,
-                                  border: checked ? "1px solid rgba(140,107,42,0.34)" : `1px solid ${C.border}`,
-                                  background: checked ? C.goldFaint : C.surface,
-                                  color: checked ? C.gold : C.muted,
-                                  padding: "0 9px",
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                {label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                          <Field label="Slot Capacity"><input type="number" min="0" value={period.slot_capacity} onChange={(e) => updatePeriod(period.id, "slot_capacity", e.target.value)} style={inputStyle()} /></Field>
-                          <Field label="Min Guests"><input type="number" min="0" value={period.min_guests} onChange={(e) => updatePeriod(period.id, "min_guests", e.target.value)} style={inputStyle()} /></Field>
-                          <Field label="Max Guests"><input type="number" min="0" value={period.max_guests} onChange={(e) => updatePeriod(period.id, "max_guests", e.target.value)} style={inputStyle()} /></Field>
+                      </div>
+                      <div style={{ display: "grid", gap: 7 }}>
+                        <span style={{ color: C.faint, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>Quick add period</span>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {schedulePresets.map((preset) => (
+                            <button key={`${preset.label}-${preset.start_time}`} type="button" onClick={() => addPresetPeriod(preset)} style={{ ...buttonBase(), minHeight: 30 }}>
+                              <Plus size={12} /> {preset.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                    <button type="button" onClick={addPeriod} style={{ ...buttonBase(), justifyContent: "center" }}>
-                      <Plus size={14} /> Add service period
-                    </button>
-                  </div>
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {schedulePeriods.map((period, index) => (
+                          <div key={period.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: C.soft, display: "grid", gap: 10 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                              <strong style={{ color: C.text, fontSize: 12.5, fontWeight: 650 }}>Service Period {index + 1}</strong>
+                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: C.muted, fontSize: 11.5 }}>
+                                  Enabled
+                                  <input type="checkbox" checked={Boolean(period.enabled)} onChange={(event) => updatePeriod(period.id, "enabled", event.target.checked)} style={{ accentColor: C.gold }} />
+                                </label>
+                                <button type="button" onClick={() => removePeriod(period.id)} style={{ ...buttonBase(), minHeight: 30, color: C.red }}>Remove</button>
+                              </div>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                              <Field label="Label"><input value={period.label} onChange={(e) => updatePeriod(period.id, "label", e.target.value)} style={inputStyle()} /></Field>
+                              <Field label="Service Type"><input value={period.service_type} onChange={(e) => updatePeriod(period.id, "service_type", e.target.value)} placeholder="Buffet, à la carte, private dining" style={inputStyle()} /></Field>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 0.75fr", gap: 10 }}>
+                              <Field label="Start"><input type="time" value={period.start_time} onChange={(e) => updatePeriod(period.id, "start_time", e.target.value)} style={inputStyle()} /></Field>
+                              <Field label="End"><input type="time" value={period.end_time} onChange={(e) => updatePeriod(period.id, "end_time", e.target.value)} style={inputStyle()} /></Field>
+                              <Field label="Interval"><input type="number" min="15" step="15" value={period.interval_minutes} onChange={(e) => updatePeriod(period.id, "interval_minutes", e.target.value)} style={inputStyle()} /></Field>
+                            </div>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              {DAY_OPTIONS.map(([value, label]) => {
+                                const checked = period.days.map(Number).includes(Number(value));
+                                return (
+                                  <button
+                                    key={`${period.id}-${value}`}
+                                    type="button"
+                                    onClick={() => togglePeriodDay(period.id, value)}
+                                    style={{
+                                      minHeight: 28,
+                                      borderRadius: 999,
+                                      border: checked ? "1px solid rgba(140,107,42,0.34)" : `1px solid ${C.border}`,
+                                      background: checked ? C.goldFaint : C.surface,
+                                      color: checked ? C.gold : C.muted,
+                                      padding: "0 9px",
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    {label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                              <Field label="Slot Capacity"><input type="number" min="0" value={period.slot_capacity} onChange={(e) => updatePeriod(period.id, "slot_capacity", e.target.value)} style={inputStyle()} /></Field>
+                              <Field label="Min Guests"><input type="number" min="0" value={period.min_guests} onChange={(e) => updatePeriod(period.id, "min_guests", e.target.value)} style={inputStyle()} /></Field>
+                              <Field label="Max Guests"><input type="number" min="0" value={period.max_guests} onChange={(e) => updatePeriod(period.id, "max_guests", e.target.value)} style={inputStyle()} /></Field>
+                            </div>
+                          </div>
+                        ))}
+                        <button type="button" onClick={addPeriod} style={{ ...buttonBase(), justifyContent: "center" }}>
+                          <Plus size={14} /> Add service period
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ padding: "20px 14px", textAlign: "center", border: `1px dashed ${C.border}`, borderRadius: 12, background: C.soft, color: C.muted, fontSize: 13, lineHeight: 1.6 }}>
+                      🕒 Reservation scheduling is currently disabled. <br />
+                      <span style={{ fontSize: 11.5 }}>Tick the checkbox above to enable and configure custom service periods for breakfast, lunch, or dinner.</span>
+                    </div>
+                  )}
                 </section>
                 )}
 

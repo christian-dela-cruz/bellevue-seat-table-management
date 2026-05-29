@@ -1,6 +1,7 @@
 function normaliseStatus(raw) {
   const status = String(raw || "available").toLowerCase();
-  if (["pending", "approved", "reserved", "unavailable"].includes(status)) return "unavailable";
+  if (status === "pending") return "pending";
+  if (["approved", "reserved", "unavailable"].includes(status)) return "unavailable";
   return "available";
 }
 

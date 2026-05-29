@@ -4,6 +4,9 @@ import { dispatchSeatMapUpdate } from "../../utils/seatMapPersistence.js";
 import { cleanupReservationsForDeletedTable, cleanupReservationsForDeletedSeat, cleanupReservationsForDeletedStandaloneSeat } from "../../utils/reservationCleanup.js";
 import { authAPI } from "../../services/authAPI.js";
 import { getScopedOutletGroups } from "../../constants/outletCatalog.js";
+import { 
+  Undo2, Redo2, Lock, Unlock, Copy, Plus, Trash2, Grid, RotateCw, ZoomIn, ZoomOut, Check, Square, Circle 
+} from "lucide-react";
 
 // Status Colors
 export const STATUS_COLORS = {
@@ -116,7 +119,159 @@ const C = {
 };
 
 // FIX: Use let so these can be reset when a room is loaded
-let _tableCounter = 1, _standaloneCounter = 1;
+let _tableCounter = 1, _standaloneCounter = 1, _fixtureCounter = 1;
+
+export function checkCollision(t1, t2) {
+  const w1 = t1.width || 110;
+  const h1 = t1.height || 70;
+  const w2 = t2.width || 110;
+  const h2 = t2.height || 70;
+  return (
+    t1.x < t2.x + w2 &&
+    t1.x + w1 > t2.x &&
+    t1.y < t2.y + h2 &&
+    t1.y + h1 > t2.y
+  );
+}
+
+export function getSeatsCoordinates(table) {
+  const seats = table.seats || [];
+  const N = seats.length;
+  if (N === 0) return [];
+
+  const shape = table.shape || "rect";
+  const w = table.width || 110;
+  const h = table.height || 70;
+
+  // Retrieve physical chair footprint from style
+  const chairStyleId = table.editor?.chair_style || "standard-dining";
+  const chairStyle = CHAIR_STYLES.find(c => c.id === chairStyleId) || CHAIR_STYLES[0];
+  const chairW = chairStyle.width || 38;
+  const chairH = chairStyle.depth || 38;
+  const spacingCm = table.editor?.seat_spacing_cm || 8;
+  const mult = chairStyle.spacingMultiplier || 1.0;
+
+  if (shape === "round" || shape === "oval") {
+    // Circumference scaling for overlap prevention
+    const chairFootprint = (chairW + spacingCm) * mult;
+    const minCircumference = N * chairFootprint;
+    const minRadius = minCircumference / (2 * Math.PI);
+
+    const baseRx = w / 2;
+    const baseRy = (shape === "round" ? w : h) / 2;
+
+    const pad = Math.max(18, chairH / 2 + 4);
+    const rx = Math.max(baseRx + pad, minRadius);
+    const ry = Math.max(baseRy + pad, minRadius * (baseRy / baseRx || 1));
+
+    const cx = w / 2;
+    const cy = h / 2;
+    return seats.map((seat, i) => {
+      const angle = (i * 2 * Math.PI) / N;
+      const sx = cx + rx * Math.cos(angle) - 19;
+      const sy = cy + ry * Math.sin(angle) - 19;
+      const rot = (angle * 180) / Math.PI - 90;
+      return { seat, x: sx, y: sy, rotation: rot };
+    });
+  }
+
+  let nLeft = 0, nRight = 0, nTop = 0, nBottom = 0;
+  
+  if (shape === "square" || w === h) {
+    const base = Math.floor(N / 4);
+    const rem = N % 4;
+    nTop = base + (rem > 0 ? 1 : 0);
+    nBottom = base + (rem > 1 ? 1 : 0);
+    nLeft = base + (rem > 2 ? 1 : 0);
+    nRight = base;
+  } else {
+    // Symmetrical rectangular/banquet seat distributions prioritizing long edges
+    if (w >= h) {
+      if (N <= 2) {
+        nTop = 1;
+        nBottom = N - 1;
+      } else {
+        const sideCapacity = Math.max(1, Math.floor(w / (chairW + spacingCm)));
+        nTop = Math.min(sideCapacity, Math.ceil(N / 2));
+        nBottom = Math.min(sideCapacity, N - nTop);
+        const rem = N - (nTop + nBottom);
+        if (rem > 0) {
+          nLeft = Math.ceil(rem / 2);
+          nRight = rem - nLeft;
+        }
+      }
+    } else {
+      if (N <= 2) {
+        nLeft = 1;
+        nRight = N - 1;
+      } else {
+        const sideCapacity = Math.max(1, Math.floor(h / (chairW + spacingCm)));
+        nLeft = Math.min(sideCapacity, Math.ceil(N / 2));
+        nRight = Math.min(sideCapacity, N - nLeft);
+        const rem = N - (nLeft + nRight);
+        if (rem > 0) {
+          nTop = Math.ceil(rem / 2);
+          nBottom = rem - nTop;
+        }
+      }
+    }
+  }
+
+  const coordinates = [];
+  let seatIdx = 0;
+
+  const addSideSeats = (count, side) => {
+    if (count <= 0) return;
+    const length = (side === "top" || side === "bottom") ? w : h;
+    const chairSpacing = (chairW + spacingCm) * mult;
+    const totalSpan = (count - 1) * chairSpacing;
+    const startPos = (length - totalSpan) / 2;
+
+    for (let i = 0; i < count; i++) {
+      if (seatIdx >= N) break;
+      const seat = seats[seatIdx++];
+      let sx, sy, rot;
+      
+      const pos = count === 1 
+        ? length / 2 
+        : startPos + i * chairSpacing;
+
+      const chairDist = Math.max(22, chairH / 2 + 4);
+
+      if (side === "top") {
+        sx = pos - 19;
+        sy = -chairDist - 19;
+        rot = 180;
+      } else if (side === "bottom") {
+        sx = pos - 19;
+        sy = h + chairDist - 19;
+        rot = 0;
+      } else if (side === "left") {
+        sx = -chairDist - 19;
+        sy = pos - 19;
+        rot = 90;
+      } else if (side === "right") {
+        sx = w + chairDist - 19;
+        sy = pos - 19;
+        rot = 270;
+      }
+      coordinates.push({ seat, x: sx, y: sy, rotation: rot });
+    }
+  };
+
+  addSideSeats(nTop, "top");
+  addSideSeats(nBottom, "bottom");
+  addSideSeats(nLeft, "left");
+  addSideSeats(nRight, "right");
+
+  while (seatIdx < N) {
+    const seat = seats[seatIdx];
+    coordinates.push({ seat, x: w / 2 - 19, y: h + 18 - 19, rotation: 0 });
+    seatIdx++;
+  }
+
+  return coordinates;
+}
 
 function makeTable(x = 120, y = 80) {
   const id = `T${_tableCounter++}`;
@@ -133,11 +288,7 @@ function makeStandaloneSeat(x = 100, y = 100) {
   return { id: `SS${n}`, num: n, label: `S${n}`, status: "available", x, y };
 }
 
-const DEFAULT_LABELS = [
-  { id: "screen", type: "screen", label: "SCREEN", x: 200, y: 16 },
-  { id: "entrance", type: "entrance", label: "ENTRANCE", x: 16, y: 16 },
-  { id: "exit", type: "exit", label: "EXIT", x: 16, y: 630 },
-];
+const DEFAULT_LABELS = [];
 
 function getCanonicalRoomName(room) {
   const r = String(room || "").trim();
@@ -198,9 +349,9 @@ function layoutKey(wing, room) {
   return `seatmap_layout:${actualWing}:${room}`;
 }
 
-function saveLayout(wing, room, { tables, labels, standaloneSeats }) {
+function saveLayout(wing, room, { tables, labels, standaloneSeats, fixtures, editor }) {
   if (!wing || !room) return;
-  const payload = JSON.stringify({ v: 2, tables, labels, standaloneSeats });
+  const payload = JSON.stringify({ v: 2, tables, labels, standaloneSeats, fixtures, editor });
   try {
     localStorage.setItem(layoutKey(wing, room), payload);
     window.dispatchEvent(new CustomEvent("seatmap:saved", { detail: { wing, room, payload } }));
@@ -226,7 +377,7 @@ function loadLayout(wing, room) {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed && parsed.v === 2) return parsed;
-    if (Array.isArray(parsed)) return { tables: parsed, labels: DEFAULT_LABELS, standaloneSeats: [] };
+    if (Array.isArray(parsed)) return { tables: parsed, labels: DEFAULT_LABELS, standaloneSeats: [], fixtures: [] };
     return null;
   } catch { return null; }
 }
@@ -345,13 +496,33 @@ function DraggableLabel({ item, onDragStart, isDragging }) {
 function StandaloneSeat({ seat, editMode, isSelected, isDragging, onDragStart, onSelect, onSeatClick, onDeleteClick, isMultiSelected, T }) {
   const [hov, setHov] = useState(false);
   const blocked = !editMode && seat.status !== "available";
-  const color = blocked ? STATUS_COLORS.unavailable : (STATUS_COLORS[seat.status] || STATUS_COLORS.available);
-  const SIZE = 38;
+  const color = STATUS_COLORS[seat.status] || STATUS_COLORS.available;
+  
+  const rotation = seat.editor?.rotation || 0;
+  const chairStyle = seat.editor?.chair_style || "standard-standalone";
+  const width = seat.editor?.width || 38;
+  const height = seat.editor?.height || 38;
+  const isReservable = seat.editor?.reservable !== false;
+  
   const tokens = T || { gold: C.gold, cardShadow: C.cardShadow };
+
+  // Calculate distinct colors based on status/reservability
+  const baseColor = isReservable ? color : "#8A8278"; // neutral grey if non-reservable
+  
   return (
     <div
-      style={{ position: "absolute", left: (seat.x || 0), top: (seat.y || 0), width: SIZE, height: SIZE, zIndex: isSelected ? 15 : 6 }}
-      onMouseEnter={() => !blocked && setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{
+        position: "absolute",
+        left: seat.x || 0,
+        top: seat.y || 0,
+        width: width,
+        height: height,
+        zIndex: isSelected ? 15 : 6,
+        transform: `rotate(${rotation}deg)`,
+        transformOrigin: "center center",
+      }}
+      onMouseEnter={() => !blocked && setHov(true)}
+      onMouseLeave={() => setHov(false)}
       onMouseDown={editMode ? e => { e.stopPropagation(); onDragStart(e, seat.id); } : undefined}
       onClick={e => {
         e.stopPropagation();
@@ -365,35 +536,127 @@ function StandaloneSeat({ seat, editMode, isSelected, isDragging, onDragStart, o
         }
         onSeatClick?.(seat, null);
       }}
-      title={blocked ? "Unavailable for selected schedule" : `Seat ${seat.num}`}
+      title={blocked ? "Unavailable for selected schedule" : `${seat.label || seat.id}`}
     >
       <div style={{
-        width: SIZE, height: SIZE, borderRadius: "50%",
-        background: (isSelected || isMultiSelected) ? "transparent" : color,
-        border: (isSelected || isMultiSelected) ? `2px solid ${tokens.gold}` : `1.5px solid rgba(0,0,0,0.08)`,
-        display: "flex", alignItems: "center", justifyContent: "center",
+        width: "100%",
+        height: "100%",
+        borderRadius: chairStyle === "sofa-seat" || chairStyle === "bench-seat" ? "6px" : "50%",
+        background: (isSelected || isMultiSelected) ? "transparent" : baseColor,
+        border: (isSelected || isMultiSelected) ? `2.5px solid ${tokens.gold}` : `1.5px solid rgba(0,0,0,0.08)`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         cursor: editMode ? (isDragging ? "grabbing" : "grab") : blocked ? "not-allowed" : "pointer",
         boxShadow: (isSelected || isMultiSelected) ? `0 0 0 3px ${tokens.gold}28` : hov ? "0 2px 8px rgba(0,0,0,0.18)" : tokens.cardShadow,
         transform: (isSelected || isMultiSelected) ? "scale(1.12)" : hov ? "scale(1.06)" : "scale(1)",
-        opacity: blocked ? 0.48 : 1, userSelect: "none", transition: "all 0.15s ease", position: "relative",
+        opacity: blocked ? 0.48 : 1,
+        userSelect: "none",
+        transition: "all 0.15s ease",
+        position: "relative",
       }}>
-        <span style={{ color: (isSelected || isMultiSelected) ? tokens.gold : "#fff", fontSize: 10, fontWeight: 700, fontFamily: F, lineHeight: 1, pointerEvents: "none" }}>
+        {/* Render a custom vector outline depending on style */}
+        <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" }}>
+          {/* VIP Chair Gold ring */}
+          {chairStyle === "vip-chair" && (
+            <circle cx="50%" cy="50%" r={width/2 - 4} fill="none" stroke={tokens.gold} strokeWidth={1.5} opacity={0.6} />
+          )}
+          {/* Backrest overlay for standard/premium chairs */}
+          {["standard-standalone", "premium-standalone", "arm-chair", "vip-chair"].includes(chairStyle) && (
+            <path d={`M ${width * 0.15},${height * 0.15} Q ${width * 0.5},${-height * 0.05} ${width * 0.85},${height * 0.15}`} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth={2} strokeLinecap="round" />
+          )}
+          {/* Armrests */}
+          {["premium-standalone", "arm-chair", "vip-chair", "lounge-chair"].includes(chairStyle) && (
+            <>
+              <line x1={width * 0.08} y1={height * 0.2} x2={width * 0.08} y2={height * 0.7} stroke="rgba(255,255,255,0.3)" strokeWidth={1.5} strokeLinecap="round" />
+              <line x1={width * 0.92} y1={height * 0.2} x2={width * 0.92} y2={height * 0.7} stroke="rgba(255,255,255,0.3)" strokeWidth={1.5} strokeLinecap="round" />
+            </>
+          )}
+          {/* Bar stool circle seat cushion ring */}
+          {chairStyle === "bar-stool" && (
+            <circle cx="50%" cy="50%" r={width/2 - 5} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} />
+          )}
+          {/* Sofa details */}
+          {chairStyle === "sofa-seat" && (
+            <>
+              {/* Sofa back cushion */}
+              <rect x={width * 0.1} y={height * 0.1} width={width * 0.8} height={height * 0.2} rx={2} fill="rgba(255,255,255,0.2)" />
+              {/* Sofa arms */}
+              <rect x={width * 0.05} y={height * 0.25} width={width * 0.12} height={height * 0.65} rx={1} fill="rgba(255,255,255,0.15)" />
+              <rect x={width * 0.83} y={height * 0.25} width={width * 0.12} height={height * 0.65} rx={1} fill="rgba(255,255,255,0.15)" />
+            </>
+          )}
+          {/* Bench seat details */}
+          {chairStyle === "bench-seat" && (
+            <>
+              <rect x={width * 0.05} y={height * 0.1} width={width * 0.9} height={height * 0.2} rx={1} fill="rgba(255,255,255,0.2)" />
+              <line x1={width * 0.5} y1={height * 0.3} x2={width * 0.5} y2={height * 0.9} stroke="rgba(255,255,255,0.15)" strokeWidth={1.5} />
+            </>
+          )}
+        </svg>
+
+        <span style={{
+          color: (isSelected || isMultiSelected) ? tokens.gold : "#fff",
+          fontSize: width > 45 ? 11 : 9,
+          fontWeight: 800,
+          fontFamily: F,
+          lineHeight: 1,
+          pointerEvents: "none",
+          zIndex: 1,
+          marginTop: ["sofa-seat", "bench-seat"].includes(chairStyle) ? 6 : 0
+        }}>
           {seat.num}
         </span>
+        
         {(isSelected || isMultiSelected) && (
-          <div style={{ position: "absolute", top: "-4px", right: "-4px", width: "12px", height: "12px", borderRadius: "50%", background: tokens.gold, border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "8px", fontWeight: "bold", color: "#fff", zIndex: 20 }}>✓</div>
+          <div style={{
+            position: "absolute",
+            top: "-4px",
+            right: "-4px",
+            width: "12px",
+            height: "12px",
+            borderRadius: "50%",
+            background: tokens.gold,
+            border: "2px solid #fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "8px",
+            fontWeight: "bold",
+            color: "#fff",
+            zIndex: 20
+          }}>✓</div>
         )}
       </div>
     </div>
   );
 }
 
-function SeatNode({ seat, isSelected, editMode, isDragging, onSeatClick, onSeatDragStart, T }) {
+function SeatNode({ seat, isSelected, editMode, isDragging, onSeatClick, onSeatDragStart, T, rotation = 0, isBench = false, chairStyle = "standard-dining", tableRotation = 0 }) {
   const [hov, setHov] = useState(false);
   const blocked = !editMode && seat.status !== "available";
-  const color = blocked ? STATUS_COLORS.unavailable : (STATUS_COLORS[seat.status] || STATUS_COLORS.available);
-  const SIZE = 38;
+  const color = STATUS_COLORS[seat.status] || STATUS_COLORS.available;
+  
+  const sizeMap = {
+    "standard-dining": 38,
+    "premium-dining": 42,
+    "high-chair": 34,
+    "bar-stool": 34,
+    "arm-chair": 42,
+    "banquet-chair": 38,
+    "sofa-chair": 46,
+    "bench-seat": 46,
+    "lounge-chair": 42,
+    "vip-chair": 42,
+    "child-chair": 32,
+  };
+  const SIZE = sizeMap[chairStyle] || 38;
   const tokens = T || { gold: C.gold, cardShadow: C.cardShadow };
+
+  const isBenchStyle = chairStyle === "bench-seat" || chairStyle === "sofa-chair";
+  const seatColor = isSelected ? "transparent" : color;
+  const totalRot = (tableRotation || 0) + (rotation || 0);
+
   return (
     <div
       onClick={e => {
@@ -408,154 +671,232 @@ function SeatNode({ seat, isSelected, editMode, isDragging, onSeatClick, onSeatD
       onMouseDown={editMode ? e => { e.stopPropagation(); onSeatDragStart?.(e, seat.id); } : undefined}
       onMouseEnter={() => !blocked && !editMode && setHov(true)} onMouseLeave={() => setHov(false)}
       style={{
-        width: SIZE, height: SIZE, borderRadius: "50%",
-        background: isSelected ? "transparent" : color,
-        border: isSelected ? `2px solid ${tokens.gold}` : `1.5px solid rgba(0,0,0,0.08)`,
-        display: "flex", alignItems: "center", justifyContent: "center",
+        position: "absolute",
+        left: 19 - SIZE / 2,
+        top: 19 - SIZE / 2,
+        width: SIZE,
+        height: SIZE,
+        borderRadius: isBenchStyle ? "6px" : "50%",
+        background: isBench
+          ? (isSelected ? "rgba(196,163,90,0.30)" : "rgba(255,255,255,0.75)")
+          : seatColor,
+        border: isSelected ? `2px solid ${tokens.gold}` : isBench ? `1.5px solid ${tokens.gold}50` : `1.5px solid rgba(0,0,0,0.08)`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         cursor: editMode ? "grab" : blocked ? "not-allowed" : "pointer",
         boxShadow: isSelected ? `0 0 0 3px ${tokens.gold}28` : hov ? "0 2px 8px rgba(0,0,0,0.18)" : tokens.cardShadow,
-        transform: isSelected ? "scale(1.12)" : hov ? "scale(1.06)" : "scale(1)",
-        opacity: blocked ? 0.48 : 1, flexShrink: 0, userSelect: "none", transition: "all 0.15s ease",
+        transform: `scale(${isSelected ? 1.12 : hov ? 1.06 : 1}) rotate(${rotation}deg)`,
+        opacity: blocked ? 0.48 : 1,
+        flexShrink: 0,
+        userSelect: "none",
+        transition: "all 0.15s ease",
       }}
     >
-      <span style={{ color: isSelected ? tokens.gold : "#fff", fontSize: 11, fontWeight: 700, fontFamily: F, lineHeight: 1, pointerEvents: "none" }}>
+      {/* SVG chair details */}
+      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" }}>
+        {/* VIP Chair Gold ring */}
+        {chairStyle === "vip-chair" && (
+          <circle cx="50%" cy="50%" r={SIZE/2 - 4} fill="none" stroke={tokens.gold} strokeWidth={1.5} opacity={0.6} />
+        )}
+        {/* Backrest overlay */}
+        {["standard-dining", "premium-dining", "arm-chair", "vip-chair", "banquet-chair", "child-chair", "lounge-chair"].includes(chairStyle) && (
+          <path d={`M ${SIZE * 0.15},${SIZE * 0.15} Q ${SIZE * 0.5},${-SIZE * 0.05} ${SIZE * 0.85},${SIZE * 0.15}`} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth={2} strokeLinecap="round" />
+        )}
+        {/* Armrests */}
+        {["premium-dining", "arm-chair", "vip-chair", "lounge-chair"].includes(chairStyle) && (
+          <>
+            <line x1={SIZE * 0.08} y1={SIZE * 0.2} x2={SIZE * 0.08} y2={SIZE * 0.7} stroke="rgba(255,255,255,0.3)" strokeWidth={1.5} strokeLinecap="round" />
+            <line x1={SIZE * 0.92} y1={SIZE * 0.2} x2={SIZE * 0.92} y2={SIZE * 0.7} stroke="rgba(255,255,255,0.3)" strokeWidth={1.5} strokeLinecap="round" />
+          </>
+        )}
+        {/* Bar stool seat ring */}
+        {chairStyle === "bar-stool" && (
+          <circle cx="50%" cy="50%" r={SIZE/2 - 5} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} />
+        )}
+        {/* Sofa details */}
+        {chairStyle === "sofa-chair" && (
+          <>
+            <rect x={SIZE * 0.1} y={SIZE * 0.1} width={SIZE * 0.8} height={SIZE * 0.2} rx={2} fill="rgba(255,255,255,0.2)" />
+            <rect x={SIZE * 0.05} y={SIZE * 0.25} width={SIZE * 0.12} height={SIZE * 0.65} rx={1} fill="rgba(255,255,255,0.15)" />
+            <rect x={SIZE * 0.83} y={SIZE * 0.25} width={SIZE * 0.12} height={SIZE * 0.65} rx={1} fill="rgba(255,255,255,0.15)" />
+          </>
+        )}
+        {/* Bench seat details */}
+        {chairStyle === "bench-seat" && (
+          <>
+            <rect x={SIZE * 0.05} y={SIZE * 0.1} width={SIZE * 0.9} height={SIZE * 0.2} rx={1} fill="rgba(255,255,255,0.2)" />
+            <line x1={SIZE * 0.5} y1={SIZE * 0.3} x2={SIZE * 0.5} y2={SIZE * 0.9} stroke="rgba(255,255,255,0.15)" strokeWidth={1.5} />
+          </>
+        )}
+      </svg>
+
+      <span style={{ 
+        color: (isSelected || isBench) ? tokens.gold : "#fff", 
+        fontSize: SIZE > 40 ? 11 : 9, 
+        fontWeight: 800, 
+        fontFamily: F, 
+        lineHeight: 1, 
+        pointerEvents: "none",
+        zIndex: 1,
+        transform: `rotate(${-totalRot}deg)`,
+        transformOrigin: "center center",
+        display: "inline-block",
+        marginTop: ["sofa-chair", "bench-seat"].includes(chairStyle) ? 4 : 0
+      }}>
         {seat.num}
       </span>
     </div>
   );
 }
 
-function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectTable, onDragStart, onResizeStart, onSeatClick, onLabelEdit, isDragging, onSeatMove, T, wing, room, mode }) {
+function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectTable, onDragStart, onResizeStart, onSeatClick, onLabelEdit, isDragging, onSeatMove, T, wing, room, mode, isColliding }) {
   const [hov, setHov] = useState(false);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelVal, setLabelVal] = useState(table.label || table.id);
-  const [draggingSeatId, setDraggingSeatId] = useState(null);
-  const [dropSide, setDropSide] = useState(null);
-  const [ghostXY, setGhostXY] = useState(null);
   const tableBodyRef = useRef(null);
-  const seatDragRef = useRef(null);
   const tokens = T || {
     gold: C.gold, cardShadow: C.cardShadow, tableBg: C.tableBg, tableSelected: C.tableSelected,
     borderDefault: C.borderDefault, borderAccent: C.borderAccent,
     textPrimary: C.textPrimary, textTertiary: C.textTertiary, divider: C.divider,
   };
+  
   const tableBlocked = !editMode && mode === "whole" && (table.seats || []).some(seat => seat.status !== "available");
   useEffect(() => setLabelVal(table.label || table.id), [table.label, table.id]);
-  const SEAT_D = 38, SEAT_GAP = 6, SEAT_OFF = 8;
+  
   const tableW = Math.max(table.width || 110, 80);
   const tableH = Math.max(table.height || 70, 50);
-  const maxH = Math.max(1, Math.floor((tableW + SEAT_GAP) / (SEAT_D + SEAT_GAP)));
-  const maxV = Math.max(1, Math.floor((tableH + SEAT_GAP) / (SEAT_D + SEAT_GAP)));
-  const byPos = { top: [], bottom: [], left: [], right: [] };
-  const free = [];
-  (table.seats || []).forEach(s => s.position ? byPos[s.position].push(s) : free.push(s));
-  free.forEach(s => {
-    if (byPos.top.length < maxH) byPos.top.push(s);
-    else if (byPos.bottom.length < maxH) byPos.bottom.push(s);
-    else if (byPos.left.length < maxV) byPos.left.push(s);
-    else byPos.right.push(s);
-  });
-  const topPad = byPos.top.length ? SEAT_D + SEAT_OFF : 0;
-  const botPad = byPos.bottom.length ? SEAT_D + SEAT_OFF : 0;
-  const leftPad = byPos.left.length ? SEAT_D + SEAT_OFF : 0;
-  const rightPad = byPos.right.length ? SEAT_D + SEAT_OFF : 0;
-  const contW = leftPad + tableW + rightPad;
-  const contH = topPad + tableH + botPad;
-  const tOffX = leftPad, tOffY = topPad;
-  const startSeatDrag = useCallback((e, seatId) => {
-    e.preventDefault(); e.stopPropagation();
-    seatDragRef.current = { seatId };
-    setDraggingSeatId(seatId); setGhostXY({ x: e.clientX, y: e.clientY });
-  }, []);
-  useEffect(() => {
-    if (!draggingSeatId) return;
-    const onMove = e => {
-      setGhostXY({ x: e.clientX, y: e.clientY });
-      if (!tableBodyRef.current) return;
-      const r = tableBodyRef.current.getBoundingClientRect();
-      const cx = e.clientX - r.left, cy = e.clientY - r.top;
-      const d = { top: cy, bottom: r.height - cy, left: cx, right: r.width - cx };
-      setDropSide(Object.entries(d).sort((a, b) => a[1] - b[1])[0][0]);
-    };
-    const onUp = () => {
-      if (seatDragRef.current?.seatId && dropSide) onSeatMove?.(table.id, seatDragRef.current.seatId, dropSide);
-      seatDragRef.current = null;
-      setDraggingSeatId(null); setDropSide(null); setGhostXY(null);
-    };
-    window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp);
-    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-  }, [draggingSeatId, dropSide, onSeatMove, table.id]);
-  const renderSide = (seats, side) => {
-    if (!seats.length) return null;
-    const horiz = side === "top" || side === "bottom";
-    const rowPx = seats.length * (SEAT_D + SEAT_GAP) - SEAT_GAP;
-    const pos = {
-      top: { top: 0, left: tOffX + tableW / 2 - rowPx / 2 },
-      bottom: { top: tOffY + tableH + SEAT_OFF, left: tOffX + tableW / 2 - rowPx / 2 },
-      left: { left: 0, top: tOffY + tableH / 2 - rowPx / 2 },
-      right: { left: tOffX + tableW + SEAT_OFF, top: tOffY + tableH / 2 - rowPx / 2 },
-    }[side];
-    return (
-      <div key={side} style={{ position: "absolute", display: "flex", flexDirection: horiz ? "row" : "column", gap: SEAT_GAP, ...pos }}>
-        {seats.map((seat, index) => (
-          <SeatNode
-            key={`${wing}-${room}-${table.id}-${seat.id ?? seat.num ?? index}`}
-            seat={seat} editMode={editMode} isSelected={seat.id === selectedSeatId}
-            isDragging={draggingSeatId === seat.id} onSeatDragStart={startSeatDrag}
-            onSeatClick={s => { if (!draggingSeatId) onSeatClick(s, table.id); }} T={tokens}
-          />
-        ))}
-      </div>
-    );
-  };
+  const rotation = table.editor?.rotation || 0;
+  const isLocked = table.editor?.locked || false;
+
+  const seatCoordinates = getSeatsCoordinates(table);
+
+  // Bench seating calculations
+  const isBench = table.editor?.chair_style === "bench-seat";
+  const hasTopBench = isBench && seatCoordinates.some(c => c.rotation === 180);
+  const hasBottomBench = isBench && seatCoordinates.some(c => c.rotation === 0);
+  const hasLeftBench = isBench && seatCoordinates.some(c => c.rotation === 90);
+  const hasRightBench = isBench && seatCoordinates.some(c => c.rotation === 270);
+
   return (
-    <>
-      {editMode && draggingSeatId && ghostXY && (() => {
-        const seat = (table.seats || []).find(s => s.id === draggingSeatId);
-        if (!seat) return null;
-        return (
-          <div style={{ position: "fixed", left: ghostXY.x - 19, top: ghostXY.y - 19, width: 38, height: 38, borderRadius: "50%", background: STATUS_COLORS[seat.status] || STATUS_COLORS.available, border: `2px solid ${tokens.gold}`, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 9999, boxShadow: `0 6px 20px rgba(0,0,0,0.15)`, transform: "scale(1.15)", opacity: 0.92 }}>
-            <span style={{ color: "#fff", fontSize: 11, fontWeight: 700, fontFamily: F }}>{seat.num}</span>
-          </div>
-        );
-      })()}
+    <div
+      style={{ 
+         position: "absolute", 
+         left: (table.x || 0), 
+         top: (table.y || 0), 
+         width: tableW, 
+         height: tableH, 
+         overflow: "visible", 
+         zIndex: isTableSelected ? 10 : 4,
+         transform: `rotate(${rotation}deg)`,
+         transformOrigin: "center center",
+         transition: isDragging ? "none" : "transform 0.15s ease",
+      }}
+      onMouseEnter={() => setHov(true)} 
+      onMouseLeave={() => setHov(false)}
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Bench seat background segments */}
+      {hasTopBench && (
+        <div style={{
+          position: "absolute", left: 2, width: tableW - 4, top: -41, height: 18,
+          background: "#E8E4D9", border: `1.5px solid ${tokens.gold}60`, borderRadius: 4, zIndex: 1, pointerEvents: "none"
+        }} />
+      )}
+      {hasBottomBench && (
+        <div style={{
+          position: "absolute", left: 2, width: tableW - 4, bottom: -41, height: 18,
+          background: "#E8E4D9", border: `1.5px solid ${tokens.gold}60`, borderRadius: 4, zIndex: 1, pointerEvents: "none"
+        }} />
+      )}
+      {hasLeftBench && (
+        <div style={{
+          position: "absolute", top: 2, height: tableH - 4, left: -41, width: 18,
+          background: "#E8E4D9", border: `1.5px solid ${tokens.gold}60`, borderRadius: 4, zIndex: 1, pointerEvents: "none"
+        }} />
+      )}
+      {hasRightBench && (
+        <div style={{
+          position: "absolute", top: 2, height: tableH - 4, right: -41, width: 18,
+          background: "#E8E4D9", border: `1.5px solid ${tokens.gold}60`, borderRadius: 4, zIndex: 1, pointerEvents: "none"
+        }} />
+      )}
+
+      {/* Absolute Seats */}
+      {seatCoordinates.map(({ seat, x, y, rotation: seatRot }) => (
+        <div key={seat.id || seat.num} style={{ position: "absolute", left: x, top: y, width: 38, height: 38, zIndex: 3 }}>
+          <SeatNode
+            seat={seat}
+            isSelected={seat.id === selectedSeatId}
+            editMode={editMode}
+            onSeatClick={s => onSeatClick(s, table.id)}
+            T={tokens}
+            rotation={seatRot}
+            isBench={isBench}
+            chairStyle={table.editor?.chair_style || "standard-dining"}
+            tableRotation={rotation}
+          />
+        </div>
+      ))}
+
+      {/* Table Body */}
       <div
-        style={{ position: "absolute", left: (table.x || 0), top: (table.y || 0), width: contW, height: contH, overflow: "visible", zIndex: isTableSelected ? 10 : 4 }}
-        onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-        onClick={e => e.stopPropagation()}
+        ref={tableBodyRef}
+        style={{
+          position: "absolute", left: 0, top: 0, width: tableW, height: tableH,
+          background: isTableSelected ? tokens.tableSelected : tokens.tableBg, 
+          borderRadius: table.shape === "round" ? "50%" : table.shape === "oval" ? "50%" : 8,
+          display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
+          border: isTableSelected 
+            ? `2px solid ${tokens.gold}` 
+            : isColliding 
+              ? `2.5px solid ${C.red}` 
+              : hov 
+                ? `1.5px solid ${tokens.borderAccent}` 
+                : `1px solid ${tokens.borderDefault}`,
+          boxShadow: isTableSelected 
+            ? `0 0 0 3px ${tokens.gold}10, 0 4px 16px rgba(0,0,0,0.12)` 
+            : isColliding
+              ? `0 0 12px ${C.red}50, 0 4px 16px rgba(160,56,56,0.15)`
+              : hov 
+                ? "0 4px 12px rgba(0,0,0,0.12)" 
+                : tokens.cardShadow,
+          transition: "border 0.15s, box-shadow 0.15s, background 0.18s",
+          cursor: editMode ? (isDragging ? "grabbing" : isLocked ? "not-allowed" : "grab") : tableBlocked ? "not-allowed" : "pointer", 
+          zIndex: 2, 
+          overflow: "visible",
+          opacity: tableBlocked ? 0.72 : 1,
+        }}
+        onMouseDown={editMode && !isLocked ? e => { e.stopPropagation(); onDragStart(e, table.id); } : undefined}
+        onClick={e => {
+          e.stopPropagation();
+          if (tableBlocked) {
+            alert("This table is unavailable for the selected schedule.");
+            return;
+          }
+          onSelectTable(table);
+        }}
+        onDoubleClick={editMode && !isLocked ? e => { e.stopPropagation(); setEditingLabel(true); } : undefined}
       >
-        {["top", "bottom", "left", "right"].map(side => renderSide(byPos[side], side))}
-        <div
-          ref={tableBodyRef}
-          style={{
-            position: "absolute", left: tOffX, top: tOffY, width: tableW, height: tableH,
-            background: isTableSelected ? tokens.tableSelected : tokens.tableBg, borderRadius: 8,
-            display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
-            border: isTableSelected ? `1.5px solid ${tokens.gold}` : hov ? `1.5px solid ${tokens.borderAccent}` : `1px solid ${tokens.borderDefault}`,
-            boxShadow: isTableSelected ? `0 0 0 3px ${tokens.gold}10, 0 4px 16px rgba(0,0,0,0.12)` : hov ? "0 4px 12px rgba(0,0,0,0.12)" : tokens.cardShadow,
-            transition: "border 0.15s, box-shadow 0.15s, background 0.18s",
-            cursor: editMode ? (isDragging ? "grabbing" : "grab") : tableBlocked ? "not-allowed" : "pointer", zIndex: 2, overflow: "visible",
-            opacity: tableBlocked ? 0.72 : 1,
-          }}
-          onMouseDown={editMode ? e => { if (!draggingSeatId) { e.stopPropagation(); onDragStart(e, table.id); } } : undefined}
-          onClick={e => {
-            e.stopPropagation();
-            if (tableBlocked) {
-              alert("This table is unavailable for the selected schedule.");
-              return;
-            }
-            onSelectTable(table);
-          }}
-          onDoubleClick={editMode ? e => { e.stopPropagation(); setEditingLabel(true); } : undefined}
-        >
-          {editingLabel
-            ? <input autoFocus value={labelVal} onChange={e => setLabelVal(e.target.value)}
+        {editingLabel
+          ? <div style={{ transform: `rotate(${-rotation}deg)`, transformOrigin: "center center", width: "100%", display: "flex", justifyContent: "center" }}>
+              <input autoFocus value={labelVal} onChange={e => setLabelVal(e.target.value)}
                 onBlur={() => { setEditingLabel(false); onLabelEdit?.(table.id, labelVal); }}
                 onKeyDown={e => { if (e.key === "Enter") { setEditingLabel(false); onLabelEdit?.(table.id, labelVal); } e.stopPropagation(); }}
                 onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
                 style={{ background: "transparent", border: "none", outline: "none", color: tokens.textPrimary, fontFamily: F, fontWeight: 700, fontSize: 10, letterSpacing: "0.10em", textAlign: "center", width: "85%", textTransform: "uppercase" }}
               />
-            : <>
+            </div>
+          : <>
+              <div style={{ 
+                transform: `rotate(${-rotation}deg)`, 
+                transformOrigin: "center center", 
+                display: "flex", 
+                flexDirection: "column", 
+                alignItems: "center", 
+                justifyContent: "center",
+                transition: isDragging ? "none" : "transform 0.15s ease"
+              }}>
                 <div style={{ color: tokens.textPrimary, fontFamily: F, fontWeight: 700, fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", lineHeight: 1.3, textAlign: "center", padding: "0 8px" }}>
                   {table.label || table.id}
                 </div>
@@ -564,11 +905,1090 @@ function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectT
                     {table.seats.length} seats
                   </div>
                 )}
-              </>
-          }
+              </div>
+              {isLocked && (
+                <div style={{ position: "absolute", top: 4, right: 6, opacity: 0.5, color: tokens.gold }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </div>
+              )}
+            </>
+        }
+      </div>
+      
+      {/* Dimensions tooltip on hover */}
+      {editMode && hov && !isDragging && (
+        <div style={{ position: "absolute", bottom: -20, left: "50%", transform: "translateX(-50%)", background: "#18140E", color: "#fff", padding: "2px 6px", borderRadius: 4, fontSize: 8, fontWeight: 700, fontFamily: "monospace", pointerEvents: "none", whiteSpace: "nowrap", zIndex: 100, boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}>
+          {Math.round(tableW)} × {Math.round(tableH)} cm
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── TABLE PRESETS ────────────────────────────────────────────────────────────
+export const TABLE_PRESETS = [
+  { id: "small-round", label: "Small Round", shape: "round", width: 90, height: 90, defaultSeatCount: 2, minSeatCount: 0, maxSeatCount: 4, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "medium-round", label: "Medium Round", shape: "round", width: 130, height: 130, defaultSeatCount: 4, minSeatCount: 0, maxSeatCount: 6, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "large-round", label: "Large Round", shape: "round", width: 170, height: 170, defaultSeatCount: 8, minSeatCount: 0, maxSeatCount: 8, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "extra-large-round", label: "Extra Large Round", shape: "round", width: 220, height: 220, defaultSeatCount: 10, minSeatCount: 0, maxSeatCount: 12, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "small-square", label: "Small Square", shape: "square", width: 90, height: 90, defaultSeatCount: 4, minSeatCount: 0, maxSeatCount: 4, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "medium-square", label: "Medium Square", shape: "square", width: 130, height: 130, defaultSeatCount: 4, minSeatCount: 0, maxSeatCount: 6, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "large-square", label: "Large Square", shape: "square", width: 170, height: 170, defaultSeatCount: 8, minSeatCount: 0, maxSeatCount: 8, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "two-rect", label: "2-Person Rectangle", shape: "rect", width: 90, height: 75, defaultSeatCount: 2, minSeatCount: 0, maxSeatCount: 2, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "four-rect", label: "4-Person Rectangle", shape: "rect", width: 120, height: 80, defaultSeatCount: 4, minSeatCount: 0, maxSeatCount: 4, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "six-rect", label: "6-Person Rectangle", shape: "rect", width: 180, height: 90, defaultSeatCount: 6, minSeatCount: 0, maxSeatCount: 6, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "eight-rect", label: "8-Person Rectangle", shape: "rect", width: 240, height: 100, defaultSeatCount: 8, minSeatCount: 0, maxSeatCount: 8, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "ten-rect", label: "10-Person Rectangle", shape: "rect", width: 300, height: 100, defaultSeatCount: 10, minSeatCount: 0, maxSeatCount: 10, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "twelve-rect", label: "12-Person Rectangle", shape: "rect", width: 360, height: 110, defaultSeatCount: 12, minSeatCount: 0, maxSeatCount: 12, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "twelve-banquet", label: "12-Person Banquet", shape: "banquet", width: 360, height: 100, defaultSeatCount: 12, minSeatCount: 0, maxSeatCount: 12, defaultSeatSpacing: 8, defaultChairStyle: "banquet-chair" },
+  { id: "conference-table", label: "Conference Table", shape: "rect", width: 400, height: 120, defaultSeatCount: 14, minSeatCount: 0, maxSeatCount: 16, defaultSeatSpacing: 8, defaultChairStyle: "premium-dining" },
+  { id: "cocktail-table", label: "Cocktail Table", shape: "round", width: 70, height: 70, defaultSeatCount: 0, minSeatCount: 0, maxSeatCount: 4, defaultSeatSpacing: 6, defaultChairStyle: "bar-stool" },
+  { id: "bar-height-table", label: "Bar-height Table", shape: "rect", width: 150, height: 70, defaultSeatCount: 4, minSeatCount: 0, maxSeatCount: 6, defaultSeatSpacing: 8, defaultChairStyle: "bar-stool" },
+  { id: "communal-dining", label: "Communal Table", shape: "rect", width: 280, height: 100, defaultSeatCount: 10, minSeatCount: 0, maxSeatCount: 12, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
+  { id: "vip-sofa-table", label: "VIP Sofa Table", shape: "rect", width: 160, height: 90, defaultSeatCount: 6, minSeatCount: 0, maxSeatCount: 8, defaultSeatSpacing: 10, defaultChairStyle: "sofa-chair" },
+  { id: "custom-table", label: "Custom Table", shape: "rect", width: 110, height: 70, defaultSeatCount: 4, minSeatCount: 0, maxSeatCount: 16, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" }
+];
+
+// ─── CHAIR STYLES ─────────────────────────────────────────────────────────────
+export const CHAIR_STYLES = [
+  { id: "standard-dining", label: "Standard Dining Chair", width: 38, depth: 38, spacingMultiplier: 1.0 },
+  { id: "premium-dining", label: "Premium Dining Chair", width: 42, depth: 42, spacingMultiplier: 1.1 },
+  { id: "high-chair", label: "High Chair", width: 34, depth: 34, spacingMultiplier: 0.9 },
+  { id: "bar-stool", label: "Bar Stool", width: 34, depth: 34, spacingMultiplier: 0.8 },
+  { id: "arm-chair", label: "Arm Chair", width: 46, depth: 46, spacingMultiplier: 1.2 },
+  { id: "banquet-chair", label: "Banquet Chair", width: 40, depth: 40, spacingMultiplier: 1.0 },
+  { id: "sofa-chair", label: "Sofa Chair", width: 55, depth: 50, spacingMultiplier: 1.3 },
+  { id: "bench-seat", label: "Bench Seat", width: 120, depth: 36, spacingMultiplier: 1.0, isBench: true },
+  { id: "lounge-chair", label: "Lounge Chair", width: 50, depth: 50, spacingMultiplier: 1.25 },
+  { id: "vip-chair", label: "VIP Chair", width: 48, depth: 48, spacingMultiplier: 1.2 },
+  { id: "child-chair", label: "Child Chair", width: 32, depth: 32, spacingMultiplier: 0.85 },
+  { id: "custom-chair", label: "Custom Chair", width: 38, depth: 38, spacingMultiplier: 1.0 }
+];
+
+// ─── FIXTURE PRESETS ──────────────────────────────────────────────────────────
+export const FIXTURE_PRESETS = [
+  { id: "host-stand", label: "Host Stand", fixture_type: "host-stand", width: 50, height: 50 },
+  { id: "reception-desk", label: "Reception Desk", fixture_type: "reception-desk", width: 150, height: 75 },
+  { id: "buffet-table", label: "Buffet Table", fixture_type: "buffet-table", width: 240, height: 90 },
+  { id: "bar-counter", label: "Bar Counter", fixture_type: "bar-counter", width: 300, height: 80 },
+  { id: "service-station", label: "Service Station", fixture_type: "service-station", width: 120, height: 60 },
+  { id: "pos-station", label: "POS Station", fixture_type: "pos-station", width: 60, height: 60 },
+  { id: "waiter-station", label: "Waiter Station", fixture_type: "waiter-station", width: 100, height: 60 },
+  { id: "divider", label: "Divider", fixture_type: "divider", width: 120, height: 15 },
+  { id: "partition-wall", label: "Partition Wall", fixture_type: "partition-wall", width: 240, height: 20 },
+  { id: "stage", label: "Stage", fixture_type: "stage", width: 400, height: 240 },
+  { id: "dance-floor", label: "Dance Floor", fixture_type: "dance-floor", width: 300, height: 300 },
+  { id: "screen", label: "Screen", fixture_type: "screen", width: 180, height: 15 },
+  { id: "projector", label: "Projector", fixture_type: "projector", width: 40, height: 40 },
+  { id: "podium", label: "Podium", fixture_type: "podium", width: 60, height: 50 },
+  { id: "entrance", label: "Entrance", fixture_type: "entrance", width: 100, height: 20 },
+  { id: "exit", label: "Exit", fixture_type: "exit", width: 100, height: 20 },
+  { id: "emergency-exit", label: "Emergency Exit", fixture_type: "emergency-exit", width: 100, height: 20 },
+  { id: "restroom-marker", label: "Restroom Marker", fixture_type: "restroom-marker", width: 60, height: 60 },
+  { id: "kitchen-door", label: "Kitchen Door", fixture_type: "kitchen-door", width: 100, height: 15 },
+  { id: "pillar-column", label: "Pillar / Column", fixture_type: "pillar-column", width: 50, height: 50 },
+  { id: "plant-decor", label: "Plant / Decor", fixture_type: "plant-decor", width: 40, height: 40 },
+  { id: "sofa", label: "Sofa", fixture_type: "sofa", width: 180, height: 80 },
+  { id: "bench", label: "Bench", fixture_type: "bench", width: 150, height: 45 },
+  { id: "cabinet", label: "Cabinet", fixture_type: "cabinet", width: 120, height: 45 },
+  { id: "av-booth", label: "AV Booth", fixture_type: "av-booth", width: 150, height: 150 },
+  { id: "custom-object", label: "Custom Object", fixture_type: "custom-object", width: 100, height: 100 }
+];
+
+export const STANDALONE_CHAIR_PRESETS = [
+  { id: "std-chair", label: "Standard Chair", chair_style: "standard-standalone", width: 38, height: 38 },
+  { id: "prem-chair", label: "Premium Chair", chair_style: "premium-standalone", width: 42, height: 42 },
+  { id: "high-chair-sa", label: "High Chair", chair_style: "high-chair", width: 34, height: 34 },
+  { id: "bar-stool-sa", label: "Bar Stool", chair_style: "bar-stool", width: 34, height: 34 },
+  { id: "lounge-chair-sa", label: "Lounge Chair", chair_style: "lounge-chair", width: 50, height: 50 },
+  { id: "arm-chair-sa", label: "Arm Chair", chair_style: "arm-chair", width: 46, height: 46 },
+  { id: "sofa-seat-sa", label: "Sofa Seat", chair_style: "sofa-seat", width: 55, height: 50 },
+  { id: "bench-seat-sa", label: "Bench Seat", chair_style: "bench-seat", width: 80, height: 38 },
+  { id: "child-chair-sa", label: "Child Chair", chair_style: "child-chair", width: 32, height: 32 },
+  { id: "vip-chair-sa", label: "VIP Chair", chair_style: "vip-chair", width: 46, height: 46 }
+];
+
+export const DISPLAY_PRESETS = [
+  { id: "projection-screen", label: "Projection Screen", fixture_type: "projection-screen", width: 180, height: 15 },
+  { id: "small-tv", label: "Small TV", fixture_type: "small-tv", width: 80, height: 15 },
+  { id: "medium-tv", label: "Medium TV", fixture_type: "medium-tv", width: 120, height: 15 },
+  { id: "large-tv", label: "Large TV", fixture_type: "large-tv", width: 160, height: 15 },
+  { id: "extra-large-tv", label: "Extra Large TV", fixture_type: "extra-large-tv", width: 200, height: 15 },
+  { id: "led-wall", label: "LED Wall", fixture_type: "led-wall", width: 300, height: 20 },
+  { id: "projector", label: "Projector", fixture_type: "projector", width: 40, height: 40 },
+  { id: "monitor-stand", label: "Monitor Stand", fixture_type: "monitor-stand", width: 60, height: 40 }
+];
+
+export const AIRFLOW_PRESETS = [
+  { id: "wall-fan", label: "Wall Fan", fixture_type: "wall-fan", width: 40, height: 40 },
+  { id: "stand-fan", label: "Stand Fan", fixture_type: "stand-fan", width: 40, height: 40 },
+  { id: "ceiling-fan", label: "Ceiling Fan", fixture_type: "ceiling-fan", width: 50, height: 50 },
+  { id: "industrial-fan", label: "Industrial Fan", fixture_type: "industrial-fan", width: 60, height: 60 },
+  { id: "aircon-unit", label: "Aircon Unit", fixture_type: "aircon-unit", width: 100, height: 35 },
+  { id: "vent-marker", label: "Vent Marker", fixture_type: "vent-marker", width: 40, height: 40 }
+];
+
+export const ENTRANCE_PRESETS = [
+  { id: "main-entrance", label: "Main Entrance", fixture_type: "main-entrance", width: 100, height: 20 },
+  { id: "side-entrance", label: "Side Entrance", fixture_type: "side-entrance", width: 80, height: 20 },
+  { id: "service-entrance", label: "Service Entrance", fixture_type: "service-entrance", width: 80, height: 20 },
+  { id: "exit-sa", label: "Exit", fixture_type: "exit", width: 100, height: 20 },
+  { id: "emergency-exit-sa", label: "Emergency Exit", fixture_type: "emergency-exit", width: 100, height: 20 },
+  { id: "fire-exit-sa", label: "Fire Exit", fixture_type: "fire-exit", width: 100, height: 20 },
+  { id: "staff-only-door", label: "Staff-only Door", fixture_type: "staff-only-door", width: 80, height: 20 },
+  { id: "kitchen-door-sa", label: "Kitchen Door", fixture_type: "kitchen-door", width: 80, height: 20 }
+];
+
+export const WALL_PRESETS = [
+  { id: "straight-wall", label: "Straight Wall", fixture_type: "straight-wall", width: 240, height: 10, thickness: 8 },
+  { id: "curved-wall", label: "Curved Wall", fixture_type: "curved-wall", width: 240, height: 60, thickness: 8, curve_strength: 50 },
+  { id: "partition-wall-sa", label: "Partition Wall", fixture_type: "partition-wall", width: 200, height: 15 },
+  { id: "glass-divider", label: "Glass Divider", fixture_type: "glass-divider", width: 180, height: 10 },
+  { id: "movable-divider", label: "Movable Divider", fixture_type: "movable-divider", width: 150, height: 15 },
+  { id: "half-wall", label: "Half Wall", fixture_type: "half-wall", width: 160, height: 12 },
+  { id: "room-boundary-segment", label: "Room Boundary", fixture_type: "room-boundary-segment", width: 300, height: 15 }
+];
+
+function makeTableFromPreset(preset, x = 120, y = 80) {
+  const id = `T${_tableCounter++}`;
+  const seatCount = preset.defaultSeatCount;
+  return {
+    id,
+    label: preset.label + " " + id,
+    x,
+    y,
+    shape: preset.shape === "rectangle" ? "rect" : preset.shape,
+    width: preset.width,
+    height: preset.height,
+    seats: Array.from({ length: seatCount }, (_, i) => ({
+      id: `${id}-S${i + 1}`,
+      num: i + 1,
+      label: `S${i + 1}`,
+      status: "available"
+    })),
+    editor: {
+      preset_id: preset.id,
+      rotation: 0,
+      chair_style: preset.defaultChairStyle || "standard-dining",
+      seat_spacing_cm: preset.defaultSeatSpacing || 8,
+      min_capacity: preset.minSeatCount ?? 0,
+      max_capacity: preset.maxSeatCount ?? seatCount,
+      locked: false
+    }
+  };
+}
+
+function makeFixtureFromPreset(preset, x = 100, y = 100) {
+  const id = `FX${_fixtureCounter++}`;
+  return {
+    id,
+    type: "fixture",
+    fixture_type: preset.fixture_type,
+    label: preset.label,
+    x,
+    y,
+    width: preset.width,
+    height: preset.height,
+    editor: {
+      rotation: 0,
+      locked: false,
+      reservable: false,
+      mounting_style: preset.fixture_type?.includes("tv") || preset.fixture_type?.includes("screen") ? "wall-mounted" : undefined,
+      thickness: preset.thickness || (preset.fixture_type?.includes("wall") || preset.fixture_type?.includes("divider") ? 8 : undefined),
+      curve_strength: preset.curve_strength || (preset.fixture_type === "curved-wall" ? 50 : undefined)
+    }
+  };
+}
+
+// ─── FIXTURE NODE ─────────────────────────────────────────────────────────────
+function FixtureNode({ fixture, editMode, isSelected, onSelect, onDragStart, isDragging, T }) {
+  const [hov, setHov] = useState(false);
+  const w = fixture.width || 80;
+  const h = fixture.height || 60;
+  const rotation = fixture.editor?.rotation || 0;
+  const isLocked = fixture.editor?.locked || false;
+
+  const normRot = ((rotation % 360) + 360) % 360;
+  const shouldFlip = normRot > 90 && normRot < 270;
+  const textTransform = shouldFlip ? "rotate(180deg)" : "none";
+
+  const tokens = T || {
+    gold: C.gold, borderDefault: C.borderDefault, borderAccent: C.borderAccent,
+    textPrimary: C.textPrimary, textTertiary: C.textTertiary, cardShadow: C.cardShadow
+  };
+
+  const isWall = [
+    "straight-wall", "curved-wall", "partition-wall", "glass-divider", 
+    "movable-divider", "half-wall", "room-boundary-segment"
+  ].includes(fixture.fixture_type);
+
+  // Determine wall color
+  const wallColors = {
+    "straight-wall": "#5E5647",
+    "partition-wall": "#8A8278",
+    "glass-divider": "rgba(173, 230, 240, 0.70)",
+    "movable-divider": "rgba(196, 163, 90, 0.30)",
+    "half-wall": "#A89F90",
+    "room-boundary-segment": "#22201C"
+  };
+  const wallColor = wallColors[fixture.fixture_type] || "#5E5647";
+  const thickness = fixture.editor?.thickness || 8;
+
+  if (isWall) {
+    if (fixture.fixture_type === "curved-wall") {
+      const curveStrength = fixture.editor?.curve_strength || 40;
+      const pathD = `M ${thickness/2},${h - thickness/2} Q ${w/2},${h - curveStrength - thickness/2} ${w - thickness/2},${h - thickness/2}`;
+      return (
+        <div
+          style={{
+            position: "absolute",
+            left: fixture.x || 0,
+            top: fixture.y || 0,
+            width: w,
+            height: h,
+            transform: `rotate(${rotation}deg)`,
+            transformOrigin: "center center",
+            zIndex: isSelected ? 10 : 2, // sits behind tables (which have zIndex 4+)
+            transition: isDragging ? "none" : "transform 0.15s ease",
+          }}
+          onMouseEnter={() => setHov(true)}
+          onMouseLeave={() => setHov(false)}
+          onClick={e => { e.stopPropagation(); onSelect(fixture); }}
+          onMouseDown={editMode && !isLocked ? e => { e.stopPropagation(); onDragStart(e, fixture.id); } : undefined}
+        >
+          <svg style={{ width: "100%", height: "100%", overflow: "visible" }}>
+            <path d={pathD} fill="none" stroke={wallColor} strokeWidth={thickness} strokeLinecap="round" />
+            {isSelected && (
+              <path d={pathD} fill="none" stroke={tokens.gold} strokeWidth={thickness + 4} strokeLinecap="round" strokeDasharray="4 4" opacity={0.5} />
+            )}
+          </svg>
+          {isSelected && (
+            <div style={{ position: "absolute", inset: -2, border: `1.5px dashed ${tokens.gold}`, borderRadius: 4, pointerEvents: "none" }} />
+          )}
+        </div>
+      );
+    } else {
+      // Straight walls: render a solid bar!
+      return (
+        <div
+          style={{
+            position: "absolute",
+            left: fixture.x || 0,
+            top: fixture.y || 0,
+            width: w,
+            height: h,
+            transform: `rotate(${rotation}deg)`,
+            transformOrigin: "center center",
+            zIndex: isSelected ? 10 : 2, // sits behind tables
+            transition: isDragging ? "none" : "transform 0.15s ease",
+          }}
+          onMouseEnter={() => setHov(true)}
+          onMouseLeave={() => setHov(false)}
+          onClick={e => { e.stopPropagation(); onSelect(fixture); }}
+          onMouseDown={editMode && !isLocked ? e => { e.stopPropagation(); onDragStart(e, fixture.id); } : undefined}
+        >
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              background: wallColor,
+              borderRadius: fixture.fixture_type === "glass-divider" ? 2 : 1,
+              border: isSelected ? `2.5px solid ${tokens.gold}` : hov ? `1.5px solid ${tokens.borderAccent}` : "none",
+              boxShadow: isSelected ? "0 4px 16px rgba(0,0,0,0.10)" : "none",
+              cursor: editMode ? (isDragging ? "grabbing" : isLocked ? "not-allowed" : "grab") : "default",
+              transition: "all 0.15s ease",
+            }}
+          />
+        </div>
+      );
+    }
+  }
+
+  // Render Display TV glossy bezel
+  const isDisplay = ["projection-screen", "small-tv", "medium-tv", "large-tv", "extra-large-tv", "led-wall"].includes(fixture.fixture_type);
+  if (isDisplay) {
+    const mountingStyle = fixture.editor?.mounting_style || "wall-mounted";
+    return (
+      <div
+        style={{
+          position: "absolute",
+          left: fixture.x || 0,
+          top: fixture.y || 0,
+          width: w,
+          height: h,
+          transform: `rotate(${rotation}deg)`,
+          transformOrigin: "center center",
+          zIndex: isSelected ? 10 : 3,
+          transition: isDragging ? "none" : "transform 0.15s ease",
+        }}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        onClick={e => { e.stopPropagation(); onSelect(fixture); }}
+        onMouseDown={editMode && !isLocked ? e => { e.stopPropagation(); onDragStart(e, fixture.id); } : undefined}
+      >
+        <div style={{
+          width: "100%", height: "100%",
+          background: "#18140E",
+          border: isSelected ? `2px solid ${tokens.gold}` : `1px solid rgba(255,255,255,0.25)`,
+          borderRadius: 3,
+          boxShadow: "0 6px 20px rgba(0,0,0,0.30)",
+          display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
+          cursor: editMode ? (isDragging ? "grabbing" : isLocked ? "not-allowed" : "grab") : "default",
+          position: "relative", overflow: "hidden"
+        }}>
+          {/* Glass glare effect */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "50%", background: "linear-gradient(to bottom, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 100%)", pointerEvents: "none" }} />
+          <span style={{ fontSize: 8, fontWeight: 800, color: tokens.gold, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center", padding: "0 4px", transform: textTransform, display: "inline-block" }}>
+            {fixture.label}
+          </span>
+          <span style={{ fontSize: 6, color: "rgba(255,255,255,0.40)", textTransform: "uppercase", marginTop: 2, transform: textTransform, display: "inline-block" }}>
+            {mountingStyle}
+          </span>
         </div>
       </div>
-    </>
+    );
+  }
+
+  // Render Doors / Entrances / Exits with CAD-style door swing!
+  const isDoor = ["entrance", "exit", "emergency-exit", "fire-exit", "main-entrance", "side-entrance", "service-entrance", "staff-only-door", "kitchen-door"].includes(fixture.fixture_type);
+  if (isDoor) {
+    return (
+      <div
+        style={{
+          position: "absolute",
+          left: fixture.x || 0,
+          top: fixture.y || 0,
+          width: w,
+          height: h,
+          transform: `rotate(${rotation}deg)`,
+          transformOrigin: "center center",
+          zIndex: isSelected ? 10 : 3,
+          transition: isDragging ? "none" : "transform 0.15s ease",
+        }}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        onClick={e => { e.stopPropagation(); onSelect(fixture); }}
+        onMouseDown={editMode && !isLocked ? e => { e.stopPropagation(); onDragStart(e, fixture.id); } : undefined}
+      >
+        <div style={{
+          width: "100%", height: "100%",
+          background: isSelected ? "rgba(196,163,90,0.08)" : "transparent",
+          border: isSelected ? `2.5px solid ${tokens.gold}` : hov ? `1.5px solid ${tokens.borderAccent}` : "none",
+          cursor: editMode ? (isDragging ? "grabbing" : isLocked ? "not-allowed" : "grab") : "default",
+          position: "relative"
+        }}>
+          {/* CAD Door Swing SVG */}
+          <svg style={{ width: "100%", height: "100%", overflow: "visible" }}>
+            {/* Wall base segment */}
+            <line x1={0} y1={h} x2={w} y2={h} stroke="#8A8278" strokeWidth={3} />
+            {/* Door Panel */}
+            <line x1={0} y1={h} x2={0} y2={0} stroke={C.gold} strokeWidth={2} />
+            {/* Dashed Swing Arc */}
+            <path d={`M 0,0 A ${h},${h} 0 0,1 ${w},${h}`} fill="none" stroke={C.gold} strokeWidth={1} strokeDasharray="3 3" opacity={0.6} />
+          </svg>
+          <div style={{ position: "absolute", bottom: -2, left: 4, fontSize: 7, fontWeight: 800, color: tokens.gold, textTransform: "uppercase", transform: textTransform, transformOrigin: "center center", display: "inline-block" }}>
+            {fixture.label}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Airflow / Ceiling fans with blades overlay!
+  const isAirflow = ["wall-fan", "stand-fan", "ceiling-fan", "industrial-fan", "aircon-unit", "vent-marker"].includes(fixture.fixture_type);
+  if (isAirflow) {
+    const isFan = fixture.fixture_type.includes("fan");
+    return (
+      <div
+        style={{
+          position: "absolute",
+          left: fixture.x || 0,
+          top: fixture.y || 0,
+          width: w,
+          height: h,
+          transform: `rotate(${rotation}deg)`,
+          transformOrigin: "center center",
+          zIndex: isSelected ? 10 : 3,
+          transition: isDragging ? "none" : "transform 0.15s ease",
+          display: "flex", alignItems: "center", justifyContent: "center"
+        }}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        onClick={e => { e.stopPropagation(); onSelect(fixture); }}
+        onMouseDown={editMode && !isLocked ? e => { e.stopPropagation(); onDragStart(e, fixture.id); } : undefined}
+      >
+        <div style={{
+          width: w, height: h,
+          background: isSelected ? "rgba(196,163,90,0.06)" : "#FAF8F4",
+          border: isSelected 
+            ? `2px solid ${tokens.gold}` 
+            : hov 
+              ? `1.5px solid ${tokens.borderAccent}` 
+              : `1px solid ${tokens.borderDefault}`,
+          borderRadius: isFan ? "50%" : 4,
+          boxShadow: tokens.cardShadow,
+          display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
+          cursor: editMode ? (isDragging ? "grabbing" : isLocked ? "not-allowed" : "grab") : "default",
+          position: "relative"
+        }}>
+          {isFan ? (
+            <svg style={{ width: "80%", height: "80%", overflow: "visible", opacity: 0.40, animation: "sm-spin 8s linear infinite" }}>
+              <circle cx="50%" cy="50%" r={4} fill="#8A8278" />
+              <line x1="50%" y1="50%" x2="50%" y2="0" stroke="#8A8278" strokeWidth={3} strokeLinecap="round" />
+              <line x1="50%" y1="50%" x2="10%" y2="75%" stroke="#8A8278" strokeWidth={3} strokeLinecap="round" />
+              <line x1="50%" y1="50%" x2="90%" y2="75%" stroke="#8A8278" strokeWidth={3} strokeLinecap="round" />
+            </svg>
+          ) : (
+            <div style={{ display: "flex", gap: 3, width: "100%", justifyContent: "center", padding: "0 6px" }}>
+              <span style={{ width: 3, height: 12, background: C.gold, borderRadius: 1 }} />
+              <span style={{ width: 3, height: 12, background: C.gold, borderRadius: 1 }} />
+              <span style={{ width: 3, height: 12, background: C.gold, borderRadius: 1 }} />
+            </div>
+          )}
+          <span style={{ fontSize: 7, fontWeight: 800, color: tokens.textPrimary, textTransform: "uppercase", position: "absolute", bottom: 2, transform: textTransform, display: "inline-block" }}>
+            {fixture.label}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback to original architectural fixture visual style
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: fixture.x || 0,
+        top: fixture.y || 0,
+        width: w,
+        height: h,
+        transform: `rotate(${rotation}deg)`,
+        transformOrigin: "center center",
+        zIndex: isSelected ? 10 : 3,
+        transition: isDragging ? "none" : "transform 0.15s ease",
+      }}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      onClick={e => {
+        e.stopPropagation();
+        onSelect(fixture);
+      }}
+      onMouseDown={editMode && !isLocked ? e => { e.stopPropagation(); onDragStart(e, fixture.id); } : undefined}
+    >
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          background: isSelected ? "rgba(140,107,42,0.06)" : "#F2EFE9",
+          border: isSelected 
+            ? `2px solid ${tokens.gold}` 
+            : hov 
+              ? `1.5px solid ${tokens.borderAccent}` 
+              : `1px solid ${tokens.borderDefault}`,
+          borderRadius: fixture.fixture_type === "pillar-column" ? "50%" : 4,
+          boxShadow: isSelected ? "0 4px 16px rgba(0,0,0,0.10)" : tokens.cardShadow,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          cursor: editMode ? (isDragging ? "grabbing" : isLocked ? "not-allowed" : "grab") : "default",
+          transition: "all 0.15s ease",
+          position: "relative",
+          overflow: "hidden"
+        }}
+      >
+        <div style={{ position: "absolute", inset: 0, opacity: 0.05, pointerEvents: "none" }}>
+          <svg width="100%" height="100%">
+            <line x1={0} y1={0} x2="100%" y2="100%" stroke="#000" strokeWidth={0.5} />
+            <line x1="100%" y1={0} x2={0} y2="100%" stroke="#000" strokeWidth={0.5} />
+          </svg>
+        </div>
+        <span style={{ fontSize: 9, fontWeight: 700, color: tokens.textPrimary, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center", padding: "0 6px", transform: textTransform, display: "inline-block" }}>
+          {fixture.label || fixture.id}
+        </span>
+      </div>
+      {isLocked && (
+        <div style={{ position: "absolute", top: 4, right: 6, opacity: 0.5, color: tokens.gold }}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+      )}
+    </div>
+  );
+}
+function LeftSidebarPanel({ 
+  activeWing, activeRoom, onSelect, venueStructure, onOpenVenueManager,
+  addTablePreset, addFixturePreset, addLabelPreset, addStandaloneSeatPreset
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roomsExpanded, setRoomsExpanded] = useState(true);
+  const [diningExpanded, setDiningExpanded] = useState(true);
+  const [architectureExpanded, setArchitectureExpanded] = useState(false);
+  const [fixturesExpanded, setFixturesExpanded] = useState(false);
+  const [annotationsExpanded, setAnnotationsExpanded] = useState(false);
+
+  const [wingsExpanded, setWingsExpanded] = useState(() => 
+    Object.fromEntries(venueStructure.map(w => [w.id, true]))
+  );
+
+  const toggleWing = id => setWingsExpanded(e => ({ ...e, [id]: !e[id] }));
+
+  useEffect(() => {
+    setWingsExpanded(prev => {
+      const next = { ...prev };
+      venueStructure.forEach(w => { if (!(w.id in next)) next[w.id] = true; });
+      return next;
+    });
+  }, [venueStructure]);
+
+  const presetButtonStyle = {
+    width: "100%",
+    padding: "7px 10px",
+    background: "transparent",
+    border: `1px solid ${C.borderDefault}`,
+    borderRadius: 6,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    cursor: "pointer",
+    textAlign: "left",
+    transition: "all 0.13s",
+    boxSizing: "border-box"
+  };
+
+  const rowStyle = (active) => ({
+    display: "flex", 
+    alignItems: "center", 
+    justifyContent: "space-between",
+    padding: "6px 14px 6px 24px", 
+    cursor: "pointer",
+    background: active ? C.goldFaint : "transparent",
+    borderLeft: `3px solid ${active ? C.gold : "transparent"}`,
+    transition: "all 0.14s",
+  });
+
+  const LABEL_PRESETS = [
+    { id: "text-label", label: "Text Label", type: "screen", defaultText: "DRAFT AREA" },
+    { id: "vip-section", label: "VIP Section Marker", type: "other", defaultText: "VIP SECTION" },
+    { id: "direction-arrow", label: "Measurement Label", type: "other", defaultText: "10m PADDING" }
+  ];
+
+  const filterPresets = (presets) => {
+    if (!searchQuery) return presets;
+    const q = searchQuery.toLowerCase().trim();
+    return presets.filter(p => 
+      (p.label && p.label.toLowerCase().includes(q)) || 
+      (p.id && p.id.toLowerCase().includes(q)) ||
+      (p.fixture_type && p.fixture_type.toLowerCase().includes(q))
+    );
+  };
+
+  const filteredTables = filterPresets(TABLE_PRESETS);
+  const filteredChairs = filterPresets(STANDALONE_CHAIR_PRESETS);
+  const filteredWalls = filterPresets(WALL_PRESETS);
+  const filteredDoors = filterPresets(ENTRANCE_PRESETS);
+  const filteredDisplays = filterPresets(DISPLAY_PRESETS);
+  const filteredAirflow = filterPresets(AIRFLOW_PRESETS);
+  const filteredFixtures = filterPresets(FIXTURE_PRESETS);
+  const filteredLabels = filterPresets(LABEL_PRESETS);
+
+  const hasAnyMatches = filteredTables.length > 0 || filteredChairs.length > 0 || 
+                        filteredWalls.length > 0 || filteredDoors.length > 0 || 
+                        filteredDisplays.length > 0 || filteredAirflow.length > 0 || 
+                        filteredFixtures.length > 0 || filteredLabels.length > 0;
+
+  const isDiningOpen = searchQuery ? true : diningExpanded;
+  const isArchitectureOpen = searchQuery ? true : architectureExpanded;
+  const isFixturesOpen = searchQuery ? true : fixturesExpanded;
+  const isAnnotationsOpen = searchQuery ? true : annotationsExpanded;
+
+  const CategoryHeader = ({ title, isOpen, onClick, count }) => {
+    const [hov, setHov] = useState(false);
+    return (
+      <div 
+        onClick={onClick}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "9px 14px",
+          borderBottom: `1px solid ${C.divider}`,
+          background: hov ? C.goldFaintest : C.surfaceRaised,
+          cursor: "pointer",
+          userSelect: "none",
+          transition: "background 0.15s ease"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ 
+            transform: isOpen ? "rotate(90deg)" : "rotate(0deg)", 
+            transition: "transform 0.15s", 
+            display: "inline-block", 
+            fontSize: 7,
+            color: C.gold
+          }}>▶</span>
+          <span style={{
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            color: C.textPrimary,
+            textTransform: "uppercase",
+            fontFamily: F
+          }}>{title}</span>
+        </div>
+        {count !== undefined && count > 0 && (
+          <span style={{ fontSize: 8, fontWeight: 700, color: C.gold, fontFamily: F, background: C.goldFaint, padding: "2px 6px", borderRadius: 10 }}>
+            {count}
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const SubSectionHeader = ({ title }) => (
+    <div style={{
+      fontSize: 8,
+      fontWeight: 700,
+      letterSpacing: "0.08em",
+      color: C.gold,
+      textTransform: "uppercase",
+      fontFamily: F,
+      marginTop: 8,
+      marginBottom: 6,
+      paddingLeft: 2
+    }}>{title}</div>
+  );
+
+  return (
+    <div className="sm-scroll" style={{ width: 240, flexShrink: 0, alignSelf: "stretch", background: C.sidebarBg, borderRight: `1px solid ${C.sidebarBorder}`, display: "flex", flexDirection: "column", overflowY: "auto", overflowX: "hidden", userSelect: "none" }}>
+      
+      {/* 1. ROOM NAVIGATOR */}
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <div 
+          onClick={() => setRoomsExpanded(!roomsExpanded)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "12px 14px 10px",
+            background: C.surfaceRaised,
+            cursor: "pointer",
+            userSelect: "none"
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ transform: roomsExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block", fontSize: 7, color: C.gold }}>▶</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", color: C.gold, textTransform: "uppercase", fontFamily: F }}>
+              Room Navigator
+            </span>
+          </div>
+        </div>
+
+        {roomsExpanded && (
+          <div style={{ display: "flex", flexDirection: "column", borderBottom: `1px solid ${C.divider}`, paddingBottom: 10 }}>
+            {/* Current Context Badge */}
+            <div style={{ padding: "0 14px 10px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "8px 10px", background: "rgba(140, 107, 42, 0.05)", borderRadius: 6, border: `1px solid ${C.borderAccent}` }}>
+                <div style={{ fontSize: 7, color: C.textTertiary, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Active Venue Context</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: F }}>
+                  {activeWing} • {activeRoom}
+                </div>
+              </div>
+            </div>
+
+            {/* Wing Room groups */}
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {venueStructure.map((wing) => (
+                <div key={wing.id}>
+                  <div
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 14px", cursor: "pointer", userSelect: "none", transition: "background 0.14s" }}
+                    onClick={() => toggleWing(wing.id)}
+                    onMouseEnter={e => e.currentTarget.style.background = C.goldFaintest}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: wingsExpanded[wing.id] ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.18s", flexShrink: 0 }}>
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", color: C.textPrimary, textTransform: "uppercase", fontFamily: F }}>{wing.label}</span>
+                    </div>
+                    <span style={{ fontSize: 8, fontWeight: 600, color: C.textTertiary, fontFamily: F, background: "rgba(0,0,0,0.03)", padding: "1px 5px", borderRadius: 4 }}>{wing.rooms.length}</span>
+                  </div>
+
+                  {wingsExpanded[wing.id] && (
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      {wing.rooms.map((room, roomIndex) => {
+                        const active = activeWing === wing.label && activeRoom === room;
+                        return (
+                          <div 
+                            key={`${wing.id}-${roomIndex}-${room}`} 
+                            onClick={() => onSelect(wing.label, room)} 
+                            style={rowStyle(active)}
+                            onMouseEnter={e => { if (!active) e.currentTarget.style.background = C.goldFaintest; }}
+                            onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <span style={{ fontSize: 10, color: active ? C.gold : C.textSecondary, fontFamily: F, fontWeight: active ? 700 : 400, lineHeight: 1.4, flex: 1, transition: "color 0.14s" }}>
+                              {room}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Manage Venue Button */}
+            {onOpenVenueManager && (
+              <div style={{ padding: "10px 14px 0", flexShrink: 0 }}>
+                <button onClick={onOpenVenueManager}
+                  style={{ width: "100%", padding: "7px 0", background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 6, fontFamily: F, fontSize: 8, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}
+                  onMouseEnter={e => { e.currentTarget.style.background = C.goldFaint; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = C.goldFaintest; }}>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+                  Manage Venue
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Divider */}
+      <div style={{ height: 1, background: C.divider }} />
+
+      {/* 2. STUDIO LIBRARY */}
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "12px 14px 10px" }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", color: C.gold, textTransform: "uppercase", fontFamily: F, marginBottom: 8 }}>
+            Studio Library
+          </div>
+          
+          {/* Search input bar */}
+          <div style={{ position: "relative" }}>
+            <input 
+              type="text" 
+              placeholder="Search objects..." 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "6px 10px 6px 26px",
+                border: `1px solid ${C.borderDefault}`,
+                borderRadius: 6,
+                fontSize: 10,
+                color: C.textPrimary,
+                background: C.surfaceInput,
+                fontFamily: F,
+                outline: "none",
+                boxSizing: "border-box",
+                transition: "all 0.15s"
+              }}
+              onFocus={e => { e.target.style.borderColor = C.borderAccent; e.target.style.boxShadow = C.inputFocus; }}
+              onBlur={e => { e.target.style.borderColor = C.borderDefault; e.target.style.boxShadow = "none"; }}
+            />
+            <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 10, pointerEvents: "none", opacity: 0.6 }}>🔍</span>
+          </div>
+        </div>
+
+        {/* Categories accordion */}
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          
+          {/* A. Dining */}
+          {(filteredTables.length > 0 || filteredChairs.length > 0) && (
+            <div>
+              <CategoryHeader 
+                title="Dining" 
+                isOpen={isDiningOpen} 
+                onClick={() => setDiningExpanded(!diningExpanded)}
+                count={filteredTables.length + filteredChairs.length}
+              />
+              {isDiningOpen && (
+                <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.divider}` }}>
+                  {filteredTables.length > 0 && (
+                    <div>
+                      <SubSectionHeader title="Table Presets" />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {filteredTables.map(preset => (
+                          <button 
+                            key={preset.id}
+                            onClick={() => addTablePreset(preset)}
+                            draggable={true}
+                            onDragStart={e => {
+                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "table" }));
+                              e.dataTransfer.effectAllowed = "copy";
+                            }}
+                            style={presetButtonStyle}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <div style={{ width: 12, height: 12, borderRadius: preset.shape === "round" ? "50%" : 2, border: `1.5px solid ${C.gold}`, background: "transparent", flexShrink: 0 }} />
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.defaultSeatCount} seats · {preset.width}x{preset.height}cm</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredChairs.length > 0 && (
+                    <div style={{ marginTop: filteredTables.length > 0 ? 6 : 0 }}>
+                      <SubSectionHeader title="Standalone Chairs" />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {filteredChairs.map(preset => (
+                          <button 
+                            key={preset.id}
+                            onClick={() => addStandaloneSeatPreset(preset)}
+                            draggable={true}
+                            onDragStart={e => {
+                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "standaloneSeat" }));
+                              e.dataTransfer.effectAllowed = "copy";
+                            }}
+                            style={presetButtonStyle}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <div style={{ width: 12, height: 12, borderRadius: "50%", border: `1.5px solid ${C.gold}`, background: C.goldFaint, flexShrink: 0 }} />
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* B. Architecture */}
+          {(filteredWalls.length > 0 || filteredDoors.length > 0) && (
+            <div>
+              <CategoryHeader 
+                title="Architecture" 
+                isOpen={isArchitectureOpen} 
+                onClick={() => setArchitectureExpanded(!architectureExpanded)}
+                count={filteredWalls.length + filteredDoors.length}
+              />
+              {isArchitectureOpen && (
+                <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.divider}` }}>
+                  {filteredWalls.length > 0 && (
+                    <div>
+                      <SubSectionHeader title="Walls &amp; Dividers" />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {filteredWalls.map(preset => (
+                          <button 
+                            key={preset.id}
+                            onClick={() => addFixturePreset(preset)}
+                            draggable={true}
+                            onDragStart={e => {
+                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
+                              e.dataTransfer.effectAllowed = "copy";
+                            }}
+                            style={presetButtonStyle}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <div style={{ width: 14, height: 4, background: "#8A8278", borderRadius: 1, flexShrink: 0 }} />
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredDoors.length > 0 && (
+                    <div style={{ marginTop: filteredWalls.length > 0 ? 6 : 0 }}>
+                      <SubSectionHeader title="Doors &amp; Openings" />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {filteredDoors.map(preset => (
+                          <button 
+                            key={preset.id}
+                            onClick={() => addFixturePreset(preset)}
+                            draggable={true}
+                            onDragStart={e => {
+                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
+                              e.dataTransfer.effectAllowed = "copy";
+                            }}
+                            style={presetButtonStyle}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <div style={{ width: 14, height: 10, borderLeft: `2px solid ${C.gold}`, borderBottom: "1px dashed rgba(0,0,0,0.2)", flexShrink: 0 }} />
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* C. Fixtures */}
+          {(filteredDisplays.length > 0 || filteredAirflow.length > 0 || filteredFixtures.length > 0) && (
+            <div>
+              <CategoryHeader 
+                title="Fixtures" 
+                isOpen={isFixturesOpen} 
+                onClick={() => setFixturesExpanded(!fixturesExpanded)}
+                count={filteredDisplays.length + filteredAirflow.length + filteredFixtures.length}
+              />
+              {isFixturesOpen && (
+                <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.divider}` }}>
+                  {filteredDisplays.length > 0 && (
+                    <div>
+                      <SubSectionHeader title="Displays &amp; TVs" />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {filteredDisplays.map(preset => (
+                          <button 
+                            key={preset.id}
+                            onClick={() => addFixturePreset(preset)}
+                            draggable={true}
+                            onDragStart={e => {
+                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
+                              e.dataTransfer.effectAllowed = "copy";
+                            }}
+                            style={presetButtonStyle}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <div style={{ width: 14, height: 10, background: "#18140E", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1, flexShrink: 0 }} />
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredAirflow.length > 0 && (
+                    <div style={{ marginTop: filteredDisplays.length > 0 ? 6 : 0 }}>
+                      <SubSectionHeader title="Airflow &amp; Cooling" />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {filteredAirflow.map(preset => (
+                          <button 
+                            key={preset.id}
+                            onClick={() => addFixturePreset(preset)}
+                            draggable={true}
+                            onDragStart={e => {
+                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
+                              e.dataTransfer.effectAllowed = "copy";
+                            }}
+                            style={presetButtonStyle}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <div style={{ width: 12, height: 12, borderRadius: preset.fixture_type.includes("fan") ? "50%" : 2, border: `1.5px solid ${C.textSecondary}`, background: "#FAF8F4", flexShrink: 0 }} />
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredFixtures.length > 0 && (
+                    <div style={{ marginTop: (filteredDisplays.length > 0 || filteredAirflow.length > 0) ? 6 : 0 }}>
+                      <SubSectionHeader title="General Fixtures" />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 180, overflowY: "auto" }} className="sm-scroll">
+                        {filteredFixtures.map(preset => (
+                          <button 
+                            key={preset.id}
+                            onClick={() => addFixturePreset(preset)}
+                            draggable={true}
+                            onDragStart={e => {
+                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
+                              e.dataTransfer.effectAllowed = "copy";
+                            }}
+                            style={presetButtonStyle}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <div style={{ width: 12, height: 12, border: `1.5px dashed ${C.textSecondary}`, background: "rgba(0,0,0,0.03)", flexShrink: 0 }} />
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* D. Annotations */}
+          {filteredLabels.length > 0 && (
+            <div>
+              <CategoryHeader 
+                title="Annotations" 
+                isOpen={isAnnotationsOpen} 
+                onClick={() => setAnnotationsExpanded(!annotationsExpanded)}
+                count={filteredLabels.length}
+              />
+              {isAnnotationsOpen && (
+                <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div>
+                    <SubSectionHeader title="Labels &amp; Markers" />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      {filteredLabels.map(preset => (
+                        <button 
+                          key={preset.id}
+                          onClick={() => addLabelPreset(preset)}
+                          draggable={true}
+                          onDragStart={e => {
+                            e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "label" }));
+                            e.dataTransfer.effectAllowed = "copy";
+                          }}
+                          style={presetButtonStyle}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                        >
+                          <div style={{ fontSize: 11, fontWeight: "bold", color: C.gold, fontFamily: F }}>A</div>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                            <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>Adds movable {preset.label.toLowerCase()}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* No search matches state */}
+          {searchQuery && !hasAnyMatches && (
+            <div style={{ padding: "20px 14px", textAlign: "center", color: C.textSecondary, fontSize: 10, fontFamily: F }}>
+              No objects match "{searchQuery}"
+            </div>
+          )}
+
+        </div>
+      </div>
+
+    </div>
   );
 }
 
@@ -894,57 +2314,57 @@ function WingRoomSidebar({ activeWing, activeRoom, onSelect, venueStructure, onO
 }
 
 // ─── INSPECTOR PANEL ──────────────────────────────────────────────────────────
-function InspectorPanel({ selected, selectedTable, selectedSeatObj, selectedStandaloneSeatObj, tables, setTables, addSeat, deleteSeat, deleteTable, deleteStandaloneSeat, updateTable, handleSeatLabelEdit, handleSeatStatus, onRequestDelete, handleStandaloneSeatStatus }) {
+function InspectorPanel({ 
+  selected, selectedTable, selectedSeatObj, selectedStandaloneSeatObj, 
+  selectedLabelObj, selectedFixtureObj,
+  tables, setTables, labels, setLabels, fixtures, setFixtures,
+  addSeat, deleteSeat, deleteTable, deleteStandaloneSeat, deleteFixture,
+  updateTable, updateLabel, updateFixture, handleSeatLabelEdit, handleSeatStatus,
+  handleStandaloneSeatStatus, onRequestDelete, 
+  duplicateTable, duplicateStandaloneSeat, duplicateFixture,
+  snapToGrid, setSnapToGrid, gridSize, setGridSize, roomWidth, setRoomWidth, 
+  roomHeight, setRoomHeight, undo, redo, canUndo, canRedo, exportLayout, 
+  importLayout, resetLayout, handleSeatCountChange, pushHistory,
+  showGrid, setShowGrid,
+  gridVisibility, setGridVisibility,
+  smartGuidesEnabled, setSmartGuidesEnabled,
+  showRulers, setShowRulers
+}) {
   const iLabel = t => (
-    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.16em", color: C.gold, textTransform: "uppercase", marginBottom: 5, marginTop: 13 }}>{t}</div>
+    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", color: C.gold, textTransform: "uppercase", marginBottom: 5, marginTop: 12, fontFamily: F }}>{t}</div>
   );
+  
   const iInput = props => (
     <input
-      style={{ width: "100%", padding: "8px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontSize: 12, color: C.textPrimary, background: C.surfaceInput, boxSizing: "border-box", outline: "none", transition: "border-color 0.15s, box-shadow 0.15s" }}
+      style={{ width: "100%", padding: "7px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontSize: 11, color: C.textPrimary, background: C.surfaceInput, boxSizing: "border-box", outline: "none", transition: "border-color 0.15s, box-shadow 0.15s" }}
       onFocus={e => { e.target.style.borderColor = C.borderAccent; e.target.style.boxShadow = C.inputFocus; }}
       onBlur={e => { e.target.style.borderColor = C.borderDefault; e.target.style.boxShadow = "none"; }}
       {...props}
     />
   );
 
-  const StatusRow = ({ current, onSet }) => (
-    <div style={{ display: "flex", gap: 3, marginTop: 4 }}>
-      {SEAT_STATUS_CYCLE.map((s, index) => (
-        <button key={`${s}-${index}`} onClick={() => onSet(s)} style={{ flex: 1, padding: "6px 0", background: current === s ? STATUS_COLORS[s] : "transparent", border: `1px solid ${STATUS_COLORS[s]}80`, borderRadius: 5, fontFamily: F, fontWeight: 600, fontSize: 9, color: current === s ? "#fff" : STATUS_COLORS[s], cursor: "pointer", transition: "all 0.14s" }}>
-          {s === "available" ? "Avail." : s === "pending" ? "Pending" : "Reserved"}
-        </button>
-      ))}
-    </div>
-  );
-
   const DeleteBtn = ({ label, deleteKey }) => (
     <button
       onClick={() => onRequestDelete(deleteKey)}
-      style={{ width: "100%", marginTop: 10, padding: "8px 0", background: "transparent", color: C.red, border: `1px solid ${C.redBorder}`, borderRadius: 6, fontFamily: F, fontWeight: 600, fontSize: 10, cursor: "pointer", transition: "background 0.14s", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+      style={{ width: "100%", marginTop: 12, padding: "8px 0", background: "transparent", color: C.red, border: `1px solid ${C.redBorder}`, borderRadius: 6, fontFamily: F, fontWeight: 600, fontSize: 10, cursor: "pointer", transition: "background 0.14s", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
       onMouseEnter={e => e.currentTarget.style.background = C.redFaint}
       onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-      </svg>
+      <Trash2 size={11} />
       {label}
     </button>
   );
 
-  // ── Reusable "Add Seat" button wired to a specific tableId ──────────────────
   const AddSeatBtn = ({ tableId }) => (
     <button
       onClick={() => addSeat(tableId)}
       style={{ flex: 1, padding: "6px 0", background: "transparent", color: C.green, border: `1px solid ${C.greenBorder}`, borderRadius: 5, fontFamily: F, fontWeight: 600, fontSize: 10, cursor: "pointer", transition: "background 0.14s", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}
       onMouseEnter={e => e.currentTarget.style.background = C.greenFaint}
       onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
-      </svg>
+      <Plus size={10} />
       Add Seat
     </button>
   );
 
-  // ── Reusable "Remove Last" button ────────────────────────────────────────────
   const RemoveLastBtn = () => (
     <button
       onClick={deleteSeat}
@@ -955,120 +2375,650 @@ function InspectorPanel({ selected, selectedTable, selectedSeatObj, selectedStan
     </button>
   );
 
+  const changeTablePreset = async (presetId, customTableId) => {
+    const tid = customTableId || selected?.tableId;
+    if (!tid) return;
+    const table = tables.find(t => t.id === tid);
+    if (!table) return;
+
+    const preset = TABLE_PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+
+    const newSeatCount = preset.defaultSeatCount;
+    const currentSeatsCount = table.seats?.length || 0;
+
+    // Safety check first: warn if removing seats that have active bookings
+    if (newSeatCount < currentSeatsCount) {
+      const truncated = table.seats.slice(newSeatCount);
+      const hasBookings = truncated.some(s => s.status !== "available");
+      if (hasBookings) {
+        const confirm = window.confirm("Warning: Changing table type will reduce seats. Some of the seats being removed have active or pending reservations. Are you sure you want to proceed? This will remove their bookings.");
+        if (!confirm) return;
+      }
+      for (const seat of truncated) {
+        try { await cleanupReservationsForDeletedSeat(seat, table, activeWing, activeRoom, "admin"); } catch {}
+      }
+    }
+
+    pushHistory();
+    setTables(p => p.map(t => {
+      if (t.id !== tid) return t;
+
+      let updatedSeats = [...(t.seats || [])];
+      if (newSeatCount < currentSeatsCount) {
+        updatedSeats = updatedSeats.slice(0, newSeatCount);
+      } else if (newSeatCount > currentSeatsCount) {
+        for (let i = currentSeatsCount; i < newSeatCount; i++) {
+          const num = i + 1;
+          updatedSeats.push({
+            id: `${t.id}-S${num}-${Date.now()}`,
+            num,
+            label: `S${num}`,
+            status: "available"
+          });
+        }
+      }
+
+      return {
+        ...t,
+        shape: preset.shape === "rectangle" ? "rect" : preset.shape,
+        width: preset.width,
+        height: preset.height,
+        seats: updatedSeats,
+        editor: {
+          ...(t.editor || {}),
+          preset_id: preset.id,
+          chair_style: preset.defaultChairStyle || "standard-dining",
+          seat_spacing_cm: preset.defaultSeatSpacing || 8,
+          min_capacity: preset.minSeatCount ?? 0,
+          max_capacity: preset.maxSeatCount ?? newSeatCount,
+        }
+      };
+    }));
+  };
+
+  const changeFixturePreset = (presetId) => {
+    const preset = FIXTURE_PRESETS.find(p => p.id === presetId);
+    if (!preset || !selectedFixtureObj) return;
+    pushHistory();
+    setFixtures(p => p.map(f => {
+      if (f.id !== selectedFixtureObj.id) return f;
+      return {
+        ...f,
+        fixture_type: preset.fixture_type,
+        label: preset.label,
+        width: preset.width,
+        height: preset.height
+      };
+    }));
+  };
+
   return (
     <div style={{ fontFamily: F }}>
-      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.20em", color: C.gold, textTransform: "uppercase", marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${C.divider}` }}>
-        Inspector
+      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.20em", color: C.gold, textTransform: "uppercase", marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span>Studio Inspector</span>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button disabled={!canUndo} onClick={undo} style={{ background: "transparent", border: "none", cursor: canUndo ? "pointer" : "not-allowed", color: canUndo ? C.textPrimary : C.textTertiary, opacity: canUndo ? 1 : 0.4, padding: 2 }} title="Undo (Ctrl+Z)">
+            <Undo2 size={12} />
+          </button>
+          <button disabled={!canRedo} onClick={redo} style={{ background: "transparent", border: "none", cursor: canRedo ? "pointer" : "not-allowed", color: canRedo ? C.textPrimary : C.textTertiary, opacity: canRedo ? 1 : 0.4, padding: 2 }} title="Redo (Ctrl+Y)">
+            <Redo2 size={12} />
+          </button>
+        </div>
       </div>
 
-      {/* ── Nothing selected ── */}
+      {/* ── Nothing selected: Canvas settings ── */}
       {!selected && (
-        <div style={{ color: C.textTertiary, fontSize: 11, lineHeight: 1.65 }}>
-          Select a table or seat to edit its properties.
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: C.textSecondary, marginBottom: 6 }}>Room Dimensions (cm)</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Width</span>
+                {iInput({ type: "number", value: roomWidth, onChange: e => setRoomWidth(Number(e.target.value)) })}
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Height</span>
+                {iInput({ type: "number", value: roomHeight, onChange: e => setRoomHeight(Number(e.target.value)) })}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: C.textSecondary }}>Show Grid</span>
+              <input type="checkbox" checked={showGrid !== false} onChange={e => setShowGrid(e.target.checked)} style={{ accentColor: C.gold }} />
+            </div>
+            {showGrid !== false && (
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+                  <span style={{ fontSize: 8, color: C.textTertiary }}>Grid Visibility (%)</span>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    max="100" 
+                    value={gridVisibility ?? 30} 
+                    onChange={e => setGridVisibility(Math.min(100, Math.max(0, Number(e.target.value))))} 
+                    style={{ width: "42px", background: "transparent", border: `1px solid ${C.borderDefault}`, borderRadius: 4, textAlign: "center", fontSize: 10, fontFamily: "monospace" }} 
+                  />
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="100" 
+                  value={gridVisibility ?? 30} 
+                  onChange={e => setGridVisibility(Number(e.target.value))} 
+                  style={{ width: "100%", accentColor: C.gold, cursor: "pointer" }} 
+                />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: C.textSecondary }}>Snap to Grid</span>
+              <input type="checkbox" checked={snapToGrid} onChange={e => setSnapToGrid(e.target.checked)} style={{ accentColor: C.gold }} />
+            </div>
+            {snapToGrid && (
+              <div>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Grid Size (cm)</span>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <select value={gridSize} onChange={e => setGridSize(Number(e.target.value))} style={{ flex: 1, padding: "7px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontSize: 11, background: C.surfaceInput, color: C.textPrimary, outline: "none" }}>
+                    <option value={10}>10 cm</option>
+                    <option value={20}>20 cm</option>
+                    <option value={25}>25 cm (Bellevue standard)</option>
+                    <option value={50}>50 cm</option>
+                  </select>
+                  <input 
+                    type="number" 
+                    min="5" 
+                    max="100" 
+                    value={gridSize} 
+                    onChange={e => setGridSize(Math.max(5, Math.min(100, Number(e.target.value))))} 
+                    style={{ width: "45px", padding: "6px 4px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, textAlign: "center", fontSize: 11, outline: "none" }} 
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: C.textSecondary }}>Smart Guides</span>
+              <input type="checkbox" checked={smartGuidesEnabled !== false} onChange={e => setSmartGuidesEnabled(e.target.checked)} style={{ accentColor: C.gold }} />
+            </div>
+          </div>
+
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: C.textSecondary }}>Show Rulers</span>
+              <input type="checkbox" checked={showRulers !== false} onChange={e => setShowRulers(e.target.checked)} style={{ accentColor: C.gold }} />
+            </div>
+          </div>
+
+          <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 12, marginTop: 4 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: C.textSecondary, marginBottom: 8 }}>Layout Configuration</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <button onClick={exportLayout} style={{ width: "100%", padding: "8px", background: "transparent", border: `1px solid ${C.borderAccent}`, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, cursor: "pointer", transition: "all 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.background = C.goldFaint}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                Export JSON Layout
+              </button>
+              <label style={{ width: "100%", padding: "8px", background: "transparent", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: C.textSecondary, cursor: "pointer", display: "block", textAlign: "center", transition: "all 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = C.borderAccent}
+                onMouseLeave={e => e.currentTarget.style.borderColor = C.borderDefault}>
+                Import JSON Layout
+                <input type="file" accept=".json" onChange={importLayout} style={{ display: "none" }} />
+              </label>
+              <button onClick={resetLayout} style={{ width: "100%", padding: "8px", background: "transparent", border: `1px solid ${C.redBorder}`, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: C.red, cursor: "pointer", transition: "all 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.background = C.redFaint}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                Reset Room Layout
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* ── Table selected ── */}
-      {selected?.type === "table" && (
-        <>
-          {selectedTable && (
-            <>
+      {selected?.type === "table" && selectedTable && (() => {
+        const presetId = selectedTable.editor?.preset_id || "custom-table";
+        const preset = TABLE_PRESETS.find(p => p.id === presetId) || TABLE_PRESETS.find(p => p.id === "custom-table");
+        const minChairs = preset?.minSeatCount ?? 0;
+        const maxChairs = preset?.maxSeatCount ?? 16;
+        const seatCount = selectedTable.seats?.length || 0;
+
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div>
+              {iLabel("Table Preset")}
+              <select value={presetId} onChange={e => changeTablePreset(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontSize: 12, background: C.surfaceInput, color: C.textPrimary, outline: "none" }}>
+                {TABLE_PRESETS.map(p => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               {iLabel("Table Label")}
               {iInput({ value: selectedTable.label || selectedTable.id, onChange: e => updateTable("label", e.target.value) })}
+            </div>
 
-              {iLabel(`Seats · ${selectedTable.seats?.length || 0}`)}
-              <div style={{ display: "flex", gap: 5, marginTop: 4 }}>
-                <AddSeatBtn tableId={selectedTable.id} />
-                <RemoveLastBtn />
+            <div>
+              {iLabel("Shape")}
+              <select value={selectedTable.shape || "rect"} onChange={e => updateTable("shape", e.target.value)} style={{ width: "100%", padding: "8px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontSize: 12, background: C.surfaceInput, color: C.textPrimary, outline: "none" }}>
+                <option value="rect">Rectangle</option>
+                <option value="square">Square</option>
+                <option value="round">Round Banquet</option>
+                <option value="oval">Oval Classic</option>
+                <option value="banquet">Long Banquet</option>
+              </select>
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Width (cm)</span>
+                {iInput({ type: "number", value: Math.round(selectedTable.width || 110), onChange: e => updateTable("width", Number(e.target.value)) })}
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Height (cm)</span>
+                {iInput({ type: "number", value: Math.round(selectedTable.height || 70), onChange: e => updateTable("height", Number(e.target.value)) })}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Position X</span>
+                {iInput({ type: "number", value: Math.round(selectedTable.x || 0), onChange: e => updateTable("x", Number(e.target.value)) })}
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Position Y</span>
+                {iInput({ type: "number", value: Math.round(selectedTable.y || 0), onChange: e => updateTable("y", Number(e.target.value)) })}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Rotation (°)</span>
+                {iInput({ type: "number", min: 0, max: 360, value: selectedTable.editor?.rotation || 0, onChange: e => updateTable("editor", { ...(selectedTable.editor || {}), rotation: Number(e.target.value) }) })}
+              </div>
+              <button onClick={() => updateTable("editor", { ...(selectedTable.editor || {}), locked: !selectedTable.editor?.locked })} style={{ marginTop: 14, flex: 1, padding: "8px 0", background: selectedTable.editor?.locked ? `${C.gold}15` : "transparent", border: `1px solid ${selectedTable.editor?.locked ? C.gold : C.borderDefault}`, color: selectedTable.editor?.locked ? C.gold : C.textSecondary, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                {selectedTable.editor?.locked ? <Lock size={11} /> : <Unlock size={11} />}
+                {selectedTable.editor?.locked ? "Locked" : "Lock Pos."}
+              </button>
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Min Capacity</span>
+                {iInput({ type: "number", value: selectedTable.editor?.min_capacity ?? 0, onChange: e => updateTable("editor", { ...(selectedTable.editor || {}), min_capacity: Number(e.target.value) }) })}
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Max Capacity</span>
+                {iInput({ type: "number", value: selectedTable.editor?.max_capacity ?? seatCount, onChange: e => updateTable("editor", { ...(selectedTable.editor || {}), max_capacity: Number(e.target.value) }) })}
+              </div>
+            </div>
+
+            <div>
+              <span style={{ fontSize: 8, color: C.textTertiary }}>Notes / Internal Label</span>
+              <textarea 
+                value={selectedTable.editor?.notes || ""} 
+                onChange={e => updateTable("editor", { ...(selectedTable.editor || {}), notes: e.target.value })} 
+                placeholder="Internal notes or category tags..."
+                style={{ 
+                  width: "100%", 
+                  height: "50px", 
+                  padding: "8px 10px", 
+                  border: `1px solid ${C.borderDefault}`, 
+                  borderRadius: 6, 
+                  fontFamily: F, 
+                  fontSize: 11, 
+                  color: C.textPrimary, 
+                  background: C.surfaceInput, 
+                  boxSizing: "border-box", 
+                  outline: "none", 
+                  resize: "none",
+                  transition: "border-color 0.15s, box-shadow 0.15s" 
+                }}
+                onFocus={e => { e.target.style.borderColor = C.borderAccent; e.target.style.boxShadow = C.inputFocus; }}
+                onBlur={e => { e.target.style.borderColor = C.borderDefault; e.target.style.boxShadow = "none"; }}
+              />
+            </div>
+
+            <div>
+              {iLabel("Chair Configuration")}
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input type="range" min={minChairs} max={maxChairs} value={seatCount} onChange={e => handleSeatCountChange(selectedTable.id, Number(e.target.value))} style={{ flex: 1, accentColor: C.gold }} />
+                <input type="number" min={minChairs} max={maxChairs} value={seatCount} onChange={e => handleSeatCountChange(selectedTable.id, Math.min(maxChairs, Math.max(minChairs, Number(e.target.value))))} style={{ width: 44, padding: "4px", border: `1px solid ${C.borderDefault}`, borderRadius: 4, textAlign: "center", fontFamily: F, fontSize: 11 }} />
+              </div>
+              
+              <div style={{ marginTop: 8 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Chair Spacing (cm)</span>
+                <input type="range" min="4" max="16" value={selectedTable.editor?.seat_spacing_cm || 8} onChange={e => updateTable("editor", { ...(selectedTable.editor || {}), seat_spacing_cm: Number(e.target.value) })} style={{ width: "100%", accentColor: C.gold }} />
               </div>
 
-              <div style={{ marginTop: 8, padding: "7px 10px", background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 5, fontSize: 10, color: C.textSecondary }}>
-                Drag table to move · double-click to rename
+              <div style={{ marginTop: 8 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Chair Visual Style</span>
+                <select value={selectedTable.editor?.chair_style || "standard-dining"} onChange={e => updateTable("editor", { ...(selectedTable.editor || {}), chair_style: e.target.value })} style={{ width: "100%", padding: "7px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontSize: 11, background: C.surfaceInput, color: C.textPrimary, outline: "none" }}>
+                  {CHAIR_STYLES.map(c => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </select>
               </div>
-            </>
-          )}
-          <DeleteBtn label="Delete Table" deleteKey="table" />
-        </>
-      )}
+            </div>
+
+            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+              <button onClick={() => duplicateTable(selectedTable)} style={{ flex: 1, padding: "8px 0", background: "transparent", color: C.gold, border: `1px solid ${C.borderAccent}`, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
+                onMouseEnter={e => e.currentTarget.style.background = C.goldFaint}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <Copy size={11} />
+                Duplicate Table
+              </button>
+            </div>
+            <DeleteBtn label="Delete Table" deleteKey="table" />
+          </div>
+        );
+      })()}
 
       {/* ── Individual seat selected ── */}
       {selected?.type === "seat" && selectedSeatObj && (
-        <>
-          {iLabel("Seat Label")}
-          {iInput({
-            value: selectedSeatObj.label || selectedSeatObj.num,
-            onChange: e => handleSeatLabelEdit(e.target.value),
-          })}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div>
+            {iLabel("Seat Label")}
+            {iInput({
+              value: selectedSeatObj.label || selectedSeatObj.num,
+              onChange: e => handleSeatLabelEdit(e.target.value),
+            })}
+          </div>
 
-          {iLabel("Seat Number")}
-          {iInput({
-            type: "number",
-            value: selectedSeatObj.num,
-            onChange: e => setTables(p => p.map(t =>
-              t.id !== selected.tableId ? t : {
+          <div>
+            {iLabel("Seat Number")}
+            {iInput({
+              type: "number",
+              value: selectedSeatObj.num,
+              onChange: e => setTables(p => p.map(t =>
+                t.id !== selected.tableId ? t : {
+                  ...t,
+                  seats: (t.seats || []).map(s =>
+                    s.id === selected.seatId ? { ...s, num: Number(e.target.value) } : s
+                  ),
+                }
+              )),
+            })}
+          </div>
+
+          <div>
+            {iLabel("Parent Table")}
+            <div style={{ fontSize: 11, fontWeight: 600, color: C.textSecondary, fontFamily: F }}>{tables.find(t => t.id === selected.tableId)?.label}</div>
+          </div>
+
+          <div>
+            {iLabel("Chair Style Override")}
+            <select value={selectedSeatObj.editor?.chair_style_override || ""} onChange={e => {
+              pushHistory();
+              setTables(p => p.map(t => t.id !== selected.tableId ? t : {
                 ...t,
-                seats: (t.seats || []).map(s =>
-                  s.id === selected.seatId ? { ...s, num: Number(e.target.value) } : s
-                ),
-              }
-            )),
-          })}
+                seats: t.seats.map(s => s.id === selected.seatId ? { ...s, editor: { ...(s.editor || {}), chair_style_override: e.target.value || null } } : s)
+              }));
+            }} style={{ width: "100%", padding: "7px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontSize: 11, background: C.surfaceInput, color: C.textPrimary, outline: "none" }}>
+              <option value="">Use parent table style</option>
+              {CHAIR_STYLES.map(c => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          </div>
 
-          {iLabel("Status")}
-          <StatusRow current={selectedSeatObj.status} onSet={handleSeatStatus} />
-
-          <DeleteBtn label="Delete This Seat" deleteKey="seat" />
-
-          {/* ── Parent table seat management ── */}
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.divider}` }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.16em", color: C.textTertiary, textTransform: "uppercase" }}>
-                Parent Table
-              </div>
-              {/* Live seat count badge */}
-              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 7px", background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 10 }}>
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.5" strokeLinecap="round">
-                  <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-                </svg>
-                <span style={{ fontSize: 9, fontWeight: 700, color: C.gold, fontFamily: F }}>
-                  {tables.find(t => t.id === selected.tableId)?.seats?.length || 0} seats
-                </span>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 5 }}>
-              <AddSeatBtn tableId={selected.tableId} />
-              <RemoveLastBtn />
-            </div>
-
-            <div style={{ marginTop: 8, padding: "6px 9px", background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 5, fontSize: 10, color: C.textSecondary }}>
-              Adds / removes seats on the parent table
+          <div>
+            {iLabel("Reservation Status (Read-Only)")}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: `${STATUS_COLORS[selectedSeatObj.status || "available"]}15`, border: `1.5px solid ${STATUS_COLORS[selectedSeatObj.status || "available"]}`, width: "100%" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: STATUS_COLORS[selectedSeatObj.status || "available"] }} />
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: STATUS_COLORS[selectedSeatObj.status || "available"], textTransform: "uppercase" }}>
+                {STATUS_LABELS[selectedSeatObj.status || "available"]}
+              </span>
             </div>
           </div>
 
-          <div style={{ marginTop: 10, borderTop: `1px solid ${C.divider}` }} />
-          <DeleteBtn label="Delete Entire Table" deleteKey="table" />
-        </>
+          <DeleteBtn label="Delete This Seat" deleteKey="seat" />
+        </div>
       )}
 
       {/* ── Standalone seat selected ── */}
-      {selected?.type === "standaloneSeat" && (
-        <>
-          {iLabel("Standalone Seat")}
-          {selectedStandaloneSeatObj && (
-            <>
-              {iLabel("Status")}
-              <StatusRow
-                current={selectedStandaloneSeatObj.status}
-                onSet={status => handleStandaloneSeatStatus?.(selected.standaloneSeatId, status)}
-              />
-            </>
-          )}
-          <div style={{ marginTop: 8, padding: "7px 10px", background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 5, fontSize: 10, color: C.textSecondary }}>
-            Drag to reposition this seat on the canvas.
+      {selected?.type === "standaloneSeat" && selectedStandaloneSeatObj && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div>
+            {iLabel("Seat Label")}
+            {iInput({
+              value: selectedStandaloneSeatObj.label || "",
+              onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, label: e.target.value } : s))
+            })}
+          </div>
+
+          <div>
+            {iLabel("Seat Number")}
+            {iInput({
+              type: "number",
+              value: selectedStandaloneSeatObj.num,
+              onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, num: Number(e.target.value) } : s))
+            })}
+          </div>
+
+          <div>
+            {iLabel("Chair Style")}
+            <select value={selectedStandaloneSeatObj.editor?.chair_style || "standard-standalone"} onChange={e => {
+              pushHistory();
+              setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? {
+                ...s,
+                editor: { ...(s.editor || {}), chair_style: e.target.value }
+              } : s));
+            }} style={{ width: "100%", padding: "7px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontSize: 11, background: C.surfaceInput, color: C.textPrimary, outline: "none" }}>
+              {STANDALONE_CHAIR_PRESETS.map(c => (
+                <option key={c.id} value={c.chair_style}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 8, color: C.textTertiary }}>Width (cm)</span>
+              {iInput({ type: "number", value: Math.round(selectedStandaloneSeatObj.editor?.width || 38), onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), width: Number(e.target.value) } } : s)) })}
+            </div>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 8, color: C.textTertiary }}>Height (cm)</span>
+              {iInput({ type: "number", value: Math.round(selectedStandaloneSeatObj.editor?.height || 38), onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), height: Number(e.target.value) } } : s)) })}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 8, color: C.textTertiary }}>Position X</span>
+              {iInput({ type: "number", value: Math.round(selectedStandaloneSeatObj.x || 0), onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, x: Number(e.target.value) } : s)) })}
+            </div>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 8, color: C.textTertiary }}>Position Y</span>
+              {iInput({ type: "number", value: Math.round(selectedStandaloneSeatObj.y || 0), onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, y: Number(e.target.value) } : s)) })}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 8, color: C.textTertiary }}>Rotation (°)</span>
+              {iInput({ type: "number", min: 0, max: 360, value: selectedStandaloneSeatObj.editor?.rotation || 0, onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), rotation: Number(e.target.value) } } : s)) })}
+            </div>
+            <button onClick={() => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), locked: !s.editor?.locked } } : s))} style={{ marginTop: 14, flex: 1, padding: "8px 0", background: selectedStandaloneSeatObj.editor?.locked ? `${C.gold}15` : "transparent", border: `1px solid ${selectedStandaloneSeatObj.editor?.locked ? C.gold : C.borderDefault}`, color: selectedStandaloneSeatObj.editor?.locked ? C.gold : C.textSecondary, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+              {selectedStandaloneSeatObj.editor?.locked ? <Lock size={11} /> : <Unlock size={11} />}
+              {selectedStandaloneSeatObj.editor?.locked ? "Locked" : "Lock Position"}
+            </button>
+          </div>
+
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: C.textSecondary }}>Reservable Seating</span>
+              <input type="checkbox" checked={selectedStandaloneSeatObj.editor?.reservable !== false} onChange={e => {
+                pushHistory();
+                setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), reservable: e.target.checked } } : s));
+              }} style={{ accentColor: C.gold }} />
+            </div>
+          </div>
+
+          <div>
+            {iLabel("Reservation Status (Read-Only)")}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: `${STATUS_COLORS[selectedStandaloneSeatObj.status || "available"]}15`, border: `1.5px solid ${STATUS_COLORS[selectedStandaloneSeatObj.status || "available"]}`, width: "100%" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: STATUS_COLORS[selectedStandaloneSeatObj.status || "available"] }} />
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: STATUS_COLORS[selectedStandaloneSeatObj.status || "available"], textTransform: "uppercase" }}>
+                {STATUS_LABELS[selectedStandaloneSeatObj.status || "available"]}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <button onClick={() => duplicateStandaloneSeat(selectedStandaloneSeatObj)} style={{ flex: 1, padding: "8px 0", background: "transparent", color: C.gold, border: `1px solid ${C.borderAccent}`, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
+              onMouseEnter={e => e.currentTarget.style.background = C.goldFaint}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              <Copy size={11} />
+              Duplicate Seat
+            </button>
           </div>
           <DeleteBtn label="Delete Seat" deleteKey="standaloneSeat" />
-        </>
+        </div>
+      )}
+
+      {/* ── Fixture selected ── */}
+      {selected?.type === "fixture" && selectedFixtureObj && (() => {
+        const ALL_FIXTURES_LIST = [
+          ...FIXTURE_PRESETS,
+          ...DISPLAY_PRESETS,
+          ...AIRFLOW_PRESETS,
+          ...ENTRANCE_PRESETS,
+          ...WALL_PRESETS
+        ];
+        const selectedPreset = ALL_FIXTURES_LIST.find(p => p.fixture_type === selectedFixtureObj.fixture_type) || ALL_FIXTURES_LIST.find(p => p.fixture_type === "custom-object") || ALL_FIXTURES_LIST[0];
+
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div>
+              {iLabel("Fixture Library Template")}
+              <select value={selectedPreset.id} onChange={e => changeFixturePreset(e.target.value)} style={{ width: "100%", padding: "8px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontSize: 12, background: C.surfaceInput, color: C.textPrimary, outline: "none" }}>
+                {ALL_FIXTURES_LIST.map(p => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              {iLabel("Fixture Label")}
+              {iInput({
+                value: selectedFixtureObj.label || "",
+                onChange: e => updateFixture("label", e.target.value)
+              })}
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Width (cm)</span>
+                {iInput({ type: "number", value: Math.round(selectedFixtureObj.width || 80), onChange: e => updateFixture("width", Number(e.target.value)) })}
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Height (cm)</span>
+                {iInput({ type: "number", value: Math.round(selectedFixtureObj.height || 60), onChange: e => updateFixture("height", Number(e.target.value)) })}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Position X</span>
+                {iInput({ type: "number", value: Math.round(selectedFixtureObj.x || 0), onChange: e => updateFixture("x", Number(e.target.value)) })}
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Position Y</span>
+                {iInput({ type: "number", value: Math.round(selectedFixtureObj.y || 0), onChange: e => updateFixture("y", Number(e.target.value)) })}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 8, color: C.textTertiary }}>Rotation (°)</span>
+                {iInput({ type: "number", min: 0, max: 360, value: selectedFixtureObj.editor?.rotation || 0, onChange: e => updateFixture("editor", { ...(selectedFixtureObj.editor || {}), rotation: Number(e.target.value) }) })}
+              </div>
+              <button onClick={() => updateFixture("editor", { ...(selectedFixtureObj.editor || {}), locked: !selectedFixtureObj.editor?.locked })} style={{ marginTop: 14, flex: 1, padding: "8px 0", background: selectedFixtureObj.editor?.locked ? `${C.gold}15` : "transparent", border: `1px solid ${selectedFixtureObj.editor?.locked ? C.gold : C.borderDefault}`, color: selectedFixtureObj.editor?.locked ? C.gold : C.textSecondary, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                {selectedFixtureObj.editor?.locked ? <Lock size={11} /> : <Unlock size={11} />}
+                {selectedFixtureObj.editor?.locked ? "Locked" : "Lock Position"}
+              </button>
+            </div>
+
+            {/* Wall Specific thickness and curved wall bend radius controls */}
+            {["straight-wall", "curved-wall", "partition-wall", "glass-divider", "movable-divider", "half-wall", "room-boundary-segment"].includes(selectedFixtureObj.fixture_type) && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div>
+                  <span style={{ fontSize: 8, color: C.textTertiary }}>Wall Thickness: {selectedFixtureObj.editor?.thickness || 8} cm</span>
+                  <input type="range" min="2" max="40" value={selectedFixtureObj.editor?.thickness || 8} onChange={e => updateFixture("editor", { thickness: Number(e.target.value) })} style={{ width: "100%", accentColor: C.gold, cursor: "pointer" }} />
+                </div>
+                
+                {selectedFixtureObj.fixture_type === "curved-wall" && (
+                  <div>
+                    <span style={{ fontSize: 8, color: C.textTertiary }}>Curvature Strength: {selectedFixtureObj.editor?.curve_strength || 50} cm</span>
+                    <input type="range" min="-150" max="150" value={selectedFixtureObj.editor?.curve_strength || 50} onChange={e => updateFixture("editor", { curve_strength: Number(e.target.value) })} style={{ width: "100%", accentColor: C.gold, cursor: "pointer" }} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Displays Specific mounting style selectors */}
+            {["projection-screen", "small-tv", "medium-tv", "large-tv", "extra-large-tv", "led-wall"].includes(selectedFixtureObj.fixture_type) && (
+              <div>
+                {iLabel("Mounting Style")}
+                <select value={selectedFixtureObj.editor?.mounting_style || "wall-mounted"} onChange={e => updateFixture("editor", { mounting_style: e.target.value })} style={{ width: "100%", padding: "7px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontSize: 11, background: C.surfaceInput, color: C.textPrimary, outline: "none" }}>
+                  <option value="wall-mounted">Wall Mounted</option>
+                  <option value="stand-mounted">Stand Mounted</option>
+                  <option value="ceiling-mounted">Ceiling Mounted</option>
+                </select>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+              <button onClick={() => duplicateFixture(selectedFixtureObj)} style={{ flex: 1, padding: "8px 0", background: "transparent", color: C.gold, border: `1px solid ${C.borderAccent}`, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
+                onMouseEnter={e => e.currentTarget.style.background = C.goldFaint}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <Copy size={11} />
+                Duplicate Object
+              </button>
+            </div>
+            <DeleteBtn label="Delete Fixture" deleteKey="fixture" />
+          </div>
+        );
+      })()}
+
+      {/* ── Label selected ── */}
+      {selected?.type === "label" && selectedLabelObj && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div>
+            {iLabel("Label Text")}
+            {iInput({
+              value: selectedLabelObj.label || "",
+              onChange: e => updateLabel("label", e.target.value)
+            })}
+          </div>
+
+          <div>
+            {iLabel("Marker Type")}
+            <select value={selectedLabelObj.type || "other"} onChange={e => updateLabel("type", e.target.value)} style={{ width: "100%", padding: "8px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontSize: 12, background: C.surfaceInput, color: C.textPrimary, outline: "none" }}>
+              <option value="screen">Screen Block</option>
+              <option value="other">Area / Boundary Label</option>
+            </select>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 8, color: C.textTertiary }}>Position X</span>
+              {iInput({ type: "number", value: Math.round(selectedLabelObj.x || 0), onChange: e => updateLabel("x", Number(e.target.value)) })}
+            </div>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 8, color: C.textTertiary }}>Position Y</span>
+              {iInput({ type: "number", value: Math.round(selectedLabelObj.y || 0), onChange: e => updateLabel("y", Number(e.target.value)) })}
+            </div>
+          </div>
+
+          <DeleteBtn label="Delete Label" deleteKey="label" />
+        </div>
       )}
     </div>
   );
@@ -1092,13 +3042,87 @@ export default function SeatMap({
     return DEFAULT_LABELS;
   });
   const [standaloneSeats, setStandaloneSeats] = useState([]);
+  const [fixtures, setFixtures]               = useState([]);
   const [selected, setSelected]         = useState(null);
   const [selectedStandaloneSeats, setSelectedStandaloneSeats] = useState(new Set());
+  const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
   const [saved, setSaved]               = useState(false);
   const [tool, setTool]                 = useState("select");
   const [activeDragId, setActiveDragId] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showVenueManager, setShowVenueManager] = useState(false);
+
+  // ── Panning & Zooming & Blueprint Guides ────────────────────────────────────
+  const [pan, setPan]                   = useState({ x: 0, y: 0 });
+  const [zoom, setZoom]                 = useState(1);
+  const [snapToGrid, setSnapToGrid]     = useState(true);
+  const [gridSize, setGridSize]         = useState(25);
+  const [roomWidth, setRoomWidth]       = useState(1200);
+  const [roomHeight, setRoomHeight]     = useState(800);
+  const [alignGuides, setAlignGuides]   = useState(null);
+  const [isPanning, setIsPanning]       = useState(false);
+  const [spacePressed, setSpacePressed] = useState(false);
+  const [showGrid, setShowGrid]                     = useState(true);
+  const [gridVisibility, setGridVisibility]         = useState(30);
+  const [smartGuidesEnabled, setSmartGuidesEnabled] = useState(true);
+  const [showRulers, setShowRulers]                 = useState(true);
+
+  // ── History States for Undo / Redo ──────────────────────────────────────────
+  const [history, setHistory]           = useState({ past: [], future: [] });
+
+  const pushHistory = useCallback((currentTables = tables, currentSeats = standaloneSeats, currentLabels = labels, currentFixtures = fixtures) => {
+    setHistory(prev => ({
+      past: [...prev.past, { 
+        tables: JSON.parse(JSON.stringify(currentTables)), 
+        standaloneSeats: JSON.parse(JSON.stringify(currentSeats)), 
+        labels: JSON.parse(JSON.stringify(currentLabels)),
+        fixtures: JSON.parse(JSON.stringify(currentFixtures))
+      }].slice(-50),
+      future: []
+    }));
+  }, [tables, standaloneSeats, labels, fixtures]);
+
+  const undo = useCallback(() => {
+    setHistory(prev => {
+      if (prev.past.length === 0) return prev;
+      const previous = prev.past[prev.past.length - 1];
+      const newPast = prev.past.slice(0, -1);
+      const newFuture = [{
+        tables: JSON.parse(JSON.stringify(tables)),
+        standaloneSeats: JSON.parse(JSON.stringify(standaloneSeats)),
+        labels: JSON.parse(JSON.stringify(labels)),
+        fixtures: JSON.parse(JSON.stringify(fixtures))
+      }, ...prev.future];
+
+      setTables(previous.tables);
+      setStandaloneSeats(previous.standaloneSeats);
+      setLabels(previous.labels);
+      setFixtures(previous.fixtures || []);
+      setSelected(null);
+      return { past: newPast, future: newFuture };
+    });
+  }, [tables, standaloneSeats, labels, fixtures]);
+
+  const redo = useCallback(() => {
+    setHistory(prev => {
+      if (prev.future.length === 0) return prev;
+      const next = prev.future[0];
+      const newFuture = prev.future.slice(1);
+      const newPast = [...prev.past, {
+        tables: JSON.parse(JSON.stringify(tables)),
+        standaloneSeats: JSON.parse(JSON.stringify(standaloneSeats)),
+        labels: JSON.parse(JSON.stringify(labels)),
+        fixtures: JSON.parse(JSON.stringify(fixtures))
+      }];
+
+      setTables(next.tables);
+      setStandaloneSeats(next.standaloneSeats);
+      setLabels(next.labels);
+      setFixtures(next.fixtures || []);
+      setSelected(null);
+      return { past: newPast, future: newFuture };
+    });
+  }, [tables, standaloneSeats, labels, fixtures]);
 
   const [venueStructure, setVenueStructure] = useState(() => loadVenueStructure());
   const currentAdmin = useMemo(() => authAPI.getCurrentUser(), []);
@@ -1114,6 +3138,8 @@ export default function SeatMap({
   const loadedRef     = useRef(false);
   const dragging      = useRef(null);
   const canvasRef     = useRef(null);
+  const canvasViewportRef = useRef(null);
+  const panStart      = useRef({ x: 0, y: 0 });
   const adminScaleRef = useRef(1);
   const T = getClientTokens(isDark);
 
@@ -1124,6 +3150,29 @@ export default function SeatMap({
     window.addEventListener("venue:structure:changed", handler);
     return () => window.removeEventListener("venue:structure:changed", handler);
   }, []);
+
+  useEffect(() => {
+    if (!canvasViewportRef.current) return;
+    const updateSize = () => {
+      if (canvasViewportRef.current) {
+        setViewportSize({
+          width: canvasViewportRef.current.clientWidth,
+          height: canvasViewportRef.current.clientHeight
+        });
+      }
+    };
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    let observer;
+    if (window.ResizeObserver && canvasViewportRef.current) {
+      observer = new ResizeObserver(updateSize);
+      observer.observe(canvasViewportRef.current);
+    }
+    return () => {
+      window.removeEventListener("resize", updateSize);
+      if (observer) observer.disconnect();
+    };
+  }, [canvasViewportRef.current]);
 
   useEffect(() => {
     let mounted = true;
@@ -1247,9 +3296,44 @@ export default function SeatMap({
         const n = parseInt(s.id?.replace(/\D/g, "")) || 0;
         if (n >= _standaloneCounter) _standaloneCounter = n + 1;
       });
+      const fixs = (stored.fixtures || []).map(f => ({ ...f, type: "fixture" }));
+      setFixtures(fixs);
+      fixs.forEach(f => {
+        const n = parseInt(f.id?.replace(/\D/g, "")) || 0;
+        if (n >= _fixtureCounter) _fixtureCounter = n + 1;
+      });
+
+      // Load Editor Configurations
+      if (stored.editor) {
+        if (stored.editor.room_width_cm) setRoomWidth(stored.editor.room_width_cm);
+        if (stored.editor.room_height_cm) setRoomHeight(stored.editor.room_height_cm);
+        if (stored.editor.grid_cm) setGridSize(stored.editor.grid_cm);
+        if (stored.editor.snap_enabled !== undefined) setSnapToGrid(stored.editor.snap_enabled);
+        if (stored.editor.zoom) setZoom(stored.editor.zoom);
+        if (stored.editor.pan) setPan(stored.editor.pan);
+        if (stored.editor.show_grid !== undefined) setShowGrid(stored.editor.show_grid);
+        if (stored.editor.grid_visibility !== undefined) setGridVisibility(stored.editor.grid_visibility);
+        if (stored.editor.smart_guides_enabled !== undefined) setSmartGuidesEnabled(stored.editor.smart_guides_enabled);
+        if (stored.editor.show_rulers !== undefined) setShowRulers(stored.editor.show_rulers);
+      } else {
+        setRoomWidth(1200);
+        setRoomHeight(800);
+        setGridSize(25);
+        setSnapToGrid(true);
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+        setShowGrid(true);
+        setGridVisibility(30);
+        setSmartGuidesEnabled(true);
+        setShowRulers(true);
+      }
     } else {
-      setTables([]); setLabels(DEFAULT_LABELS); setStandaloneSeats([]);
+      setTables([]); setLabels(DEFAULT_LABELS); setStandaloneSeats([]); setFixtures([]);
+      setRoomWidth(1200); setRoomHeight(800); setGridSize(25); setSnapToGrid(true);
+      setZoom(1); setPan({ x: 0, y: 0 });
+      setShowGrid(true); setGridVisibility(30); setSmartGuidesEnabled(true); setShowRulers(true);
     }
+    setHistory({ past: [], future: [] });
     setSelected(null);
     const t = setTimeout(() => { loadedRef.current = true; }, 100);
     return () => clearTimeout(t);
@@ -1260,11 +3344,28 @@ export default function SeatMap({
     if (!editMode) return;
     if (!activeWing || !activeRoom) return;
     if (!loadedRef.current) return;
-    const completeData = { tables, labels, standaloneSeats };
+    const completeData = { 
+      tables, 
+      labels, 
+      standaloneSeats,
+      fixtures,
+      editor: {
+        room_width_cm: roomWidth,
+        room_height_cm: roomHeight,
+        grid_cm: gridSize,
+        snap_enabled: snapToGrid,
+        zoom,
+        pan,
+        show_grid: showGrid,
+        grid_visibility: gridVisibility,
+        smart_guides_enabled: smartGuidesEnabled,
+        show_rulers: showRulers
+      }
+    };
     saveLayout(activeWing, activeRoom, completeData);
     const actualWing = getActualWingForRoom(activeRoom);
     dispatchSeatMapUpdate(actualWing, activeRoom, completeData);
-  }, [tables, labels, standaloneSeats, editMode, activeWing, activeRoom]);
+  }, [tables, labels, standaloneSeats, fixtures, editMode, activeWing, activeRoom, roomWidth, roomHeight, gridSize, snapToGrid, zoom, pan, showGrid, gridVisibility, smartGuidesEnabled, showRulers]);
 
   // ── Client: sync from prop ───────────────────────────────────────────────────
   useEffect(() => {
@@ -1274,10 +3375,12 @@ export default function SeatMap({
       setTables(normalize(tableData.tables || []).filter(t => t.seats?.length > 0));
       setLabels(tableData.labels?.length ? tableData.labels : DEFAULT_LABELS);
       setStandaloneSeats(tableData.standaloneSeats || []);
+      setFixtures(tableData.fixtures || []);
     } else if (tableData.tables) {
       setTables(normalize(tableData.tables).filter(t => t.seats?.length > 0));
       setLabels(tableData.labels?.length ? tableData.labels : DEFAULT_LABELS);
       setStandaloneSeats(tableData.standaloneSeats || []);
+      setFixtures(tableData.fixtures || []);
     } else if (Array.isArray(tableData)) {
       setTables(normalize(tableData).filter(t => t.seats?.length > 0));
       setLabels(DEFAULT_LABELS); setStandaloneSeats([]);
@@ -1287,7 +3390,87 @@ export default function SeatMap({
   const selectedTable             = selected?.type === "table"          ? tables.find(t => t.id === selected.tableId) : null;
   const selectedSeatObj           = selected?.type === "seat"           ? tables.find(t => t.id === selected.tableId)?.seats.find(s => s.id === selected.seatId) : null;
   const selectedStandaloneSeatObj = selected?.type === "standaloneSeat" ? standaloneSeats.find(s => s.id === selected.standaloneSeatId) : null;
+  const selectedLabelObj           = selected?.type === "label"          ? labels.find(l => l.id === selected.labelId) : null;
+  const selectedFixtureObj         = selected?.type === "fixture"        ? fixtures.find(f => f.id === selected.fixtureId) : null;
 
+  const quickInspectorPosition = useMemo(() => {
+    if (selected?.type !== "table" || !selectedTable || !canvasViewportRef.current) {
+      return null;
+    }
+    const { width: viewportWidth, height: viewportHeight } = viewportSize;
+    const tx = selectedTable.x;
+    const ty = selectedTable.y;
+    const tw = selectedTable.width || 110;
+    const th = selectedTable.height || 70;
+    
+    const tableLeft = tx * zoom + pan.x;
+    const tableTop = ty * zoom + pan.y;
+    const tableWidthScaled = tw * zoom;
+    const tableHeightScaled = th * zoom;
+    const tableCenterX = tableLeft + tableWidthScaled / 2;
+    const tableCenterY = tableTop + tableHeightScaled / 2;
+    
+    const W = 280;
+    const H = 250; // Estimated height for compact inspector
+    const margin = 12;
+    
+    let left = 0;
+    let top = 0;
+    let placement = "right";
+    
+    // Priority 1: Right
+    const rightLeft = tableLeft + tableWidthScaled + margin;
+    const rightTop = tableCenterY - H / 2;
+    if (rightLeft + W <= viewportWidth && rightTop >= 0 && rightTop + H <= viewportHeight) {
+      left = rightLeft;
+      top = rightTop;
+      placement = "right";
+    }
+    // Priority 2: Left
+    else {
+      const leftLeft = tableLeft - W - margin;
+      const leftTop = tableCenterY - H / 2;
+      if (leftLeft >= 0 && leftTop >= 0 && leftTop + H <= viewportHeight) {
+        left = leftLeft;
+        top = leftTop;
+        placement = "left";
+      }
+      // Priority 3: Bottom
+      else {
+        const bottomLeft = tableCenterX - W / 2;
+        const bottomTop = tableTop + tableHeightScaled + margin;
+        if (bottomTop + H <= viewportHeight && bottomLeft >= 0 && bottomLeft + W <= viewportWidth) {
+          left = bottomLeft;
+          top = bottomTop;
+          placement = "bottom";
+        }
+        // Priority 4: Top
+        else {
+          const topLeft = tableCenterX - W / 2;
+          const topTop = tableTop - H - margin;
+          if (topTop >= 0 && topLeft >= 0 && topLeft + W <= viewportWidth) {
+            left = topLeft;
+            top = topTop;
+            placement = "top";
+          }
+          // Priority 5: Fallback & Dock to visible viewport corners
+          else {
+            left = rightLeft;
+            top = rightTop;
+            placement = "docked";
+          }
+        }
+      }
+    }
+    
+    // Clamp inside viewport margins
+    left = Math.max(16, Math.min(viewportWidth - W - 16, left));
+    top = Math.max(16, Math.min(viewportHeight - H - 16, top));
+    
+    return { left, top, placement };
+  }, [selected, selectedTable, zoom, pan, viewportSize]);
+
+  // ── Drag & Alignment Guide handlers ───────────────────────────────────────────────
   useEffect(() => {
     if (!editMode) return;
     const THRESHOLD = 4;
@@ -1296,69 +3479,374 @@ export default function SeatMap({
       const rawDx = e.clientX - d.startX, rawDy = e.clientY - d.startY;
       if (!d.active) {
         if (Math.abs(rawDx) < THRESHOLD && Math.abs(rawDy) < THRESHOLD) return;
-        d.active = true; setActiveDragId(d.id);
+        d.active = true; 
+        setActiveDragId(d.id);
+        pushHistory();
       }
-      const s = adminScaleRef.current || 1;
-      const dx = rawDx / s, dy = rawDy / s;
-      if      (d.type === "table")          setTables(p => p.map(t => t.id === d.id ? { ...t, x: Math.max(0, d.originX + dx), y: Math.max(0, d.originY + dy) } : t));
-      else if (d.type === "label")          setLabels(p => p.map(l => l.id === d.id ? { ...l, x: Math.max(0, d.originX + dx), y: Math.max(0, d.originY + dy) } : l));
-      else if (d.type === "standaloneSeat") setStandaloneSeats(p => p.map(ss => ss.id === d.id ? { ...ss, x: Math.max(0, d.originX + dx), y: Math.max(0, d.originY + dy) } : ss));
+      
+      let dx = rawDx / zoom;
+      let dy = rawDy / zoom;
+
+      let newX = d.originX + dx;
+      let newY = d.originY + dy;
+
+      if (snapToGrid) {
+        newX = Math.round(newX / gridSize) * gridSize;
+        newY = Math.round(newY / gridSize) * gridSize;
+      }
+
+      const w = d.type === "table" 
+        ? (tables.find(t => t.id === d.id)?.width || 110) 
+        : d.type === "fixture"
+          ? (fixtures.find(f => f.id === d.id)?.width || 80)
+          : d.type === "label"
+            ? 100
+            : 38;
+      const h = d.type === "table" 
+        ? (tables.find(t => t.id === d.id)?.height || 70) 
+        : d.type === "fixture"
+          ? (fixtures.find(f => f.id === d.id)?.height || 60)
+          : d.type === "label"
+            ? 30
+            : 38;
+      newX = Math.max(0, Math.min(roomWidth - w, newX));
+      newY = Math.max(0, Math.min(roomHeight - h, newY));
+
+      // Alignment Guides calculations
+      let alignX = null;
+      let alignY = null;
+      const ALIGN_THRESHOLD = 6;
+
+      const candidates = [
+        ...tables.filter(t => t.id !== d.id).map(t => ({ x: t.x, y: t.y, w: t.width || 110, h: t.height || 70 })),
+        ...standaloneSeats.filter(s => s.id !== d.id).map(s => ({ x: s.x, y: s.y, w: 38, h: 38 })),
+        ...fixtures.filter(f => f.id !== d.id).map(f => ({ x: f.x, y: f.y, w: f.width || 80, h: f.height || 60 }))
+      ];
+
+      for (const cand of candidates) {
+        const leftAlign = Math.abs(newX - cand.x);
+        const centerAlign = Math.abs((newX + w/2) - (cand.x + cand.w/2));
+        const rightAlign = Math.abs((newX + w) - (cand.x + cand.w));
+
+        if (leftAlign < ALIGN_THRESHOLD) { newX = cand.x; alignX = cand.x; }
+        else if (centerAlign < ALIGN_THRESHOLD) { newX = cand.x + cand.w/2 - w/2; alignX = cand.x + cand.w/2; }
+        else if (rightAlign < ALIGN_THRESHOLD) { newX = cand.x + cand.w - w; alignX = cand.x + cand.w; }
+
+        const topAlign = Math.abs(newY - cand.y);
+        const middleAlign = Math.abs((newY + h/2) - (cand.y + cand.h/2));
+        const bottomAlign = Math.abs((newY + h) - (cand.y + cand.h));
+
+        if (topAlign < ALIGN_THRESHOLD) { newY = cand.y; alignY = cand.y; }
+        else if (middleAlign < ALIGN_THRESHOLD) { newY = cand.y + cand.h/2 - h/2; alignY = cand.y + cand.h/2; }
+        else if (bottomAlign < ALIGN_THRESHOLD) { newY = cand.y + cand.h - h; alignY = cand.y + cand.h; }
+      }
+
+      setAlignGuides({ x: alignX, y: alignY });
+
+      if      (d.type === "table")          setTables(p => p.map(t => t.id === d.id ? { ...t, x: newX, y: newY } : t));
+      else if (d.type === "label")          setLabels(p => p.map(l => l.id === d.id ? { ...l, x: newX, y: newY } : l));
+      else if (d.type === "standaloneSeat") setStandaloneSeats(p => p.map(ss => ss.id === d.id ? { ...ss, x: newX, y: newY } : ss));
+      else if (d.type === "fixture")        setFixtures(p => p.map(f => f.id === d.id ? { ...f, x: newX, y: newY } : f));
     };
-    const onUp = () => { dragging.current = null; setActiveDragId(null); };
+    const onUp = () => { 
+      dragging.current = null; 
+      setActiveDragId(null); 
+      setAlignGuides(null); 
+    };
     window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp);
     return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-  }, [editMode, labels]);
+  }, [editMode, tables, standaloneSeats, labels, fixtures, zoom, snapToGrid, gridSize, roomWidth, roomHeight, pushHistory]);
 
+  // ── Keyboard Shortcuts (ESC, DEL, Undo/Redo/Duplicate) ────────────────────────
   useEffect(() => {
     const h = e => {
       if (e.key === "Escape") { setSelected(null); setTool("select"); }
       else if (e.key === "Delete" && editMode && selected) {
         if (selected.type === "table") {
           const tbl = tables.find(t => t.id === selected.tableId);
+          if (tbl?.editor?.locked) return;
           setDeleteConfirm({ key: "table", message: `Delete "${tbl?.label || tbl?.id}"? This will also remove all ${tbl?.seats?.length || 0} seats and cannot be undone.` });
         } else if (selected.type === "seat") {
           const seatObj = tables.find(t => t.id === selected.tableId)?.seats.find(s => s.id === selected.seatId);
           setDeleteConfirm({ key: "seat", message: `Delete seat "${seatObj?.label || seatObj?.num}"? This cannot be undone.` });
         } else if (selected.type === "standaloneSeat") {
+          const ss = standaloneSeats.find(s => s.id === selected.standaloneSeatId);
+          if (ss?.editor?.locked) return;
           setDeleteConfirm({ key: "standaloneSeat", message: "Delete this standalone seat? This cannot be undone." });
+        } else if (selected.type === "fixture") {
+          const fx = fixtures.find(f => f.id === selected.fixtureId);
+          if (fx?.editor?.locked) return;
+          setDeleteConfirm({ key: "fixture", message: `Delete architectural fixture "${fx?.label || fx?.id}"? This cannot be undone.` });
+        } else if (selected.type === "label") {
+          const lbl = labels.find(l => l.id === selected.labelId);
+          setDeleteConfirm({ key: "label", message: `Delete text label "${lbl?.label || lbl?.id}"? This cannot be undone.` });
         }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d" && editMode && selected) {
+        e.preventDefault();
+        if (selected.type === "table" && selectedTable) duplicateTable(selectedTable);
+        else if (selected.type === "standaloneSeat" && selectedStandaloneSeatObj) duplicateStandaloneSeat(selectedStandaloneSeatObj);
+        else if (selected.type === "fixture" && selectedFixtureObj) duplicateFixture(selectedFixtureObj);
       }
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [editMode, selected, tables]);
+  }, [editMode, selected, tables, standaloneSeats, fixtures, selectedTable, selectedStandaloneSeatObj, selectedFixtureObj, undo, redo]);
 
   const startTableDrag = useCallback((e, id) => {
-    e.preventDefault(); const t = tables.find(t => t.id === id);
+    e.preventDefault(); 
+    const t = tables.find(t => t.id === id);
+    if (t?.editor?.locked) return;
     dragging.current = { type: "table", id, startX: e.clientX, startY: e.clientY, originX: t?.x || 0, originY: t?.y || 0, active: false };
   }, [tables]);
+
   const startTableResize = useCallback((e) => { e.preventDefault(); }, []);
+  
   const startLabelDrag = useCallback((e, id) => {
     e.preventDefault(); const l = labels.find(l => l.id === id);
     dragging.current = { type: "label", id, startX: e.clientX, startY: e.clientY, originX: l?.x || 0, originY: l?.y || 0, active: false };
   }, [labels]);
+
   const startStandaloneSeatDrag = useCallback((e, id) => {
-    e.preventDefault(); const ss = standaloneSeats.find(s => s.id === id);
+    e.preventDefault(); 
+    const ss = standaloneSeats.find(s => s.id === id);
+    if (ss?.editor?.locked) return;
     dragging.current = { type: "standaloneSeat", id, startX: e.clientX, startY: e.clientY, originX: ss?.x || 0, originY: ss?.y || 0, active: false };
   }, [standaloneSeats]);
+
+  const startFixtureDrag = useCallback((e, id) => {
+    e.preventDefault(); 
+    const f = fixtures.find(f => f.id === id);
+    if (f?.editor?.locked) return;
+    dragging.current = { type: "fixture", id, startX: e.clientX, startY: e.clientY, originX: f?.x || 0, originY: f?.y || 0, active: false };
+  }, [fixtures]);
+
+  const addTablePreset = useCallback((preset) => {
+    pushHistory();
+    const cx = Math.max(40, (-pan.x + 200) / zoom);
+    const cy = Math.max(40, (-pan.y + 200) / zoom);
+    const t = makeTableFromPreset(preset, cx, cy);
+    setTables(p => [...p, t]);
+    setSelected({ type: "table", tableId: t.id });
+  }, [pan, zoom, pushHistory]);
+
+  const addFixturePreset = useCallback((preset) => {
+    pushHistory();
+    const cx = Math.max(40, (-pan.x + 200) / zoom);
+    const cy = Math.max(40, (-pan.y + 200) / zoom);
+    const f = makeFixtureFromPreset(preset, cx, cy);
+    setFixtures(p => [...p, f]);
+    setSelected({ type: "fixture", fixtureId: f.id });
+  }, [pan, zoom, pushHistory]);
+
+  const addLabelPreset = useCallback((preset) => {
+    pushHistory();
+    const id = `L-${Date.now()}`;
+    const cx = Math.max(40, (-pan.x + 200) / zoom);
+    const cy = Math.max(40, (-pan.y + 200) / zoom);
+    const l = {
+      id,
+      type: preset.type,
+      label: preset.defaultText,
+      x: cx,
+      y: cy
+    };
+    setLabels(p => [...p, l]);
+    setSelected({ type: "label", labelId: id });
+  }, [pan, zoom, pushHistory]);
+
+  const addStandaloneSeatPreset = useCallback((preset) => {
+    pushHistory();
+    const n = _standaloneCounter++;
+    const cx = Math.max(40, (-pan.x + 200) / zoom);
+    const cy = Math.max(40, (-pan.y + 200) / zoom);
+    const ss = {
+      id: `SS${n}`, num: n, label: `S${n}`, status: "available", x: cx, y: cy,
+      editor: { chair_style: preset.chair_style, rotation: 0, reservable: true, locked: false, width: preset.width, height: preset.height }
+    };
+    setStandaloneSeats(p => [...p, ss]);
+    setSelected({ type: "standaloneSeat", standaloneSeatId: ss.id });
+  }, [pan, zoom, pushHistory]);
+
+  const duplicateFixture = useCallback((fixture) => {
+    pushHistory();
+    const id = `FX${_fixtureCounter++}`;
+    const newFixture = {
+      ...fixture,
+      id,
+      label: `${fixture.label || fixture.id} (Copy)`,
+      x: Math.min(roomWidth - (fixture.width || 80), fixture.x + 30),
+      y: Math.min(roomHeight - (fixture.height || 60), fixture.y + 30),
+      editor: {
+        ...(fixture.editor || {}),
+        rotation: fixture.editor?.rotation || 0,
+        locked: false,
+      }
+    };
+    setFixtures(p => [...p, newFixture]);
+    setSelected({ type: "fixture", fixtureId: id });
+  }, [fixtures, roomWidth, roomHeight, pushHistory]);
+
+  const updateLabel = (k, v) => {
+    if (!selected?.labelId) return;
+    pushHistory();
+    setLabels(p => p.map(l => l.id === selected.labelId ? { ...l, [k]: v } : l));
+  };
+
+  const updateFixture = (k, v) => {
+    if (!selected?.fixtureId) return;
+    pushHistory();
+    setFixtures(p => p.map(f => {
+      if (f.id !== selected.fixtureId) return f;
+      if (k === "editor") {
+        return { ...f, editor: { ...(f.editor || {}), ...v } };
+      }
+      return { ...f, [k]: v };
+    }));
+  };
+
+  const deleteFixture = useCallback((id) => {
+    const fid = id || selected?.fixtureId;
+    if (!fid) return;
+    const fixtureToDelete = fixtures.find(f => f.id === fid);
+    if (fixtureToDelete?.editor?.locked) return;
+    
+    pushHistory();
+    setFixtures(p => p.filter(f => f.id !== fid));
+    if (!id || selected?.fixtureId === fid) setSelected(null);
+  }, [selected, fixtures, pushHistory]);
 
   const handleCanvasClick = e => {
     if (!editMode) return;
     const rect = canvasRef.current?.getBoundingClientRect();
-    const s = adminScaleRef.current || 1;
-    const cx = Math.max(0, (e.clientX - rect.left) / s), cy = Math.max(0, (e.clientY - rect.top) / s);
-    if      (tool === "addTable") { const t = makeTable(cx - 55, cy - 27); setTables(p => [...p, t]); setSelected({ type: "table", tableId: t.id }); setTool("select"); }
-    else if (tool === "addSeat")  { const ss = makeStandaloneSeat(cx - 19, cy - 19); setStandaloneSeats(p => [...p, ss]); setSelected({ type: "standaloneSeat", standaloneSeatId: ss.id }); setTool("select"); }
+    const cx = Math.max(0, (e.clientX - rect.left) / zoom), cy = Math.max(0, (e.clientY - rect.top) / zoom);
+    
+    if (tool === "addTable") { 
+      pushHistory();
+      const t = makeTable(cx - 55, cy - 27); 
+      setTables(p => [...p, t]); 
+      setSelected({ type: "table", tableId: t.id }); 
+      setTool("select"); 
+    }
+    else if (tool === "addSeat") { 
+      pushHistory();
+      const ss = makeStandaloneSeat(cx - 19, cy - 19); 
+      setStandaloneSeats(p => [...p, ss]); 
+      setSelected({ type: "standaloneSeat", standaloneSeatId: ss.id }); 
+      setTool("select"); 
+    }
+  };
+
+  const handleDragOver = e => {
+    if (!editMode) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDrop = e => {
+    if (!editMode) return;
+    e.preventDefault();
+    try {
+      const dataStr = e.dataTransfer.getData("application/react-preset");
+      if (!dataStr) return;
+      const { preset, presetType } = JSON.parse(dataStr);
+      if (!preset || !presetType) return;
+
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      // Convert page coordinates to canvas space (accounting for offset, zoom, pan)
+      let cx = (e.clientX - rect.left) / zoom;
+      let cy = (e.clientY - rect.top) / zoom;
+
+      // Center the dropped preset based on its dimensions
+      const w = preset.width || (presetType === "table" ? 110 : presetType === "fixture" ? 80 : 38);
+      const h = preset.height || (presetType === "table" ? 70 : presetType === "fixture" ? 60 : 38);
+      
+      cx = cx - w / 2;
+      cy = cy - h / 2;
+
+      // Bound within the room canvas boundary limits
+      cx = Math.max(0, Math.min(roomWidth - w, cx));
+      cy = Math.max(0, Math.min(roomHeight - h, cy));
+
+      // Snap to grid if grid alignment is enabled
+      if (snapToGrid) {
+        cx = Math.round(cx / gridSize) * gridSize;
+        cy = Math.round(cy / gridSize) * gridSize;
+      }
+
+      pushHistory();
+
+      if (presetType === "table") {
+        const t = makeTableFromPreset(preset, cx, cy);
+        setTables(p => [...p, t]);
+        setSelected({ type: "table", tableId: t.id });
+      } else if (presetType === "standaloneSeat") {
+        const n = _standaloneCounter++;
+        const ss = {
+          id: `SS${n}`,
+          num: n,
+          label: `S${n}`,
+          status: "available",
+          x: cx,
+          y: cy,
+          editor: {
+            chair_style: preset.chair_style,
+            rotation: 0,
+            reservable: true,
+            locked: false,
+            width: preset.width,
+            height: preset.height
+          }
+        };
+        setStandaloneSeats(p => [...p, ss]);
+        setSelected({ type: "standaloneSeat", standaloneSeatId: ss.id });
+      } else if (presetType === "fixture") {
+        const f = makeFixtureFromPreset(preset, cx, cy);
+        setFixtures(p => [...p, f]);
+        setSelected({ type: "fixture", fixtureId: f.id });
+      } else if (presetType === "label") {
+        const id = `L-${Date.now()}`;
+        const l = {
+          id,
+          type: preset.type,
+          label: preset.defaultText,
+          x: cx,
+          y: cy
+        };
+        setLabels(p => [...p, l]);
+        setSelected({ type: "label", labelId: id });
+      }
+    } catch (err) {
+      console.error("[SeatMap] Error in drop handler: ", err);
+    }
   };
 
   const handleRequestDelete = key => {
     if (key === "table") {
       const tbl = selectedTable || tables.find(t => t.id === selected?.tableId);
+      if (tbl?.editor?.locked) return;
       setDeleteConfirm({ key, message: `Delete "${tbl?.label || tbl?.id || "this table"}"? This will also remove all ${tbl?.seats?.length || 0} seats and cannot be undone.` });
     } else if (key === "seat") {
       setDeleteConfirm({ key, message: `Delete seat "${selectedSeatObj?.label || selectedSeatObj?.num}"? This cannot be undone.` });
     } else if (key === "standaloneSeat") {
+      const ss = standaloneSeats.find(s => s.id === selected?.standaloneSeatId);
+      if (ss?.editor?.locked) return;
       setDeleteConfirm({ key, message: "Delete this standalone seat? This cannot be undone." });
+    } else if (key === "fixture") {
+      const fx = selectedFixtureObj || fixtures.find(f => f.id === selected?.fixtureId);
+      if (fx?.editor?.locked) return;
+      setDeleteConfirm({ key, message: `Delete architectural fixture "${fx?.label || fx?.id || "this fixture"}"? This cannot be undone.` });
+    } else if (key === "label") {
+      const lbl = selectedLabelObj || labels.find(l => l.id === selected?.labelId);
+      setDeleteConfirm({ key, message: `Delete text label "${lbl?.label || lbl?.id || "this label"}"? This cannot be undone.` });
     }
   };
 
@@ -1369,12 +3857,24 @@ export default function SeatMap({
     else if (key === "seat") await deleteSeat();
     else if (key === "standaloneSeat") await deleteStandaloneSeat();
     else if (key === "bulkDeleteStandaloneSeats") await deleteBulkStandaloneSeats();
+    else if (key === "fixture") {
+      pushHistory();
+      setFixtures(p => p.filter(f => f.id !== selected?.fixtureId));
+      setSelected(null);
+    } else if (key === "label") {
+      pushHistory();
+      setLabels(p => p.filter(l => l.id !== selected?.labelId));
+      setSelected(null);
+    }
   };
 
   const deleteTable = async id => {
     const tid = id || selected?.tableId;
     if (!tid) return;
     const tableToDelete = tables.find(t => t.id === tid);
+    if (tableToDelete?.editor?.locked) return;
+    
+    pushHistory();
     if (tableToDelete) {
       try { await cleanupReservationsForDeletedTable(tableToDelete, activeWing, activeRoom, "admin"); } catch {}
     }
@@ -1386,6 +3886,9 @@ export default function SeatMap({
     const sid = id || selected?.standaloneSeatId;
     if (!sid) return;
     const seatToDelete = standaloneSeats.find(s => s.id === sid);
+    if (seatToDelete?.editor?.locked) return;
+    
+    pushHistory();
     if (seatToDelete) {
       try { await cleanupReservationsForDeletedStandaloneSeat(seatToDelete, activeWing, activeRoom, "admin"); } catch {}
     }
@@ -1395,7 +3898,9 @@ export default function SeatMap({
 
   const deleteBulkStandaloneSeats = async () => {
     if (selectedStandaloneSeats.size === 0) return;
-    const seatsToDelete = standaloneSeats.filter(s => selectedStandaloneSeats.has(s.id));
+    const seatsToDelete = standaloneSeats.filter(s => selectedStandaloneSeats.has(s.id) && !s.editor?.locked);
+    
+    pushHistory();
     for (const seat of seatsToDelete) {
       try { await cleanupReservationsForDeletedStandaloneSeat(seat, activeWing, activeRoom, "admin"); } catch {}
     }
@@ -1404,14 +3909,13 @@ export default function SeatMap({
     setSelected(null);
   };
 
-  // ── UPDATED: accepts optional tableId so it works from any inspector context ─
   const addSeat = useCallback((tableId) => {
     const tid = tableId || selected?.tableId;
     if (!tid) return;
+    pushHistory();
     setTables(p => p.map(t => {
       if (t.id !== tid) return t;
       const existingNums = (t.seats || []).map(s => s.num);
-      // Find the next available number to avoid collisions
       let num = (t.seats || []).length + 1;
       while (existingNums.includes(num)) num++;
       return {
@@ -1422,13 +3926,22 @@ export default function SeatMap({
         ],
       };
     }));
-  }, [selected]);
+  }, [selected, pushHistory]);
 
   const deleteSeat = async () => {
     if (!selected?.tableId) return;
     const table = tables.find(t => t.id === selected.tableId);
+    if (table?.editor?.locked) return;
+
     if (table?.seats?.length > 0) {
-      try { await cleanupReservationsForDeletedSeat(table.seats[table.seats.length - 1], table, activeWing, activeRoom, "admin"); } catch {}
+      const lastSeat = table.seats[table.seats.length - 1];
+      if (lastSeat.status !== "available") {
+        const confirm = window.confirm("Warning: The last seat has a pending or active booking. Are you sure you want to remove it?");
+        if (!confirm) return;
+      }
+      
+      pushHistory();
+      try { await cleanupReservationsForDeletedSeat(lastSeat, table, activeWing, activeRoom, "admin"); } catch {}
     }
     setTables(p => {
       const u = p.map(t => t.id !== selected.tableId ? t : { ...t, seats: (t.seats || []).slice(0, -1) });
@@ -1438,12 +3951,205 @@ export default function SeatMap({
     });
   };
 
-  const updateTable           = (k, v)    => { if (!selected?.tableId) return; setTables(p => p.map(t => t.id === selected.tableId ? { ...t, [k]: v } : t)); };
-  const handleLabelEdit       = (id, val) => { setTables(p => p.map(t => t.id === id ? { ...t, label: val } : t)); };
-  const handleSeatLabelEdit   = val       => { if (!selected?.seatId) return; setTables(p => p.map(t => t.id !== selected.tableId ? t : { ...t, seats: (t.seats || []).map(s => s.id === selected.seatId ? { ...s, label: val } : s) })); };
-  const handleSeatStatus      = status    => { if (!selected?.seatId) return; setTables(p => p.map(t => t.id !== selected.tableId ? t : { ...t, seats: (t.seats || []).map(s => s.id === selected.seatId ? { ...s, status } : s) })); };
-  const handleSeatMove        = (tableId, seatId, pos) => { setTables(p => p.map(t => t.id !== tableId ? t : { ...t, seats: (t.seats || []).map(s => s.id === seatId ? { ...s, position: pos } : s) })); };
-  const handleStandaloneSeatStatus = (seatId, status) => { setStandaloneSeats(p => p.map(s => s.id === seatId ? { ...s, status } : s)); };
+  const handleSeatCountChange = async (tableId, newCount) => {
+    const table = tables.find(t => t.id === tableId);
+    if (!table) return;
+    const currentCount = table.seats?.length || 0;
+    if (newCount < currentCount) {
+      const truncated = table.seats.slice(newCount);
+      const hasBookings = truncated.some(s => s.status !== "available");
+      if (hasBookings) {
+        const confirm = window.confirm("Warning: Some of the seats being removed have active or pending reservations. Are you sure you want to delete them? This will remove their bookings.");
+        if (!confirm) return;
+      }
+      
+      pushHistory();
+      for (const seat of truncated) {
+        try { await cleanupReservationsForDeletedSeat(seat, table, activeWing, activeRoom, "admin"); } catch {}
+      }
+      setTables(p => p.map(t => t.id === tableId ? {
+        ...t,
+        seats: t.seats.slice(0, newCount)
+      } : t));
+    } else {
+      pushHistory();
+      const seatsToAdd = newCount - currentCount;
+      setTables(p => p.map(t => {
+        if (t.id !== tableId) return t;
+        const newSeats = [...(t.seats || [])];
+        for (let i = 0; i < seatsToAdd; i++) {
+          const num = newSeats.length + 1;
+          newSeats.push({
+            id: `${t.id}-S${num}-${Date.now()}`,
+            num,
+            label: `S${num}`,
+            status: "available"
+          });
+        }
+        return { ...t, seats: newSeats };
+      }));
+    }
+  };
+
+  const duplicateTable = useCallback((table) => {
+    pushHistory();
+    const id = `T${_tableCounter++}`;
+    const newTable = {
+      ...table,
+      id,
+      label: `${table.label || table.id} (Copy)`,
+      x: Math.min(roomWidth - (table.width || 110), table.x + 30),
+      y: Math.min(roomHeight - (table.height || 70), table.y + 30),
+      seats: (table.seats || []).map((s, idx) => ({
+        id: `${id}-S${idx + 1}-${Date.now()}`,
+        num: idx + 1,
+        label: `S${idx + 1}`,
+        status: "available",
+        position: s.position,
+      })),
+      editor: {
+        ...(table.editor || {}),
+        rotation: table.editor?.rotation || 0,
+        locked: false,
+      }
+    };
+    setTables(p => [...p, newTable]);
+    setSelected({ type: "table", tableId: id });
+  }, [tables, roomWidth, roomHeight, pushHistory]);
+
+  const bringTableToFront = useCallback((tableId) => {
+    pushHistory();
+    setTables(p => {
+      const target = p.find(t => t.id === tableId);
+      if (!target) return p;
+      const rest = p.filter(t => t.id !== tableId);
+      return [...rest, target];
+    });
+  }, [pushHistory]);
+
+  const sendTableToBack = useCallback((tableId) => {
+    pushHistory();
+    setTables(p => {
+      const target = p.find(t => t.id === tableId);
+      if (!target) return p;
+      const rest = p.filter(t => t.id !== tableId);
+      return [target, ...rest];
+    });
+  }, [pushHistory]);
+
+  const duplicateStandaloneSeat = useCallback((seat) => {
+    pushHistory();
+    const n = _standaloneCounter++;
+    const newSeat = {
+      ...seat,
+      id: `SS${n}`,
+      num: n,
+      label: `S${n}`,
+      status: "available",
+      x: Math.min(roomWidth - 38, seat.x + 20),
+      y: Math.min(roomHeight - 38, seat.y + 20),
+      editor: {
+        locked: false
+      }
+    };
+    setStandaloneSeats(p => [...p, newSeat]);
+    setSelected({ type: "standaloneSeat", standaloneSeatId: newSeat.id });
+  }, [standaloneSeats, roomWidth, roomHeight, pushHistory]);
+
+  const exportLayout = useCallback(() => {
+    const data = {
+      v: 2,
+      tables,
+      labels,
+      standaloneSeats,
+      editor: {
+        room_width_cm: roomWidth,
+        room_height_cm: roomHeight,
+        grid_cm: gridSize,
+        snap_enabled: snapToGrid,
+        show_grid: showGrid,
+        grid_visibility: gridVisibility,
+        smart_guides_enabled: smartGuidesEnabled,
+        show_rulers: showRulers
+      }
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `layout-${activeRoom.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [tables, labels, standaloneSeats, roomWidth, roomHeight, gridSize, snapToGrid, activeRoom, showGrid, gridVisibility, smartGuidesEnabled, showRulers]);
+
+  const importLayout = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (data.v === 2 && data.tables) {
+          pushHistory();
+          setTables(normalize(data.tables).filter(t => t.seats?.length > 0));
+          setLabels(data.labels || DEFAULT_LABELS);
+          setStandaloneSeats(data.standaloneSeats || []);
+          if (data.editor) {
+            if (data.editor.room_width_cm) setRoomWidth(data.editor.room_width_cm);
+            if (data.editor.room_height_cm) setRoomHeight(data.editor.room_height_cm);
+            if (data.editor.grid_cm) setGridSize(data.editor.grid_cm);
+            if (data.editor.snap_enabled !== undefined) setSnapToGrid(data.editor.snap_enabled);
+            if (data.editor.show_grid !== undefined) setShowGrid(data.editor.show_grid);
+            if (data.editor.grid_visibility !== undefined) setGridVisibility(data.editor.grid_visibility);
+            if (data.editor.smart_guides_enabled !== undefined) setSmartGuidesEnabled(data.editor.smart_guides_enabled);
+            if (data.editor.show_rulers !== undefined) setShowRulers(data.editor.show_rulers);
+          }
+          alert("Layout imported successfully!");
+        } else {
+          alert("Invalid layout file structure. Make sure it is v2 layout JSON.");
+        }
+      } catch (err) {
+        alert("Failed to parse layout JSON.");
+      }
+    };
+    reader.readAsText(file);
+  }, [pushHistory, normalize]);
+
+  const resetLayout = useCallback(() => {
+    const confirm = window.confirm("Are you sure you want to reset the layout of this room? This will clear all tables and standalone seats and cannot be undone!");
+    if (!confirm) return;
+    pushHistory();
+    setTables([]);
+    setStandaloneSeats([]);
+    setLabels(DEFAULT_LABELS);
+    setRoomWidth(1200);
+    setRoomHeight(800);
+    setGridSize(25);
+    setSnapToGrid(true);
+    setShowGrid(true);
+    setGridVisibility(30);
+    setSmartGuidesEnabled(true);
+    setShowRulers(true);
+    setSelected(null);
+  }, [pushHistory]);
+
+  const updateTable           = (k, v)    => { 
+    if (!selected?.tableId) return; 
+    pushHistory();
+    setTables(p => p.map(t => {
+      if (t.id !== selected.tableId) return t;
+      if (k === "editor") {
+        return { ...t, editor: { ...(t.editor || {}), ...v } };
+      }
+      return { ...t, [k]: v };
+    })); 
+  };
+
+  const handleLabelEdit       = (id, val) => { pushHistory(); setTables(p => p.map(t => t.id === id ? { ...t, label: val } : t)); };
+  const handleSeatLabelEdit   = val       => { if (!selected?.seatId) return; pushHistory(); setTables(p => p.map(t => t.id !== selected.tableId ? t : { ...t, seats: (t.seats || []).map(s => s.id === selected.seatId ? { ...s, label: val } : s) })); };
+  const handleSeatStatus      = status    => { if (!selected?.seatId) return; pushHistory(); setTables(p => p.map(t => t.id !== selected.tableId ? t : { ...t, seats: (t.seats || []).map(s => s.id === selected.seatId ? { ...s, status } : s) })); };
+  const handleSeatMove        = (tableId, seatId, pos) => { pushHistory(); setTables(p => p.map(t => t.id !== tableId ? t : { ...t, seats: (t.seats || []).map(s => s.id === seatId ? { ...s, position: pos } : s) })); };
+  const handleStandaloneSeatStatus = (seatId, status) => { pushHistory(); setStandaloneSeats(p => p.map(s => s.id === seatId ? { ...s, status } : s)); };
   const handleSeatClick       = (seat, tableId) => { if (!editMode) { onSeatClick?.(seat, tableId); return; } setSelected({ type: "seat", tableId, seatId: seat.id }); };
   const handleTableSelect     = table => { if (editMode) { setSelected({ type: "table", tableId: table.id }); return; } onTableClick?.(table); };
   const handleSelectRoom      = (w, r) => { setActiveWing(w); setActiveRoom(r); };
@@ -1457,6 +4163,7 @@ export default function SeatMap({
     tables.forEach(t => { const tw = t.width || 110, th = t.height || 70; minX = Math.min(minX, t.x - SEAT_OFF); minY = Math.min(minY, t.y - SEAT_OFF); maxX = Math.max(maxX, t.x + tw + SEAT_OFF); maxY = Math.max(maxY, t.y + th + SEAT_OFF); });
     standaloneSeats.forEach(s => { minX = Math.min(minX, s.x); minY = Math.min(minY, s.y); maxX = Math.max(maxX, s.x + 38); maxY = Math.max(maxY, s.y + 38); });
     labels.forEach(l => { const lw = l.type === "screen" ? 120 : 100, lh = l.type === "screen" ? 32 : 26; minX = Math.min(minX, l.x); minY = Math.min(minY, l.y); maxX = Math.max(maxX, l.x + lw); maxY = Math.max(maxY, l.y + lh); });
+    fixtures.forEach(f => { const fw = f.width || 80, fh = f.height || 60; minX = Math.min(minX, f.x); minY = Math.min(minY, f.y); maxX = Math.max(maxX, f.x + fw); maxY = Math.max(maxY, f.y + fh); });
     if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 1400; maxY = 780; }
     const VIRTUAL_W = virtualWidth  || Math.max(maxX - minX + PAD * 2, 500);
     const VIRTUAL_H = virtualHeight || Math.max(maxY - minY + PAD * 2, 400);
@@ -1466,6 +4173,10 @@ export default function SeatMap({
         <ScaledCanvas virtualW={VIRTUAL_W} virtualH={VIRTUAL_H} fitMode="contain" remountKey={0}>
           <div style={{ position: "absolute", top: 0, left: 0, width: VIRTUAL_W, height: VIRTUAL_H }}>
             {labels.map(l => <StaticLabel key={`${wing}-${room}-label-${l.id}`} item={{ ...l, x: l.x + ox, y: l.y + oy }} T={T} />)}
+            {fixtures.map((f, index) => (
+              <FixtureNode key={`${wing}-${room}-fixture-${f.id}-${index}`} fixture={{ ...f, x: f.x + ox, y: f.y + oy }}
+                editMode={false} isSelected={false} onSelect={() => {}} onDragStart={() => {}} isDragging={false} T={T} />
+            ))}
             {standaloneSeats.map(s => (
               <StandaloneSeat key={`${wing}-${room}-standalone-${s.id}`} seat={{ ...s, x: s.x + ox, y: s.y + oy }}
                 editMode={false} isSelected={selectedSeat ? selectedSeat.id === s.id : false}
@@ -1486,8 +4197,6 @@ export default function SeatMap({
   }
 
   // ─── ADMIN / EDIT VIEW ────────────────────────────────────────────────────────
-  const VIRTUAL_W = virtualWidth  || 1400;
-  const VIRTUAL_H = virtualHeight || 780;
   const isAddMode = tool === "addTable" || tool === "addSeat";
   const isDeleteMode = tool === "deleteSeat";
   const isMultiSelectMode = tool === "multiSelect";
@@ -1497,6 +4206,157 @@ export default function SeatMap({
     deleteSeat: "Click on any standalone seat to delete it",
     multiSelect: "Click standalone seats to select multiple for bulk deletion",
   }[tool] || "";
+
+  // Spacebar grab panning key listeners
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.code === "Space" && e.target === document.body) {
+        e.preventDefault();
+        setSpacePressed(true);
+      }
+    };
+    const handleKeyUp = (e) => {
+      if (e.code === "Space") {
+        setSpacePressed(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
+  // Viewport Zoom wheel listener (Focal zooming centered on cursor)
+  useEffect(() => {
+    const el = canvasViewportRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
+      const newZoom = Math.min(3.0, Math.max(0.4, zoom * zoomFactor));
+      const rect = el.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      setPan(prev => ({
+        x: mouseX - (mouseX - prev.x) * (newZoom / zoom),
+        y: mouseY - (mouseY - prev.y) * (newZoom / zoom)
+      }));
+      setZoom(newZoom);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [zoom]);
+
+  // Mouse Drag Panning handling
+  const handleViewportMouseDown = (e) => {
+    const isMiddleClick = e.button === 1;
+    const isSpaceDrag = spacePressed || tool === "pan";
+    if (isMiddleClick || isSpaceDrag) {
+      e.preventDefault();
+      setIsPanning(true);
+      panStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+    }
+  };
+
+  useEffect(() => {
+    if (!isPanning) return;
+    const handleMouseMove = (e) => {
+      setPan({
+        x: e.clientX - panStart.current.x,
+        y: e.clientY - panStart.current.y
+      });
+    };
+    const handleMouseUp = () => {
+      setIsPanning(false);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isPanning]);
+
+  // Dot Grid pattern drawing
+  const renderDotGrid = () => {
+    if (showGrid === false) return null;
+    const opacityValue = (gridVisibility !== undefined ? gridVisibility : 30) / 100;
+    return (
+      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", opacity: opacityValue }}>
+        <defs>
+          <pattern id="dotGrid" width={gridSize} height={gridSize} patternUnits="userSpaceOnUse">
+            <circle cx={2} cy={2} r={1.5} fill={C.gold} />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#dotGrid)" />
+      </svg>
+    );
+  };
+
+  // Horizontal Ruler drawing
+  const renderHorizontalRuler = () => {
+    if (showRulers === false) return null;
+    const ticks = [];
+    const step = 10; // cm
+    for (let x = 0; x <= roomWidth; x += step) {
+      const isMajor = x % 50 === 0;
+      ticks.push(
+        <g key={`h-tick-${x}`} transform={`translate(${x}, 0)`}>
+          <line x1={0} y1={isMajor ? 0 : 10} x2={0} y2={20} stroke={C.borderStrong} strokeWidth={1} />
+          {isMajor && (
+            <text x={3} y={9} fontSize={7} fontFamily="monospace" fill={C.textSecondary} fontWeight={600} textAnchor="start">
+              {x}
+            </text>
+          )}
+        </g>
+      );
+    }
+    return (
+      <div style={{ position: "absolute", top: 0, left: 24, right: 0, height: 20, background: C.surfaceRaised, borderBottom: `1px solid ${C.borderDefault}`, overflow: "hidden", zIndex: 10, pointerEvents: "none", userSelect: "none" }}>
+        <svg style={{ width: "100%", height: "100%" }}>
+          <g transform={`translate(${pan.x}, 0) scale(${zoom}, 1)`}>
+            {ticks}
+          </g>
+        </svg>
+      </div>
+    );
+  };
+
+  // Vertical Ruler drawing
+  const renderVerticalRuler = () => {
+    if (showRulers === false) return null;
+    const ticks = [];
+    const step = 10; // cm
+    for (let y = 0; y <= roomHeight; y += step) {
+      const isMajor = y % 50 === 0;
+      ticks.push(
+        <g key={`v-tick-${y}`} transform={`translate(0, ${y})`}>
+          <line x1={isMajor ? 0 : 10} y1={0} x2={20} y2={0} stroke={C.borderStrong} strokeWidth={1} />
+          {isMajor && (
+            <text x={3} y={7} fontSize={7} fontFamily="monospace" fill={C.textSecondary} fontWeight={600} transform="rotate(-90 3 7)">
+              {y}
+            </text>
+          )}
+        </g>
+      );
+    }
+    return (
+      <div style={{ position: "absolute", top: 20, left: 0, width: 24, bottom: 0, background: C.surfaceRaised, borderRight: `1px solid ${C.borderDefault}`, overflow: "hidden", zIndex: 10, pointerEvents: "none", userSelect: "none" }}>
+        <svg style={{ width: "100%", height: "100%" }}>
+          <g transform={`translate(0, ${pan.y}) scale(1, ${zoom})`}>
+            {ticks}
+          </g>
+        </svg>
+      </div>
+    );
+  };
+
+  const handleHudSeatCount = async (newCount) => {
+    if (!selectedTable) return;
+    await handleSeatCountChange(selectedTable.id, newCount);
+  };
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", fontFamily: F, color: C.textPrimary, overflow: "hidden" }}>
@@ -1516,8 +4376,7 @@ export default function SeatMap({
         <div style={{ width: 1, height: 20, background: C.borderDefault, flexShrink: 0 }} />
         <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
           <ToolBtn active={tool === "select"}      onClick={() => setTool("select")}      label="Select" />
-          <ToolBtn active={tool === "addTable"}    onClick={() => setTool("addTable")}    label="+ Table" />
-          <ToolBtn active={tool === "addSeat"}     onClick={() => setTool("addSeat")}     label="+ Seat" />
+          <ToolBtn active={tool === "pan"}         onClick={() => setTool("pan")}         label="Grab Workspace" />
           <ToolBtn active={tool === "multiSelect"} onClick={() => { setTool("multiSelect"); setSelectedStandaloneSeats(new Set()); }} label="Multi-Select" />
         </div>
 
@@ -1557,81 +4416,449 @@ export default function SeatMap({
 
       {/* Main editor area */}
       <div style={{ flex: "1 1 0", minHeight: 0, display: "flex", overflow: "hidden" }}>
-        <WingRoomSidebar
+        <LeftSidebarPanel
           activeWing={activeWing} activeRoom={activeRoom} onSelect={handleSelectRoom}
           venueStructure={visibleVenueStructure}
           onOpenVenueManager={canManageVenues ? () => setShowVenueManager(true) : null}
+          addTablePreset={addTablePreset}
+          addFixturePreset={addFixturePreset}
+          addLabelPreset={addLabelPreset}
+          addStandaloneSeatPreset={addStandaloneSeatPreset}
         />
 
-        {/* Canvas */}
-        <div style={{ flex: "1 1 0", minWidth: 0, padding: 14, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <div style={{ flex: "1 1 0", minHeight: 0, background: C.canvasBg, border: `1.5px solid ${isAddMode ? C.gold : C.canvasBorder}`, borderRadius: 10, overflow: "hidden", transition: "border-color 0.2s", boxShadow: "0 1px 6px rgba(0,0,0,0.06)", position: "relative" }}>
-            <ScaledCanvas virtualW={VIRTUAL_W} virtualH={VIRTUAL_H} fitMode="contain" onScale={s => { adminScaleRef.current = s; }}>
-              <div ref={canvasRef} style={{ position: "absolute", inset: 0, cursor: isAddMode ? "crosshair" : "default" }}
-                onClick={e => { if (e.target !== canvasRef.current) return; if (tool === "select") setSelected(null); handleCanvasClick(e); }} />
-              {labels.map((l, index) => (
-                <DraggableLabel key={`label-${l.id}-${index}`} item={l}
-                  onDragStart={(e, id) => startLabelDrag(e, id)}
-                  isDragging={activeDragId === l.id} />
-              ))}
-              {standaloneSeats.map((s, index) => (
-                <StandaloneSeat key={`standalone-${s.id}-${index}`} seat={s} editMode={true}
-                  isSelected={selected?.type === "standaloneSeat" && selected.standaloneSeatId === s.id}
-                  isMultiSelected={selectedStandaloneSeats.has(s.id)}
-                  isDragging={activeDragId === s.id}
-                  onDragStart={startStandaloneSeatDrag}
-                  onSelect={ss => {
-                    if (tool === "multiSelect") {
-                      setSelectedStandaloneSeats(prev => { const n = new Set(prev); n.has(ss.id) ? n.delete(ss.id) : n.add(ss.id); return n; });
-                    } else { setSelected({ type: "standaloneSeat", standaloneSeatId: ss.id }); }
-                  }}
-                  onDeleteClick={tool === "deleteSeat" ? ss => {
-                    setSelected({ type: "standaloneSeat", standaloneSeatId: ss.id });
-                    setDeleteConfirm({ key: "standaloneSeat", message: `Delete standalone seat "${ss.label || ss.num}"? This cannot be undone.` });
-                  } : null}
-                  T={T} />
-              ))}
-              {tables.map((t, index) => (
-                <TableNode key={`table-${t.id}-${index}`} table={t} editMode={true}
-                  isTableSelected={selected?.tableId === t.id}
-                  selectedSeatId={selected?.type === "seat" && selected?.tableId === t.id ? selected.seatId : null}
-                  onDragStart={startTableDrag} onResizeStart={startTableResize}
-                  onSeatClick={handleSeatClick} onLabelEdit={handleLabelEdit}
-                  isDragging={activeDragId === t.id} onSeatMove={handleSeatMove}
-                  T={T}
-                  wing={activeWing} room={activeRoom} />
-              ))}
-              {tables.length === 0 && standaloneSeats.length === 0 && (
-                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none", gap: 10, animation: "sm-fadeUp 0.3s ease" }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 10, border: `1.5px dashed ${C.borderStrong}`, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.35 }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.textSecondary} strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        {/* CAD Drafting Table Canvas Viewport */}
+        <div style={{ flex: "1 1 0", minWidth: 0, padding: 14, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", background: C.surfaceRaised }}>
+          <div style={{ flex: "1 1 0", minHeight: 0, position: "relative", border: `1px solid ${C.borderDefault}`, borderRadius: 12, overflow: "hidden", background: C.canvasBg }}>
+            
+            {/* SVG rulers */}
+            {renderHorizontalRuler()}
+            {renderVerticalRuler()}
+
+            {/* Corner Ruler intersection indicator */}
+            <div style={{ position: "absolute", top: 0, left: 0, width: 24, height: 20, background: C.surfaceRaised, borderRight: `1px solid ${C.borderDefault}`, borderBottom: `1px solid ${C.borderDefault}`, zIndex: 11, display: "flex", alignItems: "center", justifyContent: "center", userSelect: "none" }}>
+              <span style={{ fontSize: 7, fontWeight: 800, color: C.gold, fontFamily: "monospace" }}>cm</span>
+            </div>
+
+            {/* Scrollable Viewport Canvas Container */}
+            <div 
+              ref={canvasViewportRef}
+              style={{
+                position: "absolute",
+                top: 20,
+                left: 24,
+                right: 0,
+                bottom: 0,
+                overflow: "hidden",
+                cursor: isPanning ? "grabbing" : (spacePressed || tool === "pan") ? "grab" : isAddMode ? "crosshair" : "default",
+                userSelect: "none"
+              }}
+              onMouseDown={handleViewportMouseDown}
+            >
+              {/* Inner zoomable/panable sheet canvas of roomWidth x roomHeight */}
+              <div 
+                ref={canvasRef}
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  width: roomWidth,
+                  height: roomHeight,
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  transformOrigin: "top left",
+                  background: "#FAF9F5", // Premium warm luxury paper workspace
+                  boxShadow: "0 12px 48px rgba(0,0,0,0.12)",
+                  transition: isPanning ? "none" : "transform 0.08s ease-out",
+                  border: "1px dashed rgba(140, 107, 42, 0.25)"
+                }}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onClick={e => { if (e.target !== canvasRef.current) return; if (tool === "select") setSelected(null); handleCanvasClick(e); }}
+              >
+                {/* Dot Grid */}
+                {renderDotGrid()}
+
+                {/* Alignment Guides */}
+                {alignGuides && (
+                  <svg style={{ position: "absolute", inset: 0, width: roomWidth, height: roomHeight, pointerEvents: "none", zIndex: 20 }}>
+                    {alignGuides.x !== null && (
+                      <line x1={alignGuides.x} y1={0} x2={alignGuides.x} y2={roomHeight} stroke={C.gold} strokeWidth={1} strokeDasharray="3 3" />
+                    )}
+                    {alignGuides.y !== null && (
+                      <line x1={0} y1={alignGuides.y} x2={roomWidth} y2={alignGuides.y} stroke={C.gold} strokeWidth={1} strokeDasharray="3 3" />
+                    )}
+                  </svg>
+                )}
+
+                {/* Boundary Alert overlay */}
+                {tables.map(t => {
+                  const tw = t.width || 110;
+                  const th = t.height || 70;
+                  const outOfBounds = t.x < 0 || t.y < 0 || t.x + tw > roomWidth || t.y + th > roomHeight;
+                  if (!outOfBounds) return null;
+                  return (
+                    <div key={`out-bounds-${t.id}`} style={{ position: "absolute", left: t.x, top: t.y, width: tw, height: th, border: `2.5px dashed ${C.red}`, borderRadius: 8, pointerEvents: "none", zIndex: 1, animation: "sm-spin 4s linear infinite", opacity: 0.25 }} />
+                  );
+                })}
+                {fixtures.map(f => {
+                  const fw = f.width || 80;
+                  const fh = f.height || 60;
+                  const outOfBounds = f.x < 0 || f.y < 0 || f.x + fw > roomWidth || f.y + fh > roomHeight;
+                  if (!outOfBounds) return null;
+                  return (
+                    <div key={`out-bounds-${f.id}`} style={{ position: "absolute", left: f.x, top: f.y, width: fw, height: fh, border: `2.5px dashed ${C.red}`, borderRadius: 4, pointerEvents: "none", zIndex: 1, animation: "sm-spin 4s linear infinite", opacity: 0.25 }} />
+                  );
+                })}
+
+                {/* Draggable Labels */}
+                {labels.map((l, index) => (
+                  <DraggableLabel key={`label-${l.id}-${index}`} item={l}
+                    onDragStart={(e, id) => startLabelDrag(e, id)}
+                    isDragging={activeDragId === l.id} />
+                ))}
+
+                {/* Draggable Fixtures */}
+                {fixtures.map((f, index) => (
+                  <FixtureNode key={`fixture-${f.id}-${index}`} fixture={f} editMode={true}
+                    isSelected={selected?.type === "fixture" && selected.fixtureId === f.id}
+                    onSelect={fx => setSelected({ type: "fixture", fixtureId: fx.id })}
+                    onDragStart={startFixtureDrag} isDragging={activeDragId === f.id} T={T} />
+                ))}
+
+                {/* Draggable Standalone Seats */}
+                {standaloneSeats.map((s, index) => (
+                  <StandaloneSeat key={`standalone-${s.id}-${index}`} seat={s} editMode={true}
+                    isSelected={selected?.type === "standaloneSeat" && selected.standaloneSeatId === s.id}
+                    isMultiSelected={selectedStandaloneSeats.has(s.id)}
+                    isDragging={activeDragId === s.id}
+                    onDragStart={startStandaloneSeatDrag}
+                    onSelect={ss => {
+                      if (tool === "multiSelect") {
+                        setSelectedStandaloneSeats(prev => { const n = new Set(prev); n.has(ss.id) ? n.delete(ss.id) : n.add(ss.id); return n; });
+                      } else { setSelected({ type: "standaloneSeat", standaloneSeatId: ss.id }); }
+                    }}
+                    onDeleteClick={tool === "deleteSeat" ? ss => {
+                      setSelected({ type: "standaloneSeat", standaloneSeatId: ss.id });
+                      setDeleteConfirm({ key: "standaloneSeat", message: `Delete standalone seat "${ss.label || ss.num}"? This cannot be undone.` });
+                    } : null}
+                    T={T} />
+                ))}
+
+                {/* Draggable Tables */}
+                {tables.map((t, index) => {
+                  const isColliding = tables.some(other => other.id !== t.id && checkCollision(t, other));
+                  return (
+                    <TableNode key={`table-${t.id}-${index}`} table={t} editMode={true}
+                      isTableSelected={selected?.tableId === t.id}
+                      isColliding={isColliding}
+                      selectedSeatId={selected?.type === "seat" && selected?.tableId === t.id ? selected.seatId : null}
+                      onSelectTable={handleTableSelect}
+                      onDragStart={startTableDrag} onResizeStart={startTableResize}
+                      onSeatClick={handleSeatClick} onLabelEdit={handleLabelEdit}
+                      isDragging={activeDragId === t.id} onSeatMove={handleSeatMove}
+                      T={T}
+                      wing={activeWing} room={activeRoom} />
+                  );
+                })}
+
+                {/* Relocated Table Quick Inspector outside scaled canvas container */}
+
+                {/* Empty State visualizer */}
+                {tables.length === 0 && standaloneSeats.length === 0 && fixtures.length === 0 && (
+                  <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none", gap: 10, animation: "sm-fadeUp 0.3s ease" }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 10, border: `1.5px dashed ${C.borderStrong}`, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.35 }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.textSecondary} strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                    </div>
+                    <p style={{ color: C.textSecondary, fontSize: 12, fontFamily: F, margin: 0 }}>Empty canvas — use the toolbar to add tables or seats</p>
                   </div>
-                  <p style={{ color: C.textSecondary, fontSize: 12, fontFamily: F, margin: 0 }}>Empty canvas — use the toolbar to add tables or seats</p>
-                </div>
-              )}
-            </ScaledCanvas>
+                )}
+              </div>
+
+              {/* Table Quick Inspector - Premium Viewport-Aware HUD */}
+              {selected?.type === "table" && selectedTable && quickInspectorPosition && (() => {
+                const presetId = selectedTable.editor?.preset_id || "custom-table";
+                const preset = TABLE_PRESETS.find(p => p.id === presetId) || TABLE_PRESETS.find(p => p.id === "custom-table");
+                const minChairs = preset?.minSeatCount ?? 0;
+                const maxChairs = preset?.maxSeatCount ?? 16;
+                const seatCount = selectedTable.seats?.length || 0;
+                const isLocked = selectedTable.editor?.locked || false;
+
+                const hudBg = isDark ? "rgba(22, 20, 16, 0.98)" : "rgba(252, 250, 246, 0.98)";
+                const hudText = isDark ? "#EDE8DF" : "#18140E";
+                const hudBorder = isDark ? "1px solid rgba(196, 163, 90, 0.45)" : "1px solid rgba(140, 107, 42, 0.35)";
+                const hudShadow = isDark ? "0 12px 36px rgba(0,0,0,0.5)" : "0 12px 36px rgba(140, 107, 42, 0.12)";
+                const secondaryText = isDark ? "#8A8278" : "#7A7060";
+
+                return (
+                  <div style={{
+                    position: "absolute",
+                    left: quickInspectorPosition.left,
+                    top: quickInspectorPosition.top,
+                    background: hudBg,
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
+                    border: hudBorder,
+                    borderRadius: "8px",
+                    padding: "12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                    boxShadow: hudShadow,
+                    zIndex: 1000,
+                    animation: "sm-fadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1)",
+                    pointerEvents: "auto",
+                    width: "280px",
+                    color: hudText,
+                    fontFamily: F
+                  }}>
+                    {/* Header */}
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, paddingBottom: "8px", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` }}>
+                      <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+                        <input 
+                          value={selectedTable.label || selectedTable.id} 
+                          onChange={e => updateTable("label", e.target.value)}
+                          style={{ 
+                            background: "transparent", 
+                            border: "none", 
+                            color: hudText, 
+                            fontFamily: F, 
+                            fontWeight: 700, 
+                            fontSize: "12px", 
+                            outline: "none", 
+                            width: "180px",
+                            borderBottom: `1px dashed ${isDark ? "rgba(196, 163, 90, 0.30)" : "rgba(140, 107, 42, 0.40)"}`,
+                            padding: "2px 0"
+                          }} 
+                          placeholder="Table Label"
+                        />
+                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                          <span style={{ 
+                            background: isDark ? "rgba(196, 163, 90, 0.15)" : "rgba(140, 107, 42, 0.08)", 
+                            color: isDark ? "#C4A35A" : "#8C6B2A", 
+                            fontSize: "8px", 
+                            fontWeight: 800, 
+                            letterSpacing: "0.08em",
+                            textTransform: "uppercase",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                          }}>
+                            {preset?.label || "Custom"}
+                          </span>
+                          <span style={{ 
+                            background: isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.04)", 
+                            color: secondaryText, 
+                            fontSize: "8px", 
+                            fontWeight: 800, 
+                            letterSpacing: "0.08em",
+                            textTransform: "uppercase",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                          }}>
+                            {seatCount} chairs
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Close button */}
+                      <button 
+                        onClick={() => setSelected(null)} 
+                        style={{ 
+                          background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", 
+                          border: "none", 
+                          color: secondaryText, 
+                          cursor: "pointer", 
+                          width: "20px", 
+                          height: "20px", 
+                          borderRadius: "50%", 
+                          display: "flex", 
+                          alignItems: "center", 
+                          justifyContent: "center",
+                          fontSize: "9px",
+                          transition: "all 0.15s"
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.color = hudText}
+                        onMouseLeave={e => e.currentTarget.style.color = secondaryText}
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Chair count control */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "8px", fontWeight: 800, color: secondaryText, letterSpacing: "0.08em", textTransform: "uppercase" }}>Chairs</span>
+                        <input 
+                          type="number" 
+                          min={minChairs} 
+                          max={maxChairs} 
+                          value={seatCount} 
+                          onChange={e => handleSeatCountChange(selectedTable.id, Math.min(maxChairs, Math.max(minChairs, Number(e.target.value))))} 
+                          style={{ 
+                            width: "36px", 
+                            background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", 
+                            border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`, 
+                            borderRadius: "4px", 
+                            color: hudText, 
+                            fontSize: "10px", 
+                            fontFamily: "monospace", 
+                            textAlign: "center",
+                            outline: "none"
+                          }} 
+                        />
+                      </div>
+                      <input 
+                        type="range" 
+                        min={minChairs} 
+                        max={maxChairs} 
+                        value={seatCount} 
+                        onChange={e => handleSeatCountChange(selectedTable.id, Number(e.target.value))} 
+                        style={{ width: "100%", accentColor: C.gold, cursor: "pointer" }} 
+                      />
+                    </div>
+
+                    {/* Chair Style Selector */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ fontSize: "8px", fontWeight: 800, color: secondaryText, letterSpacing: "0.08em", textTransform: "uppercase" }}>Chair Style</span>
+                      <select 
+                        value={selectedTable.editor?.chair_style || "standard-dining"} 
+                        onChange={e => updateTable("editor", { chair_style: e.target.value })} 
+                        style={{ 
+                          width: "100%", 
+                          padding: "6px 8px", 
+                          background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", 
+                          border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`, 
+                          borderRadius: "6px", 
+                          color: hudText, 
+                          fontSize: "11px", 
+                          fontFamily: F,
+                          outline: "none",
+                          cursor: "pointer"
+                        }}
+                      >
+                        {CHAIR_STYLES.map(c => (
+                          <option key={c.id} value={c.id} style={{ background: isDark ? "#161410" : "#FCFAF6", color: hudText }}>{c.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Spacing Slider */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "8px", fontWeight: 800, color: secondaryText, letterSpacing: "0.08em", textTransform: "uppercase" }}>Chair Spacing</span>
+                        <span style={{ fontSize: "9px", fontFamily: "monospace", color: C.gold }}>{selectedTable.editor?.seat_spacing_cm || 8}cm</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="4" 
+                        max="16" 
+                        value={selectedTable.editor?.seat_spacing_cm || 8} 
+                        onChange={e => updateTable("editor", { seat_spacing_cm: Number(e.target.value) })} 
+                        style={{ width: "100%", accentColor: C.gold, cursor: "pointer" }} 
+                      />
+                    </div>
+
+                    {/* Spacing and Lock Toggle */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "4px" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
+                        <input 
+                          type="checkbox" 
+                          checked={isLocked} 
+                          onChange={e => updateTable("editor", { locked: e.target.checked })}
+                          style={{ accentColor: C.gold }}
+                        />
+                        <span style={{ fontSize: "9px", color: secondaryText, textTransform: "uppercase", fontWeight: 800 }}>Locked</span>
+                      </label>
+                    </div>
+
+                    {/* Footer Actions */}
+                    <div style={{ display: "flex", gap: 6, paddingTop: "8px", borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, marginTop: "2px" }}>
+                      <button 
+                        onClick={() => bringTableToFront(selectedTable.id)} 
+                        style={{ flex: 1, padding: "5px 0", background: "transparent", border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`, borderRadius: "4px", color: hudText, fontSize: "9px", fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
+                        title="Bring to Front"
+                      >
+                        ▲ Front
+                      </button>
+                      <button 
+                        onClick={() => sendTableToBack(selectedTable.id)} 
+                        style={{ flex: 1, padding: "5px 0", background: "transparent", border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`, borderRadius: "4px", color: hudText, fontSize: "9px", fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
+                        title="Send to Back"
+                      >
+                        ▼ Back
+                      </button>
+                      <button 
+                        onClick={() => duplicateTable(selectedTable)} 
+                        style={{ flex: 1, padding: "5px 0", background: "transparent", border: `1px solid ${isDark ? "rgba(196, 163, 90, 0.40)" : "rgba(140, 107, 42, 0.35)"}`, borderRadius: "4px", color: C.gold, fontSize: "9px", fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
+                        title="Duplicate"
+                      >
+                        Copy
+                      </button>
+                      <button 
+                        onClick={() => handleRequestDelete("table")} 
+                        style={{ flex: 1, padding: "5px 0", background: "transparent", border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`, borderRadius: "4px", color: C.red, fontSize: "9px", fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
+                        title="Delete Safely"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Viewport Floating Zoom controls */}
+            <div style={{ position: "absolute", bottom: 16, right: 16, display: "flex", gap: 6, zIndex: 10, background: "rgba(255, 255, 255, 0.90)", backdropFilter: "blur(6px)", padding: "4px 8px", borderRadius: 8, border: `1px solid ${C.borderDefault}`, boxShadow: "0 4px 16px rgba(0,0,0,0.06)", alignItems: "center" }}>
+              <button onClick={() => setZoom(prev => Math.min(3.0, prev + 0.1))} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", color: C.textSecondary }} title="Zoom In">
+                <ZoomIn size={13} />
+              </button>
+              <div style={{ fontSize: 9, fontWeight: 700, fontFamily: "monospace", color: C.textPrimary, minWidth: 32, textAlign: "center" }}>
+                {Math.round(zoom * 100)}%
+              </div>
+              <button onClick={() => setZoom(prev => Math.max(0.4, prev - 0.1))} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", color: C.textSecondary }} title="Zoom Out">
+                <ZoomOut size={13} />
+              </button>
+              <div style={{ width: 1, height: 14, background: C.divider }} />
+              <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 9, fontWeight: 700, color: C.gold, fontFamily: F, padding: "2px 4px" }} title="Reset Viewport Pan and Zoom">
+                1:1
+              </button>
+              <div style={{ width: 1, height: 14, background: C.divider }} />
+              <button onClick={() => setSnapToGrid(prev => !prev)} style={{ background: snapToGrid ? `${C.gold}15` : "transparent", border: "none", borderRadius: 4, cursor: "pointer", padding: "4px 6px", color: snapToGrid ? C.gold : C.textSecondary, display: "flex", alignItems: "center" }} title="Toggle Snapping Grid">
+                <Grid size={13} />
+              </button>
+            </div>
+
           </div>
         </div>
 
-        {/* Inspector sidebar */}
+        {/* Sidebar details inspector */}
         <div className="sm-scroll" style={{ flexShrink: 0, width: 252, borderLeft: `1px solid ${C.borderDefault}`, background: C.surfaceBase, overflowY: "auto", padding: "14px 13px 24px", display: "flex", flexDirection: "column", gap: 0 }}>
           <InspectorPanel
             selected={selected} selectedTable={selectedTable} selectedSeatObj={selectedSeatObj}
-            selectedStandaloneSeatObj={selectedStandaloneSeatObj} tables={tables} setTables={setTables}
+            selectedStandaloneSeatObj={selectedStandaloneSeatObj}
+            selectedLabelObj={selectedLabelObj} selectedFixtureObj={selectedFixtureObj}
+            tables={tables} setTables={setTables}
+            labels={labels} setLabels={setLabels}
+            fixtures={fixtures} setFixtures={setFixtures}
             addSeat={addSeat} deleteSeat={deleteSeat} deleteTable={deleteTable}
-            deleteStandaloneSeat={deleteStandaloneSeat} updateTable={updateTable}
+            deleteStandaloneSeat={deleteStandaloneSeat} deleteFixture={deleteFixture}
+            updateTable={updateTable} updateLabel={updateLabel} updateFixture={updateFixture}
             handleSeatLabelEdit={handleSeatLabelEdit} handleSeatStatus={handleSeatStatus}
             handleStandaloneSeatStatus={handleStandaloneSeatStatus} onRequestDelete={handleRequestDelete}
+            duplicateTable={duplicateTable} duplicateStandaloneSeat={duplicateStandaloneSeat} duplicateFixture={duplicateFixture}
+            snapToGrid={snapToGrid} setSnapToGrid={setSnapToGrid}
+            gridSize={gridSize} setGridSize={setGridSize}
+            roomWidth={roomWidth} setRoomWidth={setRoomWidth}
+            roomHeight={roomHeight} setRoomHeight={setRoomHeight}
+            undo={undo} redo={redo}
+            canUndo={history.past.length > 0} canRedo={history.future.length > 0}
+            exportLayout={exportLayout} importLayout={importLayout}
+            resetLayout={resetLayout}
+            handleSeatCountChange={handleSeatCountChange}
+            pushHistory={pushHistory}
+            showGrid={showGrid} setShowGrid={setShowGrid}
+            gridVisibility={gridVisibility} setGridVisibility={setGridVisibility}
+            smartGuidesEnabled={smartGuidesEnabled} setSmartGuidesEnabled={setSmartGuidesEnabled}
+            showRulers={showRulers} setShowRulers={setShowRulers}
           />
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.20em", color: C.gold, textTransform: "uppercase", marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${C.divider}` }}>Status Legend</div>
-            {Object.entries(STATUS_COLORS).map(([key, color], index) => (
-              <div key={`${key}-${index}`} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
-                <div style={{ width: 9, height: 9, borderRadius: "50%", background: color, flexShrink: 0 }} />
-                <span style={{ fontFamily: F, fontSize: 11, color: C.textSecondary, fontWeight: 500 }}>{key.charAt(0).toUpperCase() + key.slice(1)}</span>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </div>

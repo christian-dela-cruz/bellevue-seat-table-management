@@ -25,7 +25,7 @@ class VenueStoreRequest extends FormRequest
         return [
             'parent_id' => 'nullable|exists:venues,id',
             'name' => 'required|string|max:255',
-            'slug' => ['nullable', 'string', 'max:255', Rule::unique('venues', 'slug')],
+            'slug' => ['nullable', 'string', 'max:255', Rule::unique('venues', 'slug')->where('is_archived', false)],
             'display_name' => 'nullable|string|max:255',
             'wing' => 'required|string|max:255',
             'type' => 'required|string|max:255',    
