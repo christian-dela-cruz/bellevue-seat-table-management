@@ -157,7 +157,10 @@ function resolveRoomImage(image) {
   if (!image) return businessCenterImg;
   if (/^(https?:|data:|blob:)/i.test(image)) return image;
   const key = String(image).split("/").pop();
-  if (roomImageMap[key]) return roomImageMap[key];
+  // Bypass static local assets if the path is a custom folder/server directory or URL
+  const isCustomPath = String(image).includes("/");
+  if (!isCustomPath && roomImageMap[key]) return roomImageMap[key];
+  
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "");
   if (String(image).startsWith("/")) return `${apiRoot}${image}`;
   if (String(image).includes("/")) return `${apiRoot}/${String(image).replace(/^\/+/, "")}`;
@@ -178,6 +181,16 @@ function roomRoute(room) {
 function resolveDiningLogo(room) {
   const key = canonicalRoomName(room?.display_name || room?.name);
   const slugKey = canonicalRoomName(String(room?.slug || "").replace(/-/g, " "));
+
+  // Prioritize dynamic custom uploads (starts with http/data/blob or contains a path slash '/')
+  const isCustomUploaded = room?.image && (
+    /^(https?:|data:|blob:)/i.test(String(room.image)) || 
+    String(room.image).includes("/")
+  );
+  if (isCustomUploaded) {
+    return resolveRoomImage(room.image);
+  }
+
   const mappedLogo = diningLogoMap[key] || diningLogoMap[slugKey];
   if (mappedLogo) return mappedLogo;
   if (room?.image && /^(https?:|data:|blob:|\/)/i.test(String(room.image))) return resolveRoomImage(room.image);
@@ -306,10 +319,10 @@ function uniqueConfiguredRooms(rooms = []) {
     const key = diningGroup
       ? `dining:${diningGroup}`
       : derivedParent
-      ? `child:${derivedParent}:${childGroupingKey(room, derivedParent)}`
-      : room.parent_id
-        ? `child:${room.parent_id}:${nameKey}`
-        : `parent:${parentKey || nameKey}`;
+        ? `child:${derivedParent}:${childGroupingKey(room, derivedParent)}`
+        : room.parent_id
+          ? `child:${room.parent_id}:${nameKey}`
+          : `parent:${parentKey || nameKey}`;
     const existing = byKey.get(key);
     if (!existing || score(room) >= score(existing)) {
       byKey.set(key, room);
@@ -493,7 +506,7 @@ function VenueCard({ item, variant = "event", isInteractive = true }) {
 
 export default function ReservationLanding() {
   const navigate = useNavigate();
-  const [theme, setTheme] = useState("dark");
+  const [theme, setTheme] = useState("light");
   const [diningOutlets, setDiningOutlets] = useState(fallbackDiningOutlets);
   const [eventVenues, setEventVenues] = useState(null);
   const isLight = theme === "light";
@@ -502,18 +515,18 @@ export default function ReservationLanding() {
     let mounted = true;
     const loadConfiguredRooms = () => {
       venueAPI.getAll({ _t: Date.now() })
-      .then((rooms) => {
-        if (!mounted) return;
-        const venueRows = Array.isArray(rooms) ? rooms : [];
-        setDiningOutlets(buildDiningOutletsFromConfig(venueRows));
-        setEventVenues(buildEventVenuesFromConfig(venueRows));
-      })
-      .catch(() => {
-        if (mounted) {
-          setDiningOutlets(fallbackDiningOutlets);
-          setEventVenues(fallbackEventVenues);
-        }
-      });
+        .then((rooms) => {
+          if (!mounted) return;
+          const venueRows = Array.isArray(rooms) ? rooms : [];
+          setDiningOutlets(buildDiningOutletsFromConfig(venueRows));
+          setEventVenues(buildEventVenuesFromConfig(venueRows));
+        })
+        .catch(() => {
+          if (mounted) {
+            setDiningOutlets(fallbackDiningOutlets);
+            setEventVenues(fallbackEventVenues);
+          }
+        });
     };
 
     loadConfiguredRooms();
@@ -530,55 +543,57 @@ export default function ReservationLanding() {
 
   return (
     <main className="reservation-launcher" data-theme={theme}>
-      <header className="reservation-topbar">
-        <nav className="reservation-topbar__nav" aria-label="Reservation quick navigation">
-          <button
-            type="button"
-            className="reservation-theme-toggle"
-            onClick={() => setTheme(isLight ? "dark" : "light")}
-            aria-pressed={isLight}
-            aria-label={`Switch to ${isLight ? "dark" : "light"} mode`}
-          >
-            <span className="reservation-theme-toggle__switch" aria-hidden="true">
-              <span className="reservation-theme-toggle__icon reservation-theme-toggle__icon--moon">
-                <svg viewBox="0 0 24 24" role="presentation">
-                  <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
-                </svg>
-              </span>
-              <span className="reservation-theme-toggle__icon reservation-theme-toggle__icon--sun">
-                <svg viewBox="0 0 24 24" role="presentation">
-                  <circle cx="12" cy="12" r="4.2" />
-                  <path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" />
-                </svg>
-              </span>
-              <span className="reservation-theme-toggle__thumb">
-                {isLight ? (
-                  <svg viewBox="0 0 24 24" role="presentation">
-                    <circle cx="12" cy="12" r="4.2" />
-                    <path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" role="presentation">
-                    <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
-                  </svg>
-                )}
-              </span>
-            </span>
-          </button>
-        </nav>
-      </header>
+      <button
+        type="button"
+        className="reservation-theme-toggle reservation-theme-toggle--floating"
+        onClick={() => setTheme(isLight ? "dark" : "light")}
+        aria-pressed={isLight}
+        aria-label={`Switch to ${isLight ? "dark" : "light"} mode`}
+      >
+        <span className="reservation-theme-toggle__switch" aria-hidden="true">
+          <span className="reservation-theme-toggle__icon reservation-theme-toggle__icon--moon">
+            <svg viewBox="0 0 24 24" role="presentation">
+              <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
+            </svg>
+          </span>
+          <span className="reservation-theme-toggle__icon reservation-theme-toggle__icon--sun">
+            <svg viewBox="0 0 24 24" role="presentation">
+              <circle cx="12" cy="12" r="4.2" />
+              <path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" />
+            </svg>
+          </span>
+          <span className="reservation-theme-toggle__thumb">
+            {isLight ? (
+              <svg viewBox="0 0 24 24" role="presentation">
+                <circle cx="12" cy="12" r="4.2" />
+                <path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" role="presentation">
+                <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
+              </svg>
+            )}
+          </span>
+        </span>
+      </button>
 
       <div className="reservation-shell">
         <section className="reservation-hero" aria-label="Bellevue reservation introduction">
           <div className="reservation-hero__content">
-            <button
-              type="button"
+            <div
               className="reservation-hero__brand"
               onClick={() => navigate("/")}
+              role="button"
+              tabIndex={0}
               aria-label="The Bellevue Manila reservation home"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  navigate("/");
+                }
+              }}
             >
               <img src={bellevueLogo} alt="" />
-            </button>
+            </div>
             <div className="reservation-eyebrow">Concierge Booking</div>
             <h1>
               Seat &amp;
@@ -660,8 +675,8 @@ export default function ReservationLanding() {
           --muted: rgba(74, 60, 39, 0.72);
           --radius-panel: 28px;
           --radius-card: 18px;
-          --brand-logo-size: clamp(46px, 4vw, 58px);
-          --brand-mark-size: clamp(34px, 3.05vw, 42px);
+          --brand-logo-width: clamp(170px, 15vw, 220px);
+          --brand-logo-height: clamp(110px, 10vw, 140px);
           --dining-card-max: 220px;
           min-height: 100vh;
           min-height: 100svh;
@@ -671,8 +686,7 @@ export default function ReservationLanding() {
           position: relative;
           isolation: isolate;
           display: grid;
-          grid-template-rows: 52px minmax(0, 1fr);
-          gap: 14px;
+          grid-template-rows: minmax(0, 1fr);
           padding: 16px clamp(18px, 2.5vw, 34px) clamp(16px, 2vw, 26px);
           background-color: #17130f;
           background-image:
@@ -812,6 +826,45 @@ export default function ReservationLanding() {
           justify-content: center;
           min-width: 58px;
           padding: 0 6px !important;
+        }
+
+        .reservation-theme-toggle--floating {
+          position: absolute;
+          top: clamp(14px, 2.2vw, 24px);
+          right: clamp(14px, 2.2vw, 28px);
+          z-index: 10;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 38px;
+          min-width: 62px;
+          border: 1px solid rgba(255, 250, 241, 0.12);
+          border-radius: 14px;
+          background: rgba(18, 15, 11, 0.54);
+          color: rgba(255, 250, 241, 0.76);
+          box-shadow: 0 8px 24px rgba(18, 12, 7, 0.12);
+          backdrop-filter: blur(14px);
+          cursor: pointer;
+          transition: border-color 0.22s ease, background 0.22s ease, transform 0.22s ease;
+        }
+
+        .reservation-launcher[data-theme="light"] .reservation-theme-toggle--floating {
+          border-color: rgba(164, 120, 33, 0.2);
+          background: rgba(255, 252, 246, 0.74);
+          color: rgba(42, 33, 23, 0.72);
+        }
+
+        .reservation-theme-toggle--floating:hover,
+        .reservation-theme-toggle--floating:focus-visible {
+          border-color: rgba(196, 163, 90, 0.52);
+          background: rgba(196, 163, 90, 0.14);
+          transform: translateY(-1px);
+          outline: none;
+        }
+
+        .reservation-launcher[data-theme="light"] .reservation-theme-toggle--floating:hover,
+        .reservation-launcher[data-theme="light"] .reservation-theme-toggle--floating:focus-visible {
+          background: rgba(164, 120, 33, 0.1);
         }
 
         .reservation-theme-toggle__switch {
@@ -963,30 +1016,30 @@ export default function ReservationLanding() {
         .reservation-hero__brand {
           display: inline-flex;
           align-items: center;
-          justify-content: center;
-          width: var(--brand-logo-size);
-          height: var(--brand-logo-size);
+          justify-content: flex-start;
+          width: var(--brand-logo-width);
+          height: var(--brand-logo-height);
           margin-bottom: clamp(24px, 4vh, 46px);
-          border: 1px solid rgba(196, 163, 90, 0.48);
-          border-radius: 18px;
-          background: rgba(255, 250, 241, 0.055);
-          box-shadow: 0 18px 32px rgba(0,0,0,0.22), inset 0 0 0 1px rgba(255, 250, 241, 0.035);
+          background: transparent;
+          border: none;
+          outline: none;
           cursor: pointer;
-          transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+          transition: opacity 0.22s ease, transform 0.22s ease;
+          padding: 0;
+          box-sizing: border-box;
         }
 
         .reservation-hero__brand img {
-          width: var(--brand-mark-size);
-          height: var(--brand-mark-size);
+          width: 100%;
+          height: 100%;
           object-fit: contain;
           filter: drop-shadow(0 8px 16px rgba(0,0,0,0.24));
         }
 
         .reservation-hero__brand:hover,
         .reservation-hero__brand:focus-visible {
-          background: rgba(196, 163, 90, 0.13);
-          box-shadow: 0 22px 42px rgba(0,0,0,0.26), 0 0 0 1px rgba(196, 163, 90, 0.18);
-          transform: translateY(-1px);
+          opacity: 0.88;
+          transform: scale(1.02);
           outline: none;
         }
 
@@ -1088,7 +1141,7 @@ export default function ReservationLanding() {
           display: grid;
           grid-template-rows: auto minmax(0, 1fr);
           gap: clamp(26px, 3vh, 40px);
-          padding: clamp(18px, 2.2vw, 32px);
+          padding: clamp(18px, 2.2vw, 32px) clamp(20px, 3.8vw, 54px);
           container-type: inline-size;
           border-radius: var(--radius-panel);
           background: rgba(255, 252, 246, 0.34);
@@ -1162,14 +1215,14 @@ export default function ReservationLanding() {
         }
 
         .reservation-grid--dining {
-          grid-template-columns: repeat(5, minmax(0, 1fr));
+          grid-template-columns: repeat(6, minmax(0, 1fr));
           justify-content: start;
           align-items: start;
         }
 
         .reservation-grid--events {
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          grid-auto-rows: minmax(0, 1fr);
+          grid-auto-rows: clamp(170px, 15vh, 220px);
           min-height: 0;
         }
 
@@ -1633,11 +1686,10 @@ export default function ReservationLanding() {
 
         @media (max-height: 840px) and (min-width: 981px) {
           .reservation-launcher {
-            --brand-logo-size: 50px;
-            --brand-mark-size: 36px;
+            --brand-logo-width: 180px;
+            --brand-logo-height: 115px;
             --dining-card-max: 196px;
-            grid-template-rows: 46px minmax(0, 1fr);
-            gap: 10px;
+            grid-template-rows: minmax(0, 1fr);
             padding: 10px 22px 12px;
           }
 
@@ -1660,7 +1712,7 @@ export default function ReservationLanding() {
           }
 
           .reservation-directory {
-            padding: 18px 22px;
+            padding: 18px clamp(22px, 3.2vw, 42px);
             gap: 22px;
           }
 
@@ -1684,20 +1736,20 @@ export default function ReservationLanding() {
           }
 
           .reservation-directory {
-            padding: 18px;
+            padding: 18px clamp(18px, 2.8vw, 34px);
           }
         }
 
         @media (max-width: 980px) {
           .reservation-launcher {
-            --brand-logo-size: 54px;
-            --brand-mark-size: 39px;
+            --brand-logo-width: 190px;
+            --brand-logo-height: 120px;
             --dining-card-max: 210px;
             height: auto;
             min-height: 100vh;
             min-height: 100svh;
             overflow: auto;
-            grid-template-rows: auto auto;
+            grid-template-rows: auto;
             background-color: #18140f;
             background-image:
               radial-gradient(circle at 12% 8%, rgba(196, 163, 90, 0.09), transparent 28%),
@@ -1734,8 +1786,8 @@ export default function ReservationLanding() {
           .reservation-launcher {
             --radius-panel: 18px;
             --radius-card: 12px;
-            --brand-logo-size: 48px;
-            --brand-mark-size: 34px;
+            --brand-logo-width: 150px;
+            --brand-logo-height: 100px;
             --dining-card-max: 1fr;
             padding: 12px;
             gap: 12px;

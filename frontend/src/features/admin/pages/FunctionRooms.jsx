@@ -268,7 +268,9 @@ function routeFromSlug(value) {
 
 function isEarlierTime(start, end) {
   if (!start || !end) return true;
-  return String(start).substring(0, 5) < String(end).substring(0, 5);
+  // Allow overnight / midnight-crossing times (e.g. 17:00 → 01:00).
+  // The only invalid case is start === end (handled separately).
+  return String(start).substring(0, 5) !== String(end).substring(0, 5);
 }
 
 function overrideDefaults(type) {
@@ -355,6 +357,67 @@ function imageUrl(image) {
   if (image.startsWith("/")) return `${apiRoot}${image}`;
   if (image.includes("/")) return `${apiRoot}/${image.replace(/^\/+/, "")}`;
   return `${apiRoot}/images/${image}`;
+}
+
+async function compressImageIfNeeded(file, maxDimension = 1200, quality = 0.85) {
+  // Only compress files larger than 1.2 MB
+  if (file.size <= 1200000) {
+    return file;
+  }
+  
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > height) {
+          if (width > maxDimension) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Export to a compressed blob
+        const outputType = file.type === "image/png" ? "image/png" : "image/jpeg";
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file); // Fallback to original
+              return;
+            }
+            if (blob.size >= file.size) {
+              resolve(file); // If compression didn't save space, keep original
+            } else {
+              resolve(new File([blob], file.name, {
+                type: outputType,
+                lastModified: Date.now(),
+              }));
+            }
+          },
+          outputType,
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+    };
+    reader.onerror = () => resolve(file);
+  });
 }
 
 function canonical(value) {
@@ -1274,20 +1337,20 @@ export default function FunctionRooms() {
       if (!period.days.length) return `${period.label || "A schedule period"} needs at least one day.`;
       if (!period.start_time || !period.end_time) return `${period.label || "A schedule period"} needs start and end times.`;
       if (period.start_time === period.end_time) return `${period.label || "A schedule period"} cannot start and end at the same time.`;
-      if (!isEarlierTime(period.start_time, period.end_time)) return `${period.label || "A schedule period"} start time must be before end time.`;
+      if (!isEarlierTime(period.start_time, period.end_time)) return `${period.label || "A schedule period"} start and end times cannot be the same.`;
       if (Number(period.interval_minutes) < 15) return `${period.label || "A schedule period"} interval must be at least 15 minutes.`;
     }
     for (const override of normalizeScheduleOverrides(form.availability_overrides)) {
       if (!override.date) return `${overrideTitle(override)} needs a calendar date.`;
       if (["block_time", "special_hours"].includes(override.type)) {
         if (!override.start_time || !override.end_time) return `${overrideTitle(override)} needs start and end times.`;
-        if (!isEarlierTime(override.start_time, override.end_time)) return `${overrideTitle(override)} start time must be before end time.`;
+        if (!isEarlierTime(override.start_time, override.end_time)) return `${overrideTitle(override)} start and end times cannot be the same.`;
       }
       if (override.type === "capacity" && Number(override.slot_capacity || 0) <= 0 && Number(override.max_reservations_per_slot || 0) <= 0) {
         return "Capacity adjustment needs a slot capacity or max bookings value.";
       }
       if (override.type === "capacity" && override.start_time && override.end_time && !isEarlierTime(override.start_time, override.end_time)) {
-        return "Capacity adjustment start time must be before end time.";
+        return "Capacity adjustment start and end times cannot be the same.";
       }
     }
     if (imageFile && !["image/jpeg", "image/png", "image/webp"].includes(imageFile.type)) return "Image must be JPG, PNG, or WEBP.";
@@ -1521,7 +1584,8 @@ export default function FunctionRooms() {
         const saved = editing ? await venueAPI.update(editing.id, payload) : await venueAPI.create(payload);
         let finalSaved = saved;
         if (imageFile) {
-          finalSaved = await venueAPI.uploadImage(saved.id, imageFile);
+          const optimizedFile = await compressImageIfNeeded(imageFile);
+          finalSaved = await venueAPI.uploadImage(saved.id, optimizedFile);
         }
         await loadRooms();
         notifyVenueConfigUpdated();
@@ -1835,46 +1899,7 @@ export default function FunctionRooms() {
             </div>
 
             <form onSubmit={saveRoom} style={{ minHeight: 0, flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
-              {error && (
-                <div style={{
-                  padding: "11px 20px",
-                  background: "rgba(160, 56, 56, 0.08)",
-                  borderBottom: `1px solid rgba(160, 56, 56, 0.20)`,
-                  color: C.red,
-                  fontSize: 12.5,
-                  fontWeight: 560,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  animation: "fadeIn 0.2s ease",
-                  flexShrink: 0
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 13 }}>⚠️</span>
-                    <span>{error}</span>
-                  </div>
-                  <button 
-                    type="button" 
-                    onClick={() => setError("")} 
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: C.red,
-                      cursor: "pointer",
-                      fontSize: 13,
-                      padding: "2px 6px",
-                      opacity: 0.75,
-                      fontWeight: "bold",
-                      outline: "none"
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                    onMouseLeave={e => e.currentTarget.style.opacity = 0.75}
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
+
               <div style={{ padding: "12px 20px", borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
                 <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 2, alignItems: "center" }}>
                   {EDITOR_TABS.map(([key, label], index) => {
@@ -1967,41 +1992,43 @@ export default function FunctionRooms() {
 
                 <section style={formSectionStyle()}>
                 <div style={sectionTitleStyle()}>Venue Identity</div>
-                <Field label="Venue Type">
-                  <select value={form.type} onChange={(e) => updateForm("type", e.target.value)} style={inputStyle()}>
-                    <option value="function_room">Function Room</option>
-                    <option value="dining">Dining Outlet</option>
-                  </select>
-                </Field>
-                <Field label="Venue Name"><input value={form.name} onChange={(e) => updateForm("name", e.target.value)} style={inputStyle()} /></Field>
-                <Field label="Customer Display Name"><input value={form.display_name} onChange={(e) => updateForm("display_name", e.target.value)} style={inputStyle()} /></Field>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr", gap: 10, alignItems: "start" }}>
-                  <Field 
-                    label="Venue Code / Slug" 
-                    hint="This becomes the venue’s public page URL, such as /potato-corner."
-                  >
-                    <div style={{ display: "grid", gap: 4 }}>
-                      <input value={form.slug} onChange={(e) => updateForm("slug", slugify(e.target.value))} placeholder="hanakazu-japanese-restaurant" style={{ ...inputStyle(), borderColor: isSlugTaken ? C.red : C.border }} />
-                      {isSlugTaken && (
-                        <span style={{ color: C.red, fontSize: 11.5, fontWeight: 550, display: "block", marginTop: 2 }}>
-                          ⚠️ This slug is already in use by an active venue.
-                        </span>
-                      )}
-                      {form.slug && (
-                        <div style={{ marginTop: 4, padding: "5px 8px", borderRadius: 6, background: "rgba(0,0,0,0.025)", border: `1px solid ${isSlugTaken ? "rgba(160,56,56,0.1)" : "rgba(0,0,0,0.04)"}`, display: "inline-flex", alignItems: "center", gap: 6, width: "fit-content" }}>
-                          <span style={{ fontSize: 8, fontWeight: 750, color: C.gold, letterSpacing: "0.06em", textTransform: "uppercase" }}>Public URL</span>
-                          <span style={{ fontSize: 11.5, color: C.text, fontFamily: "monospace" }}>{form.reservation_route || `/${form.slug}`}</span>
-                        </div>
-                      )}
-                    </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <Field label="Venue Type">
+                    <select value={form.type} onChange={(e) => updateForm("type", e.target.value)} style={inputStyle()}>
+                      <option value="function_room">Function Room</option>
+                      <option value="dining">Dining Outlet</option>
+                    </select>
                   </Field>
                   <Field label="Order"><input type="number" min="0" value={form.display_order} onChange={(e) => updateForm("display_order", e.target.value)} style={inputStyle()} /></Field>
                 </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    <Field label="Location"><select value={form.wing} onChange={(e) => updateForm("wing", e.target.value)} style={inputStyle()}><option>Dining</option><option>Main Wing</option><option>Tower Wing</option></select></Field>
-                    <Field label="Capacity"><input type="number" min="0" value={form.capacity} onChange={(e) => updateForm("capacity", e.target.value)} style={inputStyle()} /></Field>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <Field label="Venue Name"><input value={form.name} onChange={(e) => updateForm("name", e.target.value)} style={inputStyle()} /></Field>
+                  <Field label="Customer Display Name"><input value={form.display_name} onChange={(e) => updateForm("display_name", e.target.value)} style={inputStyle()} /></Field>
+                </div>
+                <Field 
+                  label="Venue Code / Slug" 
+                  hint="This becomes the venue’s public page URL, such as /potato-corner."
+                >
+                  <div style={{ display: "grid", gap: 4 }}>
+                    <input value={form.slug} onChange={(e) => updateForm("slug", slugify(e.target.value))} placeholder="hanakazu-japanese-restaurant" style={{ ...inputStyle(), borderColor: isSlugTaken ? C.red : C.border }} />
+                    {isSlugTaken && (
+                      <span style={{ color: C.red, fontSize: 11.5, fontWeight: 550, display: "block", marginTop: 2 }}>
+                        ⚠️ This slug is already in use by an active venue.
+                      </span>
+                    )}
+                    {form.slug && (
+                      <div style={{ marginTop: 4, padding: "5px 8px", borderRadius: 6, background: "rgba(0,0,0,0.025)", border: `1px solid ${isSlugTaken ? "rgba(160,56,56,0.1)" : "rgba(0,0,0,0.04)"}`, display: "inline-flex", alignItems: "center", gap: 6, width: "fit-content" }}>
+                        <span style={{ fontSize: 8, fontWeight: 750, color: C.gold, letterSpacing: "0.06em", textTransform: "uppercase" }}>Public URL</span>
+                        <span style={{ fontSize: 11.5, color: C.text, fontFamily: "monospace" }}>{form.reservation_route || `/${form.slug}`}</span>
+                      </div>
+                    )}
                   </div>
-                </section>
+                </Field>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <Field label="Location"><select value={form.wing} onChange={(e) => updateForm("wing", e.target.value)} style={inputStyle()}><option>Dining</option><option>Main Wing</option><option>Tower Wing</option></select></Field>
+                  <Field label="Capacity"><input type="number" min="0" value={form.capacity} onChange={(e) => updateForm("capacity", e.target.value)} style={inputStyle()} /></Field>
+                </div>
+              </section>
 
                 <section style={formSectionStyle()}>
                   <div style={sectionTitleStyle()}>Grouping & Reservation</div>
@@ -2105,11 +2132,11 @@ export default function FunctionRooms() {
                   
                   {form.availability_enabled ? (
                     <>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: "10px 0", borderTop: `1px solid ${C.divider}` }}>
-                        <span style={{ color: C.muted, fontSize: 12, lineHeight: 1.5, flex: 1 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 0", borderTop: `1px solid ${C.divider}` }}>
+                        <span style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
                           Add multiple service periods for breakfast, lunch, dinner, private dining, or event windows.
                         </span>
-                        <button type="button" onClick={applyDefaultSchedule} style={{ ...buttonBase(), flexShrink: 0, padding: "8px 14px", border: `1px solid ${C.gold}`, color: C.gold, background: "transparent", transition: "all 0.2s" }} onMouseEnter={e => { e.currentTarget.style.background = C.goldFaint; }} onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+                        <button type="button" onClick={applyDefaultSchedule} style={{ ...buttonBase(), alignSelf: "flex-start", padding: "8px 14px", border: `1px solid ${C.gold}`, color: C.gold, background: "transparent", transition: "all 0.2s" }} onMouseEnter={e => { e.currentTarget.style.background = C.goldFaint; }} onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
                           Apply Template
                         </button>
                       </div>
@@ -2281,11 +2308,33 @@ export default function FunctionRooms() {
                 </aside>
               </div>
 
-              <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", gap: 9 }}>
-                <button type="button" onClick={closeDrawer} disabled={saving} style={buttonBase()}>Cancel</button>
-                <button type="submit" disabled={!canManage || saving} style={{ ...buttonBase(), minWidth: 150, border: "none", background: canManage ? C.gold : C.faint, color: "#fff", cursor: canManage && !saving ? "pointer" : "not-allowed" }}>
-                  {saving ? "Saving..." : editing ? "Save Changes" : "Create Venue"}
-                </button>
+              <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 9 }}>
+                <div style={{ display: "flex", gap: 8, flex: 1 }}>
+                  {error && (
+                    <div style={{
+                      padding: "8px 12px",
+                      background: "rgba(160, 56, 56, 0.08)",
+                      border: `1px solid rgba(160, 56, 56, 0.20)`,
+                      borderRadius: 8,
+                      color: C.red,
+                      fontSize: 12.5,
+                      fontWeight: 560,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      animation: "fadeIn 0.2s ease",
+                    }}>
+                      <span style={{ fontSize: 13 }}>⚠️</span>
+                      <span>{error}</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 9, flexShrink: 0 }}>
+                  <button type="button" onClick={closeDrawer} disabled={saving} style={buttonBase()}>Cancel</button>
+                  <button type="submit" disabled={!canManage || saving} style={{ ...buttonBase(), minWidth: 150, border: "none", background: canManage ? C.gold : C.faint, color: "#fff", cursor: canManage && !saving ? "pointer" : "not-allowed" }}>
+                    {saving ? "Saving..." : editing ? "Save Changes" : "Create Venue"}
+                  </button>
+                </div>
               </div>
             </form>
           </aside>

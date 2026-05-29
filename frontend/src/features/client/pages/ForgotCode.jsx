@@ -240,6 +240,13 @@ export default function ForgotCode() {
   const [results,     setResults]     = useState(null);
   const [focused,     setFocused]     = useState(false);
 
+  // Email recovery tab state
+  const [activeTab,    setActiveTab]    = useState("combo");
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [emailSending,  setEmailSending]  = useState(false);
+  const [emailSent,     setEmailSent]     = useState(false);
+  const [emailFocused,  setEmailFocused]  = useState(false);
+
   // ── Date / time formatters ──────────────────────────────────────────────────
   // Parse without UTC shift: "2025-04-20" → local midnight, not UTC midnight
   const fmtDate = (d) => {
@@ -316,6 +323,39 @@ export default function ForgotCode() {
       setError("No reservations found. Please double-check your surname and phone number.");
     } finally {
       setSearching(false);
+    }
+  };
+
+  // ── Email recovery handler ──────────────────────────────────────────────────
+  const handleEmailRecovery = async () => {
+    const trimmed = recoveryEmail.trim();
+    if (!trimmed) {
+      setError("Please enter your email address.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    setError("");
+    setEmailSending(true);
+    setEmailSent(false);
+    try {
+      const res = await fetch(`${API_BASE}/reservations/recover-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ email: trimmed }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.message || "Something went wrong. Please try again.");
+      } else {
+        setEmailSent(true);
+      }
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+    } finally {
+      setEmailSending(false);
     }
   };
 
@@ -599,7 +639,7 @@ export default function ForgotCode() {
             }}>
 
               {/* Header — hidden once results appear */}
-              {!results && (
+              {!results && !emailSent && (
                 <div style={{ marginBottom: 28, animation: "fadeUp 0.32s ease" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                     <span style={{ display: "inline-block", width: 24, height: "1px", background: C.gold, opacity: 0.6 }} />
@@ -619,15 +659,70 @@ export default function ForgotCode() {
                   </h1>
                   <p style={{
                     fontFamily: F.body, fontSize: 13.5, color: C.textSecondary,
-                    margin: 0, lineHeight: 1.72,
+                    margin: "0 0 22px", lineHeight: 1.72,
                   }}>
-                    Enter your combination code to locate your booking reference.
+                    {activeTab === "combo"
+                      ? "Enter your combination code to locate your booking reference."
+                      : "We'll send your reference code(s) to your email address."}
                   </p>
+
+                  {/* ── Tab Switcher ── */}
+                  <div style={{
+                    display: "flex", gap: 0,
+                    background: isDark ? "rgba(255,250,241,0.04)" : "rgba(0,0,0,0.03)",
+                    borderRadius: 10, padding: 3,
+                    border: `1px solid ${C.borderDefault}`,
+                  }}>
+                    {[
+                      { key: "combo", label: "Combination Code", icon: (
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="2.5"
+                          strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                      )},
+                      { key: "email", label: "Email Recovery", icon: (
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="2.5"
+                          strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="4" width="20" height="16" rx="2" />
+                          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                        </svg>
+                      )},
+                    ].map(({ key, label, icon }) => (
+                      <button
+                        key={key}
+                        onClick={() => { setActiveTab(key); setError(""); setResults(null); setEmailSent(false); }}
+                        style={{
+                          flex: 1, padding: "9px 14px",
+                          background: activeTab === key
+                            ? (isDark ? "rgba(196,163,90,0.15)" : "rgba(255,255,255,0.92)")
+                            : "transparent",
+                          border: activeTab === key
+                            ? `1px solid ${C.borderAccent}`
+                            : "1px solid transparent",
+                          borderRadius: 8,
+                          fontFamily: F.label, fontSize: 10, fontWeight: 700,
+                          letterSpacing: "0.08em", textTransform: "uppercase",
+                          color: activeTab === key ? C.gold : C.textSecondary,
+                          cursor: "pointer", transition: "all 0.20s",
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                          boxShadow: activeTab === key
+                            ? (isDark ? "0 2px 8px rgba(0,0,0,0.18)" : "0 2px 8px rgba(78,60,32,0.10)")
+                            : "none",
+                        }}
+                      >
+                        {icon}
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {/* ── Search form ── */}
-              {!results && (
+              {/* ── Combination code search form ── */}
+              {!results && !emailSent && activeTab === "combo" && (
                 <div style={{ animation: "fadeUp 0.36s ease" }}>
 
                   {/* How-it-works hint */}
@@ -801,6 +896,254 @@ export default function ForgotCode() {
                         strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="9 18 15 12 9 6" />
                       </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+              {/* ── Email recovery form ── */}
+              {!results && !emailSent && activeTab === "email" && (
+                <div style={{ animation: "fadeUp 0.36s ease" }}>
+
+                  {/* Email input */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      fontFamily: F.label, fontSize: 9, letterSpacing: "0.22em",
+                      color: emailFocused ? C.gold : C.textSecondary,
+                      fontWeight: 700, textTransform: "uppercase", marginBottom: 8,
+                      transition: "color 0.18s",
+                    }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2.5"
+                        strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                      </svg>
+                      Email Address{" "}
+                      <span style={{ color: C.red, marginLeft: 2 }}>*</span>
+                    </label>
+                    <input
+                      value={recoveryEmail}
+                      onChange={(e) => { setRecoveryEmail(e.target.value); setError(""); }}
+                      onKeyDown={(e) => e.key === "Enter" && handleEmailRecovery()}
+                      onFocus={() => setEmailFocused(true)}
+                      onBlur={() => setEmailFocused(false)}
+                      placeholder="e.g. juan@email.com"
+                      type="email"
+                      autoComplete="email"
+                      style={{
+                        width: "100%", boxSizing: "border-box",
+                        padding: "14px 18px",
+                        border: `1px solid ${emailFocused ? C.borderAccent : C.borderDefault}`,
+                        borderRadius: 12,
+                        background: isDark ? "rgba(255,250,241,0.055)" : "rgba(255,255,255,0.76)",
+                        fontFamily: F.body, fontSize: 15, fontWeight: 500,
+                        color: C.textPrimary,
+                        outline: "none",
+                        transition: "border-color 0.18s, box-shadow 0.18s, background 0.18s",
+                        boxShadow: emailFocused ? `${C.inputFocusShadow}, inset 0 1px 0 rgba(255,255,255,0.04)` : "inset 0 1px 0 rgba(255,255,255,0.035)",
+                        colorScheme: isDark ? "dark" : "light",
+                      }}
+                    />
+                  </div>
+
+                  {/* Info hint */}
+                  <div style={{
+                    padding: "10px 14px", borderRadius: 10, marginBottom: 14,
+                    background: isDark ? "rgba(196,163,90,0.06)" : "rgba(140,107,42,0.05)",
+                    border: `1px solid ${C.borderAccent}`,
+                    display: "flex", gap: 10, alignItems: "flex-start",
+                  }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                      stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                      style={{ flexShrink: 0, marginTop: 1 }}>
+                      <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                      <path d="M12 16v-4" />
+                      <path d="M12 8h.01" />
+                    </svg>
+                    <span style={{ fontFamily: F.body, fontSize: 12, color: C.textSecondary, lineHeight: 1.6 }}>
+                      We'll send all your active reservation reference codes to this email. Check your inbox (and spam folder) after submitting.
+                    </span>
+                  </div>
+
+                  {/* Error */}
+                  {error && (
+                    <div style={{
+                      padding: "10px 14px", borderRadius: 8, marginBottom: 14,
+                      background: C.redFaint, borderLeft: `3px solid ${C.red}`,
+                      fontSize: 12.5, color: C.red, lineHeight: 1.60,
+                      display: "flex", alignItems: "center", gap: 8,
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2"
+                        strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8"  x2="12"    y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Submit button */}
+                  <button
+                    onClick={handleEmailRecovery}
+                    disabled={emailSending}
+                    style={{
+                      width: "100%", padding: "14px",
+                      background: emailSending
+                        ? (isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)")
+                        : `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`,
+                      border: `1px solid ${emailSending ? C.borderDefault : "transparent"}`,
+                      borderRadius: 12,
+                      fontFamily: F.label, fontSize: 10, fontWeight: 700,
+                      letterSpacing: "0.18em", textTransform: "uppercase",
+                      color: emailSending ? C.textSecondary : C.textOnAccent,
+                      cursor: emailSending ? "not-allowed" : "pointer",
+                      transition: "all 0.20s",
+                      display: "flex", alignItems: "center",
+                      justifyContent: "center", gap: 10,
+                      boxShadow: emailSending ? "none" : "0 14px 26px rgba(140,107,42,0.22)",
+                    }}
+                    onMouseEnter={(e) => { if (!emailSending) e.currentTarget.style.background = C.goldLight; }}
+                    onMouseLeave={(e) => { if (!emailSending) e.currentTarget.style.background = `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`; }}
+                  >
+                    {emailSending ? (
+                      <>
+                        <span style={{
+                          display: "inline-block", width: 13, height: 13,
+                          border: `1.5px solid ${C.textSecondary}40`,
+                          borderTopColor: C.textSecondary,
+                          borderRadius: "50%",
+                          animation: "spin 0.65s linear infinite",
+                        }} />
+                        Sending…
+                      </>
+                    ) : (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="2.5"
+                          strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="4" width="20" height="16" rx="2" />
+                          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                        </svg>
+                        Send to My Email
+                      </>
+                    )}
+                  </button>
+
+                  {/* Footer link */}
+                  <div style={{
+                    marginTop: 24, paddingTop: 22,
+                    borderTop: `1px solid ${C.divider}`,
+                    display: "flex", alignItems: "center",
+                    justifyContent: "space-between",
+                  }}>
+                    <span style={{ fontFamily: F.body, fontSize: 12.5, color: C.textSecondary }}>
+                      Remember your code?
+                    </span>
+                    <button
+                      onClick={() => navigate("/manage-booking")}
+                      style={{
+                        background: "none", border: "none",
+                        fontFamily: F.label, fontSize: 11, fontWeight: 700,
+                        letterSpacing: "0.08em", textTransform: "uppercase",
+                        color: C.gold, cursor: "pointer", padding: 0,
+                        display: "flex", alignItems: "center", gap: 4,
+                      }}
+                    >
+                      Manage Booking
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2.5"
+                        strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Email sent success ── */}
+              {emailSent && (
+                <div style={{ animation: "fadeUp 0.32s ease" }}>
+                  <div style={{
+                    padding: "28px 24px", borderRadius: 16,
+                    background: isDark ? "rgba(74,158,126,0.08)" : "rgba(46,122,90,0.06)",
+                    border: `1px solid ${C.greenBorder}`,
+                    textAlign: "center",
+                    marginBottom: 20,
+                  }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: "50%",
+                      background: C.greenFaint, border: `2px solid ${C.greenBorder}`,
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      marginBottom: 16,
+                    }}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                        stroke={C.green} strokeWidth="2.5"
+                        strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                    <h3 style={{
+                      fontFamily: F.display, fontSize: 20, fontWeight: 600,
+                      color: C.green, margin: "0 0 10px",
+                    }}>
+                      Check Your Inbox
+                    </h3>
+                    <p style={{
+                      fontFamily: F.body, fontSize: 13, color: C.textSecondary,
+                      margin: 0, lineHeight: 1.72,
+                    }}>
+                      If a reservation exists with <strong style={{ color: C.textPrimary }}>{recoveryEmail}</strong>, we've sent your reference code(s) to your inbox. Please also check your spam/junk folder.
+                    </p>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      onClick={() => { setEmailSent(false); setRecoveryEmail(""); setError(""); }}
+                      style={{
+                        flex: 1, padding: "11px 16px",
+                        background: "transparent",
+                        border: `1px solid ${C.borderDefault}`,
+                        borderRadius: 8,
+                        fontFamily: F.label, fontSize: 10, fontWeight: 700,
+                        letterSpacing: "0.10em", textTransform: "uppercase",
+                        color: C.textSecondary, cursor: "pointer", transition: "all 0.18s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = C.borderAccent;
+                        e.currentTarget.style.color       = C.gold;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = C.borderDefault;
+                        e.currentTarget.style.color       = C.textSecondary;
+                      }}
+                    >
+                      Try Again
+                    </button>
+                    <button
+                      onClick={() => navigate("/manage-booking")}
+                      style={{
+                        flex: 1, padding: "11px 16px",
+                        background: C.gold, border: "none",
+                        borderRadius: 8,
+                        fontFamily: F.label, fontSize: 10, fontWeight: 700,
+                        letterSpacing: "0.10em", textTransform: "uppercase",
+                        color: C.textOnAccent, cursor: "pointer", transition: "all 0.18s",
+                        display: "flex", alignItems: "center",
+                        justifyContent: "center", gap: 8,
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = C.goldLight; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = C.gold; }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2.5"
+                        strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                      Manage Booking
                     </button>
                   </div>
                 </div>

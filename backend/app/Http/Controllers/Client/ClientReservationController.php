@@ -11,6 +11,7 @@ use App\Events\ReservationCreated;
 use App\Events\SeatReserved;
 use App\Events\TableReserved;
 use App\Mail\ReservationStatusMail;
+use App\Mail\ReferenceCodeRecoveryMail;
 use App\Services\ReservationService;
 use App\Services\VenueService;
 use Illuminate\Http\Request;
@@ -654,6 +655,47 @@ class ClientReservationController extends Controller
             \Log::error('[ClientReservationController::notify] Mail failed: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Mail failed: ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Recover reference codes via email.
+     * Looks up all active reservations for the given email address and sends
+     * them in a branded recovery email. Always returns a generic success
+     * message to prevent email enumeration.
+     *
+     * POST /api/reservations/recover-code
+     * Body: { email: "guest@example.com" }
+     */
+    public function recoverReferenceCode(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => 'required|email|max:255',
+        ]);
+
+        $email = strtolower(trim($validated['email']));
+
+        // Find all active (non-cancelled, non-rejected) reservations for this email
+        $reservations = Reservation::with('venue')
+            ->whereRaw('lower(email) = ?', [$email])
+            ->whereNotIn('status', ['cancelled'])
+            ->orderBy('event_date', 'desc')
+            ->get();
+
+        if ($reservations->isNotEmpty()) {
+            try {
+                Mail::to($email)
+                    ->send(new ReferenceCodeRecoveryMail($reservations));
+                \Log::info("Reference code recovery email sent to: {$email} ({$reservations->count()} reservations)");
+            } catch (\Exception $e) {
+                \Log::error('Failed to send reference code recovery email: ' . $e->getMessage());
+            }
+        }
+
+        // Always return success to prevent email enumeration
+        return response()->json([
+            'success' => true,
+            'message' => 'If a reservation exists with this email address, we have sent your reference code(s) to your inbox.',
+        ]);
     }
 
     /**

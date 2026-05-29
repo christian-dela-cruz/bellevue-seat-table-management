@@ -103,6 +103,7 @@ Route::prefix('admin/reservations')->group(function () {
 
 // Client reservation routes
 Route::prefix('reservations')->group(function () {
+    Route::post('/recover-code', [ClientReservationController::class, 'recoverReferenceCode']);
     Route::get('/', [ClientReservationController::class, 'index']);
     Route::post('/', [ClientReservationController::class, 'store']);
     Route::get('/{id}', [ClientReservationController::class, 'show']);
