@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { venueAPI } from "../../services/venueAPI";
+import BellevueDropdown from "../BellevueDropdown";
 
 export const DEFAULT_EVENT_TIME = "19:00";
 const STORAGE_KEY = "seatmap:selected_schedule";
@@ -125,54 +126,64 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
     onChange(saveSeatmapSchedule(draftSchedule));
   };
 
+  const [dateFocused, setDateFocused] = useState(false);
+
   if (isReady) {
     return (
       <div style={{
         width: "100%",
         display: "grid",
-        gap: 10,
-        padding: "14px 16px",
-        borderRadius: 12,
-        border: isDark ? "1px solid rgba(212,175,55,0.28)" : "1px solid rgba(140,107,42,0.22)",
-        background: isDark ? "rgba(18,16,14,0.94)" : "rgba(255,255,255,0.96)",
-        boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.30)" : "0 2px 12px rgba(0,0,0,0.06)",
+        gap: 14,
+        padding: "22px",
+        borderRadius: 16,
+        border: isDark ? "1.5px solid rgba(196,163,90,0.22)" : "1.5px solid rgba(140,107,42,0.18)",
+        background: isDark ? "#111009" : "#FFFFFF",
+        boxShadow: isDark ? "0 10px 30px rgba(0,0,0,0.25)" : "0 8px 24px rgba(78,60,32,0.04)",
         boxSizing: "border-box",
         fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#8C6B2A" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"}`, paddingBottom: 10 }}>
+          <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.20em", textTransform: "uppercase", color: isDark ? "#C4A35A" : "#8C6B2A" }}>
             Availability Schedule
           </span>
-          <span style={{
-            maxWidth: 130,
-            overflow: "hidden",
-            whiteSpace: "nowrap",
-            textOverflow: "ellipsis",
-            fontSize: 11,
-            color: isDark ? "rgba(247,244,238,0.62)" : "rgba(24,20,14,0.52)",
-          }}>
-            {roomLabel}
-          </span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 104px", gap: 8 }}>
-          <input
-            type="date"
-            value={draftSchedule.eventDate}
-            onChange={(event) => setDraftSchedule({ ...draftSchedule, eventDate: event.target.value })}
-            style={controlStyle(isDark)}
-          />
-          <TimeSlotControl
-            value={draftSchedule.eventTime}
-            slots={slots}
-            loading={slotLoading}
-            scheduleEnforced={scheduleEnforced}
-            emptyMessage={scheduleMessage}
-            onChange={(eventTime) => setDraftSchedule({ ...draftSchedule, eventTime })}
-            style={controlStyle(isDark)}
-          />
+        
+        <div style={{ display: "grid", gap: 12 }}>
+          <label style={{ ...labelStyle, color: isDark ? "#8A8278" : "rgba(24,20,14,0.48)" }}>
+            Date
+            <input
+              type="date"
+              value={draftSchedule.eventDate}
+              onFocus={() => setDateFocused(true)}
+              onBlur={() => setDateFocused(false)}
+              onChange={(event) => setDraftSchedule({ ...draftSchedule, eventDate: event.target.value })}
+              style={{
+                ...controlStyle(isDark),
+                border: dateFocused
+                  ? (isDark ? "1.5px solid rgba(196,163,90,0.35)" : "1.5px solid rgba(140,107,42,0.32)")
+                  : (isDark ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid rgba(0,0,0,0.08)"),
+                boxShadow: dateFocused ? (isDark ? "0 0 0 3px rgba(196,163,90,0.12)" : "0 0 0 3px rgba(140,107,42,0.10)") : "none",
+              }}
+            />
+          </label>
+          
+          <label style={{ ...labelStyle, color: isDark ? "#8A8278" : "rgba(24,20,14,0.48)" }}>
+            Time
+            <TimeSlotControl
+              value={draftSchedule.eventTime}
+              slots={slots}
+              loading={slotLoading}
+              scheduleEnforced={scheduleEnforced}
+              emptyMessage={scheduleMessage}
+              onChange={(eventTime) => setDraftSchedule({ ...draftSchedule, eventTime })}
+              style={controlStyle(isDark)}
+              isDark={isDark}
+            />
+          </label>
         </div>
+
         {(slotError || selectedSlot?.reason || scheduleMessage) && (
-          <div style={{ fontSize: 11.5, lineHeight: 1.45, color: selectedSlot?.reason ? "#A03838" : (isDark ? "rgba(247,244,238,0.58)" : "rgba(24,20,14,0.52)") }}>
+          <div style={{ fontSize: 11.5, lineHeight: 1.45, color: selectedSlot?.reason ? "#B85C5C" : (isDark ? "#8A8278" : "rgba(24,20,14,0.52)") }}>
             {selectedSlot?.reason || scheduleMessage || slotError}
           </div>
         )}
@@ -207,34 +218,37 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
         maxWidth: 420,
         borderRadius: 14,
         overflow: "hidden",
-        background: "#FFFFFF",
-        border: "1px solid rgba(0,0,0,0.08)",
+        background: isDark ? "#111009" : "#FFFFFF",
+        border: isDark ? "1.5px solid rgba(196,163,90,0.22)" : "1.5px solid rgba(0,0,0,0.08)",
         boxShadow: "0 24px 80px rgba(0,0,0,0.24)",
       }}>
-        <div style={{ height: 2, background: "linear-gradient(90deg, transparent, rgba(140,107,42,0.75), transparent)" }} />
-        <div style={{ padding: "20px 22px 18px", background: "linear-gradient(160deg,#FAF8F4 0%,#F2EFE8 100%)", borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
-          <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.22em", color: "#8C6B2A", textTransform: "uppercase", marginBottom: 6 }}>
+        <div style={{ height: 2, background: isDark ? "linear-gradient(90deg, transparent, rgba(196,163,90,0.75), transparent)" : "linear-gradient(90deg, transparent, rgba(140,107,42,0.75), transparent)" }} />
+        <div style={{ padding: "20px 22px 18px", background: isDark ? "linear-gradient(160deg,#161410 0%,#111009 100%)" : "linear-gradient(160deg,#FAF8F4 0%,#F2EFE8 100%)", borderBottom: isDark ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(0,0,0,0.05)" }}>
+          <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.22em", color: isDark ? "#C4A35A" : "#8C6B2A", textTransform: "uppercase", marginBottom: 6 }}>
             Select Schedule First
           </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#18140E", lineHeight: 1.2 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: isDark ? "#EDE8DF" : "#18140E", lineHeight: 1.2 }}>
             Check availability for {roomLabel}
           </div>
         </div>
         <div style={{ padding: "20px 22px 24px" }}>
-          <div style={{ fontSize: 12.5, color: "#7A7060", lineHeight: 1.65, marginBottom: 16 }}>
+          <div style={{ fontSize: 12.5, color: isDark ? "#8A8278" : "#7A7060", lineHeight: 1.65, marginBottom: 16 }}>
             Seat and table status depends on the reservation date and time. Choose a schedule before selecting a seat/table.
           </div>
           <div style={{ display: "grid", gap: 12 }}>
-            <label style={labelStyle}>
+            <label style={{ ...labelStyle, color: isDark ? "#8A8278" : "rgba(24,20,14,0.48)" }}>
               Date
               <input
                 type="date"
                 value={draftSchedule.eventDate}
                 onChange={(event) => setDraftSchedule({ ...draftSchedule, eventDate: event.target.value })}
-                style={modalInputStyle}
+                style={{
+                  ...modalInputStyle(isDark),
+                  border: isDark ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid rgba(0,0,0,0.10)",
+                }}
               />
             </label>
-            <label style={labelStyle}>
+            <label style={{ ...labelStyle, color: isDark ? "#8A8278" : "rgba(24,20,14,0.48)" }}>
               Time
               <TimeSlotControl
                 value={draftSchedule.eventTime}
@@ -243,11 +257,12 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
                 scheduleEnforced={scheduleEnforced}
                 emptyMessage={scheduleMessage}
                 onChange={(eventTime) => setDraftSchedule({ ...draftSchedule, eventTime })}
-                style={modalInputStyle}
+                style={modalInputStyle(isDark)}
+                isDark={isDark}
               />
             </label>
             {(slotError || selectedSlot?.reason || scheduleMessage) && (
-              <div style={{ fontSize: 12, lineHeight: 1.5, color: selectedSlot?.reason ? "#A03838" : "#7A7060" }}>
+              <div style={{ fontSize: 12, lineHeight: 1.5, color: selectedSlot?.reason ? "#B85C5C" : (isDark ? "#8A8278" : "#7A7060") }}>
                 {selectedSlot?.reason || scheduleMessage || slotError}
               </div>
             )}
@@ -255,7 +270,7 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
               type="button"
               onClick={confirmSchedule}
               disabled={!isDraftValid}
-              style={confirmButtonStyle(false, isDraftValid)}
+              style={confirmButtonStyle(isDark, isDraftValid)}
             >
               Confirm Schedule
             </button>
@@ -266,13 +281,18 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
   );
 }
 
-function TimeSlotControl({ value, slots, loading, scheduleEnforced = false, emptyMessage = "", onChange, style }) {
+function TimeSlotControl({ value, slots, loading, scheduleEnforced = false, emptyMessage = "", onChange, style, isDark }) {
   if (!slots.length) {
     if (scheduleEnforced) {
       return (
-        <select value="" disabled style={style} aria-label={emptyMessage || "No available time slots"}>
-          <option value="">{loading ? "Loading..." : "No available times"}</option>
-        </select>
+        <BellevueDropdown
+          value=""
+          disabled
+          options={[]}
+          placeholder={loading ? "Loading..." : "No available times"}
+          isDark={isDark}
+          style={style}
+        />
       );
     }
 
@@ -281,49 +301,58 @@ function TimeSlotControl({ value, slots, loading, scheduleEnforced = false, empt
         type="time"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        style={style}
+        style={{
+          ...style,
+          colorScheme: isDark ? "dark" : "light"
+        }}
       />
     );
   }
 
   return (
-    <select value={String(value || "").substring(0, 5)} onChange={(event) => onChange(event.target.value)} style={style} disabled={loading}>
-      {slots.map((slot) => (
-        <option key={slot.time} value={slot.time} disabled={!slot.available}>
-          {slot.label}{slot.available ? "" : ` - ${slot.reason || "Unavailable"}`}
-        </option>
-      ))}
-    </select>
+    <BellevueDropdown
+      value={String(value || "").substring(0, 5)}
+      onChange={(val) => onChange(val)}
+      options={slots}
+      placeholder="Select a time"
+      isDark={isDark}
+      disabled={loading}
+      style={style}
+    />
   );
 }
 
 function controlStyle(isDark) {
   return {
-    height: 32,
-    border: "1px solid rgba(0,0,0,0.10)",
+    width: "100%",
+    height: 40,
+    boxSizing: "border-box",
+    padding: "0 14px",
+    border: isDark ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid rgba(0,0,0,0.08)",
     borderRadius: 8,
-    background: isDark ? "#18140E" : "#FFFFFF",
-    color: isDark ? "#F7F4EE" : "#18140E",
-    padding: "0 8px",
-    fontSize: 12,
+    background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
+    color: isDark ? "#EDE8DF" : "#18140E",
+    fontSize: 13,
     fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
     outline: "none",
+    transition: "border-color 0.18s, box-shadow 0.18s",
   };
 }
 
 function confirmButtonStyle(isDark, isActive) {
   return {
-    height: 34,
+    height: 40, // Uniform 40px height
     border: 0,
     borderRadius: 8,
-    background: isActive ? "#2E7A5A" : (isDark ? "rgba(247,244,238,0.14)" : "rgba(24,20,14,0.12)"),
-    color: isActive ? "#FFFFFF" : (isDark ? "rgba(247,244,238,0.42)" : "rgba(24,20,14,0.38)"),
+    background: isActive ? (isDark ? "#C4A35A" : "#8C6B2A") : (isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"),
+    color: isActive ? (isDark ? "#0A0908" : "#FFFFFF") : (isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)"),
     fontSize: 10,
     fontWeight: 800,
     letterSpacing: "0.14em",
     textTransform: "uppercase",
     fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
     cursor: isActive ? "pointer" : "not-allowed",
+    transition: "all 0.18s ease",
   };
 }
 
@@ -334,17 +363,21 @@ const labelStyle = {
   fontWeight: 800,
   letterSpacing: "0.16em",
   textTransform: "uppercase",
-  color: "rgba(24,20,14,0.48)",
 };
 
-const modalInputStyle = {
-  height: 40,
-  border: "1px solid rgba(0,0,0,0.10)",
-  borderRadius: 8,
-  background: "#FFFFFF",
-  color: "#18140E",
-  padding: "0 11px",
-  fontSize: 13,
-  fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-  outline: "none",
-};
+function modalInputStyle(isDark) {
+  return {
+    width: "100%",
+    height: 40,
+    boxSizing: "border-box",
+    border: isDark ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid rgba(0,0,0,0.10)",
+    borderRadius: 8,
+    background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
+    color: isDark ? "#EDE8DF" : "#18140E",
+    padding: "0 11px",
+    fontSize: 13,
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    outline: "none",
+    colorScheme: isDark ? "dark" : "light"
+  };
+}
