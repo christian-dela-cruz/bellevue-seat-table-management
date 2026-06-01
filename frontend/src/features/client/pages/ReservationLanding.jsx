@@ -598,36 +598,16 @@ export default function ReservationLanding() {
               </div>
               <button
                 type="button"
-                className="reservation-theme-toggle reservation-theme-toggle--floating"
+                className="reservation-theme-icon-button"
                 onClick={() => setTheme(isLight ? "dark" : "light")}
-                aria-pressed={isLight}
-                aria-label={`Switch to ${isLight ? "dark" : "light"} mode`}
+                title={isLight ? "Switch to dark mode" : "Switch to light mode"}
+                aria-label={isLight ? "Switch to dark mode" : "Switch to light mode"}
               >
-                <span className="reservation-theme-toggle__switch" aria-hidden="true">
-                  <span className="reservation-theme-toggle__icon reservation-theme-toggle__icon--moon">
-                    <svg viewBox="0 0 24 24" role="presentation">
-                      <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
-                    </svg>
-                  </span>
-                  <span className="reservation-theme-toggle__icon reservation-theme-toggle__icon--sun">
-                    <svg viewBox="0 0 24 24" role="presentation">
-                      <circle cx="12" cy="12" r="4.2" />
-                      <path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" />
-                    </svg>
-                  </span>
-                  <span className="reservation-theme-toggle__thumb">
-                    {isLight ? (
-                      <svg viewBox="0 0 24 24" role="presentation">
-                        <circle cx="12" cy="12" r="4.2" />
-                        <path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" role="presentation">
-                        <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
-                      </svg>
-                    )}
-                  </span>
-                </span>
+                {isLight ? (
+                  <span style={{ fontSize: "18px", lineHeight: 1, display: "block", color: "#a47821", pointerEvents: "none" }} role="presentation">☾</span>
+                ) : (
+                  <span style={{ fontSize: "18px", lineHeight: 1, display: "block", color: "#e2c96a", pointerEvents: "none" }} role="presentation">☀</span>
+                )}
               </button>
             </div>
 
@@ -822,133 +802,56 @@ export default function ReservationLanding() {
           background: rgba(164, 120, 33, 0.1);
         }
 
-        .reservation-theme-toggle {
-          gap: 0;
-          justify-content: center;
-          min-width: 58px;
-          padding: 0 6px !important;
-        }
-
-        .reservation-theme-toggle--floating {
+        .reservation-theme-icon-button {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          background: transparent;
-          border: none;
-          padding: 0 !important;
-          min-width: 0 !important;
-          width: auto !important;
-          color: rgba(255, 250, 241, 0.76);
-          box-shadow: none;
-          backdrop-filter: none;
-          cursor: pointer;
-          transition: transform 0.22s ease;
-          align-self: flex-end;
-          position: relative;
-          right: 14px; /* Shift left to align with the card's rightmost edge */
-          top: -12px;  /* Move a little bit up */
-        }
-
-        .reservation-launcher[data-theme="light"] .reservation-theme-toggle--floating {
-          background: transparent;
-          border: none;
-          color: rgba(42, 33, 23, 0.72);
-        }
-
-        .reservation-theme-toggle--floating:hover,
-        .reservation-theme-toggle--floating:focus-visible {
-          transform: translateY(-1px);
-          outline: none;
-        }
-
-        .reservation-theme-toggle__switch {
-          position: relative;
-          display: inline-flex;
-          align-items: center;
-          justify-content: space-between;
-          width: 46px;
-          height: 24px;
-          padding: 3px 5px;
-          border-radius: 999px;
-          background:
-            linear-gradient(135deg, rgba(255, 250, 241, 0.18), rgba(196, 163, 90, 0.14)),
-            rgba(10, 8, 6, 0.24);
-          box-shadow: inset 0 0 0 1px rgba(255,255,255,0.13);
-          overflow: hidden;
-        }
-
-        .reservation-theme-toggle__icon,
-        .reservation-theme-toggle__thumb {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .reservation-theme-toggle__icon {
-          width: 14px;
-          height: 14px;
-          color: rgba(255, 250, 241, 0.42);
-          transition: color 0.26s ease, opacity 0.26s ease, transform 0.26s ease;
-        }
-
-        .reservation-theme-toggle__icon svg,
-        .reservation-theme-toggle__thumb svg {
-          width: 100%;
-          height: 100%;
-          fill: none;
-          stroke: currentColor;
-          stroke-width: 1.9;
-          stroke-linecap: round;
-          stroke-linejoin: round;
-        }
-
-        .reservation-theme-toggle__icon--moon svg,
-        .reservation-theme-toggle__thumb svg path:first-child:last-child {
-          fill: currentColor;
-          stroke: none;
-        }
-
-        .reservation-theme-toggle__thumb {
-          position: absolute;
-          top: 3px;
-          left: 3px;
-          width: 18px;
-          height: 18px;
+          width: 38px;
+          height: 38px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #d8bd78, #a47821);
+          border: 1px solid rgba(164, 120, 33, 0.16);
+          background: rgba(255, 252, 246, 0.6);
+          color: #a47821;
+          box-shadow: 0 4px 12px rgba(23, 19, 14, 0.04);
+          cursor: pointer;
+          transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+          padding: 0;
+          outline: none;
+          flex-shrink: 0;
+        }
+
+        .reservation-launcher[data-theme="dark"] .reservation-theme-icon-button {
+          border-color: rgba(255, 250, 241, 0.12);
+          background: rgba(30, 26, 22, 0.68);
+          color: #e2c96a;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+        }
+
+        .reservation-theme-icon-button:hover,
+        .reservation-theme-icon-button:focus-visible {
+          border-color: #c4a35a;
+          color: #ffffff;
+          background: linear-gradient(135deg, #a47821, #c4a35a);
+          box-shadow: 0 6px 16px rgba(164, 120, 33, 0.25);
+          transform: translateY(-1px);
+        }
+
+        .reservation-launcher[data-theme="dark"] .reservation-theme-icon-button:hover,
+        .reservation-launcher[data-theme="dark"] .reservation-theme-icon-button:focus-visible {
+          border-color: #d8bd78;
           color: #17130e;
-          padding: 4px;
-          transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), background 0.28s ease, color 0.28s ease, box-shadow 0.28s ease;
-          box-shadow: 0 3px 9px rgba(0,0,0,0.24);
-          z-index: 2;
+          background: linear-gradient(135deg, #c4a35a, #d8bd78);
+          box-shadow: 0 6px 16px rgba(196, 163, 90, 0.3);
         }
 
-        .reservation-theme-toggle[aria-pressed="false"] .reservation-theme-toggle__icon--moon,
-        .reservation-theme-toggle[aria-pressed="true"] .reservation-theme-toggle__icon--sun {
-          color: rgba(255, 250, 241, 0.72);
-          transform: scale(1.04);
+        .reservation-theme-icon-button:focus-visible {
+          outline: 2px solid #c4a35a;
+          outline-offset: 2px;
         }
 
-        .reservation-theme-toggle[aria-pressed="true"] .reservation-theme-toggle__thumb {
-          transform: translateX(22px);
-          background: linear-gradient(135deg, #fffaf1, #d8bd78);
-          color: #8a621c;
-        }
-
-        .reservation-launcher[data-theme="light"] .reservation-theme-toggle__switch {
-          background:
-            linear-gradient(135deg, rgba(164, 120, 33, 0.10), rgba(255, 255, 255, 0.62)),
-            rgba(255, 252, 246, 0.82);
-          box-shadow: inset 0 0 0 1px rgba(164,120,33,0.16);
-        }
-
-        .reservation-launcher[data-theme="light"] .reservation-theme-toggle__icon {
-          color: rgba(74, 60, 39, 0.34);
-        }
-
-        .reservation-theme-toggle:hover .reservation-theme-toggle__switch,
-        .reservation-theme-toggle:focus-visible .reservation-theme-toggle__switch {
-          box-shadow: inset 0 0 0 1px rgba(196, 163, 90, 0.32), 0 6px 16px rgba(0,0,0,0.10);
+        .reservation-theme-icon-button svg {
+          display: block;
+          transition: transform 0.25s ease;
         }
 
         .reservation-shell {
@@ -1131,7 +1034,7 @@ export default function ReservationLanding() {
           display: grid;
           grid-template-rows: auto minmax(0, 1fr);
           gap: clamp(26px, 3vh, 40px);
-          padding: clamp(18px, 2.2vw, 32px) clamp(20px, 3.8vw, 54px);
+          padding: clamp(20px, 3.8vw, 54px) clamp(20px, 3.8vw, 54px) clamp(18px, 2.2vw, 32px);
           container-type: inline-size;
           border-radius: var(--radius-panel);
           background: rgba(255, 252, 246, 0.34);
@@ -1164,7 +1067,7 @@ export default function ReservationLanding() {
 
         .reservation-section__header {
           display: flex;
-          align-items: flex-end;
+          align-items: flex-start;
           justify-content: space-between;
           gap: 16px;
           margin-bottom: clamp(12px, 1.3vw, 18px);
@@ -1702,7 +1605,7 @@ export default function ReservationLanding() {
           }
 
           .reservation-directory {
-            padding: 18px clamp(22px, 3.2vw, 42px);
+            padding: clamp(22px, 3.2vw, 42px) clamp(22px, 3.2vw, 42px) 18px;
             gap: 22px;
           }
 
@@ -1726,7 +1629,7 @@ export default function ReservationLanding() {
           }
 
           .reservation-directory {
-            padding: 18px clamp(18px, 2.8vw, 34px);
+            padding: clamp(18px, 2.8vw, 34px) clamp(18px, 2.8vw, 34px) 18px;
           }
         }
 
@@ -1783,11 +1686,10 @@ export default function ReservationLanding() {
             gap: 12px;
           }
 
-          .reservation-theme-toggle--floating {
-            right: 0 !important;
-            top: 0 !important;
-            align-self: flex-start !important;
-            margin-top: 4px;
+          .reservation-section--dining .reservation-section__header {
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: space-between;
           }
 
           .reservation-topbar {
