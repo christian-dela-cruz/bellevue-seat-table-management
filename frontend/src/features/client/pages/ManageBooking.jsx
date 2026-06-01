@@ -674,6 +674,10 @@ export default function ManageBooking() {
           outline: 2px solid #C4A35A;
           outline-offset: 2px;
         }
+        @media (max-width: 500px) {
+          .action-buttons { flex-direction: column !important; gap: 10px !important; }
+          .action-buttons > button { width: 100% !important; padding: 14px 16px !important; }
+        }
       `}</style>
 
       <div style={{
@@ -1052,7 +1056,7 @@ export default function ManageBooking() {
                 </div>
 
                 {/* ── ACTION BUTTONS ──────────────────────────────────────── */}
-                <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                <div className="action-buttons" style={{ display: "flex", gap: 10, marginTop: 6 }}>
                   {editing ? (
                     <>
                       <button onClick={() => { setEditing(false); setError(""); }} disabled={saving}
@@ -1100,7 +1104,7 @@ export default function ManageBooking() {
                         disabled={!isCancelableStatus(booking?.status)}
                         style={{
                           flex: 1, padding: "11px 16px",
-                          background: isCancelableStatus(booking?.status) ? C.textSecondary : C.borderStrong,
+                          background: isCancelableStatus(booking?.status) ? C.red : C.borderStrong,
                           border: "none", borderRadius: 8,
                           fontFamily: F.label, fontSize: 10, fontWeight: 700,
                           letterSpacing: "0.10em", textTransform: "uppercase",
@@ -1109,8 +1113,8 @@ export default function ManageBooking() {
                           transition: "0.25s",
                           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                         }}
-                        onMouseEnter={(e) => { if (isCancelableStatus(booking?.status)) e.currentTarget.style.background = C.borderAccent; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = isCancelableStatus(booking?.status) ? C.textSecondary : C.borderStrong; }}
+                        onMouseEnter={(e) => { if (isCancelableStatus(booking?.status)) e.currentTarget.style.opacity = "0.85"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.background = isCancelableStatus(booking?.status) ? C.red : C.borderStrong; }}
                       >
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         Cancel

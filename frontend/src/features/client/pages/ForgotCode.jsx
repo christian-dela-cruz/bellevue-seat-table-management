@@ -372,6 +372,10 @@ export default function ForgotCode() {
           outline: 2px solid #C4A35A;
           outline-offset: 2px;
         }
+        @media (max-width: 500px) {
+          .action-buttons { flex-direction: column !important; gap: 10px !important; }
+          .action-buttons > button { width: 100% !important; padding: 14px 16px !important; }
+        }
       `}</style>
 
       <div style={{
@@ -910,40 +914,30 @@ export default function ForgotCode() {
             {/* ── Email sent success ── */}
             {emailSent && (
               <div style={{ animation: "fadeUp 0.32s ease" }}>
-                <div style={{
-                  padding: "28px 24px", borderRadius: 16,
-                  background: isDark ? "rgba(74,158,126,0.08)" : "rgba(46,122,90,0.06)",
-                  border: `1px solid ${C.greenBorder}`,
-                  textAlign: "center",
-                  marginBottom: 20,
-                }}>
-                  <div style={{
-                    width: 48, height: 48, borderRadius: "50%",
-                    background: C.greenFaint, border: `2px solid ${C.greenBorder}`,
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    marginBottom: 16,
-                  }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-                      stroke={C.green} strokeWidth="2.5"
-                      strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 6,
+                      background: C.greenFaint, border: `1px solid ${C.greenBorder}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                    <span style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.26em", color: C.green, fontWeight: 700, textTransform: "uppercase" }}>
+                      Guest Services
+                    </span>
                   </div>
-                  <h3 style={{
-                    fontFamily: F.display, fontSize: 20, fontWeight: 600,
-                    color: C.green, margin: "0 0 10px",
-                  }}>
+                  <h1 style={{ fontFamily: F.display, fontSize: 32, fontWeight: 400, color: C.textPrimary, lineHeight: 1.2, margin: "0 0 12px", letterSpacing: "0.01em" }}>
                     Check Your Inbox
-                  </h3>
-                  <p style={{
-                    fontFamily: F.body, fontSize: 13, color: C.textSecondary,
-                    margin: 0, lineHeight: 1.72,
-                  }}>
+                  </h1>
+                  <p style={{ fontFamily: F.body, fontSize: 13.5, color: C.textSecondary, margin: 0, lineHeight: 1.72 }}>
                     If a reservation exists with <strong style={{ color: C.textPrimary }}>{recoveryEmail}</strong>, we've sent your reference code(s) to your inbox. Please also check your spam/junk folder.
                   </p>
                 </div>
 
-                <div style={{ display: "flex", gap: 10 }}>
+                <div className="action-buttons" style={{ display: "flex", gap: 10 }}>
                   <button
                     onClick={() => { setEmailSent(false); setRecoveryEmail(""); setError(""); }}
                     style={{
