@@ -668,174 +668,11 @@ export default function ManageBooking() {
         @keyframes spin    { to { transform: rotate(360deg) } }
         @keyframes fadeUp  { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes servicePanelIn { from { opacity: 0; transform: translateY(18px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        @keyframes serviceVisualIn { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes modalIn { from { opacity: 0; transform: scale(0.97) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-        .guest-service-shell {
-          position: relative;
-          z-index: 1;
-          min-height: 100vh;
-          display: grid;
-          grid-template-columns: minmax(380px, 42%) minmax(0, 58%);
-          padding-top: 82px;
-        }
-        .guest-service-left {
-          position: relative;
-          min-height: calc(100vh - 82px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: clamp(34px, 5vw, 72px) clamp(24px, 5vw, 84px);
-        }
-        .guest-service-back {
-          position: absolute;
-          top: clamp(18px, 3vh, 34px);
-          left: clamp(20px, 4vw, 52px);
-        }
-        .guest-service-visual {
-          min-height: calc(100vh - 82px);
-          display: flex;
-          align-items: stretch;
-          padding: clamp(22px, 3vw, 42px) clamp(22px, 4vw, 60px) clamp(22px, 3vw, 42px) 0;
-        }
-        .guest-service-visual__frame {
-          position: relative;
-          flex: 1;
-          overflow: hidden;
-          border-radius: 28px;
-          background-size: cover;
-          background-position: center;
-          min-height: 520px;
-          box-shadow: 0 34px 88px rgba(0,0,0,0.30), inset 0 0 0 1px rgba(255,250,241,0.12);
-          animation: serviceVisualIn 0.58s cubic-bezier(0.22,1,0.36,1) both;
-        }
-        .guest-service-visual__frame::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(90deg, rgba(10,9,8,0.62), rgba(10,9,8,0.12) 52%, rgba(10,9,8,0.48)),
-            radial-gradient(circle at 24% 20%, rgba(196,163,90,0.22), transparent 34%);
-        }
-        .guest-service-visual__content {
-          position: absolute;
-          left: clamp(24px, 4vw, 56px);
-          right: clamp(24px, 4vw, 56px);
-          bottom: clamp(24px, 4vw, 56px);
-          color: #fffaf1;
-          max-width: 440px;
-        }
-        .guest-service-visual__eyebrow {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 14px;
-          color: #d8bd78;
-          font-family: ${F.label};
-          font-size: 10px;
-          font-weight: 800;
-          text-transform: uppercase;
-        }
-        .guest-service-visual__eyebrow::before {
-          content: "";
-          width: 28px;
-          height: 1px;
-          background: #d8bd78;
-          opacity: 0.72;
-        }
-        .guest-service-visual__title {
-          margin: 0 0 12px;
-          font-family: ${F.display};
-          font-size: clamp(34px, 4vw, 58px);
-          font-weight: 500;
-          line-height: 0.96;
-        }
-        .guest-service-visual__copy {
-          margin: 0;
-          color: rgba(255,250,241,0.74);
-          font-size: 14px;
-          line-height: 1.72;
-          max-width: 370px;
-        }
-        .guest-service-visual__tile {
-          position: absolute;
-          width: clamp(126px, 15vw, 210px);
-          aspect-ratio: 1.38 / 1;
-          border-radius: 18px;
-          background-size: cover;
-          background-position: center;
-          box-shadow: 0 20px 46px rgba(0,0,0,0.26), inset 0 0 0 1px rgba(255,250,241,0.14);
-          overflow: hidden;
-        }
-        .guest-service-visual__tile::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.34));
-        }
-        .guest-service-visual__tile--one {
-          top: clamp(22px, 5vw, 70px);
-          right: clamp(20px, 4vw, 54px);
-        }
-        .guest-service-visual__tile--two {
-          top: clamp(150px, 20vw, 260px);
-          right: clamp(84px, 11vw, 178px);
-          width: clamp(110px, 13vw, 178px);
-        }
-        @media (max-width: 1080px) {
-          .guest-service-shell {
-            grid-template-columns: minmax(360px, 46%) minmax(0, 54%);
-          }
-          .guest-service-visual {
-            padding-right: clamp(18px, 3vw, 34px);
-          }
-          .guest-service-visual__frame {
-            min-height: 460px;
-          }
-          .guest-service-visual__tile--two {
-            display: none;
-          }
-        }
-        @media (max-width: 860px) {
-          .guest-service-shell {
-            display: flex;
-            flex-direction: column;
-          }
-          .guest-service-visual {
-            order: 1;
-            min-height: 300px;
-            padding: 20px 20px 0;
-          }
-          .guest-service-visual__frame {
-            min-height: 300px;
-            border-radius: 22px;
-          }
-          .guest-service-left {
-            order: 2;
-            min-height: auto;
-            padding: 26px 20px 44px;
-          }
-          .guest-service-back {
-            top: 18px;
-            left: 20px;
-          }
-          .guest-service-visual__tile {
-            display: none;
-          }
-        }
-        @media (max-width: 560px) {
-          .guest-service-visual {
-            min-height: 220px;
-            padding: 14px 14px 0;
-          }
-          .guest-service-visual__frame {
-            min-height: 220px;
-            border-radius: 18px;
-          }
-          .guest-service-visual__title {
-            font-size: 34px;
-          }
-          .guest-service-visual__copy {
-            display: none;
-          }
+        
+        button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+          outline: 2px solid #C4A35A;
+          outline-offset: 2px;
         }
       `}</style>
 
@@ -846,435 +683,451 @@ export default function ManageBooking() {
       }}>
 
         {/* Background */}
-        <div style={{ position: "fixed", inset: 0, zIndex: 0 }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 0, overflow: "hidden" }}>
           <div style={{
             position: "absolute", inset: 0,
-            backgroundImage: "url('/src/assets/bg-login.jpeg')",
+            backgroundImage: `url(${towerShowcase})`,
             backgroundSize: "cover", backgroundPosition: "center",
-            filter: isDark ? "blur(3.5px) brightness(0.58) saturate(1.05)" : "blur(3.5px) brightness(0.82) saturate(0.82)",
-            transform: "scale(1.025)", transition: "filter 0.40s, transform 0.40s",
+            filter: isDark
+              ? "blur(3px) brightness(0.40) saturate(1.15)"
+              : "blur(3px) brightness(0.95) saturate(0.85)",
+            transform: "scale(1.025)",
+            transition: "filter 0.40s, transform 0.40s",
           }} />
           <div style={{
             position: "absolute", inset: 0,
             background: isDark
-              ? "radial-gradient(circle at 50% 42%, rgba(196,163,90,0.10), transparent 34%), linear-gradient(135deg, rgba(10,9,8,0.78), rgba(10,9,8,0.56))"
-              : "radial-gradient(circle at 50% 42%, rgba(196,163,90,0.12), transparent 36%), linear-gradient(135deg, rgba(250,246,238,0.78), rgba(242,234,219,0.62))",
+              ? "linear-gradient(135deg, rgba(17,16,9,0.88), rgba(17,16,9,0.70))"
+              : "linear-gradient(135deg, rgba(250,246,238,0.88), rgba(242,234,219,0.70))",
             transition: "background 0.40s",
           }} />
         </div>
 
-        <SharedNavbar isDark={isDark} toggle={toggleTheme} height={58} variant="reservation" />
+        {/* Navigation Controls */}
+        <div style={{
+          position: "fixed", top: "24px", left: "24px", right: "24px",
+          display: "flex", justifyContent: "space-between", zIndex: 100,
+          pointerEvents: "none",
+        }}>
+          <button
+            onClick={() => navigate("/")}
+            title="Go back"
+            style={{
+              width: 44, height: 44, borderRadius: "50%",
+              background: isDark ? "rgba(17,16,9,0.58)" : "rgba(255,255,255,0.58)",
+              border: `1px solid ${C.borderDefault}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)", padding: 0,
+              backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+              color: C.textSecondary,
+              boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.15)" : "0 4px 12px rgba(78,60,32,0.06)",
+              pointerEvents: "auto",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaint; e.currentTarget.style.color = C.gold; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = isDark ? "rgba(17,16,9,0.58)" : "rgba(255,255,255,0.58)"; e.currentTarget.style.color = C.textSecondary; }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+          </button>
 
-        <div className="guest-service-shell">
-          <div className="guest-service-left">
+          <button
+            onClick={toggleTheme}
+            title="Toggle theme"
+            style={{
+              width: 44, height: 44, borderRadius: "50%",
+              background: isDark ? "rgba(17,16,9,0.58)" : "rgba(255,255,255,0.58)",
+              border: `1px solid ${C.borderDefault}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)", padding: 0,
+              backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+              color: C.textSecondary,
+              boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.15)" : "0 4px 12px rgba(78,60,32,0.06)",
+              pointerEvents: "auto",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaint; e.currentTarget.style.color = C.gold; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = isDark ? "rgba(17,16,9,0.58)" : "rgba(255,255,255,0.58)"; e.currentTarget.style.color = C.textSecondary; }}
+          >
+            {isDark ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            )}
+          </button>
+        </div>
 
-            {/* Back button */}
-            <div className="guest-service-back">
-              <button onClick={() => navigate("/")} title="Go back"
-                style={{
-                  width: 36, height: 36, borderRadius: "50%",
-                  background: isDark ? "rgba(17,16,9,0.58)" : "rgba(255,255,255,0.58)", border: `1px solid ${C.borderDefault}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", transition: "all 0.18s", padding: 0,
-                  backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
-                  boxShadow: isDark ? "0 12px 28px rgba(0,0,0,0.22)" : "0 12px 28px rgba(78,60,32,0.12)",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaint; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = isDark ? "rgba(17,16,9,0.58)" : "rgba(255,255,255,0.58)"; }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                  fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                  style={{ color: C.textSecondary }}>
-                  <path d="m15 18-6-6 6-6" />
-                </svg>
-              </button>
-            </div>
+        {/* Page body */}
+        <div style={{
+          position: "relative",
+          zIndex: 10,
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "96px 24px 48px",
+          boxSizing: "border-box",
+        }}>
+          <div style={{
+            width: "100%",
+            maxWidth: booking ? 540 : 462,
+            padding: booking ? 0 : "clamp(24px,3vw,34px)",
+            borderRadius: booking ? 0 : 24,
+            background: booking ? "transparent" : (isDark
+              ? "linear-gradient(145deg, rgba(255,250,241,0.075), rgba(255,250,241,0.025)), rgba(17,16,9,0.70)"
+              : "linear-gradient(145deg, rgba(255,255,255,0.88), rgba(255,250,241,0.66)), rgba(255,255,255,0.62)"),
+            border: booking ? "none" : `1px solid ${isDark ? "rgba(255,250,241,0.13)" : "rgba(140,107,42,0.17)"}`,
+            boxShadow: booking ? "none" : (isDark
+              ? "0 16px 40px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.08)"
+              : "0 16px 40px rgba(78,60,32,0.08), inset 0 1px 0 rgba(255,255,255,0.72)"),
+            backdropFilter: booking ? undefined : "blur(18px) saturate(1.08)",
+            WebkitBackdropFilter: booking ? undefined : "blur(18px) saturate(1.08)",
+            animation: "servicePanelIn 0.48s cubic-bezier(0.22,1,0.36,1) both",
+          }}>
 
-            <div style={{
-              width: "100%",
-              maxWidth: booking ? 540 : 462,
-              padding: booking ? 0 : "clamp(24px,3vw,34px)",
-              borderRadius: booking ? 0 : 24,
-              background: booking ? "transparent" : (isDark
-                ? "linear-gradient(145deg, rgba(255,250,241,0.075), rgba(255,250,241,0.025)), rgba(17,16,9,0.70)"
-                : "linear-gradient(145deg, rgba(255,255,255,0.88), rgba(255,250,241,0.66)), rgba(255,255,255,0.62)"),
-              border: booking ? "none" : `1px solid ${isDark ? "rgba(255,250,241,0.13)" : "rgba(140,107,42,0.17)"}`,
-              boxShadow: booking ? "none" : (isDark
-                ? "0 28px 70px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.08)"
-                : "0 28px 70px rgba(78,60,32,0.16), inset 0 1px 0 rgba(255,255,255,0.72)"),
-              backdropFilter: booking ? undefined : "blur(18px) saturate(1.08)",
-              WebkitBackdropFilter: booking ? undefined : "blur(18px) saturate(1.08)",
-              animation: "servicePanelIn 0.48s cubic-bezier(0.22,1,0.36,1) both",
-            }}>
-
-              {/* ── SEARCH STATE ─────────────────────────────────────────── */}
-              {!booking && (
-                <>
-                  <div style={{ marginBottom: 28, animation: "fadeUp 0.32s ease" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                      <span style={{ display: "inline-block", width: 24, height: "1px", background: C.gold, opacity: 0.6 }} />
-                      <span style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.26em", color: C.gold, fontWeight: 700, textTransform: "uppercase" }}>
-                        Guest Services
-                      </span>
-                    </div>
-                    <h1 style={{ fontFamily: F.display, fontSize: "clamp(30px,5vw,44px)", fontWeight: 400, color: C.textPrimary, lineHeight: 1.12, margin: "0 0 12px", letterSpacing: "0.01em" }}>
-                      Manage Your<br />Booking
-                    </h1>
-                    <p style={{ fontFamily: F.body, fontSize: 13.5, color: C.textSecondary, margin: 0, lineHeight: 1.72 }}>
-                      Enter your reference code to view and manage your booking.
-                    </p>
+            {/* ── SEARCH STATE ─────────────────────────────────────────── */}
+            {!booking && (
+              <>
+                <div style={{ marginBottom: 28, animation: "fadeUp 0.32s ease" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                    <span style={{ display: "inline-block", width: 24, height: "1px", background: C.gold, opacity: 0.6 }} />
+                    <span style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.26em", color: C.gold, fontWeight: 700, textTransform: "uppercase" }}>
+                      Guest Services
+                    </span>
                   </div>
+                  <h1 style={{ fontFamily: F.display, fontSize: 32, fontWeight: 400, color: C.textPrimary, lineHeight: 1.2, margin: "0 0 12px", letterSpacing: "0.01em" }}>
+                    Manage Your Booking
+                  </h1>
+                  <p style={{ fontFamily: F.body, fontSize: 13.5, color: C.textSecondary, margin: 0, lineHeight: 1.72 }}>
+                    Enter your reference code to view and manage your booking.
+                  </p>
+                </div>
 
-                  <div style={{ animation: "fadeUp 0.36s ease" }}>
-                    <div style={{
-                      padding: "12px 14px", borderRadius: 12, marginBottom: 20,
-                      background: isDark ? "rgba(196,163,90,0.075)" : "rgba(140,107,42,0.065)", border: `1px solid ${C.borderAccent}`,
-                      display: "flex", gap: 12, alignItems: "flex-start",
-                    }}>
-                      <div style={{
-                        width: 28, height: 28, borderRadius: 6, background: C.goldFaintest,
-                        border: `1px solid ${C.borderAccent}`, display: "flex",
-                        alignItems: "center", justifyContent: "center", flexShrink: 0,
-                      }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                        </svg>
-                      </div>
-                      <div>
-                        <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold, marginBottom: 3 }}>
-                          How it works
-                        </div>
-                        <div style={{ fontFamily: F.body, fontSize: 12, color: C.textSecondary, lineHeight: 1.65 }}>
-                          Enter your booking reference code to view, edit, or cancel your reservation.
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: 14 }}>
-                      <label style={{
-                        display: "flex", alignItems: "center", gap: 6,
-                        fontFamily: F.label, fontSize: 9, letterSpacing: "0.22em",
-                        color: focused ? C.gold : C.textSecondary,
-                        fontWeight: 700, textTransform: "uppercase", marginBottom: 8,
-                        transition: "color 0.18s",
-                      }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-                        </svg>
-                        Reference Code <span style={{ color: C.red, marginLeft: 2 }}>*</span>
-                      </label>
-                      <input
-                        value={referenceCode}
-                        onChange={(e) => { setReferenceCode(e.target.value); setError(""); }}
-                        onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                        onFocus={() => setFocused(true)}
-                        onBlur={() => setFocused(false)}
-                        placeholder="e.g. 2024-001"
-                        autoComplete="off"
-                        style={{
-                          width: "100%", boxSizing: "border-box", padding: "14px 18px",
-                          border: `1px solid ${focused ? C.borderAccent : C.borderDefault}`,
-                          borderRadius: 12, background: isDark ? "rgba(255,250,241,0.055)" : "rgba(255,255,255,0.76)",
-                          fontFamily: F.mono, fontSize: 17, fontWeight: 500, letterSpacing: "0.06em",
-                          color: C.textPrimary, outline: "none",
-                          transition: "border-color 0.18s, box-shadow 0.18s, background 0.18s",
-                          boxShadow: focused ? `${C.inputFocusShadow}, inset 0 1px 0 rgba(255,255,255,0.04)` : "inset 0 1px 0 rgba(255,255,255,0.035)",
-                          colorScheme: isDark ? "dark" : "light",
-                        }}
-                      />
-                    </div>
-
-                    {error && (
-                      <div style={{
-                        padding: "10px 14px", borderRadius: 8, marginBottom: 14,
-                        background: C.redFaint, borderLeft: `3px solid ${C.red}`,
-                        fontSize: 12.5, color: C.red, lineHeight: 1.60,
-                        display: "flex", alignItems: "center", gap: 8,
-                      }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                        </svg>
-                        {error}
-                      </div>
-                    )}
-
-                    <button onClick={handleSearch} disabled={searching}
-                      style={{
-                        width: "100%", padding: "14px",
-                        background: searching ? (isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)") : `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`,
-                        border: `1px solid ${searching ? C.borderDefault : "transparent"}`,
-                        borderRadius: 12,
-                        fontFamily: F.label, fontSize: 10, fontWeight: 700,
-                        letterSpacing: "0.18em", textTransform: "uppercase",
-                        color: searching ? C.textSecondary : C.textOnAccent,
-                        cursor: searching ? "not-allowed" : "pointer", transition: "all 0.20s",
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                        boxShadow: searching ? "none" : "0 14px 26px rgba(140,107,42,0.22)",
-                      }}
-                      onMouseEnter={(e) => { if (!searching) e.currentTarget.style.background = C.goldLight; }}
-                      onMouseLeave={(e) => { if (!searching) e.currentTarget.style.background = `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`; }}
-                    >
-                      {searching
-                        ? <><span style={{ display: "inline-block", width: 13, height: 13, border: `1.5px solid ${C.textSecondary}40`, borderTopColor: C.textSecondary, borderRadius: "50%", animation: "spin 0.65s linear infinite" }} />Searching...</>
-                        : <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>Find My Booking</>
-                      }
-                    </button>
-
-                    <div style={{ marginTop: 24, paddingTop: 22, borderTop: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span style={{ fontFamily: F.body, fontSize: 12.5, color: C.textSecondary }}>Don't have your code?</span>
-                      <button onClick={() => navigate("/forgot-code")}
-                        style={{ background: "none", border: "none", fontFamily: F.label, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.gold, cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 4 }}
-                      >
-                        Recover Code
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* ── BOOKING FOUND STATE ───────────────────────────────────── */}
-              {booking && (
-                <div style={{ animation: "fadeUp 0.28s ease" }}>
-
-                  <div style={{ marginBottom: 28 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                      <div style={{
-                        width: 28, height: 28, borderRadius: 6,
-                        background: C.greenFaint, border: `1px solid ${C.greenBorder}`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      </div>
-                      <span style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.22em", color: C.green, fontWeight: 700, textTransform: "uppercase" }}>
-                        Booking Found
-                      </span>
-                    </div>
-                    <h1 style={{ fontFamily: F.display, fontSize: "clamp(30px,5vw,44px)", fontWeight: 400, color: C.textPrimary, lineHeight: 1.12, margin: "0 0 10px", letterSpacing: "0.01em" }}>
-                      Manage Your<br />Booking
-                    </h1>
-                    <p style={{ fontFamily: F.body, fontSize: 12.5, color: C.textSecondary, margin: 0 }}>
-                      {editing ? "Update your booking information below." : "View details, edit information, or cancel your reservation."}
-                    </p>
-                  </div>
-
-                  {/* Card */}
+                <div style={{ animation: "fadeUp 0.36s ease" }}>
                   <div style={{
-                    background: C.surfaceBase, borderRadius: 14,
-                    border: `1px solid ${C.borderDefault}`,
-                    overflow: "hidden", marginBottom: 14,
+                    padding: "12px 14px", borderRadius: 12, marginBottom: 20,
+                    background: isDark ? "rgba(196,163,90,0.075)" : "rgba(140,107,42,0.065)", border: `1px solid ${C.borderAccent}`,
+                    display: "flex", gap: 12, alignItems: "flex-start",
                   }}>
-                    <div style={{ height: "2px", background: `linear-gradient(90deg, transparent 0%, ${C.gold}80 30%, ${C.gold}80 70%, transparent 100%)` }} />
-
-                    <div style={{ padding: "20px 22px" }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
-                        <div>
-                          <div style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.20em", color: C.gold, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
-                            Reference Code
-                          </div>
-                          <div style={{ fontFamily: F.mono, fontSize: 28, fontWeight: 500, color: C.textPrimary, letterSpacing: "0.06em", lineHeight: 1 }}>
-                            {booking.reference_code || booking.id || "—"}
-                          </div>
-                        </div>
-                        <StatusBadge status={booking.status} />
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 6, background: C.goldFaintest,
+                      border: `1px solid ${C.borderAccent}`, display: "flex",
+                      alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold, marginBottom: 3 }}>
+                        How it works
                       </div>
-
-                      <div style={{ height: "1px", background: C.divider, marginBottom: 20 }} />
-
-                      {editing ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                          <EditField
-                            label="Full Name" required
-                            value={editForm.name}
-                            onChange={(v) => setEditForm({ ...editForm, name: v })}
-                            placeholder="Full name"
-                            C={C} isDark={isDark}
-                          />
-                          <EditField
-                            label="Email Address" type="email" required
-                            value={editForm.email}
-                            onChange={(v) => setEditForm({ ...editForm, email: v })}
-                            placeholder="email@example.com"
-                            C={C} isDark={isDark}
-                          />
-                          <EditField
-                            label="Phone Number" type="tel" required
-                            value={editForm.phone}
-                            onChange={(v) => {
-                              const digits = (v.startsWith("+63") ? v.slice(3) : v).replace(/[^0-9]/g, "").slice(0, 10);
-                              setEditForm({ ...editForm, phone: "+63" + digits });
-                            }}
-                            placeholder="+63XXXXXXXXXX"
-                            C={C} isDark={isDark}
-                          />
-
-                          {/* ── Date AND Time side by side ── */}
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                            <EditField
-                              label="Event Date" type="date" required
-                              value={editForm.eventDate}
-                              min={new Date().toISOString().split("T")[0]}
-                              onChange={(v) => setEditForm({ ...editForm, eventDate: v })}
-                              C={C} isDark={isDark}
-                            />
-                            <EditField
-                              label="Event Time" type="time"
-                              value={editForm.eventTime}
-                              onChange={(v) => setEditForm({ ...editForm, eventTime: v })}
-                              C={C} isDark={isDark}
-                            />
-                          </div>
-
-                          <EditField
-                            label="Special Requests" type="textarea"
-                            value={editForm.specialRequests}
-                            onChange={(v) => setEditForm({ ...editForm, specialRequests: v })}
-                            placeholder="Dietary needs, accessibility, preferences…"
-                            C={C} isDark={isDark}
-                          />
-
-                          {error && (
-                            <div style={{ padding: "10px 14px", borderRadius: 8, background: C.redFaint, border: `1px solid ${C.redBorder}`, color: C.red, fontSize: 12.5, lineHeight: 1.5, display: "flex", alignItems: "center", gap: 8 }}>
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                              {error}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div>
-                          <div style={{ marginBottom: 16 }}>
-                            <div style={{ fontSize: 15, fontWeight: 600, color: C.textPrimary, marginBottom: 3 }}>{booking.name || "—"}</div>
-                            <div style={{ fontSize: 12.5, color: C.textSecondary }}>
-                              {booking.email}{booking.email && booking.phone ? " • " : ""}{booking.phone}
-                            </div>
-                          </div>
-
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 20px", marginBottom: 14 }}>
-                            {[
-                              ["Date",         fmtDate(booking.event_date)],
-                              ["Time",         fmtTime(booking.event_time)],
-                              ["Guests",       booking.guests ? `${booking.guests} pax` : "—"],
-                              ["Table / Seat", [booking.table, booking.seat].filter(Boolean).join(" / ") || "—"],
-                            ].map(([label, val]) => (
-                              <div key={label}>
-                                <div style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary, fontWeight: 700, marginBottom: 3 }}>{label}</div>
-                                <div style={{ fontFamily: F.body, fontSize: 12.5, color: C.textPrimary }}>{val}</div>
-                              </div>
-                            ))}
-                          </div>
-
-                          {booking.special_requests && (
-                            <div>
-                              <div style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary, fontWeight: 700, marginBottom: 3 }}>Special Requests</div>
-                              <div style={{ fontFamily: F.body, fontSize: 12.5, color: C.textPrimary, lineHeight: 1.6 }}>{booking.special_requests}</div>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <div style={{ fontFamily: F.body, fontSize: 12, color: C.textSecondary, lineHeight: 1.65 }}>
+                        Enter your booking reference code to view, edit, or cancel your reservation.
+                      </div>
                     </div>
                   </div>
 
-                  {/* ── ACTION BUTTONS ──────────────────────────────────────── */}
-                  <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
-                    {editing ? (
-                      <>
-                        <button onClick={() => { setEditing(false); setError(""); }} disabled={saving}
-                          style={{ flex: 1, padding: "11px 16px", background: "transparent", border: `1px solid ${C.borderDefault}`, borderRadius: 8, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.textSecondary, cursor: saving ? "not-allowed" : "pointer", transition: "all 0.18s" }}
-                          onMouseEnter={(e) => { if (!saving) { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.color = C.gold; } }}
-                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.color = C.textSecondary; }}
-                        >Cancel</button>
-                        <button onClick={handleUpdate} disabled={saving}
-                          style={{ flex: 1, padding: "11px 16px", background: saving ? C.goldDim : C.gold, border: "none", borderRadius: 8, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.textOnAccent, cursor: saving ? "not-allowed" : "pointer", transition: "all 0.18s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-                          onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = C.goldLight; }}
-                          onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = C.gold; }}
-                        >
-                          {saving ? <><Spinner C={C} size={12} />Saving…</> : <>
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 0-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                            Save Changes
-                          </>}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={() => { setBooking(null); setError(""); }}
-                          style={{ flex: 1, padding: "11px 16px", background: "transparent", border: `1px solid ${C.borderDefault}`, borderRadius: 8, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.textSecondary, cursor: "pointer", transition: "all 0.18s" }}
-                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.color = C.gold; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.color = C.textSecondary; }}
-                        >Search Again</button>
-
-                        <button onClick={() => { setEditing(true); setError(""); }}
-                          style={{ flex: 1, padding: "11px 16px", background: C.gold, border: "none", borderRadius: 8, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.textOnAccent, cursor: "pointer", transition: "all 0.18s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = C.goldLight; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = C.gold; }}
-                        >
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                          Edit Details
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            if (!isCancelableStatus(booking?.status)) {
-                              setError("Only reservations awaiting confirmation or confirmed reservations can be cancelled.");
-                              return;
-                            }
-                            setError("");
-                            setShowCancelModal(true);
-                          }}
-                          disabled={!isCancelableStatus(booking?.status)}
-                          style={{
-                            flex: 1, padding: "11px 16px",
-                            background: isCancelableStatus(booking?.status) ? C.textSecondary : C.borderStrong,
-                            border: "none", borderRadius: 8,
-                            fontFamily: F.label, fontSize: 10, fontWeight: 700,
-                            letterSpacing: "0.10em", textTransform: "uppercase",
-                            color: "#fff",
-                            cursor: isCancelableStatus(booking?.status) ? "pointer" : "not-allowed",
-                            transition: "0.18s",
-                            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                          }}
-                          onMouseEnter={(e) => { if (isCancelableStatus(booking?.status)) e.currentTarget.style.background = C.borderAccent; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = isCancelableStatus(booking?.status) ? C.textSecondary : C.borderStrong; }}
-                        >
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                          Cancel
-                        </button>
-                      </>
-                    )}
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      fontFamily: F.label, fontSize: 9, letterSpacing: "0.22em",
+                      color: focused ? C.gold : C.textSecondary,
+                      fontWeight: 700, textTransform: "uppercase", marginBottom: 8,
+                      transition: "color 0.18s",
+                    }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                      </svg>
+                      Reference Code <span style={{ color: C.red, marginLeft: 2 }}>*</span>
+                    </label>
+                    <input
+                      value={referenceCode}
+                      onChange={(e) => { setReferenceCode(e.target.value); setError(""); }}
+                      onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                      onFocus={() => setFocused(true)}
+                      onBlur={() => setFocused(false)}
+                      placeholder="e.g. 2024-001"
+                      autoComplete="off"
+                      style={{
+                        width: "100%", boxSizing: "border-box", padding: "14px 18px",
+                        border: `1px solid ${focused ? C.borderAccent : C.borderDefault}`,
+                        borderRadius: 12, background: isDark ? "rgba(255,250,241,0.055)" : "rgba(255,255,255,0.76)",
+                        fontFamily: F.mono, fontSize: 17, fontWeight: 500, letterSpacing: "0.06em",
+                        color: C.textPrimary, outline: "none",
+                        transition: "border-color 0.18s, box-shadow 0.18s, background 0.18s",
+                        boxShadow: focused ? `${C.inputFocusShadow}, inset 0 1px 0 rgba(255,255,255,0.04)` : "inset 0 1px 0 rgba(255,255,255,0.035)",
+                        colorScheme: isDark ? "dark" : "light",
+                      }}
+                    />
                   </div>
 
-                  {!editing && error && (
-                    <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8, background: C.redFaint, border: `1px solid ${C.redBorder}`, color: C.red, fontSize: 12.5, lineHeight: 1.5, display: "flex", alignItems: "center", gap: 8 }}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  {error && (
+                    <div style={{
+                      padding: "10px 14px", borderRadius: 8, marginBottom: 14,
+                      background: C.redFaint, borderLeft: `3px solid ${C.red}`,
+                      fontSize: 12.5, color: C.red, lineHeight: 1.60,
+                      display: "flex", alignItems: "center", gap: 8,
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
                       {error}
                     </div>
                   )}
+
+                  <button onClick={handleSearch} disabled={searching}
+                    style={{
+                      width: "100%", padding: "14px",
+                      background: searching ? (isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)") : `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`,
+                      border: `1px solid ${searching ? C.borderDefault : "transparent"}`,
+                      borderRadius: 12,
+                      fontFamily: F.label, fontSize: 10, fontWeight: 700,
+                      letterSpacing: "0.18em", textTransform: "uppercase",
+                      color: searching ? C.textSecondary : C.textOnAccent,
+                      cursor: searching ? "not-allowed" : "pointer", transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                      boxShadow: searching ? "none" : "0 14px 26px rgba(140,107,42,0.22)",
+                    }}
+                    onMouseEnter={(e) => { if (!searching) e.currentTarget.style.background = C.goldLight; }}
+                    onMouseLeave={(e) => { if (!searching) e.currentTarget.style.background = `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`; }}
+                  >
+                    {searching
+                      ? <><span style={{ display: "inline-block", width: 13, height: 13, border: `1.5px solid ${C.textSecondary}40`, borderTopColor: C.textSecondary, borderRadius: "50%", animation: "spin 0.65s linear infinite" }} />Searching...</>
+                      : <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>Find My Booking</>
+                    }
+                  </button>
+
+                  <div style={{ marginTop: 24, paddingTop: 22, borderTop: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontFamily: F.body, fontSize: 12.5, color: C.textSecondary }}>Don't have your code?</span>
+                    <button onClick={() => navigate("/forgot-code")}
+                      style={{ background: "none", border: "none", fontFamily: F.label, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.gold, cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 4 }}
+                    >
+                      Recover Code
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-          <aside className="guest-service-visual" aria-hidden="true">
-            <div
-              className="guest-service-visual__frame"
-              style={{ backgroundImage: `url(${grandBallroomShowcase})` }}
-            >
-              <div
-                className="guest-service-visual__tile guest-service-visual__tile--one"
-                style={{ backgroundImage: `url(${diningShowcase})` }}
-              />
-              <div
-                className="guest-service-visual__tile guest-service-visual__tile--two"
-                style={{ backgroundImage: `url(${towerShowcase})` }}
-              />
-              <div className="guest-service-visual__content">
-                <div className="guest-service-visual__eyebrow">The Bellevue Manila</div>
-                <h2 className="guest-service-visual__title">Concierge Booking Care</h2>
-                <p className="guest-service-visual__copy">
-                  A quieter way to review, update, and manage your reservation before arrival.
-                </p>
+              </>
+            )}
+
+            {/* ── BOOKING FOUND STATE ───────────────────────────────────── */}
+            {booking && (
+              <div style={{ animation: "fadeUp 0.28s ease" }}>
+
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 6,
+                      background: C.greenFaint, border: `1px solid ${C.greenBorder}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                    <span style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.22em", color: C.green, fontWeight: 700, textTransform: "uppercase" }}>
+                      Booking Found
+                    </span>
+                  </div>
+                  <h1 style={{ fontFamily: F.display, fontSize: 32, fontWeight: 400, color: C.textPrimary, lineHeight: 1.2, margin: "0 0 10px", letterSpacing: "0.01em" }}>
+                    Manage Your Booking
+                  </h1>
+                  <p style={{ fontFamily: F.body, fontSize: 12.5, color: C.textSecondary, margin: 0 }}>
+                    {editing ? "Update your booking information below." : "View details, edit information, or cancel your reservation."}
+                  </p>
+                </div>
+
+                {/* Card */}
+                <div style={{
+                  background: C.surfaceBase, borderRadius: 14,
+                  border: `1px solid ${C.borderDefault}`,
+                  overflow: "hidden", marginBottom: 14,
+                }}>
+                  <div style={{ height: "2px", background: `linear-gradient(90deg, transparent 0%, ${C.gold}80 30%, ${C.gold}80 70%, transparent 100%)` }} />
+
+                  <div style={{ padding: "20px 22px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
+                      <div>
+                        <div style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.20em", color: C.gold, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
+                          Reference Code
+                        </div>
+                        <div style={{ fontFamily: F.mono, fontSize: 28, fontWeight: 500, color: C.textPrimary, letterSpacing: "0.06em", lineHeight: 1 }}>
+                          {booking.reference_code || booking.id || "—"}
+                        </div>
+                      </div>
+                      <StatusBadge status={booking.status} />
+                    </div>
+
+                    <div style={{ height: "1px", background: C.divider, marginBottom: 20 }} />
+
+                    {editing ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                        <EditField
+                          label="Full Name" required
+                          value={editForm.name}
+                          onChange={(v) => setEditForm({ ...editForm, name: v })}
+                          placeholder="Full name"
+                          C={C} isDark={isDark}
+                        />
+                        <EditField
+                          label="Email Address" type="email" required
+                          value={editForm.email}
+                          onChange={(v) => setEditForm({ ...editForm, email: v })}
+                          placeholder="email@example.com"
+                          C={C} isDark={isDark}
+                        />
+                        <EditField
+                          label="Phone Number" type="tel" required
+                          value={editForm.phone}
+                          onChange={(v) => {
+                            const digits = (v.startsWith("+63") ? v.slice(3) : v).replace(/[^0-9]/g, "").slice(0, 10);
+                            setEditForm({ ...editForm, phone: "+63" + digits });
+                          }}
+                          placeholder="+63XXXXXXXXXX"
+                          C={C} isDark={isDark}
+                        />
+
+                        {/* ── Date AND Time side by side ── */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                          <EditField
+                            label="Event Date" type="date" required
+                            value={editForm.eventDate}
+                            min={new Date().toISOString().split("T")[0]}
+                            onChange={(v) => setEditForm({ ...editForm, eventDate: v })}
+                            C={C} isDark={isDark}
+                          />
+                          <EditField
+                            label="Event Time" type="time"
+                            value={editForm.eventTime}
+                            onChange={(v) => setEditForm({ ...editForm, eventTime: v })}
+                            C={C} isDark={isDark}
+                          />
+                        </div>
+
+                        <EditField
+                          label="Special Requests" type="textarea"
+                          value={editForm.specialRequests}
+                          onChange={(v) => setEditForm({ ...editForm, specialRequests: v })}
+                          placeholder="Dietary needs, accessibility, preferences…"
+                          C={C} isDark={isDark}
+                        />
+
+                        {error && (
+                          <div style={{ padding: "10px 14px", borderRadius: 8, background: C.redFaint, border: `1px solid ${C.redBorder}`, color: C.red, fontSize: 12.5, lineHeight: 1.5, display: "flex", alignItems: "center", gap: 8 }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            {error}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: C.textPrimary, marginBottom: 3 }}>{booking.name || "—"}</div>
+                          <div style={{ fontSize: 12.5, color: C.textSecondary }}>
+                            {booking.email}{booking.email && booking.phone ? " • " : ""}{booking.phone}
+                          </div>
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 20px", marginBottom: 14 }}>
+                          {[
+                            ["Date",         fmtDate(booking.event_date)],
+                            ["Time",         fmtTime(booking.event_time)],
+                            ["Guests",       booking.guests ? `${booking.guests} pax` : "—"],
+                            ["Table / Seat", [booking.table, booking.seat].filter(Boolean).join(" / ") || "—"],
+                          ].map(([label, val]) => (
+                            <div key={label}>
+                              <div style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary, fontWeight: 700, marginBottom: 3 }}>{label}</div>
+                              <div style={{ fontFamily: F.body, fontSize: 12.5, color: C.textPrimary }}>{val}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {booking.special_requests && (
+                          <div>
+                            <div style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary, fontWeight: 700, marginBottom: 3 }}>Special Requests</div>
+                            <div style={{ fontFamily: F.body, fontSize: 12.5, color: C.textPrimary, lineHeight: 1.6 }}>{booking.special_requests}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── ACTION BUTTONS ──────────────────────────────────────── */}
+                <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                  {editing ? (
+                    <>
+                      <button onClick={() => { setEditing(false); setError(""); }} disabled={saving}
+                        style={{ flex: 1, padding: "11px 16px", background: "transparent", border: `1px solid ${C.borderDefault}`, borderRadius: 8, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.textSecondary, cursor: saving ? "not-allowed" : "pointer", transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)" }}
+                        onMouseEnter={(e) => { if (!saving) { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.color = C.gold; } }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.color = C.textSecondary; }}
+                      >Cancel</button>
+                      <button onClick={handleUpdate} disabled={saving}
+                        style={{ flex: 1, padding: "11px 16px", background: saving ? C.goldDim : C.gold, border: "none", borderRadius: 8, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.textOnAccent, cursor: saving ? "not-allowed" : "pointer", transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                        onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = C.goldLight; }}
+                        onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = C.gold; }}
+                      >
+                        {saving ? <><Spinner C={C} size={12} />Saving…</> : <>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 0-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                          Save Changes
+                        </>}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => { setBooking(null); setError(""); }}
+                        style={{ flex: 1, padding: "11px 16px", background: "transparent", border: `1px solid ${C.borderDefault}`, borderRadius: 8, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.textSecondary, cursor: "pointer", transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.color = C.gold; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.color = C.textSecondary; }}
+                      >Search Again</button>
+
+                      <button onClick={() => { setEditing(true); setError(""); }}
+                        style={{ flex: 1, padding: "11px 16px", background: C.gold, border: "none", borderRadius: 8, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.textOnAccent, cursor: "pointer", transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = C.goldLight; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = C.gold; }}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Edit Details
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (!isCancelableStatus(booking?.status)) {
+                            setError("Only reservations awaiting confirmation or confirmed reservations can be cancelled.");
+                            return;
+                          }
+                          setError("");
+                          setShowCancelModal(true);
+                        }}
+                        disabled={!isCancelableStatus(booking?.status)}
+                        style={{
+                          flex: 1, padding: "11px 16px",
+                          background: isCancelableStatus(booking?.status) ? C.textSecondary : C.borderStrong,
+                          border: "none", borderRadius: 8,
+                          fontFamily: F.label, fontSize: 10, fontWeight: 700,
+                          letterSpacing: "0.10em", textTransform: "uppercase",
+                          color: "#fff",
+                          cursor: isCancelableStatus(booking?.status) ? "pointer" : "not-allowed",
+                          transition: "0.25s",
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        }}
+                        onMouseEnter={(e) => { if (isCancelableStatus(booking?.status)) e.currentTarget.style.background = C.borderAccent; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = isCancelableStatus(booking?.status) ? C.textSecondary : C.borderStrong; }}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {!editing && error && (
+                  <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8, background: C.redFaint, border: `1px solid ${C.redBorder}`, color: C.red, fontSize: 12.5, lineHeight: 1.5, display: "flex", alignItems: "center", gap: 8 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    {error}
+                  </div>
+                )}
               </div>
-            </div>
-          </aside>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1300,4 +1153,5 @@ export default function ManageBooking() {
       )}
     </ThemeContext.Provider>
   );
+
 }

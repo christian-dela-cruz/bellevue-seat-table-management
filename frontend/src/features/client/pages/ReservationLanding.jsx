@@ -543,39 +543,7 @@ export default function ReservationLanding() {
 
   return (
     <main className="reservation-launcher" data-theme={theme}>
-      <button
-        type="button"
-        className="reservation-theme-toggle reservation-theme-toggle--floating"
-        onClick={() => setTheme(isLight ? "dark" : "light")}
-        aria-pressed={isLight}
-        aria-label={`Switch to ${isLight ? "dark" : "light"} mode`}
-      >
-        <span className="reservation-theme-toggle__switch" aria-hidden="true">
-          <span className="reservation-theme-toggle__icon reservation-theme-toggle__icon--moon">
-            <svg viewBox="0 0 24 24" role="presentation">
-              <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
-            </svg>
-          </span>
-          <span className="reservation-theme-toggle__icon reservation-theme-toggle__icon--sun">
-            <svg viewBox="0 0 24 24" role="presentation">
-              <circle cx="12" cy="12" r="4.2" />
-              <path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" />
-            </svg>
-          </span>
-          <span className="reservation-theme-toggle__thumb">
-            {isLight ? (
-              <svg viewBox="0 0 24 24" role="presentation">
-                <circle cx="12" cy="12" r="4.2" />
-                <path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" role="presentation">
-                <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
-              </svg>
-            )}
-          </span>
-        </span>
-      </button>
+
 
       <div className="reservation-shell">
         <section className="reservation-hero" aria-label="Bellevue reservation introduction">
@@ -628,6 +596,39 @@ export default function ReservationLanding() {
                 <span className="reservation-section__kicker">Dining Reservation</span>
                 <h2>Dining Outlets</h2>
               </div>
+              <button
+                type="button"
+                className="reservation-theme-toggle reservation-theme-toggle--floating"
+                onClick={() => setTheme(isLight ? "dark" : "light")}
+                aria-pressed={isLight}
+                aria-label={`Switch to ${isLight ? "dark" : "light"} mode`}
+              >
+                <span className="reservation-theme-toggle__switch" aria-hidden="true">
+                  <span className="reservation-theme-toggle__icon reservation-theme-toggle__icon--moon">
+                    <svg viewBox="0 0 24 24" role="presentation">
+                      <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
+                    </svg>
+                  </span>
+                  <span className="reservation-theme-toggle__icon reservation-theme-toggle__icon--sun">
+                    <svg viewBox="0 0 24 24" role="presentation">
+                      <circle cx="12" cy="12" r="4.2" />
+                      <path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" />
+                    </svg>
+                  </span>
+                  <span className="reservation-theme-toggle__thumb">
+                    {isLight ? (
+                      <svg viewBox="0 0 24 24" role="presentation">
+                        <circle cx="12" cy="12" r="4.2" />
+                        <path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" role="presentation">
+                        <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
+                      </svg>
+                    )}
+                  </span>
+                </span>
+              </button>
             </div>
 
             <div className="reservation-grid reservation-grid--dining">
@@ -829,42 +830,35 @@ export default function ReservationLanding() {
         }
 
         .reservation-theme-toggle--floating {
-          position: absolute;
-          top: clamp(14px, 2.2vw, 24px);
-          right: clamp(14px, 2.2vw, 28px);
-          z-index: 10;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          min-height: 38px;
-          min-width: 62px;
-          border: 1px solid rgba(255, 250, 241, 0.12);
-          border-radius: 14px;
-          background: rgba(18, 15, 11, 0.54);
+          background: transparent;
+          border: none;
+          padding: 0 !important;
+          min-width: 0 !important;
+          width: auto !important;
           color: rgba(255, 250, 241, 0.76);
-          box-shadow: 0 8px 24px rgba(18, 12, 7, 0.12);
-          backdrop-filter: blur(14px);
+          box-shadow: none;
+          backdrop-filter: none;
           cursor: pointer;
-          transition: border-color 0.22s ease, background 0.22s ease, transform 0.22s ease;
+          transition: transform 0.22s ease;
+          align-self: flex-end;
+          position: relative;
+          right: 14px; /* Shift left to align with the card's rightmost edge */
+          top: -12px;  /* Move a little bit up */
         }
 
         .reservation-launcher[data-theme="light"] .reservation-theme-toggle--floating {
-          border-color: rgba(164, 120, 33, 0.2);
-          background: rgba(255, 252, 246, 0.74);
+          background: transparent;
+          border: none;
           color: rgba(42, 33, 23, 0.72);
         }
 
         .reservation-theme-toggle--floating:hover,
         .reservation-theme-toggle--floating:focus-visible {
-          border-color: rgba(196, 163, 90, 0.52);
-          background: rgba(196, 163, 90, 0.14);
           transform: translateY(-1px);
           outline: none;
-        }
-
-        .reservation-launcher[data-theme="light"] .reservation-theme-toggle--floating:hover,
-        .reservation-launcher[data-theme="light"] .reservation-theme-toggle--floating:focus-visible {
-          background: rgba(164, 120, 33, 0.1);
         }
 
         .reservation-theme-toggle__switch {
@@ -999,13 +993,7 @@ export default function ReservationLanding() {
         }
 
         .reservation-hero::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          z-index: -1;
-          background: linear-gradient(115deg, transparent 0 58%, rgba(255, 250, 241, 0.05) 58.2% 60.2%, transparent 60.6% 100%);
-          opacity: 0.9;
-          pointer-events: none;
+          display: none;
         }
 
         .reservation-hero__content {
@@ -1020,6 +1008,7 @@ export default function ReservationLanding() {
           width: var(--brand-logo-width);
           height: var(--brand-logo-height);
           margin-bottom: clamp(24px, 4vh, 46px);
+          margin-left: -14px;
           background: transparent;
           border: none;
           outline: none;
@@ -1033,7 +1022,7 @@ export default function ReservationLanding() {
           width: 100%;
           height: 100%;
           object-fit: contain;
-          filter: drop-shadow(0 8px 16px rgba(0,0,0,0.24));
+          filter: invert(1) hue-rotate(180deg) brightness(1.15) contrast(1.15) drop-shadow(0 8px 16px rgba(0,0,0,0.24));
         }
 
         .reservation-hero__brand:hover,
@@ -1089,26 +1078,27 @@ export default function ReservationLanding() {
           justify-content: center;
           min-height: 48px;
           margin-top: clamp(18px, 2.4vh, 26px);
-          border: 1px solid rgba(196, 163, 90, 0.42);
+          border: 1px solid #c4a35a;
           border-radius: 14px;
-          padding: 0 20px;
-          background: rgba(255, 250, 241, 0.07);
-          color: rgba(255, 250, 241, 0.94);
+          padding: 0 24px;
+          background: linear-gradient(135deg, #a47821, #c4a35a);
+          color: #ffffff;
           font: inherit;
-          font-size: 10.5px;
-          font-weight: 760;
+          font-size: 11px;
+          font-weight: 700;
           letter-spacing: 0.13em;
           text-transform: uppercase;
           cursor: pointer;
           transition: background 0.22s ease, color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+          box-shadow: 0 4px 14px rgba(164, 120, 33, 0.25);
         }
 
         .reservation-hero__manage:hover,
         .reservation-hero__manage:focus-visible {
-          background: rgba(196, 163, 90, 0.16);
-          color: #fffaf1;
-          box-shadow: 0 12px 28px rgba(0,0,0,0.18);
-          transform: translateY(-1px);
+          background: linear-gradient(135deg, #c4a35a, #d8bd78);
+          color: #ffffff;
+          box-shadow: 0 8px 24px rgba(164, 120, 33, 0.4);
+          transform: translateY(-2px);
           outline: none;
         }
 
@@ -1791,6 +1781,13 @@ export default function ReservationLanding() {
             --dining-card-max: 1fr;
             padding: 12px;
             gap: 12px;
+          }
+
+          .reservation-theme-toggle--floating {
+            right: 0 !important;
+            top: 0 !important;
+            align-self: flex-start !important;
+            margin-top: 4px;
           }
 
           .reservation-topbar {
