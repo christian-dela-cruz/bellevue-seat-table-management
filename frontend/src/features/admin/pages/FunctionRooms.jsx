@@ -61,7 +61,7 @@ const emptyForm = {
   show_on_landing: true,
   reservations_enabled: true,
   parent_selectable: true,
-  child_selectable: true,
+  child_selectable: false,
   reservation_route: "",
   image_position: "center 50%",
   metadata: {},
@@ -2052,9 +2052,9 @@ export default function FunctionRooms() {
                           }}
                           style={inputStyle()}
                         >
-                          <option value="admin_assign">Admin assigns after request</option>
-                          <option value="auto_assign">Auto-assign available subroom</option>
-                          <option value="whole_booking">Whole parent booking</option>
+                          <option value="admin_assign">Admin Assign after requests</option>
+                          <option value="auto_assign">Auto-Assign Available Subroom</option>
+                          <option value="whole_booking">Whole Parent Booking</option>
                         </select>
                       </Field>
                       <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text, marginTop: 4, marginBottom: 12 }}>

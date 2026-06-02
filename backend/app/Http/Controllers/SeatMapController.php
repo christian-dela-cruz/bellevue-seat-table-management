@@ -45,10 +45,13 @@ class SeatMapController extends Controller
 
             // Fallback inheritance logic: if parent venue has no layout, try to find a child that has one
             $payload = $venue->seatmap_payload;
+            $isEmptyPayload = empty($payload) || $payload === '{}' || $payload === '[]' || strlen(trim($payload)) < 5;
             
-            if (empty($payload)) {
+            if ($isEmptyPayload) {
                 $childWithLayout = Venue::where('parent_id', $venue->id)
                     ->whereNotNull('seatmap_payload')
+                    ->where('seatmap_payload', '!=', '{}')
+                    ->where('seatmap_payload', '!=', '[]')
                     ->first();
                 if ($childWithLayout) {
                     $payload = $childWithLayout->seatmap_payload;
@@ -128,7 +131,7 @@ class SeatMapController extends Controller
                     'name' => $venue->name,
                     'wing' => $venue->wing,
                 ]
-            ]);
+            ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
@@ -186,9 +189,23 @@ class SeatMapController extends Controller
 
     private function scheduledReservations(Request $request, int $venueId)
     {
-        return Reservation::where('venue_id', $venueId)
-            ->when($request->filled('room'), function ($query) use ($request) {
-                $query->where('room', $request->query('room'));
+        $venue = Venue::find($venueId);
+        $parentId = $venue ? $venue->parent_id : null;
+
+        return Reservation::query()
+            ->where(function ($query) use ($venueId, $parentId, $venue) {
+                if ($parentId) {
+                    $query->where('venue_id', $parentId)
+                          ->where(function ($sub) use ($venueId, $venue) {
+                              $sub->where('assigned_room_id', $venueId);
+                              if ($venue) {
+                                  $sub->orWhere('room', $venue->name);
+                              }
+                          });
+                } else {
+                    $query->where('venue_id', $venueId)
+                          ->orWhere('assigned_room_id', $venueId);
+                }
             })
             ->whereIn('status', ['pending', 'approved', 'reserved'])
             ->when($request->filled('event_date'), function ($query) use ($request) {

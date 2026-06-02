@@ -114,8 +114,19 @@ class ClientReservationController extends Controller
             'seat_id'          => 'nullable|string|max:50',
         ]);
 
-        // Keep sub-room reservations tied to their parent venue for booking scope,
-        // while still letting VenueService enforce the selected child room's state.
+        $originalRoom = $request->input('room');
+        if (!empty($originalRoom)) {
+            $selectedVenue = $this->venueService->findVenueForAvailability(['room' => $originalRoom]);
+            if ($selectedVenue && $selectedVenue->parent_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Manual selection of subrooms is not available. Please reserve the main venue and our team will assign the room.',
+                ], 422);
+            }
+        }
+
+        // Public bookings are always tied to the parent venue. Child room allocation
+        // is handled later by the configured allocation mode or by admin assignment.
         if (!empty($validated['room'])) {
             $selectedVenue = $this->venueService->findVenueForAvailability(['room' => $validated['room']]);
             if ($selectedVenue) {
@@ -132,15 +143,14 @@ class ClientReservationController extends Controller
 
         $requestedVenue = Venue::find($validated['venue_id']);
         if ($requestedVenue) {
-            if ($requestedVenue->parent_id !== null && !$requestedVenue->child_selectable) {
+            if ($requestedVenue->parent_id !== null) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Manual selection of this subroom is not allowed.',
+                    'message' => 'Manual selection of subrooms is not available. Please reserve the main venue and our team will assign the room.',
                 ], 422);
             }
 
-            // Tie to parent venue
-            $parentVenue = $requestedVenue->parent_id ? Venue::find($requestedVenue->parent_id) : $requestedVenue;
+            $parentVenue = $requestedVenue;
             $validated['venue_id'] = $parentVenue->id;
             $validated['room'] = $parentVenue->name;
             $validated['public_room_name'] = $parentVenue->name;
@@ -180,7 +190,7 @@ class ClientReservationController extends Controller
                 }
 
                 // If available, perform allocation
-                if ($allocationMode === 'auto_assign' && $validated['type'] !== 'whole') {
+                if ($allocationMode === 'auto_assign') {
                     $availableSubrooms = $this->venueService->getAvailableSubrooms(
                         $parentVenue,
                         $validated['event_date'],

@@ -74,14 +74,14 @@ Route::prefix('venues')->group(function () {
 
 // Seatmap routes
 Route::prefix('seatmap')->group(function () {
+    // ID-based routes must be registered before the wing/room wildcard route.
+    Route::get('/id/{venueId}', [SeatMapController::class, 'getSeatmapById']);
+    Route::post('/id/{venueId}', [SeatMapController::class, 'saveSeatmapById']);
+
     Route::get('/{wing}/{room}', [SeatMapController::class, 'getSeatmap'])
         ->where('room', '.*');
     Route::post('/{wing}/{room}', [SeatMapController::class, 'saveSeatmap'])
         ->where('room', '.*');
-        
-    // ID-based routes
-    Route::get('/id/{venueId}', [SeatMapController::class, 'getSeatmapById']);
-    Route::post('/id/{venueId}', [SeatMapController::class, 'saveSeatmapById']);
 });
 
 // Room seats routes (alias for seatmap to match frontend expectations)

@@ -176,6 +176,26 @@ function loadLayoutForClient(wing, room) {
   } catch { return null; }
 }
 
+function seatMapPayloadTime(layout) {
+  const raw =
+    layout?.seatmap_saved_at ||
+    layout?.seatmapSavedAt ||
+    layout?.updated_at ||
+    layout?.editor?.seatmap_saved_at ||
+    layout?.editor?.updated_at;
+  const time = Date.parse(raw || "");
+  return Number.isFinite(time) ? time : 0;
+}
+
+function isIncomingSeatMapStale(currentLayout, incomingLayout) {
+  if (!currentLayout || !incomingLayout) return false;
+  const currentTime = seatMapPayloadTime(currentLayout);
+  const incomingTime = seatMapPayloadTime(incomingLayout);
+  if (!currentTime) return false;
+  if (!incomingTime) return true;
+  return incomingTime < currentTime;
+}
+
 const loadStoredReservations = () => {
   try {
     const raw = localStorage.getItem("bellevue_reservations");
@@ -1121,7 +1141,6 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
 
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRoomId, setSelectedRoomId] = useState("");
   const [mode, setMode] = useState("whole");
   const [selectedSeat, setSelectedSeat] = useState(null);
   const [selectedTable, setSelectedTable] = useState(null);
@@ -1240,23 +1259,32 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   // Determine current venue from slug or static prop overrides
   const venue = useMemo(() => {
     if (venues.length === 0) return null;
+    let match = null;
     if (roomName) {
       // Find by static name match
       const canon = getCanonicalRoomName(roomName);
-      return venues.find((v) => getCanonicalRoomName(v.name) === canon)
+      match = venues.find((v) => getCanonicalRoomName(v.name) === canon)
         || venues.find((v) => getCanonicalRoomName(v.slug) === canon)
         || null;
+    } else {
+      const key = String(venueSlug || "").replace(/^\/+/, "").toLowerCase();
+      match = venues.find((v) => String(v.reservation_route).replace(/^\/+/, "").toLowerCase() === key)
+        || venues.find((v) => String(v.reservation_route).split("/").pop().toLowerCase() === key)
+        || venues.find((v) => String(v.slug).toLowerCase() === key)
+        || null;
     }
-    const key = String(venueSlug || "").replace(/^\/+/, "").toLowerCase();
-    return venues.find((v) => String(v.reservation_route).replace(/^\/+/, "").toLowerCase() === key)
-      || venues.find((v) => String(v.reservation_route).split("/").pop().toLowerCase() === key)
-      || venues.find((v) => String(v.slug).toLowerCase() === key)
-      || null;
+
+    if (match?.parent_id) {
+      return venues.find((v) => v.id === match.parent_id) || match;
+    }
+    return match;
   }, [venues, venueSlug, roomName]);
 
-  // Subrooms are internal and admin-managed. Guests only book the parent venue.
+  // Guests reserve the public parent venue only. Subrooms are assigned later by
+  // the configured allocation mode: admin assignment, auto-assignment, or whole parent booking.
   const selectedRoom = venue;
-  const ROOM = selectedRoom?.name || roomName || "";
+
+  const ROOM = selectedRoom?.display_name || selectedRoom?.name || roomName || "";
   const WING = wingName || getActualWingForRoom(ROOM);
 
   const flag = (value, fallback = true) => value === undefined || value === null ? fallback : Boolean(value);
@@ -1275,6 +1303,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       const params = new URLSearchParams();
       if (schedule.eventDate) params.set("event_date", schedule.eventDate);
       if (schedule.eventTime) params.set("event_time", schedule.eventTime);
+      params.set("_t", String(Date.now()));
 
       const res = await fetch(
         `${API_BASE_URL}/rooms/${venueId}/seats?${params.toString()}`,
@@ -1283,9 +1312,15 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       if (!res.ok) return;
       const json = await res.json();
       if (json.success && json.data) {
-        setTableData(json.data);
+        setTableData((current) => {
+          if (!current) return json.data;
+          if (isIncomingSeatMapStale(current, json.data)) {
+            return mergeReservationStatusIntoLayout(current, json.data);
+          }
+          return json.data;
+        });
       } else {
-        setTableData(null);
+        setTableData((current) => current ?? null);
       }
       setLayoutChecked(true);
     } catch (err) {
@@ -1320,7 +1355,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   useEffect(() => {
     if (tableData || !venue) return;
     setSlotMessage("Loading available times...");
-    venueAPI.getTimeSlots({ venue_id: venue.id, room: venue.name, date: classicDate, guests: classicGuests })
+    venueAPI.getTimeSlots({ venue_id: venue.id, room: ROOM, date: classicDate, guests: classicGuests, _t: Date.now() })
       .then((data) => {
         const nextSlots = Array.isArray(data?.slots) ? data.slots : [];
         setSlots(nextSlots);
@@ -1336,7 +1371,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
         setSlotMessage(err.message || "Unable to load time slots.");
         setForm((current) => ({ ...current, event_time: "" }));
       });
-  }, [tableData, venue, classicDate, classicGuests]);
+  }, [tableData, venue, ROOM, classicDate, classicGuests]);
 
   useEffect(() => {
     // Listen for seatmap updates saved by admin (live sync)
@@ -1344,14 +1379,20 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       if (e.key !== layoutKey(WING, ROOM)) return;
       try {
         const parsed = e.newValue ? JSON.parse(e.newValue) : null;
-        if (parsed?.v === 2) setTableData(parsed);
+        if (parsed?.v === 2) {
+          setTableData((current) => isIncomingSeatMapStale(current, parsed) ? current : parsed);
+        }
       } catch { }
     };
     const onSeatMapSaved = e => {
-      if (e.detail?.wing !== WING || e.detail?.room !== ROOM) return;
+      const savedRoom = e.detail?.room;
+      if (savedRoom !== ROOM) return;
+
       try {
         const parsed = e.detail.payload ? JSON.parse(e.detail.payload) : null;
-        if (parsed?.v === 2) setTableData(parsed);
+        if (parsed?.v === 2) {
+          setTableData((current) => isIncomingSeatMapStale(current, parsed) ? current : parsed);
+        }
       } catch { }
     };
 
@@ -1516,7 +1557,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
         name: `${formData.firstName} ${formData.lastName}`,
         email: formData.email,
         phone: formData.phone,
-        venue_id: selectedRoom?.parent_id || selectedRoom?.id || venue.parent_id || venue.id,
+        venue_id: venue.id,
         room: ROOM,
         table_number: isStandalone ? "STANDALONE" : (activeTable ? String(activeTable.id) : "GENERAL"),
         seat_number: selectedSeatNumbers.filter(Boolean).join(","),
@@ -1597,7 +1638,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
         name: form.name,
         email: form.email,
         phone: form.phone,
-        venue_id: selectedRoom?.parent_id || selectedRoom?.id || venue.parent_id || venue.id,
+        venue_id: venue.id,
         room: ROOM,
         table_number: "GENERAL",
         seat_number: "",
@@ -1773,7 +1814,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                 <button onClick={() => navigate("/venues")} style={{ width: 34, height: 34, borderRadius: "50%", background: "transparent", border: `1px solid ${C.borderDefault}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0 }} title="Back">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: C.textSecondary }}><path d="m15 18-6-6 6-6" /></svg>
                 </button>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
                   <div style={{ fontFamily: F.label, fontSize: 8, letterSpacing: "0.22em", color: C.gold, fontWeight: 700, textTransform: "uppercase" }}>{venue.type === "dining" ? "Table Booking" : "Seat Booking"}</div>
                   <div style={{ fontFamily: F.display, fontSize: 15, fontWeight: 600, color: C.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ROOM}</div>
                 </div>
@@ -1798,7 +1839,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                         </div>
                         <div style={{ display: "grid", gap: 6 }}>
                           <strong style={{ fontFamily: F.display, fontSize: 16, color: C.textPrimary }}>No seat layout available</strong>
-                          <span style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.5 }}>This venue does not have a configured seat map yet.</span>
+                          <span style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.5 }}>This space does not have a configured seat map yet.</span>
                         </div>
                       </div>
                     ) : (
@@ -1915,7 +1956,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                             </div>
                             <div style={{ textAlign: "center", display: "grid", gap: 8 }}>
                               <strong style={{ fontFamily: F.display, fontSize: 18, color: C.textPrimary }}>No seat layout available</strong>
-                              <span style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6, maxWidth: 360, margin: "0 auto" }}>This venue does not have a configured seat map yet.</span>
+                              <span style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6, maxWidth: 360, margin: "0 auto" }}>This space does not have a configured seat map yet.</span>
                             </div>
                           </div>
                         ) : (

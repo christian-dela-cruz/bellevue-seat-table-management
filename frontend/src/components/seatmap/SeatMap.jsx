@@ -349,15 +349,29 @@ function layoutKey(wing, room) {
   return `seatmap_layout:${actualWing}:${room}`;
 }
 
-function saveLayout(wing, room, { tables, labels, standaloneSeats, fixtures, editor }) {
+function withSeatmapSaveMetadata(wing, room, data) {
+  return {
+    ...data,
+    v: 2,
+    seatmap_saved_at: new Date().toISOString(),
+    seatmap_scope: {
+      wing: getActualWingForRoom(room),
+      room,
+    },
+  };
+}
+
+function saveLayout(wing, room, data) {
   if (!wing || !room) return;
-  const payload = JSON.stringify({ v: 2, tables, labels, standaloneSeats, fixtures, editor });
+  const payloadData = data?.v === 2 ? data : withSeatmapSaveMetadata(wing, room, data);
+  const payload = JSON.stringify(payloadData);
   try {
     localStorage.setItem(layoutKey(wing, room), payload);
-    window.dispatchEvent(new CustomEvent("seatmap:saved", { detail: { wing, room, payload } }));
+    window.dispatchEvent(new CustomEvent("seatmap:saved", { detail: { wing, room, payload, data: payloadData } }));
   } catch (err) {
     console.warn("SeatMap: could not save to localStorage", err);
   }
+  return payloadData;
 }
 
 function loadLayout(wing, room) {
@@ -3364,11 +3378,11 @@ export default function SeatMap({
         show_rulers: showRulers
       }
     };
-    saveLayout(activeWing, activeRoom, completeData);
+    const savedData = saveLayout(activeWing, activeRoom, completeData);
     const actualWing = getActualWingForRoom(activeRoom);
     const matchedVenue = venuesList.find(v => v.name === activeRoom);
     const venueId = matchedVenue ? matchedVenue.id : null;
-    dispatchSeatMapUpdate(actualWing, activeRoom, completeData, venueId);
+    dispatchSeatMapUpdate(actualWing, activeRoom, savedData || completeData, venueId);
   }, [tables, labels, standaloneSeats, fixtures, editMode, activeWing, activeRoom, roomWidth, roomHeight, gridSize, snapToGrid, zoom, pan, showGrid, gridVisibility, smartGuidesEnabled, showRulers, venuesList]);
 
   // ── Client: sync from prop ───────────────────────────────────────────────────

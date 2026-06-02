@@ -403,6 +403,28 @@ class ReservationService
             })
             ->whereIn('status', ['pending', 'approved', 'reserved']);
 
+        $assignedRoomId = $data['assigned_room_id'] ?? null;
+        if (!$assignedRoomId && !empty($data['room'])) {
+            $roomVenue = Venue::where('name', $data['room'])->first();
+            if ($roomVenue && $roomVenue->parent_id) {
+                $assignedRoomId = $roomVenue->id;
+            }
+        }
+
+        if ($assignedRoomId) {
+            $roomName = Venue::find($assignedRoomId)?->name;
+            $query->where(function ($roomQuery) use ($assignedRoomId, $roomName) {
+                $roomQuery->where('assigned_room_id', $assignedRoomId);
+                if ($roomName) {
+                    $roomQuery->orWhere('room', $roomName);
+                }
+                $roomQuery->orWhere(function ($parentQuery) {
+                    $parentQuery->whereNull('assigned_room_id')
+                                ->where('type', 'whole');
+                });
+            });
+        }
+
         if ($ignoreReservationId) {
             $query->whereKeyNot($ignoreReservationId);
         }
