@@ -1810,7 +1810,10 @@ export default function FunctionRooms() {
                           </div>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                              <strong style={{ color: C.text, fontSize: level ? 12.5 : 13.5, fontWeight: level ? 560 : 640, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{room.display_name || room.name}</strong>
+                              <strong style={{ color: C.text, fontSize: level ? 12.5 : 13.5, fontWeight: level ? 560 : 640, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                <span style={{ color: C.gold, opacity: 0.8, marginRight: 6, fontSize: '0.9em' }}>#{room.id}</span>
+                                {room.display_name || room.name}
+                              </strong>
                               {!level && (
                                 <Badge tone={room.type === "dining" ? "gold" : "neutral"} compact>
                                   {room.type === "dining" ? "Dining" : childCount ? `${childCount} sub-room${childCount > 1 ? "s" : ""}` : "Function"}

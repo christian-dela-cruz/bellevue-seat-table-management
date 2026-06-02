@@ -78,6 +78,10 @@ Route::prefix('seatmap')->group(function () {
         ->where('room', '.*');
     Route::post('/{wing}/{room}', [SeatMapController::class, 'saveSeatmap'])
         ->where('room', '.*');
+        
+    // ID-based routes
+    Route::get('/id/{venueId}', [SeatMapController::class, 'getSeatmapById']);
+    Route::post('/id/{venueId}', [SeatMapController::class, 'saveSeatmapById']);
 });
 
 // Room seats routes (alias for seatmap to match frontend expectations)

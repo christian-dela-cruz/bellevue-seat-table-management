@@ -20,7 +20,8 @@ class SeatMapController extends Controller
             $wing = urldecode($wing);
             $room = urldecode($room);
             
-            $venue = Venue::where('name', $room)->where('wing', $wing)->first();
+            // Search by name only since frontend wing structure might not match DB perfectly
+            $venue = Venue::where('name', $room)->first();
             if (!$venue) {
                 return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
             }
@@ -142,7 +143,31 @@ class SeatMapController extends Controller
             $wing = urldecode($wing);
             $room = urldecode($room);
             
-            $venue = Venue::where('name', $room)->where('wing', $wing)->first();
+            // Search by name only since frontend wing structure might not match DB perfectly
+            $venue = Venue::where('name', $room)->first();
+            if (!$venue) {
+                return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
+            }
+
+            $venue->seatmap_payload = json_encode($request->all());
+            $venue->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Seatmap saved successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Save seatmap data for a venue by ID
+     */
+    public function saveSeatmapById(Request $request, int $venueId): JsonResponse
+    {
+        try {
+            $venue = Venue::find($venueId);
             if (!$venue) {
                 return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
             }

@@ -3125,6 +3125,7 @@ export default function SeatMap({
   }, [tables, standaloneSeats, labels, fixtures]);
 
   const [venueStructure, setVenueStructure] = useState(() => loadVenueStructure());
+  const [venuesList, setVenuesList] = useState([]);
   const currentAdmin = useMemo(() => authAPI.getCurrentUser(), []);
   const visibleVenueStructure = useMemo(
     () => getScopedOutletGroups(currentAdmin, venueStructure),
@@ -3188,6 +3189,7 @@ export default function SeatMap({
         const venues = await res.json();
         if (!mounted || !Array.isArray(venues)) return;
 
+        setVenuesList(venues);
         const activeVenues = venues.filter(v => !v.is_archived);
         const parentIdsWithChildren = activeVenues.filter(v => v.parent_id !== null).map(v => v.parent_id);
 
@@ -3364,8 +3366,10 @@ export default function SeatMap({
     };
     saveLayout(activeWing, activeRoom, completeData);
     const actualWing = getActualWingForRoom(activeRoom);
-    dispatchSeatMapUpdate(actualWing, activeRoom, completeData);
-  }, [tables, labels, standaloneSeats, fixtures, editMode, activeWing, activeRoom, roomWidth, roomHeight, gridSize, snapToGrid, zoom, pan, showGrid, gridVisibility, smartGuidesEnabled, showRulers]);
+    const matchedVenue = venuesList.find(v => v.name === activeRoom);
+    const venueId = matchedVenue ? matchedVenue.id : null;
+    dispatchSeatMapUpdate(actualWing, activeRoom, completeData, venueId);
+  }, [tables, labels, standaloneSeats, fixtures, editMode, activeWing, activeRoom, roomWidth, roomHeight, gridSize, snapToGrid, zoom, pan, showGrid, gridVisibility, smartGuidesEnabled, showRulers, venuesList]);
 
   // ── Client: sync from prop ───────────────────────────────────────────────────
   useEffect(() => {

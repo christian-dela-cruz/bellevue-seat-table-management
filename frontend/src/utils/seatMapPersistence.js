@@ -101,14 +101,18 @@ export function subscribeToSeatMapChanges(callback) {
 }
 
 // ─── Dispatch same-tab event ──────────────────────────────────────────
-export function dispatchSeatMapUpdate(wing, room, data) {
+export function dispatchSeatMapUpdate(wing, room, data, venueId = null) {
   // 1. Send to backend API
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
   const token = localStorage.getItem("admin_token") || localStorage.getItem("auth_token") || "";
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  fetch(`${API_BASE_URL}/seatmap/${encodeURIComponent(wing)}/${encodeURIComponent(room)}`, {
+  const endpoint = venueId 
+    ? `${API_BASE_URL}/seatmap/id/${venueId}` 
+    : `${API_BASE_URL}/seatmap/${encodeURIComponent(wing)}/${encodeURIComponent(room)}`;
+
+  fetch(endpoint, {
     method: "POST",
     headers,
     body: JSON.stringify(data),

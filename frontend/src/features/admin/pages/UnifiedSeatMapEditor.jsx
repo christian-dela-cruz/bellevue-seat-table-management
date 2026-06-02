@@ -139,12 +139,12 @@ export default function UnifiedSeatMapEditor() {
   // Migration script for scooping up local storage seatmaps
   useEffect(() => {
     const migrateSeatMaps = async () => {
-      const migratedFlag = localStorage.getItem("seatmaps_migrated_to_db");
+      const migratedFlag = localStorage.getItem("seatmaps_migrated_to_db_v2");
       if (migratedFlag) return;
 
       const keys = Object.keys(localStorage).filter(k => k.startsWith("seatmap_layout:"));
       if (keys.length === 0) {
-        localStorage.setItem("seatmaps_migrated_to_db", "true");
+        localStorage.setItem("seatmaps_migrated_to_db_v2", "true");
         return;
       }
 
@@ -184,7 +184,7 @@ export default function UnifiedSeatMapEditor() {
       }
       
       console.log(`[SeatMap Migration] Migrated ${successCount} seatmaps successfully.`);
-      localStorage.setItem("seatmaps_migrated_to_db", "true");
+      localStorage.setItem("seatmaps_migrated_to_db_v2", "true");
     };
 
     migrateSeatMaps();
