@@ -26,22 +26,22 @@ function getCanonicalRoomName(room) {
 function getActualWingForRoom(room) {
   const canonicalRoom = getCanonicalRoomName(room);
   const roomToWingMap = {
-    "Alabang Function Room":   "Main Wing",
-    "Business Center":         "Main Wing",
-    "Laguna Ballroom 1":       "Main Wing",
-    "Laguna Ballroom 2":       "Main Wing",
-    "20/20 Function Room A":   "Main Wing",
-    "20/20 Function Room B":   "Main Wing",
-    "20/20 Function Room C":   "Main Wing",
-    "Grand Ballroom A":        "Grand Ballroom",
-    "Grand Ballroom B":        "Grand Ballroom",
-    "Grand Ballroom C":        "Grand Ballroom",
-    "Tower 1":                 "Tower Wing",
-    "Tower 2":                 "Tower Wing",
-    "Tower 3":                 "Tower Wing",
-    "Qsina":                   "Dining",
-    "Hanakazu":                "Dining",
-    "Phoenix Court":           "Dining",
+    "Alabang Function Room": "Main Wing",
+    "Business Center": "Main Wing",
+    "Laguna Ballroom 1": "Main Wing",
+    "Laguna Ballroom 2": "Main Wing",
+    "20/20 Function Room A": "Main Wing",
+    "20/20 Function Room B": "Main Wing",
+    "20/20 Function Room C": "Main Wing",
+    "Grand Ballroom A": "Grand Ballroom",
+    "Grand Ballroom B": "Grand Ballroom",
+    "Grand Ballroom C": "Grand Ballroom",
+    "Tower 1": "Tower Wing",
+    "Tower 2": "Tower Wing",
+    "Tower 3": "Tower Wing",
+    "Qsina": "Dining",
+    "Hanakazu": "Dining",
+    "Phoenix Court": "Dining",
   };
   if (roomToWingMap[canonicalRoom]) {
     return roomToWingMap[canonicalRoom];
@@ -55,7 +55,7 @@ function getActualWingForRoom(room) {
         if (wing.rooms?.includes(room) || wing.rooms?.includes(canonicalRoom)) return wing.label;
       }
     }
-  } catch {}
+  } catch { }
   return "Main Wing";
 }
 
@@ -73,70 +73,70 @@ function imageUrl(image) {
 }
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
-const ThemeContext = createContext({ isDark: true, toggle: () => {} });
+const ThemeContext = createContext({ isDark: true, toggle: () => { } });
 const useTheme = () => useContext(ThemeContext);
 
 function getTokens(isDark) {
   return isDark
     ? {
-        gold: "#C4A35A", goldLight: "#D9BC7A", goldDim: "#8C7240",
-        goldFaint: "rgba(196,163,90,0.08)", goldFaintest: "rgba(196,163,90,0.04)",
-        pageBg: "#0A0908", surfaceBase: "#111009", surfaceRaised: "#161410",
-        surfaceInput: "rgba(255,255,255,0.04)",
-        borderFaint: "rgba(255,255,255,0.04)", borderDefault: "rgba(255,255,255,0.08)",
-        borderStrong: "rgba(255,255,255,0.12)", borderAccent: "rgba(196,163,90,0.30)",
-        textPrimary: "#EDE8DF", textSecondary: "#C7BEAF", // Improved contrast from #8A8278
-        textTertiary: "#9C9283", textOnAccent: "#0A0908", // Improved contrast from rgba(237,232,223,0.32)
-        red: "#B85C5C", redFaint: "rgba(184,92,92,0.08)", redBorder: "rgba(184,92,92,0.20)",
-        green: "#4A9E7E", greenFaint: "rgba(74,158,126,0.08)", greenBorder: "rgba(74,158,126,0.20)",
-        badgePending:  { bg: "rgba(196,163,90,0.10)", color: "#C4A35A", dot: "#C4A35A" },
-        badgeApproved: { bg: "rgba(74,158,126,0.10)", color: "#4A9E7E", dot: "#4A9E7E" },
-        badgeRejected: { bg: "rgba(184,92,92,0.10)",  color: "#B85C5C", dot: "#B85C5C" },
-        navBg: "rgba(10,9,8,0.95)", navBorder: "rgba(196,163,90,0.12)",
-        divider: "rgba(255,255,255,0.05)", inputFocusShadow: "0 0 0 3px rgba(196,163,90,0.12)",
-        modalOverlay: "rgba(10,9,8,0.88)",
-        statusNote: { pending: "rgba(196,163,90,0.05)", approved: "rgba(74,158,126,0.05)", rejected: "rgba(184,92,92,0.05)" },
-        statusNoteBorder: { pending: "rgba(196,163,90,0.15)", approved: "rgba(74,158,126,0.15)", rejected: "rgba(184,92,92,0.15)" },
-        headerGradient: "linear-gradient(160deg,#1C1A16 0%,#131210 100%)",
-        spinnerBorder: "rgba(255,255,255,0.15)", spinnerTop: "#C4A35A",
-        cardBg: "#111009", cardBorder: "rgba(255,255,255,0.06)",
-        bottomSheet: "#161410",
-        btnDisabledBg: "#282622",
-        btnDisabledText: "#6A645A",
-      }
+      gold: "#C4A35A", goldLight: "#D9BC7A", goldDim: "#8C7240",
+      goldFaint: "rgba(196,163,90,0.08)", goldFaintest: "rgba(196,163,90,0.04)",
+      pageBg: "#0A0908", surfaceBase: "#111009", surfaceRaised: "#161410",
+      surfaceInput: "rgba(255,255,255,0.04)",
+      borderFaint: "rgba(255,255,255,0.04)", borderDefault: "rgba(255,255,255,0.08)",
+      borderStrong: "rgba(255,255,255,0.12)", borderAccent: "rgba(196,163,90,0.30)",
+      textPrimary: "#EDE8DF", textSecondary: "#C7BEAF", // Improved contrast from #8A8278
+      textTertiary: "#9C9283", textOnAccent: "#0A0908", // Improved contrast from rgba(237,232,223,0.32)
+      red: "#B85C5C", redFaint: "rgba(184,92,92,0.08)", redBorder: "rgba(184,92,92,0.20)",
+      green: "#4A9E7E", greenFaint: "rgba(74,158,126,0.08)", greenBorder: "rgba(74,158,126,0.20)",
+      badgePending: { bg: "rgba(196,163,90,0.10)", color: "#C4A35A", dot: "#C4A35A" },
+      badgeApproved: { bg: "rgba(74,158,126,0.10)", color: "#4A9E7E", dot: "#4A9E7E" },
+      badgeRejected: { bg: "rgba(184,92,92,0.10)", color: "#B85C5C", dot: "#B85C5C" },
+      navBg: "rgba(10,9,8,0.95)", navBorder: "rgba(196,163,90,0.12)",
+      divider: "rgba(255,255,255,0.05)", inputFocusShadow: "0 0 0 3px rgba(196,163,90,0.12)",
+      modalOverlay: "rgba(10,9,8,0.88)",
+      statusNote: { pending: "rgba(196,163,90,0.05)", approved: "rgba(74,158,126,0.05)", rejected: "rgba(184,92,92,0.05)" },
+      statusNoteBorder: { pending: "rgba(196,163,90,0.15)", approved: "rgba(74,158,126,0.15)", rejected: "rgba(184,92,92,0.15)" },
+      headerGradient: "linear-gradient(160deg,#1C1A16 0%,#131210 100%)",
+      spinnerBorder: "rgba(255,255,255,0.15)", spinnerTop: "#C4A35A",
+      cardBg: "#111009", cardBorder: "rgba(255,255,255,0.06)",
+      bottomSheet: "#161410",
+      btnDisabledBg: "#282622",
+      btnDisabledText: "#6A645A",
+    }
     : {
-        gold: "#8C6B2A", goldLight: "#A07D38", goldDim: "#6B5020",
-        goldFaint: "rgba(140,107,42,0.07)", goldFaintest: "rgba(140,107,42,0.04)",
-        pageBg: "#F7F4EE", surfaceBase: "#FFFFFF", surfaceRaised: "#FAF8F4",
-        surfaceInput: "#FFFFFF",
-        borderFaint: "rgba(0,0,0,0.04)", borderDefault: "rgba(0,0,0,0.08)",
-        borderStrong: "rgba(0,0,0,0.13)", borderAccent: "rgba(140,107,42,0.28)",
-        textPrimary: "#18140E", textSecondary: "#4E4537", // Improved contrast from #7A7060
-        textTertiary: "#7A7060", textOnAccent: "#FFFFFF", // Improved contrast from rgba(24,20,14,0.35)
-        red: "#A03838", redFaint: "rgba(160,56,56,0.07)", redBorder: "rgba(160,56,56,0.18)",
-        green: "#2E7A5A", greenFaint: "rgba(46,122,90,0.07)", greenBorder: "rgba(46,122,90,0.18)",
-        badgePending:  { bg: "rgba(140,107,42,0.09)", color: "#8C6B2A", dot: "#8C6B2A" },
-        badgeApproved: { bg: "rgba(46,122,90,0.09)",  color: "#2E7A5A", dot: "#2E7A5A" },
-        badgeRejected: { bg: "rgba(160,56,56,0.09)",  color: "#A03838", dot: "#A03838" },
-        navBg: "rgba(247,244,238,0.96)", navBorder: "rgba(140,107,42,0.14)",
-        divider: "rgba(0,0,0,0.05)", inputFocusShadow: "0 0 0 3px rgba(140,107,42,0.10)",
-        modalOverlay: "rgba(10,9,8,0.65)",
-        statusNote: { pending: "rgba(140,107,42,0.05)", approved: "rgba(46,122,90,0.05)", rejected: "rgba(160,56,56,0.05)" },
-        statusNoteBorder: { pending: "rgba(140,107,42,0.18)", approved: "rgba(46,122,90,0.18)", rejected: "rgba(160,56,56,0.18)" },
-        headerGradient: "linear-gradient(160deg,#FAF7F2 0%,#F3EDE0 100%)",
-        spinnerBorder: "rgba(0,0,0,0.12)", spinnerTop: "#8C6B2A",
-        cardBg: "#FFFFFF", cardBorder: "rgba(0,0,0,0.07)",
-        bottomSheet: "#FFFFFF",
-        btnDisabledBg: "#E1DDD5",
-        btnDisabledText: "#8A8070",
-      };
+      gold: "#8C6B2A", goldLight: "#A07D38", goldDim: "#6B5020",
+      goldFaint: "rgba(140,107,42,0.07)", goldFaintest: "rgba(140,107,42,0.04)",
+      pageBg: "#F7F4EE", surfaceBase: "#FFFFFF", surfaceRaised: "#FAF8F4",
+      surfaceInput: "#FFFFFF",
+      borderFaint: "rgba(0,0,0,0.04)", borderDefault: "rgba(0,0,0,0.08)",
+      borderStrong: "rgba(0,0,0,0.13)", borderAccent: "rgba(140,107,42,0.28)",
+      textPrimary: "#18140E", textSecondary: "#4E4537", // Improved contrast from #7A7060
+      textTertiary: "#7A7060", textOnAccent: "#FFFFFF", // Improved contrast from rgba(24,20,14,0.35)
+      red: "#A03838", redFaint: "rgba(160,56,56,0.07)", redBorder: "rgba(160,56,56,0.18)",
+      green: "#2E7A5A", greenFaint: "rgba(46,122,90,0.07)", greenBorder: "rgba(46,122,90,0.18)",
+      badgePending: { bg: "rgba(140,107,42,0.09)", color: "#8C6B2A", dot: "#8C6B2A" },
+      badgeApproved: { bg: "rgba(46,122,90,0.09)", color: "#2E7A5A", dot: "#2E7A5A" },
+      badgeRejected: { bg: "rgba(160,56,56,0.09)", color: "#A03838", dot: "#A03838" },
+      navBg: "rgba(247,244,238,0.96)", navBorder: "rgba(140,107,42,0.14)",
+      divider: "rgba(0,0,0,0.05)", inputFocusShadow: "0 0 0 3px rgba(140,107,42,0.10)",
+      modalOverlay: "rgba(10,9,8,0.65)",
+      statusNote: { pending: "rgba(140,107,42,0.05)", approved: "rgba(46,122,90,0.05)", rejected: "rgba(160,56,56,0.05)" },
+      statusNoteBorder: { pending: "rgba(140,107,42,0.18)", approved: "rgba(46,122,90,0.18)", rejected: "rgba(160,56,56,0.18)" },
+      headerGradient: "linear-gradient(160deg,#FAF7F2 0%,#F3EDE0 100%)",
+      spinnerBorder: "rgba(0,0,0,0.12)", spinnerTop: "#8C6B2A",
+      cardBg: "#FFFFFF", cardBorder: "rgba(0,0,0,0.07)",
+      bottomSheet: "#FFFFFF",
+      btnDisabledBg: "#E1DDD5",
+      btnDisabledText: "#8A8070",
+    };
 }
 
 const F = {
   display: "'Playfair Display','Georgia',serif",
-  body:    "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono:    "'DM Mono','Courier New',monospace",
-  label:   "'Inter','Helvetica Neue',Arial,sans-serif",
+  body: "'Inter','Helvetica Neue',Arial,sans-serif",
+  mono: "'DM Mono','Courier New',monospace",
+  label: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
 const LEGEND_STATUSES = ["available", "pending", "unavailable"];
@@ -163,10 +163,10 @@ function loadLayoutForClient(wing, room) {
       const fullRoom = canonicalRoom === "Hanakazu" ? "Hanakazu Japanese Restaurant" : canonicalRoom === "Qsina" ? "Qsina Restaurant" : room;
       const actualWing = getActualWingForRoom(canonicalRoom);
       raw = localStorage.getItem(`seatmap_layout:${actualWing}:${fullRoom}`)
-         || localStorage.getItem(`seatmap_layout:Main Wing:${fullRoom}`)
-         || localStorage.getItem(`seatmap_layout:Dining:${fullRoom}`)
-         || localStorage.getItem(`seatmap_layout:${actualWing}:${canonicalRoom}`)
-         || localStorage.getItem(`seatmap_layout:Main Wing:${canonicalRoom}`);
+        || localStorage.getItem(`seatmap_layout:Main Wing:${fullRoom}`)
+        || localStorage.getItem(`seatmap_layout:Dining:${fullRoom}`)
+        || localStorage.getItem(`seatmap_layout:${actualWing}:${canonicalRoom}`)
+        || localStorage.getItem(`seatmap_layout:Main Wing:${canonicalRoom}`);
     }
     if (!raw) return null;
     const parsed = JSON.parse(raw);
@@ -184,7 +184,7 @@ const loadStoredReservations = () => {
 };
 
 const saveStoredReservations = (reservations) => {
-  try { localStorage.setItem("bellevue_reservations", JSON.stringify(reservations)); } catch {}
+  try { localStorage.setItem("bellevue_reservations", JSON.stringify(reservations)); } catch { }
 };
 
 const makeOfflineReservation = (payload) => ({
@@ -314,16 +314,16 @@ function StepIndicator({ step, C }) {
         return (
           <div key={label} style={{ display: "flex", alignItems: "center", flex: i < steps.length - 1 ? 1 : "none" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ 
-                width: 28, 
-                height: 28, 
-                borderRadius: "50%", 
-                background: done ? C.gold : active ? C.goldFaint : C.surfaceInput, 
-                border: done ? "none" : active ? `1.5px solid ${C.gold}` : `1.5px solid ${C.borderDefault}`, 
-                display: "flex", 
-                alignItems: "center", 
-                justifyContent: "center", 
-                flexShrink: 0, 
+              <div style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: done ? C.gold : active ? C.goldFaint : C.surfaceInput,
+                border: done ? "none" : active ? `1.5px solid ${C.gold}` : `1.5px solid ${C.borderDefault}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
                 transition: "all 0.25s ease",
                 boxShadow: active ? `0 0 10px ${C.gold}50` : "none"
               }}>
@@ -337,28 +337,28 @@ function StepIndicator({ step, C }) {
                   </span>
                 )}
               </div>
-              <span style={{ 
-                fontFamily: F.label, 
-                fontSize: 9.5, 
-                fontWeight: 700, 
-                letterSpacing: "0.12em", 
-                color: done ? C.gold : active ? C.textPrimary : C.textSecondary, 
+              <span style={{
+                fontFamily: F.label,
+                fontSize: 9.5,
+                fontWeight: 700,
+                letterSpacing: "0.12em",
+                color: done ? C.gold : active ? C.textPrimary : C.textSecondary,
                 opacity: done || active ? 1 : 0.60,
-                whiteSpace: "nowrap", 
+                whiteSpace: "nowrap",
                 textTransform: "uppercase",
                 transition: "all 0.25s ease"
               }}>{label}</span>
             </div>
             {i < steps.length - 1 && (
-              <div style={{ 
-                flex: 1, 
-                height: 1.5, 
+              <div style={{
+                flex: 1,
+                height: 1.5,
                 minWidth: 40,
-                marginLeft: 12, 
-                marginRight: 12, 
-                background: done ? `linear-gradient(90deg, ${C.gold}, ${C.gold})` : `linear-gradient(90deg, ${C.borderDefault}, ${C.borderDefault})`, 
-                borderRadius: 2, 
-                transition: "background 0.25s ease" 
+                marginLeft: 12,
+                marginRight: 12,
+                background: done ? `linear-gradient(90deg, ${C.gold}, ${C.gold})` : `linear-gradient(90deg, ${C.borderDefault}, ${C.borderDefault})`,
+                borderRadius: 2,
+                transition: "background 0.25s ease"
               }} />
             )}
           </div>
@@ -375,12 +375,12 @@ function Field({ label, value, onChange, onBlur, type = "text", placeholder = ""
   const hasError = touched && error;
   const isCorrect = touched && isValid && required;
 
-  const borderColor = hasError 
-    ? C.red 
-    : isCorrect 
-      ? C.green 
-      : focused 
-        ? C.gold 
+  const borderColor = hasError
+    ? C.red
+    : isCorrect
+      ? C.green
+      : focused
+        ? C.gold
         : C.borderDefault;
 
   const focusShadow = hasError
@@ -433,10 +433,10 @@ function Field({ label, value, onChange, onBlur, type = "text", placeholder = ""
 // ─── Modal 1: Guest Count ─────────────────────────────────────────────────────
 function ModalGuestCount({ seatData, tableData, mode, isStandalone, onContinue, onCancel, C, isDark, ROOM }) {
   const bookableSeats = (tableData?.seats || []).filter(s => s.status === "available");
-  const pendingSeats  = (tableData?.seats || []).filter(s => s.status === "pending");
+  const pendingSeats = (tableData?.seats || []).filter(s => s.status === "pending");
   const capacity = bookableSeats.length || tableData?.capacity || 8;
 
-  const [guests,   setGuests]   = useState(() => Math.min(2, capacity));
+  const [guests, setGuests] = useState(() => Math.min(2, capacity));
   const [inputVal, setInputVal] = useState(String(Math.min(2, capacity)));
 
   useEffect(() => {
@@ -465,17 +465,17 @@ function ModalGuestCount({ seatData, tableData, mode, isStandalone, onContinue, 
     setInputVal(String(n));
   };
 
-  const dec   = () => { const n = Math.max(1, guests - 1); setGuests(n); setInputVal(String(n)); };
-  const inc   = () => { if (guests >= capacity) return; const n = guests + 1; setGuests(n); setInputVal(String(n)); };
+  const dec = () => { const n = Math.max(1, guests - 1); setGuests(n); setInputVal(String(n)); };
+  const inc = () => { if (guests >= capacity) return; const n = guests + 1; setGuests(n); setInputVal(String(n)); };
   const atMax = guests >= capacity;
   const atMin = guests <= 1;
 
   const infoRows = [
-    ["Room",         ROOM,                                                      null],
+    ["Room", ROOM, null],
     ...(tableData ? [["Table", `Table ${tableData?.id ?? "—"}`, null]] : []),
-    ["Seat Number",  `Seat ${seatData?.num ?? seatData?.id ?? "—"}`,           null],
+    ["Seat Number", `Seat ${seatData?.num ?? seatData?.id ?? "—"}`, null],
     ["Availability", seatData?.status === "available" ? "Available" : "Unavailable",
-                     seatData?.status === "available" ? C.green : C.gold],
+      seatData?.status === "available" ? C.green : C.gold],
   ];
 
   if (isStandalone) {
@@ -485,10 +485,10 @@ function ModalGuestCount({ seatData, tableData, mode, isStandalone, onContinue, 
         <div style={{ padding: "22px 24px 26px" }}>
           <div style={{ background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 10, overflow: "hidden", marginBottom: 22 }}>
             {[
-              ["Room",         ROOM,                                                null],
-              ["Seat Number",  `Seat ${seatData?.num ?? seatData?.id ?? "—"}`,     null],
+              ["Room", ROOM, null],
+              ["Seat Number", `Seat ${seatData?.num ?? seatData?.id ?? "—"}`, null],
               ["Availability", seatData?.status === "available" ? "Available" : "Unavailable",
-               seatData?.status === "available" ? C.green : C.gold],
+                seatData?.status === "available" ? C.green : C.gold],
             ].map(([key, val, color], i, arr) => (
               <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${C.divider}` : "none" }}>
                 <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>{key}</span>
@@ -571,7 +571,7 @@ function ModalGuestCount({ seatData, tableData, mode, isStandalone, onContinue, 
 // ─── Modal 2: Details ─────────────────────────────────────────────────────────
 function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onReview, onCancel, prefill, C, isDark, secondsLeft, onTimerExpired, ROOM, WING, venueType }) {
   const today = new Date().toISOString().split("T")[0];
-  
+
   const [form, setForm] = useState({
     firstName: prefill?.firstName || "", lastName: prefill?.lastName || "",
     email: prefill?.email || "", phone: prefill?.phone || "+63",
@@ -669,7 +669,7 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
       <ModalHeader eyebrow={isStandalone ? "Standalone Seat Reservation" : mode === "individual" ? "Seat Reservation" : "Table Reservation"} title="Your Information" onClose={onCancel} C={C} meta={<StepIndicator step={2} C={C} />} />
       <div style={{ display: "grid", gridTemplateColumns: window.innerWidth < 820 ? "1fr" : "minmax(0,1fr) 300px", gap: 0, maxHeight: window.innerWidth < 820 ? "calc(100vh - 180px)" : "calc(100vh - 214px)", overflow: "hidden" }}>
         <div style={{ padding: "24px 28px 28px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
-          
+
           <SectionLabel C={C}>1. Guest Information</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
             <Field label="First Name" value={form.firstName} onChange={set("firstName")} onBlur={handleBlur("firstName")} error={errors.firstName} isValid={!errors.firstName} touched={touched.firstName} C={C} isDark={isDark} required />
@@ -692,12 +692,12 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
 
         <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "24px 22px 28px", overflowY: "auto", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
           <div style={{ display: "grid", gap: 18 }}>
-            
+
             {/* Elegant Seat Hold Timer Card */}
-            <div style={{ 
-              padding: "14px 16px", 
-              borderRadius: 12, 
-              background: isUrgent ? C.redFaint : C.surfaceInput, 
+            <div style={{
+              padding: "14px 16px",
+              borderRadius: 12,
+              background: isUrgent ? C.redFaint : C.surfaceInput,
               border: `1.5px solid ${isUrgent ? C.red : C.borderAccent}`,
               boxShadow: isUrgent ? `0 0 12px ${C.red}30` : `0 0 10px ${C.gold}12`,
               transition: "all 0.3s ease",
@@ -718,25 +718,25 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
             <button
               onClick={() => allFilled && onReview(form)}
               disabled={!allFilled}
-              style={{ 
-                width: "100%", 
-                padding: "13px", 
-                background: allFilled ? C.gold : C.btnDisabledBg, 
-                border: "none", 
-                borderRadius: 8, 
-                fontFamily: F.label, 
-                fontSize: 10, 
-                fontWeight: 800, 
-                letterSpacing: "0.16em", 
-                textTransform: "uppercase", 
-                color: allFilled ? C.textOnAccent : C.btnDisabledText, 
-                cursor: allFilled ? "pointer" : "not-allowed", 
-                transition: "all 0.20s ease" 
+              style={{
+                width: "100%",
+                padding: "13px",
+                background: allFilled ? C.gold : C.btnDisabledBg,
+                border: "none",
+                borderRadius: 8,
+                fontFamily: F.label,
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color: allFilled ? C.textOnAccent : C.btnDisabledText,
+                cursor: allFilled ? "pointer" : "not-allowed",
+                transition: "all 0.20s ease"
               }}
               onMouseEnter={e => { if (allFilled) e.currentTarget.style.background = C.goldLight; }}
               onMouseLeave={e => { if (allFilled) e.currentTarget.style.background = C.gold; }}
             >Review Booking</button>
-            
+
             <GhostBtn onClick={onCancel} C={C}>Back to Seats</GhostBtn>
           </div>
         </aside>
@@ -785,7 +785,7 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
               <strong style={{ color: C.gold }}>Rebooking Notice:</strong> Previous reservation <strong>{rebookFrom.reference_code || rebookFrom.id}</strong> will be cancelled automatically on submission.
             </div>
           )}
-          
+
           <div style={{ display: "grid", gridTemplateColumns: window.innerWidth < 820 ? "1fr" : "repeat(2,minmax(0,1fr))", gap: 20 }}>
             {/* Reservation Details Card */}
             <div style={{ background: C.surfaceRaised, border: `1px solid ${C.borderDefault}`, borderRadius: 12, padding: "18px 20px" }}>
@@ -813,25 +813,25 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
             </div>
 
             {/* Redesigned Privacy Act and Consent Section */}
-            <label style={{ 
-              display: "grid", 
-              gridTemplateColumns: "20px minmax(0,1fr)", 
-              gap: 12, 
-              alignItems: "flex-start", 
-              padding: "14px 16px", 
-              borderRadius: 12, 
-              background: consentAccepted ? C.goldFaint : C.surfaceInput, 
-              border: `1.5px solid ${consentAccepted ? C.borderAccent : C.borderDefault}`, 
+            <label style={{
+              display: "grid",
+              gridTemplateColumns: "20px minmax(0,1fr)",
+              gap: 12,
+              alignItems: "flex-start",
+              padding: "14px 16px",
+              borderRadius: 12,
+              background: consentAccepted ? C.goldFaint : C.surfaceInput,
+              border: `1.5px solid ${consentAccepted ? C.borderAccent : C.borderDefault}`,
               cursor: submitting ? "not-allowed" : "pointer",
               boxShadow: consentAccepted ? `0 0 10px ${C.gold}12` : "none",
               transition: "all 0.25s ease"
             }}>
-              <input 
-                type="checkbox" 
-                checked={consentAccepted} 
-                disabled={submitting} 
-                onChange={(e) => setConsentAccepted(e.target.checked)} 
-                style={{ marginTop: 2, width: 16, height: 16, accentColor: C.gold, cursor: submitting ? "not-allowed" : "pointer" }} 
+              <input
+                type="checkbox"
+                checked={consentAccepted}
+                disabled={submitting}
+                onChange={(e) => setConsentAccepted(e.target.checked)}
+                style={{ marginTop: 2, width: 16, height: 16, accentColor: C.gold, cursor: submitting ? "not-allowed" : "pointer" }}
               />
               <span style={{ fontSize: 11.5, color: C.textSecondary, lineHeight: 1.6, userSelect: "none" }}>
                 I consent to the collection, use, and processing of my personal information for managing my reservation in accordance with the Data Privacy Act of 2012.
@@ -843,24 +843,24 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
             </div>
 
             <button onClick={onSubmit} disabled={!canSubmit}
-              style={{ 
-                width: "100%", 
-                padding: "13px", 
-                border: "none", 
-                borderRadius: 8, 
-                background: canSubmit ? C.gold : C.btnDisabledBg, 
-                color: canSubmit ? C.textOnAccent : C.btnDisabledText, 
-                fontFamily: F.label, 
-                fontSize: 10, 
-                fontWeight: 800, 
-                letterSpacing: "0.14em", 
-                textTransform: "uppercase", 
-                cursor: canSubmit ? "pointer" : "not-allowed", 
-                transition: "all 0.18s ease", 
-                display: "flex", 
-                alignItems: "center", 
-                justifyContent: "center", 
-                gap: 8 
+              style={{
+                width: "100%",
+                padding: "13px",
+                border: "none",
+                borderRadius: 8,
+                background: canSubmit ? C.gold : C.btnDisabledBg,
+                color: canSubmit ? C.textOnAccent : C.btnDisabledText,
+                fontFamily: F.label,
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                cursor: canSubmit ? "pointer" : "not-allowed",
+                transition: "all 0.18s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8
               }}
               onMouseEnter={e => { if (canSubmit) e.currentTarget.style.background = C.goldLight; }}
               onMouseLeave={e => { if (canSubmit) e.currentTarget.style.background = C.gold; }}
@@ -915,15 +915,15 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
 
         <div style={{ padding: "40px 32px 34px", textAlign: "center", display: "grid", gap: 24 }}>
           <div>
-            <div style={{ 
-              width: 56, 
-              height: 56, 
-              borderRadius: "50%", 
-              background: C.greenFaint, 
-              border: `2px solid ${C.green}`, 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center", 
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: "50%",
+              background: C.greenFaint,
+              border: `2px solid ${C.green}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               margin: "0 auto 16px",
               boxShadow: `0 0 15px ${C.green}30`,
               animation: "fadeUp 0.3s ease"
@@ -938,16 +938,16 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
           </div>
 
           {/* Code display with integrated Copy Action */}
-          <div style={{ 
-            background: C.goldFaintest, 
-            border: `1.5px solid ${C.borderAccent}`, 
-            borderRadius: 12, 
-            padding: "18px 20px", 
+          <div style={{
+            background: C.goldFaintest,
+            border: `1.5px solid ${C.borderAccent}`,
+            borderRadius: 12,
+            padding: "18px 20px",
             position: "relative",
             boxShadow: `0 0 10px ${C.gold}05`
           }}>
             <div style={{ fontSize: 8.5, letterSpacing: "0.18em", textTransform: "uppercase", color: C.textTertiary, fontWeight: 800, marginBottom: 6 }}>Booking Reference Code</div>
-            
+
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
               <div style={{ fontFamily: F.mono, fontSize: 28, color: C.gold, fontWeight: 700, letterSpacing: "0.08em" }}>{refCode || "PENDING"}</div>
               {refCode && (
@@ -994,7 +994,7 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
           {/* Scannable, Clickable Interactive QR Code */}
           {refCode && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-              <div 
+              <div
                 tabIndex={0}
                 role="button"
                 aria-label="Enlarge QR Code"
@@ -1007,11 +1007,11 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
                 }}
                 onMouseEnter={() => setQrHovered(true)}
                 onMouseLeave={() => setQrHovered(false)}
-                style={{ 
-                  background: "#FFFFFF", 
-                  padding: 14, 
-                  borderRadius: 14, 
-                  border: `1.5px solid ${qrHovered ? C.gold : C.borderDefault}`, 
+                style={{
+                  background: "#FFFFFF",
+                  padding: 14,
+                  borderRadius: 14,
+                  border: `1.5px solid ${qrHovered ? C.gold : C.borderDefault}`,
                   cursor: "pointer",
                   boxShadow: qrHovered ? `0 0 15px ${C.gold}30` : "none",
                   transform: qrHovered ? "scale(1.04)" : "scale(1)",
@@ -1019,10 +1019,10 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
                   outline: "none"
                 }}
               >
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(qrValue)}`} 
-                  alt="QR Code" 
-                  style={{ display: "block", width: 110, height: 110 }} 
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(qrValue)}`}
+                  alt="QR Code"
+                  style={{ display: "block", width: 110, height: 110 }}
                 />
               </div>
               <span style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, letterSpacing: "0.02em" }}>
@@ -1039,7 +1039,7 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
 
       {/* Enlarged QR Code Lightbox Modal */}
       {showLightbox && (
-        <div 
+        <div
           onClick={() => setShowLightbox(false)}
           style={{
             position: "fixed",
@@ -1060,7 +1060,7 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
             <CloseBtn onClick={() => setShowLightbox(false)} C={C} />
           </div>
 
-          <div 
+          <div
             onClick={(e) => e.stopPropagation()}
             style={{
               background: "#FFFFFF",
@@ -1077,12 +1077,12 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
               animation: "modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)"
             }}
           >
-            <img 
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(qrValue)}`} 
-              alt="Enlarged QR Code" 
-              style={{ display: "block", width: 260, height: 260, imageRendering: "crisp-edges" }} 
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(qrValue)}`}
+              alt="Enlarged QR Code"
+              style={{ display: "block", width: 260, height: 260, imageRendering: "crisp-edges" }}
             />
-            
+
             <div style={{ textAlign: "center", marginTop: 4 }}>
               <div style={{ fontFamily: F.mono, fontSize: 18, color: "#18140E", fontWeight: 700, letterSpacing: "0.06em", marginBottom: 6 }}>
                 {refCode}
@@ -1107,37 +1107,37 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   const location = useLocation();
 
   const [isDark, setIsDark] = useState(() => {
-    try { const s = localStorage.getItem("bellevue-theme"); if (s !== null) return s === "dark"; } catch {}
+    try { const s = localStorage.getItem("bellevue-theme"); if (s !== null) return s === "dark"; } catch { }
     return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true;
   });
-  
+
   const toggleTheme = () => setIsDark(p => {
     const n = !p;
-    try { localStorage.setItem("bellevue-theme", n ? "dark" : "light"); } catch {}
+    try { localStorage.setItem("bellevue-theme", n ? "dark" : "light"); } catch { }
     return n;
   });
 
   const C = getTokens(isDark);
 
-  const [venues,             setVenues]             = useState([]);
-  const [loading,            setLoading]            = useState(true);
-  const [selectedRoomId,     setSelectedRoomId]     = useState("");
-  const [mode,               setMode]               = useState("whole");
-  const [selectedSeat,       setSelectedSeat]       = useState(null);
-  const [selectedTable,      setSelectedTable]      = useState(null);
-  const [windowSize,         setWindowSize]         = useState({ width: window.innerWidth, height: window.innerHeight });
-  const [modal,              setModal]              = useState(null);
-  const [guests,             setGuests]             = useState(2);
-  const [formData,           setFormData]           = useState(null);
-  const [schedule,           setSchedule]           = useState(() => normalizeSchedule());
-  const [refCode,            setRefCode]            = useState(null);
-  const [submitting,         setSubmitting]         = useState(false);
-  const [rebookFrom,         setRebookFrom]         = useState(null);
+  const [venues, setVenues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedRoomId, setSelectedRoomId] = useState("");
+  const [mode, setMode] = useState("whole");
+  const [selectedSeat, setSelectedSeat] = useState(null);
+  const [selectedTable, setSelectedTable] = useState(null);
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [modal, setModal] = useState(null);
+  const [guests, setGuests] = useState(2);
+  const [formData, setFormData] = useState(null);
+  const [schedule, setSchedule] = useState(() => normalizeSchedule());
+  const [refCode, setRefCode] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [rebookFrom, setRebookFrom] = useState(null);
   const [lastBookingDetails, setLastBookingDetails] = useState(null);
-  const [tableData,          setTableData]          = useState(null);
-  const [layoutChecked,      setLayoutChecked]      = useState(false);
-  const [error,              setError]              = useState("");
-  const [success,            setSuccess]            = useState(null);
+  const [tableData, setTableData] = useState(null);
+  const [layoutChecked, setLayoutChecked] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(null);
 
   const [form, setForm] = useState({
     name: "", email: "", phone: "",
@@ -1147,8 +1147,8 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
 
   const [holdSecondsLeft, setHoldSecondsLeft] = useState(24 * 60);
   const holdStartedRef = useRef(false);
-  const echoRef        = useRef(null);
-  const pollingRef     = useRef(null);
+  const echoRef = useRef(null);
+  const pollingRef = useRef(null);
 
   const startHoldTimer = useCallback(() => {
     if (!holdStartedRef.current) { holdStartedRef.current = true; setHoldSecondsLeft(24 * 60); }
@@ -1282,7 +1282,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
 
   const ROOM = selectedRoom?.name || roomName || "";
   const WING = wingName || getActualWingForRoom(ROOM);
-  
+
   const flag = (value, fallback = true) => value === undefined || value === null ? fallback : Boolean(value);
   const isVenueReservable =
     Boolean(venue && selectedRoom) &&
@@ -1323,7 +1323,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
         const base = prev || loadLayoutForClient(WING, ROOM);
         const merged = base ? mergeReservationStatusIntoLayout(base, rows) : prev;
         if (merged) {
-          try { localStorage.setItem(layoutKey(WING, ROOM), JSON.stringify(merged)); } catch {}
+          try { localStorage.setItem(layoutKey(WING, ROOM), JSON.stringify(merged)); } catch { }
         }
         return merged;
       });
@@ -1381,14 +1381,14 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       try {
         const parsed = e.newValue ? JSON.parse(e.newValue) : null;
         if (parsed?.v === 2) setTableData(parsed);
-      } catch {}
+      } catch { }
     };
     const onSeatMapSaved = e => {
       if (e.detail?.wing !== WING || e.detail?.room !== ROOM) return;
       try {
         const parsed = e.detail.payload ? JSON.parse(e.detail.payload) : null;
         if (parsed?.v === 2) setTableData(parsed);
-      } catch {}
+      } catch { }
     };
 
     window.addEventListener("storage", onStorage);
@@ -1402,7 +1402,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   // Real-time Websocket
   useEffect(() => {
     if (!ROOM) return;
-    const pusherKey     = import.meta.env.VITE_PUSHER_APP_KEY;
+    const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
     const pusherCluster = import.meta.env.VITE_PUSHER_APP_CLUSTER;
     let wsConnected = false;
 
@@ -1423,7 +1423,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       echoRef.current = new Echo({ broadcaster: "pusher", key: pusherKey, cluster: pusherCluster });
       const echo = echoRef.current;
       const channel = echo.channel("reservations");
-      const events = ["ReservationCreated","ReservationUpdated","ReservationDeleted","ReservationApproved","ReservationRejected","SeatReserved","TableReserved"];
+      const events = ["ReservationCreated", "ReservationUpdated", "ReservationDeleted", "ReservationApproved", "ReservationRejected", "SeatReserved", "TableReserved"];
 
       events.forEach(ev => channel.listen(ev, () => {
         wsConnected = true;
@@ -1438,7 +1438,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       return () => {
         clearTimeout(fallbackTimer);
         stopPolling();
-        try { events.forEach(ev => channel.stopListening(ev)); } catch {}
+        try { events.forEach(ev => channel.stopListening(ev)); } catch { }
       };
     } catch {
       startPolling();
@@ -1543,9 +1543,9 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
         ? [String(selectedSeat?.num ?? selectedSeat?.id ?? "")]
         : mode === "whole"
           ? (activeTable?.seats || [])
-              .filter((seat) => seat.status === "available")
-              .slice(0, Number(guests || 1))
-              .map((seat) => String(seat.num ?? seat.id))
+            .filter((seat) => seat.status === "available")
+            .slice(0, Number(guests || 1))
+            .map((seat) => String(seat.num ?? seat.id))
           : [String(selectedSeat?.num ?? selectedSeat?.id ?? "")];
 
       const payload = {
@@ -1592,7 +1592,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
             };
           });
           const updated = { ...prev, tables };
-          try { localStorage.setItem(layoutKey(WING, ROOM), JSON.stringify(updated)); } catch {}
+          try { localStorage.setItem(layoutKey(WING, ROOM), JSON.stringify(updated)); } catch { }
           return updated;
         }
         if (isStandalone && selectedSeat) {
@@ -1602,7 +1602,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
               seat.id === selectedSeat.id ? { ...seat, status: "unavailable" } : seat
             ),
           };
-          try { localStorage.setItem(layoutKey(WING, ROOM), JSON.stringify(updated)); } catch {}
+          try { localStorage.setItem(layoutKey(WING, ROOM), JSON.stringify(updated)); } catch { }
           return updated;
         }
         return prev;
@@ -1669,14 +1669,14 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
     fetchAndMerge();
   };
 
-  const isMobile   = windowSize.width < 640;
-  const isTablet   = windowSize.width < 1024;
+  const isMobile = windowSize.width < 640;
+  const isTablet = windowSize.width < 1024;
   const activeTable = getActiveTable();
   const isStandalone = isStandaloneSelected();
   const hasSeatLayout = Boolean(tableData && (((tableData.tables || []).length > 0) || ((tableData.standaloneSeats || []).length > 0)));
-  const canProceed  = isVenueReservable && mode === "individual" && selectedSeat && selectedSeat.status === "available";
+  const canProceed = isVenueReservable && mode === "individual" && selectedSeat && selectedSeat.status === "available";
   const canReserveWhole = isVenueReservable && mode === "whole" && (Boolean(activeTable) || !hasSeatLayout);
-  const seatRatio   = activeTable ? getSeatRatio(activeTable) : null;
+  const seatRatio = activeTable ? getSeatRatio(activeTable) : null;
 
   const displayTable = !hasSeatLayout
     ? "General Admission"
@@ -1685,7 +1685,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       : mode === "whole"
         ? (activeTable ? `Table ${activeTable.id}` : "-")
         : (selectedTable ? `Table ${selectedTable.id}` : "-");
-  const displaySeat  = !hasSeatLayout
+  const displaySeat = !hasSeatLayout
     ? "Whole Area"
     : mode === "individual"
       ? (selectedSeat ? `Seat ${selectedSeat.num ?? selectedSeat.id}` : "Select a seat")
@@ -1697,10 +1697,10 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   const venueTitle = selectedRoom?.display_name || selectedRoom?.name || venue?.display_name || venue?.name || "Venue";
   const venueDescription = venue?.description || `Book your preferred ${venue?.type === "dining" ? "table" : "space"} at ${venueTitle}. Select your reservation type and check availability before choosing from the map.`;
 
-  const NAV_H            = 64;
-  const MOBILE_HEADER_H  = 62;
-  const MOBILE_TABS_H    = 48;
-  const BOTTOM_SHEET_H   = 180;
+  const NAV_H = 64;
+  const MOBILE_HEADER_H = 62;
+  const MOBILE_TABS_H = 48;
+  const BOTTOM_SHEET_H = 180;
   const SAFE_AREA_BOTTOM = 34;
 
   const mobileMapHeight = Math.max(
@@ -1834,7 +1834,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                         </div>
                         <div style={{ display: "grid", gap: 6 }}>
                           <strong style={{ fontFamily: F.display, fontSize: 16, color: C.textPrimary }}>No seat layout available</strong>
-                          <span style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.5 }}>This venue does not have a configured seat map yet. You can still continue with schedule and guest details if allowed.</span>
+                          <span style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.5 }}>This venue does not have a configured seat map yet.</span>
                         </div>
                       </div>
                     ) : (
@@ -1869,8 +1869,8 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                   {!isVenueReservable
                     ? "Reservations Unavailable"
                     : mode === "whole"
-                    ? (activeTable ? "Reserve This Table" : "Select a Table First")
-                    : selectedSeat ? "Reserve This Seat" : "Select a Seat First"
+                      ? (activeTable ? "Reserve This Table" : "Select a Table First")
+                      : selectedSeat ? "Reserve This Seat" : "Select a Seat First"
                   }
                 </button>
               </div>
@@ -1879,7 +1879,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
             /* TWO-COLUMN PREMIUM DESKTOP LAYOUT WITH BALANCED MARGINS */
             <div style={{ position: "relative", zIndex: 1, paddingTop: 96, paddingBottom: 48, boxSizing: "border-box" }}>
               <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
-                
+
                 {/* Desktop top header utility row */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, animation: "fadeUp 0.28s ease" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
@@ -1936,7 +1936,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: isTablet ? "1fr" : "minmax(0,1fr) 320px", gap: 28, alignItems: "start", animation: "fadeUp 0.36s ease" }}>
-                  
+
                   {/* Left Column: Intentionally framed SeatMap container card */}
                   <div style={{ background: C.surfaceBase, border: `1.5px solid ${C.cardBorder}`, borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", height: isTablet ? 580 : 660, boxShadow: isDark ? "0 20px 50px rgba(0,0,0,0.40)" : "0 12px 36px rgba(78,60,32,0.07)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: `1px solid ${C.divider}`, background: C.surfaceRaised }}>
@@ -1944,7 +1944,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                         <div style={{ fontFamily: F.label, fontSize: 8, letterSpacing: "0.20em", color: C.gold, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Interactive Space Planner</div>
                         <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 600, color: C.textPrimary }}>{ROOM} ({WING})</div>
                       </div>
-                      
+
                       {/* Deskop legend alignment */}
                       <div style={{ display: "flex", gap: 14 }}>
                         {legendEntries.map(([key, color]) => (
@@ -1965,7 +1965,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                             </div>
                             <div style={{ textAlign: "center", display: "grid", gap: 8 }}>
                               <strong style={{ fontFamily: F.display, fontSize: 18, color: C.textPrimary }}>No seat layout available</strong>
-                              <span style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6, maxWidth: 360, margin: "0 auto" }}>This venue does not have a configured seat map yet. You can still continue with schedule and guest details if allowed.</span>
+                              <span style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6, maxWidth: 360, margin: "0 auto" }}>This venue does not have a configured seat map yet.</span>
                             </div>
                           </div>
                         ) : (
@@ -1977,7 +1977,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
 
                   {/* Right Column: Sticky Availability schedule, selection summary, and action sidebar */}
                   <div style={{ display: "grid", gap: 16, position: isTablet ? "static" : "sticky", top: 80 }}>
-                    
+
                     {/* Schedule controls */}
                     <ScheduleGate schedule={schedule} onChange={setSchedule} roomLabel={ROOM} isDark={isDark} guests={guests} />
 

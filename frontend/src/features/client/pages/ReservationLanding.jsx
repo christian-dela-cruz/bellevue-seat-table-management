@@ -506,10 +506,24 @@ function VenueCard({ item, variant = "event", isInteractive = true }) {
 
 export default function ReservationLanding() {
   const navigate = useNavigate();
-  const [theme, setTheme] = useState("light");
+  const [theme, setTheme] = useState(() => {
+    try {
+      const s = localStorage.getItem("bellevue-theme");
+      if (s !== null) return s;
+    } catch {}
+    return (window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true) ? "dark" : "light";
+  });
   const [diningOutlets, setDiningOutlets] = useState(fallbackDiningOutlets);
   const [eventVenues, setEventVenues] = useState(null);
   const isLight = theme === "light";
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "light" ? "dark" : "light";
+    setTheme(nextTheme);
+    try {
+      localStorage.setItem("bellevue-theme", nextTheme);
+    } catch {}
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -599,7 +613,7 @@ export default function ReservationLanding() {
               <button
                 type="button"
                 className="reservation-theme-icon-button"
-                onClick={() => setTheme(isLight ? "dark" : "light")}
+                onClick={toggleTheme}
                 title={isLight ? "Switch to dark mode" : "Switch to light mode"}
                 aria-label={isLight ? "Switch to dark mode" : "Switch to light mode"}
               >
