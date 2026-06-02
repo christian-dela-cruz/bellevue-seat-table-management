@@ -349,9 +349,26 @@ function layoutKey(wing, room) {
   return `seatmap_layout:${actualWing}:${room}`;
 }
 
-function withSeatmapSaveMetadata(wing, room, data) {
+function resetLayoutAvailability(data = {}) {
+  const resetSeat = (seat) => ({
+    ...seat,
+    status: String(seat?.status || "").toLowerCase() === "maintenance" ? "maintenance" : "available",
+  });
+
   return {
     ...data,
+    tables: (data.tables || []).map((table) => ({
+      ...table,
+      seats: (table.seats || []).map(resetSeat),
+    })),
+    standaloneSeats: (data.standaloneSeats || []).map(resetSeat),
+  };
+}
+
+function withSeatmapSaveMetadata(wing, room, data) {
+  const layoutData = resetLayoutAvailability(data);
+  return {
+    ...layoutData,
     v: 2,
     seatmap_saved_at: new Date().toISOString(),
     seatmap_scope: {
@@ -363,7 +380,7 @@ function withSeatmapSaveMetadata(wing, room, data) {
 
 function saveLayout(wing, room, data) {
   if (!wing || !room) return;
-  const payloadData = data?.v === 2 ? data : withSeatmapSaveMetadata(wing, room, data);
+  const payloadData = withSeatmapSaveMetadata(wing, room, data || {});
   const payload = JSON.stringify(payloadData);
   try {
     localStorage.setItem(layoutKey(wing, room), payload);

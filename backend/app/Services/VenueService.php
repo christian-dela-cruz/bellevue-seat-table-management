@@ -150,7 +150,7 @@ class VenueService
                 });
             })
             ->get()
-            ->groupBy(fn (Reservation $reservation) => substr((string) $reservation->event_time, 0, 5));
+            ->groupBy(fn (Reservation $reservation) => $this->normalizeTimeValue($reservation->event_time) ?? '');
 
         $children = $venue->children()
             ->where('is_active', true)
@@ -273,7 +273,7 @@ class VenueService
             return false;
         }
 
-        $time = substr((string) ($data['event_time'] ?? ''), 0, 5);
+        $time = $this->normalizeTimeValue($data['event_time'] ?? '');
         $slots = $this->getReservationTimeSlots(
             $venue,
             $data['event_date'] ?? null,
@@ -843,16 +843,15 @@ class VenueService
             ->get();
 
         $activeStatuses = ['pending', 'approved', 'reserved'];
+        $requestedTime = $this->normalizeTimeValue($time);
         $bookings = Reservation::query()
             ->where('venue_id', $parentVenue->id)
             ->whereDate('event_date', $date)
-            ->where(function ($query) use ($time) {
-                $query->where('event_time', $time)
-                    ->orWhere('event_time', $time . ':00');
-            })
             ->whereIn('status', $activeStatuses)
             ->when($ignoreReservationId, fn ($query) => $query->whereKeyNot($ignoreReservationId))
-            ->get();
+            ->get()
+            ->filter(fn (Reservation $reservation) => $this->normalizeTimeValue($reservation->event_time) === $requestedTime)
+            ->values();
 
         $hasWholeBooking = $bookings->contains(fn ($res) => $res->type === 'whole')
             || ($parentVenue->metadata['allocation_mode'] ?? 'admin_assign') === 'whole_booking' && $bookings->isNotEmpty();
@@ -876,5 +875,29 @@ class VenueService
             }
             return true;
         })->values()->toArray();
+    }
+
+    private function normalizeTimeValue($value): ?string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+
+        if (preg_match('/(\d{1,2}):(\d{2})\s*(AM|PM)?/i', $raw, $matches)) {
+            $hour = (int) $matches[1];
+            $minute = (int) $matches[2];
+            $period = strtoupper($matches[3] ?? '');
+
+            if ($period === 'PM' && $hour < 12) {
+                $hour += 12;
+            } elseif ($period === 'AM' && $hour === 12) {
+                $hour = 0;
+            }
+
+            return sprintf('%02d:%02d', $hour, $minute);
+        }
+
+        return substr($raw, 0, 5);
     }
 }

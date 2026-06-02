@@ -97,9 +97,10 @@ class SeatMapController extends Controller
             }
 
             $data = is_string($payload) ? json_decode($payload, true) : $payload;
+            $data = is_array($data) ? $this->layoutWithAvailabilityDefaults($data) : $data;
 
-            // Merge dynamic reservations if event_date is requested
-            if ($request->filled('event_date') && isset($data['tables'])) {
+            // Merge dynamic reservations only for the exact selected schedule.
+            if ($request->filled('event_date') && $request->filled('event_time') && isset($data['tables'])) {
                 $reservations = $this->scheduledReservations($request, $venue->id);
                 
                 foreach ($data['tables'] as &$table) {
@@ -152,7 +153,7 @@ class SeatMapController extends Controller
                 return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
             }
 
-            $venue->seatmap_payload = json_encode($request->all());
+            $venue->seatmap_payload = json_encode($this->layoutWithAvailabilityDefaults($request->all()));
             $venue->save();
 
             return response()->json([
@@ -175,7 +176,7 @@ class SeatMapController extends Controller
                 return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
             }
 
-            $venue->seatmap_payload = json_encode($request->all());
+            $venue->seatmap_payload = json_encode($this->layoutWithAvailabilityDefaults($request->all()));
             $venue->save();
 
             return response()->json([
@@ -191,8 +192,9 @@ class SeatMapController extends Controller
     {
         $venue = Venue::find($venueId);
         $parentId = $venue ? $venue->parent_id : null;
+        $requestedTime = $this->normalizeTimeValue($request->query('event_time'));
 
-        return Reservation::query()
+        $reservations = Reservation::query()
             ->where(function ($query) use ($venueId, $parentId, $venue) {
                 if ($parentId) {
                     $query->where('venue_id', $parentId)
@@ -211,14 +213,73 @@ class SeatMapController extends Controller
             ->when($request->filled('event_date'), function ($query) use ($request) {
                 $query->whereDate('event_date', $request->query('event_date'));
             })
-            ->when($request->filled('event_time'), function ($query) use ($request) {
-                $time = substr((string) $request->query('event_time'), 0, 5);
-                $query->where(function ($timeQuery) use ($time) {
-                    $timeQuery->where('event_time', $time)
-                        ->orWhere('event_time', $time . ':00');
-                });
-            })
             ->get();
+
+        if (!$requestedTime) {
+            return $reservations;
+        }
+
+        return $reservations
+            ->filter(fn (Reservation $reservation) => $this->normalizeTimeValue($reservation->event_time) === $requestedTime)
+            ->values();
+    }
+
+    private function layoutWithAvailabilityDefaults(array $data): array
+    {
+        if (isset($data['tables']) && is_array($data['tables'])) {
+            foreach ($data['tables'] as &$table) {
+                if (!isset($table['seats']) || !is_array($table['seats'])) {
+                    continue;
+                }
+
+                foreach ($table['seats'] as &$seat) {
+                    $seat = $this->seatWithDefaultAvailability($seat);
+                }
+                unset($seat);
+            }
+            unset($table);
+        }
+
+        if (isset($data['standaloneSeats']) && is_array($data['standaloneSeats'])) {
+            foreach ($data['standaloneSeats'] as &$seat) {
+                $seat = $this->seatWithDefaultAvailability($seat);
+            }
+            unset($seat);
+        }
+
+        return $data;
+    }
+
+    private function seatWithDefaultAvailability(array $seat): array
+    {
+        $status = strtolower((string) ($seat['status'] ?? 'available'));
+        $seat['status'] = $status === 'maintenance' ? 'maintenance' : 'available';
+
+        return $seat;
+    }
+
+    private function normalizeTimeValue($value): ?string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+
+        if (preg_match('/(\d{1,2}):(\d{2})\s*(AM|PM)?/i', $raw, $matches)) {
+            $hour = (int) $matches[1];
+            $minute = (int) $matches[2];
+            $period = strtoupper($matches[3] ?? '');
+
+            if ($period === 'PM' && $hour < 12) {
+                $hour += 12;
+            } elseif ($period === 'AM' && $hour === 12) {
+                $hour = 0;
+            }
+
+            return sprintf('%02d:%02d', $hour, $minute);
+        }
+
+        return substr($raw, 0, 5);
     }
 
     private function reservationForSeat($reservations, ?string $tableNumber, ?string $seatNumber): ?Reservation
@@ -227,11 +288,9 @@ class SeatMapController extends Controller
         $seat = trim((string) $seatNumber);
 
         return $reservations->first(function (Reservation $reservation) use ($table, $seat) {
-            if (strtoupper((string) $reservation->table_number) === 'STANDALONE') {
-                return false;
-            }
+            $resTable = trim((string) $reservation->table_number);
 
-            if (trim((string) $reservation->table_number) !== $table) {
+            if (strcasecmp($resTable, $table) !== 0) {
                 return false;
             }
 

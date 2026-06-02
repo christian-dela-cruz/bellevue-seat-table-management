@@ -384,7 +384,7 @@ class ReservationService
         $tableNumber = trim((string) ($data['table_number'] ?? ''));
         $seatNumber = trim((string) ($data['seat_number'] ?? ''));
         $eventDate = $data['event_date'] ?? null;
-        $eventTime = isset($data['event_time']) ? substr((string) $data['event_time'], 0, 5) : null;
+        $eventTime = $this->normalizeTimeValue($data['event_time'] ?? null);
         $type = strtolower((string) ($data['type'] ?? 'whole'));
         $isStandalone = $type === 'standalone'
             || filter_var($data['is_standalone'] ?? false, FILTER_VALIDATE_BOOLEAN)
@@ -398,8 +398,12 @@ class ReservationService
             ->where('venue_id', (int) $data['venue_id'])
             ->whereDate('event_date', $eventDate)
             ->where(function ($timeQuery) use ($eventTime) {
-                $timeQuery->where('event_time', $eventTime)
-                    ->orWhere('event_time', $eventTime . ':00');
+                foreach ($this->timeCandidates($eventTime) as $candidate) {
+                    $timeQuery->orWhere('event_time', $candidate);
+                }
+                foreach ($this->timeLabelCandidates($eventTime) as $candidate) {
+                    $timeQuery->orWhere('event_time', 'like', '%' . $candidate . '%');
+                }
             })
             ->whereIn('status', ['pending', 'approved', 'reserved']);
 
@@ -1385,6 +1389,56 @@ class ReservationService
             'hanakazu' => 'Hanakazu Japanese Restaurant',
             default => $room,
         };
+    }
+
+    private function normalizeTimeValue($value): ?string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+
+        if (preg_match('/(\d{1,2}):(\d{2})\s*(AM|PM)?/i', $raw, $matches)) {
+            $hour = (int) $matches[1];
+            $minute = (int) $matches[2];
+            $period = strtoupper($matches[3] ?? '');
+
+            if ($period === 'PM' && $hour < 12) {
+                $hour += 12;
+            } elseif ($period === 'AM' && $hour === 12) {
+                $hour = 0;
+            }
+
+            return sprintf('%02d:%02d', $hour, $minute);
+        }
+
+        return substr($raw, 0, 5);
+    }
+
+    private function timeCandidates(?string $time): array
+    {
+        if (!$time) {
+            return [];
+        }
+
+        return array_values(array_unique([$time, $time . ':00']));
+    }
+
+    private function timeLabelCandidates(?string $time): array
+    {
+        if (!$time || !preg_match('/^(\d{2}):(\d{2})$/', $time, $matches)) {
+            return [];
+        }
+
+        $hour = (int) $matches[1];
+        $minute = $matches[2];
+        $period = $hour >= 12 ? 'PM' : 'AM';
+        $displayHour = $hour % 12 ?: 12;
+
+        return array_values(array_unique([
+            sprintf('%d:%s %s', $displayHour, $minute, $period),
+            sprintf('%02d:%s %s', $displayHour, $minute, $period),
+        ]));
     }
 
     /**

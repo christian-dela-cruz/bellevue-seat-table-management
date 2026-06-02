@@ -826,7 +826,7 @@ class AdminRejectReservationReasonTest extends TestCase
             ->assertJsonFragment([
                 'id' => 'S1',
                 'num' => 'S1',
-                'status' => 'unavailable',
+                'status' => 'pending',
             ]);
 
         $this->getJson($path . '?event_date=2026-06-15&event_time=19:00')

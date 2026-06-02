@@ -1168,6 +1168,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   const holdStartedRef = useRef(false);
   const echoRef = useRef(null);
   const pollingRef = useRef(null);
+  const requestCounterRef = useRef(0);
 
   const startHoldTimer = useCallback(() => {
     if (!holdStartedRef.current) { holdStartedRef.current = true; setHoldSecondsLeft(24 * 60); }
@@ -1296,6 +1297,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
 
   const fetchAndMerge = useCallback(async () => {
     if (!ROOM) return;
+    const reqId = ++requestCounterRef.current;
     try {
       const venueId = venue?.id;
       if (!venueId) return;
@@ -1309,6 +1311,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
         `${API_BASE_URL}/rooms/${venueId}/seats?${params.toString()}`,
         { headers: { Accept: "application/json" } }
       );
+      if (reqId !== requestCounterRef.current) return;
       if (!res.ok) return;
       const json = await res.json();
       if (json.success && json.data) {
@@ -1324,14 +1327,17 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       }
       setLayoutChecked(true);
     } catch (err) {
-      console.error("[VenueReservationTemplate] Failed to fetch seat map:", err);
-      setLayoutChecked(true);
+      if (reqId === requestCounterRef.current) {
+        console.error("[VenueReservationTemplate] Failed to fetch seat map:", err);
+        setLayoutChecked(true);
+      }
     }
   }, [ROOM, venue?.id, schedule.eventDate, schedule.eventTime]);
 
   useEffect(() => {
     if (!ROOM) return;
     setLayoutChecked(false);
+    setTableData(null);
     fetchAndMerge();
   }, [fetchAndMerge, ROOM]);
 
@@ -1339,11 +1345,10 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
     const onScheduleChanged = () => {
       setSelectedSeat(null);
       setSelectedTable(null);
-      fetchAndMerge();
     };
     window.addEventListener("seatmap:schedule-changed", onScheduleChanged);
     return () => window.removeEventListener("seatmap:schedule-changed", onScheduleChanged);
-  }, [fetchAndMerge]);
+  }, []);
 
   // Load classic slots if seatmap is not published
   const todayDate = new Date().toISOString().split("T")[0];
@@ -1577,41 +1582,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       const result = await reservationAPI.create(payload);
       setLastBookingDetails(result?.data || result);
       setRefCode(result?.reference_code || result?.data?.reference_code);
-
-      // Perform local seat state hold updates
-      setTableData(prev => {
-        if (!prev) return prev;
-        if (activeTable) {
-          const tables = (prev.tables || []).map(t => {
-            if (t.id !== activeTable.id) return t;
-            if (mode === "individual") {
-              return { ...t, seats: t.seats.map(s => s.id === selectedSeat?.id ? { ...s, status: "unavailable" } : s) };
-            }
-            let marked = 0;
-            return {
-              ...t,
-              seats: t.seats.map(s => {
-                if (marked < guests && s.status === "available") { marked++; return { ...s, status: "unavailable" }; }
-                return s;
-              }),
-            };
-          });
-          const updated = { ...prev, tables };
-          try { localStorage.setItem(layoutKey(WING, ROOM), JSON.stringify(updated)); } catch { }
-          return updated;
-        }
-        if (isStandalone && selectedSeat) {
-          const updated = {
-            ...prev,
-            standaloneSeats: (prev.standaloneSeats || []).map((seat) =>
-              seat.id === selectedSeat.id ? { ...seat, status: "unavailable" } : seat
-            ),
-          };
-          try { localStorage.setItem(layoutKey(WING, ROOM), JSON.stringify(updated)); } catch { }
-          return updated;
-        }
-        return prev;
-      });
+      await fetchAndMerge();
 
       setModal("success");
       resetHoldTimer();
