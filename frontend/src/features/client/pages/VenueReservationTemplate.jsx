@@ -1254,86 +1254,49 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       || null;
   }, [venues, venueSlug, roomName]);
 
-  const roomChoices = useMemo(() => {
-    if (!venue) return [];
-    if (venue.type === "function_room") {
-      return venue.parent_selectable !== false ? [venue] : [];
-    }
-    const activeChildren = (venue.children || [])
-      .filter((child) => child.is_active && child.is_visible && child.reservations_enabled && child.child_selectable !== false)
-      .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0));
-    const choices = venue.parent_selectable !== false ? [venue] : [];
-    return [...choices, ...activeChildren];
-  }, [venue]);
-
-  const selectedRoom = useMemo(() => {
-    if (!venue) return null;
-    if (roomName) {
-      const canon = getCanonicalRoomName(roomName);
-      return roomChoices.find((room) => getCanonicalRoomName(room.name) === canon) || roomChoices[0] || venue;
-    }
-    return roomChoices.find((room) => String(room.id) === String(selectedRoomId)) || roomChoices[0] || venue;
-  }, [roomChoices, selectedRoomId, venue, roomName]);
-
-  useEffect(() => {
-    if (!roomChoices.length) return;
-    setSelectedRoomId((current) => current || String(roomChoices[0].id));
-  }, [roomChoices]);
-
+  // Subrooms are internal and admin-managed. Guests only book the parent venue.
+  const selectedRoom = venue;
   const ROOM = selectedRoom?.name || roomName || "";
   const WING = wingName || getActualWingForRoom(ROOM);
 
   const flag = (value, fallback = true) => value === undefined || value === null ? fallback : Boolean(value);
   const isVenueReservable =
-    Boolean(venue && selectedRoom) &&
+    Boolean(venue) &&
     flag(venue?.is_active) &&
     flag(venue?.is_visible) &&
-    flag(venue?.reservations_enabled) &&
-    flag(selectedRoom?.is_active) &&
-    flag(selectedRoom?.is_visible) &&
-    flag(selectedRoom?.reservations_enabled);
-
-  // Load layout from localStorage
-  useEffect(() => {
-    if (!ROOM) return;
-    setLayoutChecked(false);
-    const localLayout = loadLayoutForClient(WING, ROOM);
-    setTableData(localLayout);
-    setLayoutChecked(true);
-  }, [ROOM, WING]);
+    flag(venue?.reservations_enabled);
 
   const fetchAndMerge = useCallback(async () => {
     if (!ROOM) return;
     try {
-      const params = new URLSearchParams({
-        room: ROOM,
-        wing: WING,
-        per_page: "9999",
-      });
-      const venueId = selectedRoom?.parent_id || selectedRoom?.id || venue?.parent_id || venue?.id;
-      if (venueId) params.set("venue_id", String(venueId));
+      const venueId = venue?.id;
+      if (!venueId) return;
+
+      const params = new URLSearchParams();
+      if (schedule.eventDate) params.set("event_date", schedule.eventDate);
+      if (schedule.eventTime) params.set("event_time", schedule.eventTime);
+
       const res = await fetch(
-        withSeatmapSchedule(`${API_BASE_URL}/reservations?${params.toString()}`, schedule),
+        `${API_BASE_URL}/rooms/${venueId}/seats?${params.toString()}`,
         { headers: { Accept: "application/json" } }
       );
       if (!res.ok) return;
-      const data = await res.json();
-      const rows = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
-      setTableData(prev => {
-        const base = prev || loadLayoutForClient(WING, ROOM);
-        const merged = base ? mergeReservationStatusIntoLayout(base, rows) : prev;
-        if (merged) {
-          try { localStorage.setItem(layoutKey(WING, ROOM), JSON.stringify(merged)); } catch { }
-        }
-        return merged;
-      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setTableData(json.data);
+      } else {
+        setTableData(null);
+      }
+      setLayoutChecked(true);
     } catch (err) {
-      console.error("[VenueReservationTemplate] Failed to fetch seat status:", err);
+      console.error("[VenueReservationTemplate] Failed to fetch seat map:", err);
+      setLayoutChecked(true);
     }
-  }, [ROOM, WING, selectedRoom?.id, selectedRoom?.parent_id, venue?.id, venue?.parent_id, schedule.eventDate, schedule.eventTime]);
+  }, [ROOM, venue?.id, schedule.eventDate, schedule.eventTime]);
 
   useEffect(() => {
     if (!ROOM) return;
+    setLayoutChecked(false);
     fetchAndMerge();
   }, [fetchAndMerge, ROOM]);
 
@@ -1355,9 +1318,9 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   const [slotMessage, setSlotMessage] = useState("");
 
   useEffect(() => {
-    if (tableData || !selectedRoom) return;
+    if (tableData || !venue) return;
     setSlotMessage("Loading available times...");
-    venueAPI.getTimeSlots({ venue_id: selectedRoom.id, room: selectedRoom.name, date: classicDate, guests: classicGuests })
+    venueAPI.getTimeSlots({ venue_id: venue.id, room: venue.name, date: classicDate, guests: classicGuests })
       .then((data) => {
         const nextSlots = Array.isArray(data?.slots) ? data.slots : [];
         setSlots(nextSlots);
@@ -1373,9 +1336,10 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
         setSlotMessage(err.message || "Unable to load time slots.");
         setForm((current) => ({ ...current, event_time: "" }));
       });
-  }, [tableData, selectedRoom, classicDate, classicGuests]);
+  }, [tableData, venue, classicDate, classicGuests]);
 
   useEffect(() => {
+    // Listen for seatmap updates saved by admin (live sync)
     const onStorage = e => {
       if (e.key !== layoutKey(WING, ROOM)) return;
       try {
@@ -1893,20 +1857,6 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                       <span style={{ display: "inline-block", width: 20, height: "1px", background: C.gold, opacity: 0.5 }} />
                       <span style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.22em", color: C.gold, fontWeight: 700, textTransform: "uppercase" }}>Back to All Venues</span>
                     </div>
-
-                    {roomChoices.length > 1 && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 260 }}>
-                        <span style={{ display: "inline-block", width: 1, height: "20px", background: C.divider, marginLeft: 8 }} />
-                        <span style={{ fontSize: 9, fontFamily: F.label, textTransform: "uppercase", letterSpacing: "0.14em", color: C.gold, fontWeight: 700, flexShrink: 0 }}>Select Area:</span>
-                        <BellevueDropdown
-                          value={selectedRoomId}
-                          onChange={(val) => { setSelectedRoomId(val); setSelectedSeat(null); setSelectedTable(null); }}
-                          options={roomChoices.map(c => ({ value: String(c.id), label: c.display_name || c.name }))}
-                          isDark={isDark}
-                          style={{ height: 40, width: 180 }}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
 

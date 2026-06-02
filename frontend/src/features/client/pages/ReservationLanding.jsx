@@ -377,7 +377,7 @@ function buildEventVenuesFromConfig(rooms = []) {
 
 function buildDiningOutletsFromConfig(rooms = []) {
   const configuredDining = uniqueConfiguredRooms(rooms)
-    .filter((room) => room.type === "dining" && !isArchivedRoom(room))
+    .filter((room) => room.type === "dining" && !room.parent_id && !isArchivedRoom(room))
     .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0) || String(a.name).localeCompare(String(b.name)));
 
   if (!configuredDining.length) return fallbackDiningOutlets;

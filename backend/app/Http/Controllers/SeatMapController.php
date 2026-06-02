@@ -17,91 +17,111 @@ class SeatMapController extends Controller
     public function getSeatmap(Request $request, string $wing, string $room): JsonResponse
     {
         try {
-            // URL decode parameters
             $wing = urldecode($wing);
             $room = urldecode($room);
             
-            // Debug logging
-            \Log::info("SeatMap request - Wing: '$wing', Room: '$room'");
-            
-            // Find the venue by name and wing
-            $venue = Venue::where('name', $room)
-                ->where('wing', $wing)
-                ->first();
-
+            $venue = Venue::where('name', $room)->where('wing', $wing)->first();
             if (!$venue) {
-                \Log::warning("Venue not found - Wing: '$wing', Room: '$room'");
-                return response()->json(['success' => false, 'message' => 'Venue not found', 'debug' => ['wing' => $wing, 'room' => $room]], 404);
+                return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
             }
 
-            // Get all seats for this venue
-            $seats = Seat::where('venue_id', $venue->id)->get();
+            return $this->getSeatmapById($request, $venue->id);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
 
-            $reservations = $this->scheduledReservations($request, $venue->id);
+    /**
+     * Get seatmap data by venue ID
+     */
+    public function getSeatmapById(Request $request, int $venueId): JsonResponse
+    {
+        try {
+            $venue = Venue::find($venueId);
+            if (!$venue) {
+                return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
+            }
 
-            // Group seats by table to match frontend structure
-            $tables = [];
-            foreach ($seats as $seat) {
-                $tableNumber = $seat->table_number;
-                
-                // Initialize table if not exists
-                if (!isset($tables[$tableNumber])) {
-                    $tables[$tableNumber] = [
-                        'id' => $tableNumber,
-                        'seats' => []
-                    ];
+            // Fallback inheritance logic: if parent venue has no layout, try to find a child that has one
+            $payload = $venue->seatmap_payload;
+            
+            if (empty($payload)) {
+                $childWithLayout = Venue::where('parent_id', $venue->id)
+                    ->whereNotNull('seatmap_payload')
+                    ->first();
+                if ($childWithLayout) {
+                    $payload = $childWithLayout->seatmap_payload;
+                }
+            }
+
+            if (empty($payload)) {
+                // If strictly no layout exists, check if legacy Seats exist as a fallback
+                $seats = Seat::where('venue_id', $venue->id)->get();
+                if ($seats->isEmpty()) {
+                    return response()->json([
+                        'success' => true,
+                        'data' => null,
+                        'venue' => [
+                            'id' => $venue->id,
+                            'name' => $venue->name,
+                            'wing' => $venue->wing,
+                        ]
+                    ]);
                 }
                 
-                // Check if seat is reserved
-                $reservation = $this->reservationForSeat($reservations, $seat->table_number, $seat->seat_number);
-                $status = $reservation
-                    ? $this->publicSeatStatus($reservation->status)
-                    : ($request->filled('event_date') ? ($seat->status === 'maintenance' ? 'maintenance' : 'available') : ($seat->status ?? 'available'));
+                // Legacy dynamic build
+                $tables = [];
+                foreach ($seats as $seat) {
+                    $tableNumber = $seat->table_number;
+                    if (!isset($tables[$tableNumber])) {
+                        $tables[$tableNumber] = ['id' => $tableNumber, 'seats' => []];
+                    }
+                    $tables[$tableNumber]['seats'][] = [
+                        'id' => $seat->seat_number,
+                        'num' => $seat->seat_number,
+                        'status' => 'available',
+                        'x' => $seat->x_position,
+                        'y' => $seat->y_position,
+                    ];
+                }
+                $payload = json_encode([
+                    'v' => 2,
+                    'tables' => array_values($tables),
+                    'labels' => null,
+                    'standaloneSeats' => []
+                ]);
+            }
+
+            $data = is_string($payload) ? json_decode($payload, true) : $payload;
+
+            // Merge dynamic reservations if event_date is requested
+            if ($request->filled('event_date') && isset($data['tables'])) {
+                $reservations = $this->scheduledReservations($request, $venue->id);
                 
-                // Add seat to table
-                $tables[$tableNumber]['seats'][] = [
-                    'id' => $seat->seat_number,
-                    'num' => $seat->seat_number,
-                    'status' => $status,
-                    'x' => $seat->x_position,
-                    'y' => $seat->y_position,
-                ];
+                foreach ($data['tables'] as &$table) {
+                    if (isset($table['seats'])) {
+                        foreach ($table['seats'] as &$seat) {
+                            $reservation = $this->reservationForSeat($reservations, $table['id'], $seat['id']);
+                            if ($reservation) {
+                                $seat['status'] = $this->publicSeatStatus($reservation->status);
+                            }
+                        }
+                    }
+                }
+                
+                if (isset($data['standaloneSeats'])) {
+                    foreach ($data['standaloneSeats'] as &$seat) {
+                        $reservation = $this->reservationForSeat($reservations, 'STANDALONE', $seat['id']);
+                        if ($reservation) {
+                            $seat['status'] = $this->publicSeatStatus($reservation->status);
+                        }
+                    }
+                }
             }
-
-            // Process standalone seats
-            $standaloneSeats = [];
-            $standaloneReservations = $reservations->filter(function($reservation) {
-                return $reservation->table_number === 'STANDALONE' || 
-                       $reservation->type === 'standalone' || 
-                       $reservation->is_standalone == 1;
-            });
-
-            // Create standalone seat entries for reservations
-            foreach ($standaloneReservations as $reservation) {
-                $standaloneSeats[] = [
-                    'id' => $reservation->seat_id ?? 'STANDALONE-' . $reservation->seat_number,
-                    'num' => $reservation->seat_number,
-                    'label' => $reservation->seat_number,
-                    'status' => $this->publicSeatStatus($reservation->status),
-                    'x' => 50 + (count($standaloneSeats) * 100), // Position dynamically
-                    'y' => 300,
-                ];
-            }
-
-            // Convert to array and sort by table ID
-            $tableArray = array_values($tables);
-            usort($tableArray, function($a, $b) {
-                return strcasecmp($a['id'], $b['id']);
-            });
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'v' => 2,
-                    'tables' => $tableArray,
-                    'labels' => null,
-                    'standaloneSeats' => $standaloneSeats
-                ],
+                'data' => $data,
                 'venue' => [
                     'id' => $venue->id,
                     'name' => $venue->name,
@@ -114,91 +134,25 @@ class SeatMapController extends Controller
     }
 
     /**
-     * Get seatmap data by venue ID
+     * Save seatmap data for a venue by wing and room
      */
-    public function getSeatmapById(Request $request, int $venueId): JsonResponse
+    public function saveSeatmap(Request $request, string $wing, string $room): JsonResponse
     {
         try {
-            // Find venue by ID
-            $venue = Venue::find($venueId);
-
+            $wing = urldecode($wing);
+            $room = urldecode($room);
+            
+            $venue = Venue::where('name', $room)->where('wing', $wing)->first();
             if (!$venue) {
                 return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
             }
 
-            // Get all seats for this venue
-            $seats = Seat::where('venue_id', $venue->id)->get();
-
-            $reservations = $this->scheduledReservations($request, $venue->id);
-
-            // Group seats by table to match frontend structure
-            $tables = [];
-            foreach ($seats as $seat) {
-                $tableNumber = $seat->table_number;
-                
-                // Initialize table if not exists
-                if (!isset($tables[$tableNumber])) {
-                    $tables[$tableNumber] = [
-                        'id' => $tableNumber,
-                        'seats' => []
-                    ];
-                }
-                
-                // Check if seat is reserved
-                $reservation = $this->reservationForSeat($reservations, $seat->table_number, $seat->seat_number);
-                $status = $reservation
-                    ? $this->publicSeatStatus($reservation->status)
-                    : ($request->filled('event_date') ? ($seat->status === 'maintenance' ? 'maintenance' : 'available') : ($seat->status ?? 'available'));
-                
-                // Add seat to table
-                $tables[$tableNumber]['seats'][] = [
-                    'id' => $seat->seat_number,
-                    'num' => $seat->seat_number,
-                    'status' => $status,
-                    'x' => $seat->x_position,
-                    'y' => $seat->y_position,
-                ];
-            }
-
-            // Process standalone seats
-            $standaloneSeats = [];
-            $standaloneReservations = $reservations->filter(function($reservation) {
-                return $reservation->table_number === 'STANDALONE' || 
-                       $reservation->type === 'standalone' || 
-                       $reservation->is_standalone == 1;
-            });
-
-            // Create standalone seat entries for reservations
-            foreach ($standaloneReservations as $reservation) {
-                $standaloneSeats[] = [
-                    'id' => $reservation->seat_id ?? 'STANDALONE-' . $reservation->seat_number,
-                    'num' => $reservation->seat_number,
-                    'label' => $reservation->seat_number,
-                    'status' => $this->publicSeatStatus($reservation->status),
-                    'x' => 50 + (count($standaloneSeats) * 100), // Position dynamically
-                    'y' => 300,
-                ];
-            }
-
-            // Convert to array and sort by table ID
-            $tableArray = array_values($tables);
-            usort($tableArray, function($a, $b) {
-                return strcasecmp($a['id'], $b['id']);
-            });
+            $venue->seatmap_payload = json_encode($request->all());
+            $venue->save();
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'v' => 2,
-                    'tables' => $tableArray,
-                    'labels' => null,
-                    'standaloneSeats' => $standaloneSeats
-                ],
-                'venue' => [
-                    'id' => $venue->id,
-                    'name' => $venue->name,
-                    'wing' => $venue->wing,
-                ]
+                'message' => 'Seatmap saved successfully'
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);

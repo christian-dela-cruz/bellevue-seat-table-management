@@ -101,10 +101,20 @@ export function subscribeToSeatMapChanges(callback) {
 }
 
 // ─── Dispatch same-tab event ──────────────────────────────────────────
-// Saves to localStorage AND fires both BroadcastChannel and a same-tab custom
-// event so every subscriber (same tab or other tabs) receives the update.
 export function dispatchSeatMapUpdate(wing, room, data) {
-  // 1. Persist to unified key
+  // 1. Send to backend API
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+  const token = localStorage.getItem("admin_token") || localStorage.getItem("auth_token") || "";
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  fetch(`${API_BASE_URL}/seatmap/${encodeURIComponent(wing)}/${encodeURIComponent(room)}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(data),
+  }).catch(err => console.error("Failed to save seatmap to backend:", err));
+
+  // 2. Persist to unified key (for legacy clients that haven't refreshed)
   const key = buildKey(wing, room);
   try {
     localStorage.setItem(key, JSON.stringify(data));
@@ -112,7 +122,7 @@ export function dispatchSeatMapUpdate(wing, room, data) {
     console.warn("SeatMap: could not save to localStorage", err);
   }
 
-  // 2. Fire storage event for same-tab sync
+  // 3. Fire storage event for same-tab sync
   try {
     window.dispatchEvent(new StorageEvent("storage", {
       key: key,
@@ -120,7 +130,7 @@ export function dispatchSeatMapUpdate(wing, room, data) {
     }));
   } catch {}
 
-  // 3. Fire same-tab custom event (storage events don't fire in the originating tab)
+  // 4. Fire same-tab custom event (storage events don't fire in the originating tab)
   window.dispatchEvent(
     new CustomEvent("seatmap:update", { detail: { wing, room, data } })
   );

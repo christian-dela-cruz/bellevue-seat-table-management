@@ -706,7 +706,8 @@ function VenuePreviewCard({ room, preview = "", childRooms = [], highlighted = f
       disabled
       style={{
         width: "100%",
-        minHeight: full ? PAGE_PREVIEW_CARD.cardHeight : 182,
+        minHeight: isDining ? undefined : (full ? PAGE_PREVIEW_CARD.cardHeight : 182),
+        aspectRatio: isDining ? "4 / 3" : undefined,
         border: highlighted ? "1px solid rgba(201,168,76,0.82)" : "1px solid rgba(255,255,255,0.10)",
         borderRadius: full ? 10 : 13,
         overflow: "hidden",
@@ -732,16 +733,18 @@ function VenuePreviewCard({ room, preview = "", childRooms = [], highlighted = f
             inset: 0,
             objectFit: isDining ? "contain" : "cover",
             objectPosition: room.image_position || "center 50%",
-            background: isDining ? "rgba(255,255,255,0.035)" : "#211A12",
+            background: isDining ? "#FAF8F5" : "#211A12",
             imageRendering: "auto",
           }}
         />
       ) : (
-        <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(255,255,255,0.32)" }}>
+        <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: isDining ? "rgba(0,0,0,0.32)" : "rgba(255,255,255,0.32)", background: isDining ? "#FAF8F5" : "#211A12" }}>
           <Camera size={full ? 18 : 30} />
         </span>
       )}
-      <span style={{ position: "absolute", inset: 0, background: isDining ? "linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.42))" : "linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62))" }} />
+      {!isDining && (
+        <span style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62))" }} />
+      )}
       {highlighted && (
         <span style={{ position: "absolute", top: 8, left: 8, borderRadius: 999, padding: full ? "3px 6px" : "5px 8px", background: "rgba(201,168,76,0.92)", color: "#17120C", fontSize: full ? 7 : 9, fontWeight: 850, letterSpacing: "0.08em", textTransform: "uppercase" }}>
           Editing
@@ -752,20 +755,13 @@ function VenuePreviewCard({ room, preview = "", childRooms = [], highlighted = f
           Unavailable
         </span>
       )}
-      <span style={{ position: "absolute", left: full ? 9 : 14, right: full ? 9 : 14, bottom: full ? 8 : 13, display: "grid", gap: full ? 5 : 8 }}>
-        <strong style={{ color: "#fff", fontSize: full ? PAGE_PREVIEW_CARD.title : 18, lineHeight: 1.12, textAlign: "left", textShadow: "0 2px 12px rgba(0,0,0,0.45)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: full ? "nowrap" : "normal" }}>
-          {title}
-        </strong>
-        {visibleChips.length > 0 && (
-          <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-            {visibleChips.map((child) => (
-              <span key={child.id || child.slug || child.name} style={{ borderRadius: 999, padding: full ? "3px 6px" : "4px 8px", background: "rgba(255,255,255,0.16)", color: "#fff", fontSize: full ? PAGE_PREVIEW_CARD.chip : 9, fontWeight: 800 }}>
-                {child.display_name || child.name}
-              </span>
-            ))}
-          </span>
-        )}
-      </span>
+      {!isDining && (
+        <span style={{ position: "absolute", left: full ? 9 : 14, right: full ? 9 : 14, bottom: full ? 8 : 13, display: "grid", gap: full ? 5 : 8 }}>
+          <strong style={{ color: "#fff", fontSize: full ? PAGE_PREVIEW_CARD.title : 18, lineHeight: 1.12, textAlign: "left", textShadow: "0 2px 12px rgba(0,0,0,0.45)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: full ? "nowrap" : "normal" }}>
+            {title}
+          </strong>
+        </span>
+      )}
     </button>
   );
 }
@@ -813,7 +809,7 @@ function VenueLandingPreview({ form, preview, childRooms = [], rooms = [], editi
         <div style={{ color: "#C9A84C", fontSize: 6.8, fontWeight: 850, letterSpacing: "0.22em", textTransform: "uppercase" }}>{label}</div>
         <strong style={{ display: "block", marginTop: 2, color: "#F8F3E8", fontSize: 14, lineHeight: 1.05 }}>{title}</strong>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: PAGE_PREVIEW_CARD.gap }}>
+      <div style={{ display: "grid", gridTemplateColumns: title === "Dining Outlets" ? "repeat(6, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))", gap: PAGE_PREVIEW_CARD.gap }}>
         {items.length ? items.map((room) => (
           <VenuePreviewCard
             key={room.id || room.slug || room.name}

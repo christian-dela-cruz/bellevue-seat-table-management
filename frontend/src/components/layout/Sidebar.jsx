@@ -447,6 +447,10 @@ export default function Sidebar({
   const togglePinnedOpen = () => {
     const next = !pinnedOpen;
     setPinnedOpen(next);
+    if (!next) {
+      setHoverPreview(false);
+      setAccountMenuOpen(false);
+    }
     try {
       localStorage.setItem("bellevue_admin_sidebar_open", String(next));
     } catch {

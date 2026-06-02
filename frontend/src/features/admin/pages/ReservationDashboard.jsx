@@ -1501,21 +1501,19 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
           position:"fixed",inset:0,
           background:C.modalOverlay,
           zIndex:4000,
-          display:"flex",alignItems:"center",justifyContent:"center",
-          padding:20,
+          display:"flex",justifyContent:"flex-end",
           backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",
         }}
         onClick={(e)=>{if(e.target===e.currentTarget&&!actionLoading)onClose();}}
       >
         <div style={{
-          background:C.surfaceBase,borderRadius:14,
-          width:"100%",maxWidth:isEditing?980:880,
-          maxHeight:"92vh",
-          boxShadow:"0 24px 80px rgba(0,0,0,0.16)",
-          border:`1px solid ${C.borderDefault}`,
+          background:C.surfaceBase,
+          width:"100%",maxWidth:isEditing?900:800,
+          height:"100%",
+          boxShadow:"-16px 0 40px rgba(0,0,0,0.16)",
+          borderLeft:`1px solid ${C.borderDefault}`,
           fontFamily:F.body,
-          animation:"modalIn 0.20s cubic-bezier(0.16,1,0.3,1)",
-          overflow:"hidden",
+          animation:"drawerSlideIn 0.3s cubic-bezier(0.16,1,0.3,1)",
           display:"flex",flexDirection:"column",
         }}>
           <div style={{height:2,background:`linear-gradient(90deg,transparent 0%,${C.gold}80 30%,${C.gold}80 70%,transparent 100%)`,flexShrink:0}}/>
@@ -2655,6 +2653,28 @@ export default function ReservationDashboard() {
     }
   };
 
+  const handleFocusClick = (type) => {
+    let isCurrentlyActive = false;
+    if (type === "PENDING") isCurrentlyActive = filterStatus === "PENDING";
+    if (type === "urgent") isCurrentlyActive = quickFilter === "urgent";
+    if (type === "overdue") isCurrentlyActive = filterPriority === "overdue";
+    if (type === "today") isCurrentlyActive = quickFilter === "today";
+    if (type === "APPROVED") isCurrentlyActive = filterStatus === "APPROVED";
+
+    setFilterStatus("ALL");
+    setFilterPriority("ALL");
+    setFilterType("ALL");
+    setQuickFilter("ALL");
+
+    if (isCurrentlyActive) return;
+
+    if (type === "PENDING") setFilterStatus("PENDING");
+    if (type === "urgent") setQuickFilter("urgent");
+    if (type === "overdue") setFilterPriority("overdue");
+    if (type === "today") setQuickFilter("today");
+    if (type === "APPROVED") setFilterStatus("APPROVED");
+  };
+
   const statCards=[
     {label:"Total",    count:stats.total,    filter:"ALL",      color:C.gold,               bg:C.goldFaint,           border:C.borderAccent              },
     {label:"Active",   count:stats.active,   filter:"ACTIVE",   color:C.green,              bg:C.greenFaint,          border:C.greenBorder               },
@@ -2685,6 +2705,7 @@ export default function ReservationDashboard() {
         @keyframes fadeUp     { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
         @keyframes modalIn    { from { opacity:0; transform:scale(0.96) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }
         @keyframes shimmer    { 0% { background-position:-200% 0 } 100% { background-position:200% 0 } }
+        @keyframes drawerSlideIn { from { transform:translateX(100%); } to { transform:translateX(0); } }
         @keyframes dropdownIn { from { opacity:0; transform:translateY(-6px) scale(0.98); } to { opacity:1; transform:translateY(0) scale(1); } }
         * { box-sizing:border-box; }
         ::-webkit-scrollbar { width:4px; }
@@ -2786,7 +2807,7 @@ export default function ReservationDashboard() {
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
                   <div>
                     <div style={{fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.18em",textTransform:"uppercase",color:C.gold,marginBottom:4}}>
-                      Queue Focus
+                      Queue Priorities
                     </div>
                     <div style={{fontSize:12,color:C.textSecondary}}>
                       Prioritize pending requests, near events, and delayed responses.
@@ -2802,11 +2823,11 @@ export default function ReservationDashboard() {
                 </div>
 
                 <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":isTablet?"repeat(2,1fr)":"repeat(5,minmax(0,1fr))",gap:10}}>
-                  <QueueMetric label="Pending" value={loading?"--":stats.pending} helper="awaiting action" tone="gold" active={filterStatus==="PENDING"} onClick={()=>{setFilterStatus("PENDING");setQuickFilter("ALL");}} isMobile={isMobile} />
-                  <QueueMetric label="Urgent" value={loading?"--":operationalStats.urgent} helper="within 24h" tone="red" active={quickFilter==="urgent"} onClick={()=>setQuickFilter("urgent")} isMobile={isMobile} />
-                  <QueueMetric label="Overdue" value={loading?"--":operationalStats.overdue} helper="pending over 24h" tone="red" active={filterPriority==="overdue"} onClick={()=>setFilterPriority("overdue")} isMobile={isMobile} />
-                  <QueueMetric label="Today" value={loading?"--":operationalStats.today} helper="events today" tone="green" active={quickFilter==="today"} onClick={()=>setQuickFilter("today")} isMobile={isMobile} />
-                  <QueueMetric label="Reserved" value={loading?"--":stats.approved} helper="confirmed" tone="green" active={filterStatus==="APPROVED"} onClick={()=>{setFilterStatus("APPROVED");setQuickFilter("ALL");}} isMobile={isMobile} />
+                  <QueueMetric label="Pending" value={loading?"--":stats.pending} helper="awaiting action" tone="gold" active={filterStatus==="PENDING"} onClick={()=>handleFocusClick("PENDING")} isMobile={isMobile} />
+                  <QueueMetric label="Urgent" value={loading?"--":operationalStats.urgent} helper="within 24h" tone="red" active={quickFilter==="urgent"} onClick={()=>handleFocusClick("urgent")} isMobile={isMobile} />
+                  <QueueMetric label="Overdue" value={loading?"--":operationalStats.overdue} helper="pending over 24h" tone="red" active={filterPriority==="overdue"} onClick={()=>handleFocusClick("overdue")} isMobile={isMobile} />
+                  <QueueMetric label="Today" value={loading?"--":operationalStats.today} helper="events today" tone="green" active={quickFilter==="today"} onClick={()=>handleFocusClick("today")} isMobile={isMobile} />
+                  <QueueMetric label="Reserved" value={loading?"--":stats.approved} helper="confirmed" tone="green" active={filterStatus==="APPROVED"} onClick={()=>handleFocusClick("APPROVED")} isMobile={isMobile} />
                 </div>
               </div>
 
@@ -2862,7 +2883,13 @@ export default function ReservationDashboard() {
                   background:C.headerGradient,
                 }}>
                   <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                    <div style={{fontFamily:F.label,fontSize:9,letterSpacing:"0.26em",color:C.gold,fontWeight:700,textTransform:"uppercase"}}>Reservations</div>
+                    <div style={{fontFamily:F.label,fontSize:9,letterSpacing:"0.26em",color:C.gold,fontWeight:700,textTransform:"uppercase"}}>
+                      {filterStatus === "PENDING" ? "Pending Reservations" :
+                       quickFilter === "urgent" ? "Urgent Reservations" :
+                       filterPriority === "overdue" ? "Overdue Responses" :
+                       quickFilter === "today" ? "Today's Events" :
+                       filterStatus === "APPROVED" ? "Reserved Queue" : "All Reservations"}
+                    </div>
                     <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",padding:"2px 8px",background:C.goldFaint,border:`1px solid ${C.borderAccent}`,borderRadius:20,fontFamily:F.label,fontSize:9,fontWeight:700,color:C.gold,letterSpacing:"0.10em"}}>
                       {loading?"--":filteredReservations.length}
                     </span>

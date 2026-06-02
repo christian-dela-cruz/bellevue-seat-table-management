@@ -136,6 +136,60 @@ export default function UnifiedSeatMapEditor() {
   const C         = config.colors;
   const F         = FONTS[config.theme];
 
+  // Migration script for scooping up local storage seatmaps
+  useEffect(() => {
+    const migrateSeatMaps = async () => {
+      const migratedFlag = localStorage.getItem("seatmaps_migrated_to_db");
+      if (migratedFlag) return;
+
+      const keys = Object.keys(localStorage).filter(k => k.startsWith("seatmap_layout:"));
+      if (keys.length === 0) {
+        localStorage.setItem("seatmaps_migrated_to_db", "true");
+        return;
+      }
+
+      console.log(`[SeatMap Migration] Found ${keys.length} local seatmaps. Migrating to backend...`);
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+      const token = localStorage.getItem("admin_token") || localStorage.getItem("auth_token") || "";
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      let successCount = 0;
+      for (const key of keys) {
+        try {
+          const parts = key.split(":"); // ["seatmap_layout", wing, room]
+          if (parts.length < 3) continue;
+          const wing = parts[1];
+          const room = parts.slice(2).join(":");
+          const raw = localStorage.getItem(key);
+          if (!raw) continue;
+          
+          let data;
+          try {
+             data = JSON.parse(raw);
+          } catch(e) { continue; }
+          
+          if (!data || !data.tables) continue;
+
+          const res = await fetch(`${API_BASE_URL}/seatmap/${encodeURIComponent(wing)}/${encodeURIComponent(room)}`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(data),
+          });
+          
+          if (res.ok) successCount++;
+        } catch (e) {
+          console.error(`[SeatMap Migration] Failed to migrate ${key}`, e);
+        }
+      }
+      
+      console.log(`[SeatMap Migration] Migrated ${successCount} seatmaps successfully.`);
+      localStorage.setItem("seatmaps_migrated_to_db", "true");
+    };
+
+    migrateSeatMaps();
+  }, []);
+
   return (
     <div style={{ height: "100vh", overflow: "hidden", fontFamily: F.body, background: C.pageBg, color: C.textPrimary }}>
       <style>{`
