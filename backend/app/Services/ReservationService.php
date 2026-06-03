@@ -405,7 +405,7 @@ class ReservationService
                     $timeQuery->orWhere('event_time', 'like', '%' . $candidate . '%');
                 }
             })
-            ->whereIn('status', ['pending', 'approved', 'reserved']);
+            ->whereIn('status', ['pending', 'awaiting_confirmation', 'approved', 'reserved', 'confirmed', 'unavailable']);
 
         $assignedRoomId = $data['assigned_room_id'] ?? null;
         if (!$assignedRoomId && !empty($data['room'])) {

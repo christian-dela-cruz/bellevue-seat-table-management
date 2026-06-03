@@ -1,7 +1,7 @@
 function normaliseStatus(raw) {
   const status = String(raw || "available").toLowerCase();
-  if (status === "pending") return "pending";
-  if (["approved", "reserved", "unavailable"].includes(status)) return "unavailable";
+  if (status === "pending" || status === "awaiting_confirmation") return "pending";
+  if (["approved", "reserved", "unavailable", "confirmed"].includes(status)) return "unavailable";
   return "available";
 }
 
@@ -62,7 +62,7 @@ function buildStatusMap(apiData) {
 
     if (Array.isArray(row?.seats)) {
       row.seats.forEach(seat => {
-        addStatus(map, row.id ?? row.table ?? row.table_number, seat.num ?? seat.label ?? seat.id, seat.status);
+        addStatus(map, row.id ?? row.table ?? row.table_number, seat.num ?? seat.label ?? seat.id, normaliseStatus(seat.status));
       });
       return;
     }

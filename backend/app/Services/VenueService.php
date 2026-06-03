@@ -137,7 +137,7 @@ class VenueService
         $isBlockedDate = in_array($dateKey, $config['blocked_dates'] ?? [], true) || (bool) $closedOverride;
         $periods = $isBlockedDate ? [] : $this->periodsForDate($config, $selectedDate);
         $slots = $this->buildSlots($periods);
-        $activeStatuses = ['pending', 'approved', 'reserved'];
+        $activeStatuses = ['pending', 'awaiting_confirmation', 'approved', 'reserved', 'confirmed', 'unavailable'];
         $bookings = Reservation::query()
             ->where('venue_id', $scopeVenue->id)
             ->whereDate('event_date', $dateKey)
@@ -399,7 +399,7 @@ class VenueService
 
     public function getAvailabilityByDateRange(?string $startDate = null, ?string $endDate = null): array
     {
-        $blockingStatuses = ['pending', 'approved', 'reserved'];
+        $blockingStatuses = ['pending', 'awaiting_confirmation', 'approved', 'reserved', 'confirmed', 'unavailable'];
 
         $venues = Venue::query()
             ->where('is_active', true)
@@ -842,7 +842,7 @@ class VenueService
             ->where('reservations_enabled', true)
             ->get();
 
-        $activeStatuses = ['pending', 'approved', 'reserved'];
+        $activeStatuses = ['pending', 'awaiting_confirmation', 'approved', 'reserved', 'confirmed', 'unavailable'];
         $requestedTime = $this->normalizeTimeValue($time);
         $bookings = Reservation::query()
             ->where('venue_id', $parentVenue->id)

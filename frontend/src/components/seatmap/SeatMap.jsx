@@ -792,7 +792,30 @@ function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectT
     textPrimary: C.textPrimary, textTertiary: C.textTertiary, divider: C.divider,
   };
   
-  const tableBlocked = !editMode && mode === "whole" && (table.seats || []).some(seat => seat.status !== "available");
+  const seats = table.seats || [];
+  const totalSeats = seats.length;
+  const unavailableSeats = seats.filter(s => s.status === "unavailable" || s.status === "reserved").length;
+  const pendingSeats = seats.filter(s => s.status === "pending").length;
+  const availableSeats = seats.filter(s => s.status === "available").length;
+
+  let tableStatus = "available";
+  if (totalSeats > 0) {
+    if (unavailableSeats === totalSeats) {
+      tableStatus = "unavailable";
+    } else if (pendingSeats === totalSeats) {
+      tableStatus = "pending";
+    } else if (unavailableSeats + pendingSeats === totalSeats) {
+      tableStatus = unavailableSeats > 0 ? "unavailable" : "pending";
+    } else if (unavailableSeats > 0 || pendingSeats > 0) {
+      tableStatus = "partial";
+    }
+  }
+
+  const isTableBlockedForSelection = !editMode && (
+    (mode === "whole" && (table.seats || []).some(seat => seat.status !== "available")) ||
+    (mode === "individual" && (table.seats || []).every(seat => seat.status !== "available"))
+  );
+
   useEffect(() => setLabelVal(table.label || table.id), [table.label, table.id]);
   
   const tableW = Math.max(table.width || 110, 80);
@@ -875,33 +898,50 @@ function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectT
         ref={tableBodyRef}
         style={{
           position: "absolute", left: 0, top: 0, width: tableW, height: tableH,
-          background: isTableSelected ? tokens.tableSelected : tokens.tableBg, 
+          background: (() => {
+            if (isTableSelected) return tokens.tableSelected;
+            if (!editMode) {
+              if (tableStatus === "unavailable") return "rgba(184, 92, 92, 0.15)";
+              if (tableStatus === "pending") return "rgba(196, 163, 90, 0.15)";
+              if (tableStatus === "partial") {
+                const mixColor = unavailableSeats > 0 ? "rgba(184, 92, 92, 0.15)" : "rgba(196, 163, 90, 0.15)";
+                return `linear-gradient(135deg, ${tokens.tableBg} 60%, ${mixColor} 60%)`;
+              }
+            }
+            return tokens.tableBg;
+          })(),
           borderRadius: table.shape === "round" ? "50%" : table.shape === "oval" ? "50%" : 8,
           display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
           border: isTableSelected 
             ? `2px solid ${tokens.gold}` 
             : isColliding 
               ? `2.5px solid ${C.red}` 
-              : hov 
-                ? `1.5px solid ${tokens.borderAccent}` 
-                : `1px solid ${tokens.borderDefault}`,
+              : !editMode && tableStatus === "unavailable"
+                ? `1.5px solid ${STATUS_COLORS.unavailable}`
+                : !editMode && tableStatus === "pending"
+                  ? `1.5px solid ${STATUS_COLORS.pending}`
+                  : hov 
+                    ? `1.5px solid ${tokens.borderAccent}` 
+                    : `1px solid ${tokens.borderDefault}`,
           boxShadow: isTableSelected 
             ? `0 0 0 3px ${tokens.gold}10, 0 4px 16px rgba(0,0,0,0.12)` 
             : isColliding
               ? `0 0 12px ${C.red}50, 0 4px 16px rgba(160,56,56,0.15)`
-              : hov 
-                ? "0 4px 12px rgba(0,0,0,0.12)" 
-                : tokens.cardShadow,
+              : !editMode && (tableStatus === "unavailable" || tableStatus === "pending")
+                ? "none"
+                : hov 
+                  ? "0 4px 12px rgba(0,0,0,0.12)" 
+                  : tokens.cardShadow,
           transition: "border 0.15s, box-shadow 0.15s, background 0.18s",
-          cursor: editMode ? (isDragging ? "grabbing" : isLocked ? "not-allowed" : "grab") : tableBlocked ? "not-allowed" : "pointer", 
+          cursor: editMode ? (isDragging ? "grabbing" : isLocked ? "not-allowed" : "grab") : isTableBlockedForSelection ? "not-allowed" : "pointer", 
           zIndex: 2, 
           overflow: "visible",
-          opacity: tableBlocked ? 0.72 : 1,
+          opacity: isTableBlockedForSelection ? 0.6 : 1,
         }}
         onMouseDown={editMode && !isLocked ? e => { e.stopPropagation(); onDragStart(e, table.id); } : undefined}
         onClick={e => {
           e.stopPropagation();
-          if (tableBlocked) {
+          if (isTableBlockedForSelection) {
             alert("This table is unavailable for the selected schedule.");
             return;
           }

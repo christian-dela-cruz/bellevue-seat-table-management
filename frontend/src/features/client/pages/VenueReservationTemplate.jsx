@@ -1154,6 +1154,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   const [rebookFrom, setRebookFrom] = useState(null);
   const [lastBookingDetails, setLastBookingDetails] = useState(null);
   const [tableData, setTableData] = useState(null);
+  const [roomAvailability, setRoomAvailability] = useState(null);
   const [layoutChecked, setLayoutChecked] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
@@ -1305,6 +1306,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       const params = new URLSearchParams();
       if (schedule.eventDate) params.set("event_date", schedule.eventDate);
       if (schedule.eventTime) params.set("event_time", schedule.eventTime);
+      params.set("guests", String(guests || 1));
       params.set("_t", String(Date.now()));
 
       const res = await fetch(
@@ -1314,6 +1316,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       if (reqId !== requestCounterRef.current) return;
       if (!res.ok) return;
       const json = await res.json();
+      setRoomAvailability(json.availability || null);
       if (json.success && json.data) {
         setTableData((current) => {
           if (!current) return json.data;
@@ -1332,12 +1335,13 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
         setLayoutChecked(true);
       }
     }
-  }, [ROOM, venue?.id, schedule.eventDate, schedule.eventTime]);
+  }, [ROOM, venue?.id, schedule.eventDate, schedule.eventTime, guests]);
 
   useEffect(() => {
     if (!ROOM) return;
     setLayoutChecked(false);
     setTableData(null);
+    setRoomAvailability(null);
     fetchAndMerge();
   }, [fetchAndMerge, ROOM]);
 
@@ -1491,6 +1495,10 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       alert("This venue is currently not available for online reservations.");
       return;
     }
+    if (spaceUnavailable) {
+      alert(roomAvailability?.reason || "This space is unavailable for the selected schedule.");
+      return;
+    }
     if (seat?.status !== "available") {
       alert("This seat is unavailable for the selected schedule.");
       return;
@@ -1504,8 +1512,17 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       alert("This venue is currently not available for online reservations.");
       return;
     }
+    if (spaceUnavailable) {
+      alert(roomAvailability?.reason || "This space is unavailable for the selected schedule.");
+      return;
+    }
+    const totalSeats = table?.seats?.length || 0;
     const availableSeats = (table?.seats || []).filter((seat) => seat.status === "available").length;
-    if (mode === "whole" && availableSeats < 1) {
+    if (mode === "whole" && availableSeats < totalSeats) {
+      alert("This table is partially or fully reserved. Please select another table.");
+      return;
+    }
+    if (mode === "individual" && availableSeats < 1) {
       alert("This table has no available seats for the selected schedule.");
       return;
     }
@@ -1515,6 +1532,11 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   };
 
   const handleGuestContinue = (gCount) => {
+    if (spaceUnavailable) {
+      setError(roomAvailability?.reason || "This space is unavailable for the selected schedule.");
+      setModal(null);
+      return;
+    }
     setGuests(gCount);
     setModal("details");
     startHoldTimer();
@@ -1534,6 +1556,11 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
     if (!formData) return;
     if (!isVenueReservable) {
       setError("This venue is currently not available for online reservations.");
+      setModal(null);
+      return;
+    }
+    if (spaceUnavailable) {
+      setError(roomAvailability?.reason || "This space is unavailable for the selected schedule.");
       setModal(null);
       return;
     }
@@ -1589,6 +1616,9 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
     } catch (err) {
       setError(err.message || "Failed to submit booking");
       setModal(null);
+      setSelectedSeat(null);
+      setSelectedTable(null);
+      fetchAndMerge();
     } finally {
       setSubmitting(false);
     }
@@ -1598,6 +1628,10 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
     e.preventDefault();
     if (!isVenueReservable) {
       setError("This venue is currently not available for online reservations.");
+      return;
+    }
+    if (spaceUnavailable) {
+      setError(roomAvailability?.reason || "This space is unavailable for the selected schedule.");
       return;
     }
     setSubmitting(true);
@@ -1633,6 +1667,9 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       setModal("success");
     } catch (err) {
       setError(err.message || "Failed to submit booking request");
+      setSelectedSeat(null);
+      setSelectedTable(null);
+      fetchAndMerge();
     } finally {
       setSubmitting(false);
     }
@@ -1650,9 +1687,23 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   const activeTable = getActiveTable();
   const isStandalone = isStandaloneSelected();
   const hasSeatLayout = Boolean(tableData && (((tableData.tables || []).length > 0) || ((tableData.standaloneSeats || []).length > 0)));
-  const canProceed = isVenueReservable && mode === "individual" && selectedSeat && selectedSeat.status === "available";
-  const canReserveWhole = isVenueReservable && mode === "whole" && (Boolean(activeTable) || !hasSeatLayout);
+  const hasConfirmedSchedule = Boolean(schedule.eventDate && schedule.eventTime);
+  const spaceUnavailable = Boolean(hasConfirmedSchedule && roomAvailability && roomAvailability.available === false);
+  const spaceStatusLabel = roomAvailability?.status === "pending" ? "Pending Reservation" : "Schedule Unavailable";
+  const spaceAvailabilityMessage = roomAvailability?.reason || "This space is unavailable for the selected schedule.";
+  const isWholeTableAvailable = activeTable && (activeTable.seats || []).every(seat => seat.status === "available");
+  const canProceed = isVenueReservable && !spaceUnavailable && mode === "individual" && selectedSeat && selectedSeat.status === "available";
+  const canReserveWhole = isVenueReservable && !spaceUnavailable && mode === "whole" && (((activeTable && isWholeTableAvailable) || !hasSeatLayout));
   const seatRatio = activeTable ? getSeatRatio(activeTable) : null;
+  const bookingButtonLabel = !isVenueReservable
+    ? "Reservations Unavailable"
+    : spaceUnavailable
+      ? spaceStatusLabel
+      : !hasSeatLayout
+        ? "Reserve General Admission"
+        : mode === "whole"
+          ? (activeTable ? "Reserve This Table" : "Select a Table First")
+          : selectedSeat ? "Reserve This Seat" : "Select a Seat First";
 
   const displayTable = !hasSeatLayout
     ? "General Admission"
@@ -1811,6 +1862,11 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                         <div style={{ display: "grid", gap: 6 }}>
                           <strong style={{ fontFamily: F.display, fontSize: 16, color: C.textPrimary }}>No seat layout available</strong>
                           <span style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.5 }}>This space does not have a configured seat map yet.</span>
+                          {spaceUnavailable && (
+                            <span style={{ fontSize: 11, color: roomAvailability?.status === "pending" ? C.gold : STATUS_COLORS.reserved, lineHeight: 1.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                              {spaceAvailabilityMessage}
+                            </span>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -1831,6 +1887,28 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
 
               {/* Mobile bottom-anchored booking details sheet */}
               <div style={{ flexShrink: 0, background: isDark ? "rgba(10,9,8,0.95)" : "rgba(255,255,255,0.98)", borderTop: `1px solid ${C.borderDefault}`, padding: "14px 16px", display: "grid", gap: 12 }}>
+                {error && (
+                  <div style={{
+                    background: isDark ? "rgba(160,56,56,0.15)" : "rgba(160,56,56,0.08)",
+                    border: `1.5px solid ${C.red}`,
+                    borderRadius: 10,
+                    padding: "10px 14px",
+                    color: isDark ? "#FFA8A8" : "#A03838",
+                    fontSize: 11.5,
+                    lineHeight: 1.4,
+                    fontWeight: 500,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 8,
+                    animation: "fadeUp 0.15s ease"
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                    <div style={{ flex: 1 }}>{error}</div>
+                    <button onClick={() => setError("")} style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                  </div>
+                )}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                   <div style={{ flex: 1, padding: "8px 12px", borderRadius: 10, background: C.surfaceInput, border: `1px solid ${C.borderDefault}` }}>
                     <div style={{ fontFamily: F.label, fontSize: 8, letterSpacing: "0.16em", color: C.textTertiary, fontWeight: 700, textTransform: "uppercase", marginBottom: 2 }}>Selection</div>
@@ -1842,12 +1920,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                   disabled={!(canReserveWhole || canProceed)}
                   style={{ width: "100%", padding: "15px", background: (canReserveWhole || canProceed) ? C.gold : C.btnDisabledBg, border: "none", borderRadius: 12, fontFamily: F.label, fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: (canReserveWhole || canProceed) ? C.textOnAccent : C.btnDisabledText, cursor: (canReserveWhole || canProceed) ? "pointer" : "not-allowed", transition: "all 0.18s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                 >
-                  {!isVenueReservable
-                    ? "Reservations Unavailable"
-                    : mode === "whole"
-                      ? (activeTable ? "Reserve This Table" : "Select a Table First")
-                      : selectedSeat ? "Reserve This Seat" : "Select a Seat First"
-                  }
+                  {bookingButtonLabel}
                 </button>
               </div>
             </div>
@@ -1928,6 +2001,11 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                             <div style={{ textAlign: "center", display: "grid", gap: 8 }}>
                               <strong style={{ fontFamily: F.display, fontSize: 18, color: C.textPrimary }}>No seat layout available</strong>
                               <span style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6, maxWidth: 360, margin: "0 auto" }}>This space does not have a configured seat map yet.</span>
+                              {spaceUnavailable && (
+                                <span style={{ fontSize: 11, color: roomAvailability?.status === "pending" ? C.gold : STATUS_COLORS.reserved, lineHeight: 1.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", maxWidth: 420, margin: "0 auto" }}>
+                                  {spaceAvailabilityMessage}
+                                </span>
+                              )}
                             </div>
                           </div>
                         ) : (
@@ -1942,6 +2020,30 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
 
                     {/* Schedule controls */}
                     <ScheduleGate schedule={schedule} onChange={setSchedule} roomLabel={ROOM} isDark={isDark} guests={guests} />
+
+                    {error && (
+                      <div style={{
+                        background: isDark ? "rgba(160,56,56,0.15)" : "rgba(160,56,56,0.08)",
+                        border: `1.5px solid ${C.red}`,
+                        borderRadius: 10,
+                        padding: "10px 14px",
+                        color: isDark ? "#FFA8A8" : "#A03838",
+                        fontSize: 11.5,
+                        lineHeight: 1.4,
+                        fontWeight: 500,
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 8,
+                        margin: "0 0 16px 0",
+                        animation: "fadeUp 0.15s ease"
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                        <div style={{ flex: 1 }}>{error}</div>
+                        <button onClick={() => setError("")} style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                        </button>
+                      </div>
+                    )}
 
                     {/* Selection Summary details card */}
                     <div style={{ background: C.surfaceBase, border: `1.5px solid ${C.cardBorder}`, borderRadius: 16, padding: 22, boxShadow: isDark ? "0 15px 40px rgba(0,0,0,0.30)" : "0 10px 30px rgba(78,60,32,0.05)" }}>
@@ -1960,6 +2062,12 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                             </span>
                           </div>
                         ))}
+                        {spaceUnavailable && (
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 16px", borderBottom: `1px solid ${C.divider}` }}>
+                            <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Availability</span>
+                            <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", color: roomAvailability?.status === "pending" ? C.gold : STATUS_COLORS.reserved, textAlign: "right", textTransform: "uppercase" }}>{spaceStatusLabel}</span>
+                          </div>
+                        )}
                       </div>
 
                       <button
@@ -1969,7 +2077,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                         onMouseEnter={e => { if (canReserveWhole || canProceed) e.currentTarget.style.background = C.goldLight; }}
                         onMouseLeave={e => { if (canReserveWhole || canProceed) e.currentTarget.style.background = C.gold; }}
                       >
-                        {!isVenueReservable ? "Reservations Unavailable" : !hasSeatLayout ? "Reserve General Admission" : mode === "whole" ? "Reserve This Table" : selectedSeat ? "Reserve This Seat" : "Select a Seat First"}
+                        {bookingButtonLabel}
                       </button>
                     </div>
                   </div>

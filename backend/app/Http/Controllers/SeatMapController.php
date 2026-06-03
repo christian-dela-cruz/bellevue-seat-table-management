@@ -43,6 +43,11 @@ class SeatMapController extends Controller
                 return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
             }
 
+            $reservations = collect();
+            if ($request->filled('event_date') && $request->filled('event_time')) {
+                $reservations = $this->scheduledReservations($request, $venue->id);
+            }
+
             // Fallback inheritance logic: if parent venue has no layout, try to find a child that has one
             $payload = $venue->seatmap_payload;
             $isEmptyPayload = empty($payload) || $payload === '{}' || $payload === '[]' || strlen(trim($payload)) < 5;
@@ -65,6 +70,7 @@ class SeatMapController extends Controller
                     return response()->json([
                         'success' => true,
                         'data' => null,
+                        'availability' => $this->roomAvailabilitySummary($request, $venue, $reservations, false),
                         'venue' => [
                             'id' => $venue->id,
                             'name' => $venue->name,
@@ -98,11 +104,12 @@ class SeatMapController extends Controller
 
             $data = is_string($payload) ? json_decode($payload, true) : $payload;
             $data = is_array($data) ? $this->layoutWithAvailabilityDefaults($data) : $data;
+            $hasSeatLayout = is_array($data)
+                && ((isset($data['tables']) && count($data['tables']) > 0)
+                    || (isset($data['standaloneSeats']) && count($data['standaloneSeats']) > 0));
 
             // Merge dynamic reservations only for the exact selected schedule.
             if ($request->filled('event_date') && $request->filled('event_time') && isset($data['tables'])) {
-                $reservations = $this->scheduledReservations($request, $venue->id);
-                
                 foreach ($data['tables'] as &$table) {
                     if (isset($table['seats'])) {
                         foreach ($table['seats'] as &$seat) {
@@ -127,6 +134,7 @@ class SeatMapController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $data,
+                'availability' => $this->roomAvailabilitySummary($request, $venue, $reservations, $hasSeatLayout),
                 'venue' => [
                     'id' => $venue->id,
                     'name' => $venue->name,
@@ -209,7 +217,7 @@ class SeatMapController extends Controller
                           ->orWhere('assigned_room_id', $venueId);
                 }
             })
-            ->whereIn('status', ['pending', 'approved', 'reserved'])
+            ->whereIn('status', ['pending', 'awaiting_confirmation', 'approved', 'reserved', 'confirmed', 'unavailable'])
             ->when($request->filled('event_date'), function ($query) use ($request) {
                 $query->whereDate('event_date', $request->query('event_date'));
             })
@@ -248,6 +256,153 @@ class SeatMapController extends Controller
         }
 
         return $data;
+    }
+
+    private function roomAvailabilitySummary(Request $request, Venue $venue, $reservations, bool $hasSeatLayout): array
+    {
+        if (!$request->filled('event_date') || !$request->filled('event_time')) {
+            return [
+                'available' => true,
+                'status' => 'available',
+                'reason' => 'Select a reservation date and time to check availability.',
+                'blocking_count' => 0,
+                'available_subrooms' => null,
+                'total_subrooms' => null,
+            ];
+        }
+
+        $blockingReservations = collect($reservations)->values();
+        $status = $this->publicRoomStatus($blockingReservations);
+
+        if ($venue->parent_id) {
+            $isBlocked = $blockingReservations->isNotEmpty();
+
+            return [
+                'available' => !$isBlocked,
+                'status' => $isBlocked ? $status : 'available',
+                'reason' => $isBlocked
+                    ? 'This assigned room is already held for the selected schedule.'
+                    : 'This room is available for the selected schedule.',
+                'blocking_count' => $blockingReservations->count(),
+                'available_subrooms' => $isBlocked ? 0 : 1,
+                'total_subrooms' => 1,
+            ];
+        }
+
+        $children = $venue->children()
+            ->where('is_active', true)
+            ->where('is_archived', false)
+            ->where('reservations_enabled', true)
+            ->get();
+
+        if ($children->isNotEmpty()) {
+            $requestedGuests = max(1, (int) $request->query('guests', 1));
+            $validChildren = $children->filter(fn (Venue $child) => (int) $child->capacity === 0 || $requestedGuests <= (int) $child->capacity);
+            $allocationMode = $venue->metadata['allocation_mode'] ?? 'admin_assign';
+            $hasWholeBooking = $blockingReservations->contains(fn (Reservation $reservation) => $reservation->type === 'whole'
+                || strcasecmp((string) $reservation->internal_room_name, 'Whole Venue') === 0
+                || strcasecmp((string) $reservation->table_number, 'WHOLE') === 0)
+                || ($allocationMode === 'whole_booking' && $blockingReservations->isNotEmpty());
+
+            if ($validChildren->isEmpty() || $hasWholeBooking) {
+                return [
+                    'available' => false,
+                    'status' => $status,
+                    'reason' => $hasWholeBooking
+                        ? 'This venue is already held as a whole venue booking for the selected schedule.'
+                        : 'Guest count exceeds available subroom capacity for the selected schedule.',
+                    'blocking_count' => $blockingReservations->count(),
+                    'available_subrooms' => 0,
+                    'total_subrooms' => $validChildren->count(),
+                ];
+            }
+
+            $childIds = $validChildren->pluck('id')->all();
+            $blockedChildIds = [];
+            $unassignedRoomHolds = 0;
+
+            foreach ($blockingReservations as $reservation) {
+                if ($reservation->assigned_room_id && in_array((int) $reservation->assigned_room_id, $childIds, true)) {
+                    $blockedChildIds[(int) $reservation->assigned_room_id] = true;
+                    continue;
+                }
+
+                $roomNames = array_filter([
+                    $reservation->room,
+                    $reservation->public_room_name,
+                    $reservation->internal_room_name,
+                ]);
+
+                $matchedChild = $validChildren->first(function (Venue $child) use ($roomNames) {
+                    foreach ($roomNames as $roomName) {
+                        if ($this->normalizeName($roomName) === $this->normalizeName($child->name)) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                });
+
+                if ($matchedChild) {
+                    $blockedChildIds[(int) $matchedChild->id] = true;
+                    continue;
+                }
+
+                if ($reservation->type !== 'whole') {
+                    $unassignedRoomHolds++;
+                }
+            }
+
+            $blockedCount = count($blockedChildIds) + $unassignedRoomHolds;
+            $availableCount = max(0, $validChildren->count() - $blockedCount);
+            $isBlocked = $availableCount <= 0;
+
+            return [
+                'available' => !$isBlocked,
+                'status' => $isBlocked ? $status : 'available',
+                'reason' => $isBlocked
+                    ? 'All subrooms are already held for the selected schedule.'
+                    : "{$availableCount} subroom(s) remain available for the selected schedule.",
+                'blocking_count' => $blockingReservations->count(),
+                'available_subrooms' => $availableCount,
+                'total_subrooms' => $validChildren->count(),
+            ];
+        }
+
+        $hasStandaloneBlock = $blockingReservations->contains(function (Reservation $reservation) {
+            $tableNumber = strtoupper(trim((string) $reservation->table_number));
+
+            return $reservation->type === 'whole'
+                || (bool) $reservation->is_standalone
+                || in_array($tableNumber, ['GENERAL', 'STANDALONE', 'WHOLE'], true);
+        });
+
+        $isBlocked = !$hasSeatLayout
+            ? $blockingReservations->isNotEmpty()
+            : $hasStandaloneBlock;
+
+        return [
+            'available' => !$isBlocked,
+            'status' => $isBlocked ? $status : 'available',
+            'reason' => $isBlocked
+                ? 'This venue is already held for the selected schedule.'
+                : 'This venue is available for the selected schedule.',
+            'blocking_count' => $blockingReservations->count(),
+            'available_subrooms' => null,
+            'total_subrooms' => null,
+        ];
+    }
+
+    private function publicRoomStatus($reservations): string
+    {
+        $statuses = collect($reservations)->pluck('status')->map(fn ($status) => strtolower((string) $status));
+
+        return $statuses->contains('pending') ? 'pending' : 'unavailable';
+    }
+
+    private function normalizeName($value): string
+    {
+        return preg_replace('/[^a-z0-9]+/', '', strtolower(trim((string) $value)));
     }
 
     private function seatWithDefaultAvailability(array $seat): array
@@ -307,8 +462,8 @@ class SeatMapController extends Controller
     private function publicSeatStatus(?string $status): string
     {
         return match ($status) {
-            'pending' => 'pending',
-            'approved', 'reserved' => 'reserved',
+            'pending', 'awaiting_confirmation' => 'pending',
+            'approved', 'reserved', 'confirmed', 'unavailable' => 'unavailable',
             default => $status ?: 'available',
         };
     }

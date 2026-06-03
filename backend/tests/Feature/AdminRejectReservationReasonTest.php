@@ -786,7 +786,7 @@ class AdminRejectReservationReasonTest extends TestCase
             'event_time' => '18:00',
         ], $scopedHeaders)
             ->assertStatus(422)
-            ->assertJsonPath('message', 'The selected seat or table is already held or reserved for that date and time.');
+            ->assertJsonPath('message', 'This seat or table is no longer available for the selected schedule. Please choose another option.');
     }
 
     public function test_seatmap_availability_is_scoped_by_selected_date_and_time(): void
@@ -868,7 +868,7 @@ class AdminRejectReservationReasonTest extends TestCase
 
         $this->postJson('/api/reservations', $payload)
             ->assertStatus(422)
-            ->assertJsonPath('message', 'The selected seat or table is already held or reserved for that date and time.');
+            ->assertJsonPath('message', 'This seat or table is no longer available for the selected schedule. Please choose another option.');
 
         $this->postJson('/api/reservations', array_merge($payload, [
             'event_time' => '19:00',

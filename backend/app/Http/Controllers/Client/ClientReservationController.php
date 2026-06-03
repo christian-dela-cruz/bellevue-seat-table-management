@@ -232,7 +232,7 @@ class ClientReservationController extends Controller
         if ($this->reservationService->hasScheduleConflict($validated)) {
             return response()->json([
                 'success' => false,
-                'message' => 'The selected seat or table is already held or reserved for that date and time.',
+                'message' => 'This seat or table is no longer available for the selected schedule. Please choose another option.',
             ], 422);
         }
 
