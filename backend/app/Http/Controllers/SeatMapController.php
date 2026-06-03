@@ -113,7 +113,7 @@ class SeatMapController extends Controller
                 foreach ($data['tables'] as &$table) {
                     if (isset($table['seats'])) {
                         foreach ($table['seats'] as &$seat) {
-                            $reservation = $this->reservationForSeat($reservations, $table['id'], $seat['id']);
+                            $reservation = $this->reservationForSeat($reservations, $table['id'], $seat['id'] ?? null, $seat['num'] ?? null);
                             if ($reservation) {
                                 $seat['status'] = $this->publicSeatStatus($reservation->status);
                             }
@@ -123,7 +123,7 @@ class SeatMapController extends Controller
                 
                 if (isset($data['standaloneSeats'])) {
                     foreach ($data['standaloneSeats'] as &$seat) {
-                        $reservation = $this->reservationForSeat($reservations, 'STANDALONE', $seat['id']);
+                        $reservation = $this->reservationForSeat($reservations, 'STANDALONE', $seat['id'] ?? null, $seat['num'] ?? null);
                         if ($reservation) {
                             $seat['status'] = $this->publicSeatStatus($reservation->status);
                         }
@@ -275,7 +275,12 @@ class SeatMapController extends Controller
         $status = $this->publicRoomStatus($blockingReservations);
 
         if ($venue->parent_id) {
-            $isBlocked = $blockingReservations->isNotEmpty();
+            $isBlocked = !$hasSeatLayout
+                ? $blockingReservations->isNotEmpty()
+                : $blockingReservations->contains(function (Reservation $reservation) {
+                    $tableNumber = strtoupper(trim((string) $reservation->table_number));
+                    return in_array($tableNumber, ['GENERAL', 'WHOLE'], true) || empty($reservation->table_number);
+                });
 
             return [
                 'available' => !$isBlocked,
@@ -299,10 +304,11 @@ class SeatMapController extends Controller
             $requestedGuests = max(1, (int) $request->query('guests', 1));
             $validChildren = $children->filter(fn (Venue $child) => (int) $child->capacity === 0 || $requestedGuests <= (int) $child->capacity);
             $allocationMode = $venue->metadata['allocation_mode'] ?? 'admin_assign';
-            $hasWholeBooking = $blockingReservations->contains(fn (Reservation $reservation) => $reservation->type === 'whole'
+            $hasWholeBooking = $blockingReservations->contains(fn (Reservation $reservation) => 
+                in_array(strtoupper(trim((string) $reservation->table_number)), ['GENERAL', 'WHOLE'], true)
                 || strcasecmp((string) $reservation->internal_room_name, 'Whole Venue') === 0
-                || strcasecmp((string) $reservation->table_number, 'WHOLE') === 0)
-                || ($allocationMode === 'whole_booking' && $blockingReservations->isNotEmpty());
+                || (empty($reservation->table_number) && empty($reservation->assigned_room_id))
+            ) || ($allocationMode === 'whole_booking' && $blockingReservations->isNotEmpty());
 
             if ($validChildren->isEmpty() || $hasWholeBooking) {
                 return [
@@ -369,17 +375,14 @@ class SeatMapController extends Controller
             ];
         }
 
-        $hasStandaloneBlock = $blockingReservations->contains(function (Reservation $reservation) {
+        $hasWholeVenueBlock = $blockingReservations->contains(function (Reservation $reservation) {
             $tableNumber = strtoupper(trim((string) $reservation->table_number));
-
-            return $reservation->type === 'whole'
-                || (bool) $reservation->is_standalone
-                || in_array($tableNumber, ['GENERAL', 'STANDALONE', 'WHOLE'], true);
+            return in_array($tableNumber, ['GENERAL', 'WHOLE'], true) || empty($reservation->table_number);
         });
 
         $isBlocked = !$hasSeatLayout
             ? $blockingReservations->isNotEmpty()
-            : $hasStandaloneBlock;
+            : $hasWholeVenueBlock;
 
         return [
             'available' => !$isBlocked,
@@ -437,12 +440,13 @@ class SeatMapController extends Controller
         return substr($raw, 0, 5);
     }
 
-    private function reservationForSeat($reservations, ?string $tableNumber, ?string $seatNumber): ?Reservation
+    private function reservationForSeat($reservations, ?string $tableNumber, ?string $seatId, $seatNum = null): ?Reservation
     {
         $table = trim((string) $tableNumber);
-        $seat = trim((string) $seatNumber);
+        $seatIdStr = trim((string) $seatId);
+        $seatNumStr = $seatNum !== null ? trim((string) $seatNum) : '';
 
-        return $reservations->first(function (Reservation $reservation) use ($table, $seat) {
+        return $reservations->first(function (Reservation $reservation) use ($table, $seatIdStr, $seatNumStr) {
             $resTable = trim((string) $reservation->table_number);
 
             if (strcasecmp($resTable, $table) !== 0) {
@@ -455,7 +459,8 @@ class SeatMapController extends Controller
 
             $reservedSeats = array_map('trim', explode(',', (string) $reservation->seat_number));
 
-            return in_array($seat, $reservedSeats, true);
+            return in_array($seatIdStr, $reservedSeats, true)
+                || ($seatNumStr !== '' && in_array($seatNumStr, $reservedSeats, true));
         });
     }
 

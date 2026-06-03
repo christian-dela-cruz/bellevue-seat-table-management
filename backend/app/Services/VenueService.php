@@ -203,7 +203,11 @@ class VenueService
                     $reasons[] = 'Guest capacity exceeds available subroom size.';
                 } else {
                     $allocationMode = $venue->metadata['allocation_mode'] ?? 'admin_assign';
-                    $hasWholeBooking = $slotBookings->contains(fn ($res) => $res->type === 'whole') || ($allocationMode === 'whole_booking' && $slotBookings->isNotEmpty());
+                    $hasWholeBooking = $slotBookings->contains(fn ($res) => 
+                        in_array(strtoupper(trim((string) $res->table_number)), ['GENERAL', 'WHOLE'], true)
+                        || strcasecmp((string) $res->internal_room_name, 'Whole Venue') === 0
+                        || (empty($res->table_number) && empty($res->assigned_room_id))
+                    ) || ($allocationMode === 'whole_booking' && $slotBookings->isNotEmpty());
                     
                     if ($hasWholeBooking) {
                         $reasons[] = $venue->display_name . ' is fully booked (whole venue reservation).';
@@ -853,8 +857,11 @@ class VenueService
             ->filter(fn (Reservation $reservation) => $this->normalizeTimeValue($reservation->event_time) === $requestedTime)
             ->values();
 
-        $hasWholeBooking = $bookings->contains(fn ($res) => $res->type === 'whole')
-            || ($parentVenue->metadata['allocation_mode'] ?? 'admin_assign') === 'whole_booking' && $bookings->isNotEmpty();
+        $hasWholeBooking = $bookings->contains(fn ($res) => 
+            in_array(strtoupper(trim((string) $res->table_number)), ['GENERAL', 'WHOLE'], true)
+            || strcasecmp((string) $res->internal_room_name, 'Whole Venue') === 0
+            || (empty($res->table_number) && empty($res->assigned_room_id))
+        ) || ($parentVenue->metadata['allocation_mode'] ?? 'admin_assign') === 'whole_booking' && $bookings->isNotEmpty();
 
         if ($hasWholeBooking) {
             return [];
