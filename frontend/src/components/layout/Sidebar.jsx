@@ -13,6 +13,8 @@ import {
   ChevronUp,
   ChevronDown,
   Building2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { authAPI } from "../../services/authAPI";
 
@@ -64,48 +66,50 @@ const NAV_ROUTES = {
   "seat-map": "/admin/seatmap",
 };
 
-function HamburgerBtn({ onClick, isOpen }) {
+function SidebarCollapseBtn({ onClick, isOpen }) {
   const [hovered, setHovered] = useState(false);
+  const Icon = isOpen ? ChevronLeft : ChevronRight;
   return (
     <button
+      type="button"
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title={isOpen ? "Collapse sidebar" : "Expand sidebar"}
       style={{
-        width: 34,
-        height: 34,
-        background: hovered ? "rgba(140,107,42,0.08)" : "transparent",
-        border: "1px solid rgba(140,107,42,0.10)",
+        position: "absolute",
+        top: 44, // Align exactly on the header divider border line
+        right: -12, // Float exactly over the border (half of button width)
+        transform: "translateY(-50%)",
+        width: 24,
+        height: 24,
+        borderRadius: "50%",
+        background: "#FFFFFF",
+        border: "1px solid rgba(140,107,42,0.18)",
+        padding: 0,
+        boxSizing: "border-box",
+        flexShrink: 0,
+        boxShadow: hovered 
+          ? "0 4px 10px rgba(140,107,42,0.16)" 
+          : "0 2px 6px rgba(0,0,0,0.05)",
         cursor: "pointer",
         display: "flex",
-        flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
-        gap: 5,
-        padding: 6,
-        borderRadius: 9,
+        zIndex: 50,
         transition: "background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s",
-        flexShrink: 0,
-        boxShadow: "none",
-        transform: hovered ? "translateY(-1px)" : "none",
         outline: "none",
       }}
     >
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          style={{
-            display: "block",
-            width: i === 1 && isOpen ? 12 : 18,
-            height: 2,
-            background: "#8C6B2A",
-            borderRadius: 2,
-            transition: "width 0.2s",
-            marginLeft: i === 1 && isOpen ? "auto" : 0,
-          }}
-        />
-      ))}
+      <Icon 
+        size={12} 
+        color="#8C6B2A" 
+        strokeWidth={2.5} 
+        style={{
+          transition: "transform 0.2s ease",
+          transform: hovered ? (isOpen ? "translateX(-1px)" : "translateX(1px)") : "none"
+        }}
+      />
     </button>
   );
 }
@@ -479,7 +483,7 @@ export default function Sidebar({
         flexDirection: "column",
         flexShrink: 0,
         transition: "width 0.26s cubic-bezier(.2,.8,.2,1)",
-        overflow: "hidden",
+        overflow: "visible",
         boxShadow: "4px 0 18px rgba(55,39,17,0.026)",
         position: "relative",
         zIndex: 5,
@@ -503,6 +507,9 @@ export default function Sidebar({
         }
       `}</style>
 
+      {/* Floating Collapse/Expand Arrow Toggle */}
+      <SidebarCollapseBtn isOpen={effectiveOpen} onClick={togglePinnedOpen} />
+
       <div
         style={{
           display: "flex",
@@ -511,9 +518,10 @@ export default function Sidebar({
           padding: effectiveOpen ? "16px 12px 15px 18px" : "16px 0",
           borderBottom: "1px solid rgba(140,107,42,0.09)",
           flexShrink: 0,
+          overflow: "hidden",
         }}
       >
-        {effectiveOpen && (
+        {effectiveOpen ? (
           <div
             style={{
               fontFamily: F.body,
@@ -538,8 +546,11 @@ export default function Sidebar({
               ADMIN PANEL
             </span>
           </div>
+        ) : (
+          <span style={{ color: "#8C6B2A", fontSize: 10, fontWeight: 800, fontFamily: F.body, letterSpacing: 0.5 }}>
+            AP
+          </span>
         )}
-        <HamburgerBtn isOpen={effectiveOpen} onClick={togglePinnedOpen} />
       </div>
 
       <div
@@ -550,6 +561,7 @@ export default function Sidebar({
           flex: "1 1 auto",
           minHeight: 0,
           overflowY: "auto",
+          overflowX: "hidden",
         }}
       >
         {effectiveOpen && (

@@ -1251,15 +1251,114 @@ export default function Reports() {
   const summary = report.summary || {};
   const category = report.category_breakdown || {};
   const statuses = report.status_breakdown || {};
+  const reservedCount = (statuses.reserved || 0) + (statuses.approved || 0);
+  const totalReservations = summary.reservations || 0;
+
+  const isFiltered = selectedOutlet !== "ALL";
+
+  const filteredSummary = useMemo(() => {
+    if (!isFiltered) {
+      return {
+        reservations: summary.reservations || 0,
+        guests: summary.guests || 0,
+        reserved: reservedCount,
+        pending: statuses.pending || 0,
+        rejected: statuses.rejected || 0,
+        cancelled: statuses.cancelled || 0,
+      };
+    }
+
+    let reservations = 0;
+    let guests = 0;
+    let reserved = 0;
+    let pending = 0;
+    let rejected = 0;
+    let cancelled = 0;
+
+    filteredOutlets.forEach((out) => {
+      reservations += Number(out.total_reservations || 0);
+      guests += Number(out.guests || 0);
+      reserved += Number(out.reserved || 0);
+      pending += Number(out.pending || 0);
+      rejected += Number(out.rejected || 0);
+      cancelled += Number(out.cancelled || 0);
+    });
+
+    return {
+      reservations,
+      guests,
+      reserved,
+      pending,
+      rejected,
+      cancelled,
+    };
+  }, [isFiltered, summary, filteredOutlets, reservedCount, statuses]);
+
+  const filteredCategory = useMemo(() => {
+    if (!isFiltered) {
+      return {
+        dine_in: {
+          reservations: category.dine_in?.reservations || 0,
+          guests: category.dine_in?.guests || 0,
+        },
+        room_reservations: {
+          reservations: category.room_reservations?.reservations || 0,
+          guests: category.room_reservations?.guests || 0,
+        },
+        promotion_mentions: {
+          reservations: category.promotion_mentions?.reservations || 0,
+        },
+      };
+    }
+
+    let dineInCount = 0;
+    let dineInGuests = 0;
+    let roomCount = 0;
+    let roomGuests = 0;
+    let promoCount = 0;
+
+    filteredOutlets.forEach((out) => {
+      const isDining = outletGroup(out) === "dining";
+      dineInCount += Number(out.dine_in || 0);
+      promoCount += Number(out.promotion_mentions || 0);
+      if (isDining) {
+        dineInGuests += Number(out.guests || 0);
+        roomCount += Math.max(0, Number(out.total_reservations || 0) - Number(out.dine_in || 0));
+      } else {
+        roomCount += Number(out.total_reservations || 0);
+        roomGuests += Number(out.guests || 0);
+      }
+    });
+
+    return {
+      dine_in: {
+        reservations: dineInCount,
+        guests: dineInGuests,
+      },
+      room_reservations: {
+        reservations: roomCount,
+        guests: roomGuests,
+      },
+      promotion_mentions: {
+        reservations: promoCount,
+      },
+    };
+  }, [isFiltered, category, filteredOutlets]);
+
   const roomDetails = useMemo(() => {
     const baseRooms = (report.room_details || []).filter((row) => canAccessOutlet(currentUser, row.room, outletGroups));
-    const searchFiltered = !roomSearchQuery.trim()
+    const children = selectedOutlet !== "ALL" ? resolveOutletChildren(selectedOutlet, venueRows) : [];
+    const childrenSet = new Set([selectedOutlet, ...children].map(canonicalOutletName));
+    const outletFiltered = selectedOutlet === "ALL"
       ? baseRooms
-      : baseRooms.filter((row) =>
+      : baseRooms.filter((row) => childrenSet.has(canonicalOutletName(row.room)));
+    const searchFiltered = !roomSearchQuery.trim()
+      ? outletFiltered
+      : outletFiltered.filter((row) =>
         String(row.room).toLowerCase().includes(roomSearchQuery.toLowerCase())
       );
     return sortRows(searchFiltered, roomSort);
-  }, [currentUser, outletGroups, report.room_details, roomSort, roomSearchQuery]);
+  }, [currentUser, outletGroups, report.room_details, roomSort, roomSearchQuery, selectedOutlet, venueRows]);
 
   const totalRoomPages = Math.max(1, Math.ceil(roomDetails.length / roomRowsPerPage));
   const visibleRoomRows = useMemo(() => {
@@ -1506,8 +1605,6 @@ export default function Reports() {
     ? "Monthly Performance focuses on one selected month. Use Daily or Weekly to change the activity grouping."
     : "Yearly reports use Jan-Dec to show annual seasonality and peak business periods.";
   const trendFilterBadge = activeTab === "monthly" ? "Month" : "Year";
-  const reservedCount = (statuses.reserved || 0) + (statuses.approved || 0);
-  const totalReservations = summary.reservations || 0;
   const compileCsvData = () => {
     if (csvExportType === "raw") {
       // Flat spreadsheet of reservations matching date/outlet filters (Excel BI style)
@@ -1907,9 +2004,9 @@ export default function Reports() {
                       <div className="print-overview">
                         <Section title="Overview" subtitle="High-level submission activity for the selected date range.">
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
-                            <MetricCard label="Reservations" value={summary.reservations || 0} tone="blue" />
-                            <MetricCard label="Guests" value={summary.guests || 0} tone="green" />
-                            <MetricCard label="Outlets" value={summary.outlets || 0} tone="gold" />
+                            <MetricCard label="Reservations" value={filteredSummary.reservations || 0} tone="blue" />
+                            <MetricCard label="Guests" value={filteredSummary.guests || 0} tone="green" />
+                            <MetricCard label="Outlets" value={selectedOutlet === "ALL" ? (summary.outlets || 0) : filteredOutlets.length} tone="gold" />
                             <MetricCard label="Transactions" value={transactionSummary.transactions || 0} detail={canViewTransactions ? "read-only" : ""} tone="slate" />
                           </div>
                         </Section>
@@ -1917,19 +2014,18 @@ export default function Reports() {
 
                       <div className="reports-grid print-mix" style={{ display: "grid", gridTemplateColumns: "minmax(280px,1.05fr) minmax(280px,0.95fr)", gap: 14 }}>
                         <SummaryPanel title="Reservation Status">
-                          <div style={{ display: "grid", gap: 12 }}>
-                            <ProgressRow label="Reserved" value={reservedCount} total={totalReservations} tone="green" />
-                            <ProgressRow label="Pending" value={statuses.pending || 0} total={totalReservations} tone="gold" />
-                            <ProgressRow label="Rejected" value={statuses.rejected || 0} total={totalReservations} tone="red" />
-                            <ProgressRow label="Cancelled" value={statuses.cancelled || 0} total={totalReservations} tone="slate" />
-                          </div>
+                          <DonutChart counts={{ ...filteredSummary, declined: filteredSummary.rejected }} total={filteredSummary.reservations} />
                         </SummaryPanel>
 
                         <SummaryPanel title="Reservation Mix">
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10 }}>
-                            <MetricCard label="Dine-In" value={category.dine_in?.reservations || 0} detail={`${category.dine_in?.guests || 0} guests`} tone="green" />
-                            <MetricCard label="Rooms" value={category.room_reservations?.reservations || 0} detail={`${category.room_reservations?.guests || 0} guests`} tone="gold" />
-                            <MetricCard label="Promo" value={category.promotion_mentions?.reservations || 0} detail="mentions" tone="blue" />
+                          <div style={{ display: "grid", gap: 12, padding: "8px 16px" }}>
+                            <ProgressRow label="Dine-In Outlets" value={filteredCategory.dine_in?.reservations || 0} total={filteredSummary.reservations} tone="green" />
+                            <ProgressRow label="Room Service / Tables" value={filteredCategory.room_reservations?.reservations || 0} total={filteredSummary.reservations} tone="gold" />
+                            <ProgressRow label="Promotion Mentions" value={filteredCategory.promotion_mentions?.reservations || 0} total={filteredSummary.reservations} tone="blue" />
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8, borderTop: `1px solid ${C.divider}`, paddingTop: 10 }}>
+                              <div style={{ fontSize: 11, color: C.muted }}>Dine-In: <strong style={{ color: C.text }}>{filteredCategory.dine_in?.guests || 0}</strong> guests</div>
+                              <div style={{ fontSize: 11, color: C.muted }}>Rooms: <strong style={{ color: C.text }}>{filteredCategory.room_reservations?.guests || 0}</strong> guests</div>
+                            </div>
                           </div>
                         </SummaryPanel>
                       </div>
@@ -2362,7 +2458,9 @@ export default function Reports() {
                   <div style={{ borderBottom: `2px solid ${C.gold}`, paddingBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexShrink: 0 }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 800, color: C.text, letterSpacing: "0.06em", textTransform: "uppercase" }}>The Bellevue Manila</div>
-                      <div style={{ fontSize: 9.5, color: C.muted, marginTop: 2 }}>Performance & Operational Report summary</div>
+                      <div style={{ fontSize: 9.5, color: C.muted, marginTop: 2 }}>
+                        Performance & Operational Report summary{selectedOutlet !== "ALL" && ` · Filtered by: ${selectedOutlet}`}
+                      </div>
                     </div>
                     <div style={{ fontSize: 9.5, color: C.gold, fontWeight: 700 }}>{dateRangeLabel}</div>
                   </div>
@@ -2375,9 +2473,9 @@ export default function Reports() {
                         <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>Overview Metrics</div>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
                           {[
-                            ["Reservations", summary.reservations || 0],
-                            ["Guests", summary.guests || 0],
-                            ["Outlets", summary.outlets || 0],
+                            ["Reservations", filteredSummary.reservations || 0],
+                            ["Guests", filteredSummary.guests || 0],
+                            ["Outlets", selectedOutlet === "ALL" ? (summary.outlets || 0) : filteredOutlets.length],
                             ["Transactions", transactionSummary.transactions || 0],
                           ].map(([lbl, val]) => (
                             <div key={lbl} style={{ background: C.surface, padding: 6, borderRadius: 6, border: `1px solid ${C.divider}` }}>
@@ -2395,12 +2493,12 @@ export default function Reports() {
                         <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Reservation status distribution</div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                           <div style={{ display: "grid", gap: 4 }}>
-                            <ProgressRow label="Reserved" value={reservedCount} total={totalReservations} tone="green" />
-                            <ProgressRow label="Pending" value={statuses.pending || 0} total={totalReservations} tone="gold" />
+                            <ProgressRow label="Reserved" value={filteredSummary.reserved} total={filteredSummary.reservations} tone="green" />
+                            <ProgressRow label="Pending" value={filteredSummary.pending} total={filteredSummary.reservations} tone="gold" />
                           </div>
                           <div style={{ display: "grid", gap: 4 }}>
-                            <ProgressRow label="Rejected" value={statuses.rejected || 0} total={totalReservations} tone="red" />
-                            <ProgressRow label="Cancelled" value={statuses.cancelled || 0} total={totalReservations} tone="slate" />
+                            <ProgressRow label="Rejected" value={filteredSummary.rejected} total={filteredSummary.reservations} tone="red" />
+                            <ProgressRow label="Cancelled" value={filteredSummary.cancelled} total={filteredSummary.reservations} tone="slate" />
                           </div>
                         </div>
                       </div>
@@ -2985,7 +3083,7 @@ export default function Reports() {
           <div>
             <div className="print-title">THE BELLEVUE MANILA</div>
             <div style={{ fontSize: "10pt", color: C.muted, marginTop: 4 }}>
-              Executive Performance & Operational Report · Scoped by {currentUser?.name || currentUser?.email || "Administrator"}
+              Executive Performance & Operational Report · Scoped by {currentUser?.name || currentUser?.email || "Administrator"}{selectedOutlet !== "ALL" && ` · Filtered by: ${selectedOutlet}`}
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
@@ -3001,15 +3099,15 @@ export default function Reports() {
             <div className="print-grid">
               <div className="print-card">
                 <div className="print-card-label">Total Reservations</div>
-                <div className="print-card-value">{summary.reservations || 0}</div>
+                <div className="print-card-value">{filteredSummary.reservations || 0}</div>
               </div>
               <div className="print-card">
                 <div className="print-card-label">Total Guests</div>
-                <div className="print-card-value">{summary.guests || 0}</div>
+                <div className="print-card-value">{filteredSummary.guests || 0}</div>
               </div>
               <div className="print-card">
                 <div className="print-card-label">Active Outlets</div>
-                <div className="print-card-value">{summary.outlets || 0}</div>
+                <div className="print-card-value">{selectedOutlet === "ALL" ? (summary.outlets || 0) : filteredOutlets.length}</div>
               </div>
               <div className="print-card">
                 <div className="print-card-label">Audit Logs Tracked</div>
@@ -3037,23 +3135,23 @@ export default function Reports() {
                   <tbody>
                     <tr>
                       <td className="strong">Reserved / Approved</td>
-                      <td>{reservedCount}</td>
-                      <td>{totalReservations ? Math.round((reservedCount / totalReservations) * 100) : 0}%</td>
+                      <td>{filteredSummary.reserved}</td>
+                      <td>{filteredSummary.reservations ? Math.round((filteredSummary.reserved / filteredSummary.reservations) * 100) : 0}%</td>
                     </tr>
                     <tr>
                       <td className="strong">Pending Coordination</td>
-                      <td>{statuses.pending || 0}</td>
-                      <td>{totalReservations ? Math.round(((statuses.pending || 0) / totalReservations) * 100) : 0}%</td>
+                      <td>{filteredSummary.pending}</td>
+                      <td>{filteredSummary.reservations ? Math.round((filteredSummary.pending / filteredSummary.reservations) * 100) : 0}%</td>
                     </tr>
                     <tr>
                       <td className="strong">Rejected / Declined</td>
-                      <td>{statuses.rejected || 0}</td>
-                      <td>{totalReservations ? Math.round(((statuses.rejected || 0) / totalReservations) * 100) : 0}%</td>
+                      <td>{filteredSummary.rejected}</td>
+                      <td>{filteredSummary.reservations ? Math.round((filteredSummary.rejected / filteredSummary.reservations) * 100) : 0}%</td>
                     </tr>
                     <tr>
                       <td className="strong">Cancelled By User</td>
-                      <td>{statuses.cancelled || 0}</td>
-                      <td>{totalReservations ? Math.round(((statuses.cancelled || 0) / totalReservations) * 100) : 0}%</td>
+                      <td>{filteredSummary.cancelled}</td>
+                      <td>{filteredSummary.reservations ? Math.round((filteredSummary.cancelled / filteredSummary.reservations) * 100) : 0}%</td>
                     </tr>
                   </tbody>
                 </table>
@@ -3071,17 +3169,17 @@ export default function Reports() {
                   <tbody>
                     <tr>
                       <td className="strong">Dine-In Outlets</td>
-                      <td>{category.dine_in?.reservations || 0}</td>
-                      <td>{category.dine_in?.guests || 0} guests</td>
+                      <td>{filteredCategory.dine_in?.reservations || 0}</td>
+                      <td>{filteredCategory.dine_in?.guests || 0} guests</td>
                     </tr>
                     <tr>
                       <td className="strong">Room Service / Tables</td>
-                      <td>{category.room_reservations?.reservations || 0}</td>
-                      <td>{category.room_reservations?.guests || 0} guests</td>
+                      <td>{filteredCategory.room_reservations?.reservations || 0}</td>
+                      <td>{filteredCategory.room_reservations?.guests || 0} guests</td>
                     </tr>
                     <tr>
                       <td className="strong">Promotions Mentioned</td>
-                      <td>{category.promotion_mentions?.reservations || 0}</td>
+                      <td>{filteredCategory.promotion_mentions?.reservations || 0}</td>
                       <td>-</td>
                     </tr>
                   </tbody>
