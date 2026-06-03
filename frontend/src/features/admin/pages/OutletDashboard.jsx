@@ -107,6 +107,7 @@ function readableMonth(monthIndex) {
 }
 
 function periodLabel(row, period) {
+  if (row.label) return row.label;
   return period === "yearly" ? row.label : readableDate(row.date);
 }
 
@@ -613,17 +614,40 @@ function OutletChartTooltip({ active, payload, label }) {
 }
 
 function LineChart({ rows, period = "monthly" }) {
+  const crossesYears = useMemo(() => {
+    if (!rows || rows.length < 2) return false;
+    const years = new Set();
+    rows.forEach((r) => {
+      if (r.date) {
+        const year = String(r.date).split("-")[0];
+        if (year) years.add(year);
+      }
+    });
+    return years.size > 1;
+  }, [rows]);
+
   const data = (rows || []).map((row) => ({
     ...row,
     label: periodLabel(row, period),
     reservations: Number(row.count || 0),
   }));
-  const labelInterval = data.length > 16 ? Math.ceil(data.length / 8) - 1 : 0;
+
+  const labelInterval = useMemo(() => {
+    if (period === "yearly") return 0;
+    const len = data.length;
+    if (len <= 14) {
+      return "preserveStartEnd";
+    } else if (len <= 30) {
+      return 2;
+    } else {
+      return 4;
+    }
+  }, [data.length, period]);
 
   return (
     <div style={{ width: "100%", minHeight: 260, borderRadius: 14, background: "linear-gradient(135deg,#FFFFFF 0%,#FAF8F4 58%,#F1ECE1 100%)", border: `1px solid ${C.divider}`, padding: "16px 12px 8px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)" }}>
       <ResponsiveContainer width="100%" height={235}>
-        <ComposedChart data={data} margin={{ top: 12, right: 26, bottom: 8, left: -8 }}>
+        <ComposedChart data={data} margin={{ top: 12, right: 26, bottom: 20, left: -8 }}>
           <defs>
             <linearGradient id="outletReservationFill" x1="0" x2="0" y1="0" y2="1">
               <stop offset="0%" stopColor={C.blue} stopOpacity="0.22" />
@@ -638,10 +662,20 @@ function LineChart({ rows, period = "monthly" }) {
           <XAxis
             dataKey="label"
             interval={labelInterval}
-            tick={{ fill: C.muted, fontSize: 11 }}
+            tickFormatter={(value) => {
+              if (period === "yearly") return value;
+              if (typeof value === "string") {
+                if (!crossesYears) {
+                  return value.replace(/, \d{4}$/, "").replace(/, \d{4}(?=\s*-)/, "");
+                }
+              }
+              return value;
+            }}
+            tick={{ fill: C.muted, fontSize: 10 }}
+            height={30}
             axisLine={false}
             tickLine={false}
-            minTickGap={12}
+            minTickGap={50}
             padding={{ left: 12, right: 16 }}
           />
           <YAxis
@@ -1052,15 +1086,77 @@ function OutletDashboard() {
         };
       });
     }
-    const days = [];
-    const cursor = new Date(`${startDate}T00:00:00`);
+
+    const start = new Date(`${startDate}T00:00:00`);
     const end = new Date(`${endDate}T00:00:00`);
-    while (!Number.isNaN(cursor.getTime()) && !Number.isNaN(end.getTime()) && cursor <= end && days.length < 45) {
-      const key = cursor.toISOString().slice(0, 10);
-      days.push({ date: key, count: outletReservations.filter((reservation) => reservation.event_date === key).length });
-      cursor.setDate(cursor.getDate() + 1);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return [{ date: today(), count: total }];
     }
-    return days.length ? days : [{ date: today(), count: total }];
+
+    const diffTime = Math.abs(end - start);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    if (diffDays <= 45) {
+      // 1. Daily grouping
+      const days = [];
+      const cursor = new Date(start);
+      while (cursor <= end) {
+        const key = cursor.toISOString().slice(0, 10);
+        days.push({
+          date: key,
+          label: readableDate(key),
+          count: outletReservations.filter((r) => r.event_date === key).length,
+        });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return days.length ? days : [{ date: today(), count: total }];
+    } else if (diffDays <= 180) {
+      // 2. Weekly grouping
+      const weeks = [];
+      const cursor = new Date(start);
+      while (cursor <= end) {
+        const weekStart = new Date(cursor);
+        const weekEnd = new Date(cursor);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        if (weekEnd > end) {
+          weekEnd.setTime(end.getTime());
+        }
+        const key = weekStart.toISOString().slice(0, 10);
+        const keyEnd = weekEnd.toISOString().slice(0, 10);
+
+        const startLabel = weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        const endLabel = weekEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        const crossesYears = weekStart.getFullYear() !== weekEnd.getFullYear() || weekStart.getFullYear() !== new Date().getFullYear();
+        const yearStr = crossesYears ? `, ${weekStart.getFullYear()}` : "";
+
+        weeks.push({
+          date: key,
+          label: `${startLabel} - ${endLabel}${yearStr}`,
+          count: outletReservations.filter((r) => r.event_date >= key && r.event_date <= keyEnd).length,
+        });
+        cursor.setDate(cursor.getDate() + 7);
+      }
+      return weeks;
+    } else {
+      // 3. Monthly grouping
+      const months = [];
+      const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+      const finalEnd = new Date(end.getFullYear(), end.getMonth(), 1);
+      while (cursor <= finalEnd) {
+        const year = cursor.getFullYear();
+        const month = cursor.getMonth();
+        const key = `${year}-${String(month + 1).padStart(2, "0")}`;
+        const label = cursor.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+
+        months.push({
+          date: `${key}-01`,
+          label,
+          count: outletReservations.filter((r) => String(r.event_date || "").startsWith(key)).length,
+        });
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+      return months;
+    }
   }, [analyticsPeriod, baseOutletReservations, endDate, outletReservations, selectedOutlet?.name, startDate, statusFilter, total, typeFilter]);
 
   const typeRows = useMemo(() => {
