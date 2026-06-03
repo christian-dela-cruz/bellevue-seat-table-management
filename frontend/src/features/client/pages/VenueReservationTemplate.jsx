@@ -678,7 +678,7 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
   ];
 
   const SummaryRow = ({ label, value, accent }) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, padding: "10px 0", borderBottom: `1px solid ${C.divider}` }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, padding: "7px 0", borderBottom: `1px solid ${C.divider}` }}>
       <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: C.textTertiary }}>{label}</span>
       <span style={{ fontFamily: F.body, fontSize: 12.5, color: accent ? C.gold : C.textPrimary, fontWeight: accent ? 700 : 500, textAlign: "right", lineHeight: 1.45, maxWidth: 170, overflowWrap: "anywhere" }}>{value}</span>
     </div>
@@ -710,12 +710,12 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
           <Field label="Special Requests (Optional)" value={form.specialRequests} onChange={set("specialRequests")} type="textarea" rows={3} C={C} isDark={isDark} placeholder="Optional requests, preferences, dietary restrictions, or notes for the reservation." />
         </div>
 
-        <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "24px 22px 28px", overflowY: "auto", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-          <div style={{ display: "grid", gap: 18 }}>
+        <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "20px 20px 20px", overflowY: "auto" }}>
+          <div style={{ display: "grid", gap: 12 }}>
 
             {/* Elegant Seat Hold Timer Card */}
             <div style={{
-              padding: "14px 16px",
+              padding: "10px 14px",
               borderRadius: 12,
               background: isUrgent ? C.redFaint : C.surfaceInput,
               border: `1.5px solid ${isUrgent ? C.red : C.borderAccent}`,
@@ -740,7 +740,7 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
               disabled={!allFilled}
               style={{
                 width: "100%",
-                padding: "13px",
+                padding: "11px",
                 background: allFilled ? C.gold : C.btnDisabledBg,
                 border: "none",
                 borderRadius: 8,
@@ -757,7 +757,7 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
               onMouseLeave={e => { if (allFilled) e.currentTarget.style.background = C.gold; }}
             >Review Booking</button>
 
-            <GhostBtn onClick={onCancel} C={C}>Back to Seats</GhostBtn>
+            <GhostBtn onClick={onCancel} C={C} style={{ padding: "10px" }}>Back to Seats</GhostBtn>
           </div>
         </aside>
       </div>
@@ -825,9 +825,9 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
           </div>
         </div>
 
-        <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "24px 22px 28px", overflowY: "auto", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-          <div style={{ display: "grid", gap: 16 }}>
-            <div style={{ padding: "14px", borderRadius: 12, background: C.surfaceInput, border: `1px solid ${C.borderAccent}`, boxShadow: `0 0 10px ${C.gold}08` }}>
+        <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "20px 20px 20px", overflowY: "auto" }}>
+          <div style={{ display: "grid", gap: 12 }}>
+            <div style={{ padding: "10px 14px", borderRadius: 12, background: C.surfaceInput, border: `1px solid ${C.borderAccent}`, boxShadow: `0 0 10px ${C.gold}08` }}>
               <div style={{ fontFamily: F.label, fontSize: 8.5, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, fontWeight: 800, marginBottom: 8 }}>Final Review</div>
               <div style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.6 }}>Your booking will be reviewed by our team after submission. You will receive updates through your contact details.</div>
             </div>
@@ -838,7 +838,7 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
               gridTemplateColumns: "20px minmax(0,1fr)",
               gap: 12,
               alignItems: "flex-start",
-              padding: "14px 16px",
+              padding: "10px 14px",
               borderRadius: 12,
               background: consentAccepted ? C.goldFaint : C.surfaceInput,
               border: `1.5px solid ${consentAccepted ? C.borderAccent : C.borderDefault}`,
@@ -865,7 +865,7 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
             <button onClick={onSubmit} disabled={!canSubmit}
               style={{
                 width: "100%",
-                padding: "13px",
+                padding: "11px",
                 border: "none",
                 borderRadius: 8,
                 background: canSubmit ? C.gold : C.btnDisabledBg,
@@ -887,7 +887,7 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
             >
               {submitting ? <><Spinner C={C} />Submitting...</> : isRebook ? "Confirm Rebook" : "Submit Booking"}
             </button>
-            <GhostBtn onClick={onEdit} disabled={submitting} C={C}>Edit Details</GhostBtn>
+            <GhostBtn onClick={onEdit} disabled={submitting} C={C} style={{ padding: "10px" }}>Edit Details</GhostBtn>
           </div>
         </aside>
       </div>
