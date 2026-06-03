@@ -1179,6 +1179,13 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
     holdStartedRef.current = false; setHoldSecondsLeft(24 * 60);
   }, []);
 
+  const handleCloseModal = useCallback(() => {
+    setModal(null);
+    setSelectedTable(null);
+    setSelectedSeat(null);
+    resetHoldTimer();
+  }, [resetHoldTimer]);
+
   useEffect(() => {
     if (modal !== "details" && modal !== "review") return;
     if (holdSecondsLeft <= 0) { setModal(null); resetHoldTimer(); return; }
@@ -1475,7 +1482,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   const getActiveTable = () => {
     const tables = getTables();
     if (selectedSeat && isStandaloneSelected()) return null;
-    if (mode === "whole") return selectedTable || tables[0] || null;
+    if (mode === "whole") return selectedTable || null;
     if (selectedTable) return selectedTable;
     if (selectedSeat && tables.length) {
       return tables.find(t => t.seats && t.seats.some(s => s.id === selectedSeat.id));
@@ -1504,7 +1511,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       return;
     }
     setSelectedTable(null);
-    setSelectedSeat(prev => (prev?.id === seat.id ? null : seat));
+    setSelectedSeat(seat);
   };
 
   const handleTableClick = (table) => {
@@ -1527,7 +1534,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       return;
     }
     setSelectedSeat(null);
-    setSelectedTable(prev => (prev?.id === table.id ? null : table));
+    setSelectedTable(table);
     if (mode === "whole") setModal("guestCount");
   };
 
@@ -2091,10 +2098,10 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
 
       {/* ── Booking Modals ── */}
       {modal === "guestCount" && (
-        <ModalGuestCount seatData={mode === "individual" ? selectedSeat : null} tableData={modalTableData} mode={mode} isStandalone={isStandalone} onContinue={handleGuestContinue} onCancel={() => setModal(null)} C={C} isDark={isDark} ROOM={ROOM} />
+        <ModalGuestCount seatData={mode === "individual" ? selectedSeat : null} tableData={modalTableData} mode={mode} isStandalone={isStandalone} onContinue={handleGuestContinue} onCancel={handleCloseModal} C={C} isDark={isDark} ROOM={ROOM} />
       )}
       {modal === "details" && (
-        <ModalDetails tableData={modalTableData} seatData={selectedSeat} mode={mode} guests={guests} isStandalone={isStandalone} onReview={handleReview} onCancel={() => { setModal(null); resetHoldTimer(); }} prefill={detailsPrefill} C={C} isDark={isDark} secondsLeft={holdSecondsLeft} onTimerExpired={() => { setModal(null); resetHoldTimer(); }} ROOM={ROOM} WING={WING} venueType={venue?.type} />
+        <ModalDetails tableData={modalTableData} seatData={selectedSeat} mode={mode} guests={guests} isStandalone={isStandalone} onReview={handleReview} onCancel={handleCloseModal} prefill={detailsPrefill} C={C} isDark={isDark} secondsLeft={holdSecondsLeft} onTimerExpired={handleCloseModal} ROOM={ROOM} WING={WING} venueType={venue?.type} />
       )}
       {modal === "review" && formData && (
         <ModalReview form={formData} guests={guests} mode={mode} tableData={modalTableData} seatData={selectedSeat} isStandalone={isStandalone} onSubmit={handleSubmit} onEdit={handleEditDetails} submitting={submitting} isRebook={!!rebookFrom} rebookFrom={rebookFrom} C={C} ROOM={ROOM} WING={WING} />
