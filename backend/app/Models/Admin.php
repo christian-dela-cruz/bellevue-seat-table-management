@@ -35,4 +35,9 @@ class Admin extends Model
         'outlet_scope' => 'array',
         'is_active' => 'boolean',
     ];
+
+    public function dbRole()
+    {
+        return $this->belongsTo(Role::class, 'role', 'slug');
+    }
 }

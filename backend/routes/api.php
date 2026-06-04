@@ -43,6 +43,14 @@ Route::prefix('admin/accounts')->group(function () {
     Route::patch('/{admin}/reactivate', [AdminAccountController::class, 'reactivate'])->middleware(AdminAccess::class . ':manage_accounts');
 });
 
+Route::prefix('admin/roles')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Admin\RoleController::class, 'index'])->middleware(AdminAccess::class . ':manage_accounts');
+    Route::get('/permissions', [\App\Http\Controllers\Admin\RoleController::class, 'permissions'])->middleware(AdminAccess::class . ':manage_accounts');
+    Route::post('/', [\App\Http\Controllers\Admin\RoleController::class, 'store'])->middleware(AdminAccess::class . ':manage_accounts');
+    Route::put('/{id}', [\App\Http\Controllers\Admin\RoleController::class, 'update'])->middleware(AdminAccess::class . ':manage_accounts');
+    Route::delete('/{id}', [\App\Http\Controllers\Admin\RoleController::class, 'destroy'])->middleware(AdminAccess::class . ':manage_accounts');
+});
+
 Route::prefix('admin/reports')->group(function () {
     Route::get('/outlets', [AdminReportController::class, 'outletReports'])->middleware(AdminAccess::class . ':view_outlet_reports');
     Route::get('/transactions', [AdminReportController::class, 'transactionReports'])->middleware(AdminAccess::class . ':view_transactions');

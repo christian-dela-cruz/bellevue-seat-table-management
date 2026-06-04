@@ -18,6 +18,8 @@ import AdminNavbar from "../../../components/layout/AdminNavbar";
 import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
+import { roleAPI } from "../../../services/roleAPI";
+import { useEffect } from "react";
 
 const C = {
   pageBg: "#F7F4EE",
@@ -44,19 +46,6 @@ const F = {
   display: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
-const ROLE_LABELS = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  fb_director: "F&B Director",
-  outlet_manager: "Outlet Manager",
-  supervisor: "Supervisor",
-  manager: "Outlet Manager",
-  venue_manager: "Venue Manager",
-  staff: "Staff",
-  viewer: "Viewer",
-  view_only: "Viewer",
-};
-
 const DEFAULT_PREFERENCES = {
   reservationAlerts: true,
   cancellationAlerts: true,
@@ -75,8 +64,9 @@ function readStoredPreferences() {
   }
 }
 
-function formatRole(role) {
-  return ROLE_LABELS[role] || String(role || "Admin").replace(/_/g, " ");
+function formatRole(roleSlug, availableRoles) {
+  const roleObj = availableRoles?.find(r => r.slug === roleSlug);
+  return roleObj ? roleObj.name : String(roleSlug || "Admin").replace(/_/g, " ");
 }
 
 function getInitials(name) {
@@ -343,6 +333,13 @@ export default function AccountSettings() {
     next: false,
     confirm: false,
   });
+  const [availableRoles, setAvailableRoles] = useState([]);
+
+  useEffect(() => {
+    roleAPI.getAll()
+      .then(res => setAvailableRoles(res.data || []))
+      .catch(() => setAvailableRoles([]));
+  }, []);
 
   const [profile, setProfile] = useState({
     name: currentUser.name || "",
@@ -614,7 +611,7 @@ export default function AccountSettings() {
                   <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", fontSize: 12.5, color: C.muted }}>
                     <span>{currentUser.email || "No email on file"}</span>
                     <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.faint }} />
-                    <span>{formatRole(role)}</span>
+                    <span>{formatRole(role, availableRoles)}</span>
                     <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.faint }} />
                     <span>{scopedLabel}</span>
                   </div>
@@ -625,7 +622,7 @@ export default function AccountSettings() {
                   Active Session
                 </span>
                 <span style={{ padding: "6px 10px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                  {formatRole(role)}
+                  {formatRole(role, availableRoles)}
                 </span>
               </div>
             </section>
@@ -686,7 +683,7 @@ export default function AccountSettings() {
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                             <div>
                               <div style={{ fontSize: 15, fontWeight: 760, color: C.text, lineHeight: 1.25 }}>{displayName}</div>
-                              <div style={{ marginTop: 3, fontSize: 12.2, color: C.muted }}>{formatRole(role)}</div>
+                              <div style={{ marginTop: 3, fontSize: 12.2, color: C.muted }}>{formatRole(role, availableRoles)}</div>
                             </div>
                             {avatarDirty && (
                               <span style={{ padding: "5px 8px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" }}>
@@ -705,7 +702,7 @@ export default function AccountSettings() {
                               <input value={profile.username} onChange={(event) => setProfile((prev) => ({ ...prev, username: event.target.value }))} required style={inputStyle()} />
                             </Field>
                             <Field label="System Role" hint="Role changes are managed from Account Manager by authorized administrators.">
-                              <input value={formatRole(role)} disabled style={inputStyle({ background: C.surfaceSoft, color: C.muted })} />
+                              <input value={formatRole(role, availableRoles)} disabled style={inputStyle({ background: C.surfaceSoft, color: C.muted })} />
                             </Field>
                           </div>
 

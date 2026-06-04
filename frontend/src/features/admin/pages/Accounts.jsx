@@ -5,6 +5,7 @@ import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { venueAPI } from "../../../services/venueAPI";
+import { roleAPI } from "../../../services/roleAPI";
 
 const C = {
   pageBg: "#F7F4EE",
@@ -30,14 +31,14 @@ const F = {
   label: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
-const ROLE_LABELS = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  fb_director: "F&B Director",
-  outlet_manager: "Outlet Manager",
-  supervisor: "Supervisor",
-  venue_manager: "Venue Manager",
-  staff: "Staff",
+const DEFAULT_FORM = {
+  name: "",
+  email: "",
+  username: "",
+  password: "",
+  role: "", // Will be set to first available role dynamically
+  scope_type: "all",
+  outlet_scope: [],
 };
 
 const DEFAULT_FORM = {
@@ -196,18 +197,23 @@ function paginationButtonStyle(disabled = false) {
   };
 }
 
-function roleOptionsFor(currentRole) {
-  const roles = ["super_admin", "admin", "fb_director", "outlet_manager", "supervisor", "staff"];
-  if (currentRole === "super_admin") return roles;
-  if (currentRole === "admin") return ["fb_director", "outlet_manager", "supervisor", "staff"];
-  return [];
+function roleOptionsFor(currentUser, availableRoles) {
+  if (!currentUser || !availableRoles) return [];
+  // Admin can only assign roles with a lower level than themselves
+  const userLevel = currentUser.dbRole?.level || 0; // Assume 0 if unknown
+  return availableRoles.filter(r => r.level < userLevel).map(r => r.slug);
 }
 
-function canManageAccount(currentUser, account) {
+function canManageAccount(currentUser, account, availableRoles) {
   if (!currentUser || !account || currentUser.id === account.id) return false;
-  if (currentUser.role === "super_admin") return account.role !== "super_admin";
-  if (currentUser.role === "admin") return !["super_admin", "admin"].includes(account.role);
-  return false;
+  
+  const userLevel = currentUser.dbRole?.level || 0;
+  
+  // Find the target account's role level
+  const targetRole = availableRoles?.find(r => r.slug === account.role);
+  const targetLevel = targetRole ? targetRole.level : 100; // If unknown, assume high level to protect it
+  
+  return userLevel > targetLevel;
 }
 
 function roleRequiresAssignedScope(role) {
@@ -560,7 +566,7 @@ function ConfirmStatusModal({ account, loading, onCancel, onConfirm }) {
           </div>
           <div style={{ display:"grid",gridTemplateColumns:"120px 1fr",gap:8,fontSize:12 }}>
             <span style={{ fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.faint }}>Role</span>
-            <strong style={{ color:C.text }}>{ROLE_LABELS[account.role] || account.role}</strong>
+            <strong style={{ color:C.text }}>{getRoleName(account.role)}</strong>
             <span style={{ fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.faint }}>Username</span>
             <span style={{ color:C.muted,overflow:"hidden",textOverflow:"ellipsis" }}>{account.username}</span>
           </div>
@@ -597,6 +603,7 @@ export default function Accounts() {
   const [pageSize,setPageSize] = useState("5");
   const [page,setPage] = useState(1);
   const [statusTarget,setStatusTarget] = useState(null);
+  const [availableRoles, setAvailableRoles] = useState([]);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerClosing, setDrawerClosing] = useState(false);
@@ -606,11 +613,11 @@ export default function Accounts() {
   const drawerVisible = drawerOpen || drawerClosing;
   const hasUnsavedChanges = drawerVisible && JSON.stringify(form) !== initialFormSignature;
 
-  const assignableRoles = useMemo(() => roleOptionsFor(currentUser?.role), [currentUser?.role]);
+  const assignableRoles = useMemo(() => roleOptionsFor(currentUser, availableRoles), [currentUser, availableRoles]);
   const newAccountForm = useMemo(() => ({
     ...DEFAULT_FORM,
-    role: assignableRoles.includes("staff") ? "staff" : (assignableRoles[0] || "staff"),
-    scope_type: defaultScopeForRole(assignableRoles.includes("staff") ? "staff" : (assignableRoles[0] || "staff")),
+    role: assignableRoles.includes("staff") ? "staff" : (assignableRoles[0] || ""),
+    scope_type: defaultScopeForRole(assignableRoles.includes("staff") ? "staff" : (assignableRoles[0] || "")),
   }), [assignableRoles]);
   const visibleAccounts = useMemo(() => {
     const scopedAccounts = currentUser?.role === "super_admin"
@@ -623,6 +630,11 @@ export default function Accounts() {
     () => Array.from(new Set(visibleAccounts.map((account) => account.role).filter(Boolean))).sort(),
     [visibleAccounts]
   );
+  
+  const getRoleName = (slug) => {
+    const role = availableRoles.find(r => r.slug === slug);
+    return role ? role.name : slug;
+  };
   const filteredAccounts = useMemo(() => {
     const term = search.trim().toLowerCase();
 
@@ -681,12 +693,14 @@ export default function Accounts() {
     if (!canManage) return;
     setLoadingAccounts(true);
     try {
-      const [accountsRes, venuesRes] = await Promise.all([
+      const [accountsRes, venuesRes, rolesRes] = await Promise.all([
         authAPI.getAccounts(),
-        venueAPI.getAll({ include_archived: false, _t: Date.now() }).catch(() => [])
+        venueAPI.getAll({ include_archived: false, _t: Date.now() }).catch(() => []),
+        roleAPI.getAll().catch(() => ({ data: [] }))
       ]);
       setAccounts(accountsRes.data || []);
       setVenues(Array.isArray(venuesRes) ? venuesRes : []);
+      setAvailableRoles(rolesRes.data || []);
     } catch (error) {
       setToast({ type:"error", message:error.message || "Failed to load accounts." });
     } finally {
@@ -958,7 +972,7 @@ export default function Accounts() {
               >
                 <div style={{ display:"flex",flexWrap:"wrap",gap:7 }}>
                   {assignableRoles.length
-                    ? assignableRoles.map((role) => <RoleChip key={role}>{ROLE_LABELS[role]}</RoleChip>)
+                    ? assignableRoles.map((role) => <RoleChip key={role}>{getRoleName(role)}</RoleChip>)
                     : <span style={{ fontSize:12,color:C.muted }}>No assignable roles</span>}
                 </div>
               </SummaryCard>
@@ -1006,7 +1020,7 @@ export default function Accounts() {
                       <FilterControl label="Role">
                         <select value={roleFilter} onChange={(e)=>setRoleFilter(e.target.value)} style={{...inputStyle(),minHeight:36,padding:"7px 10px"}}>
                           <option value="all">All roles</option>
-                          {roleFilterOptions.map((role) => <option key={role} value={role}>{ROLE_LABELS[role] || role}</option>)}
+                          {roleFilterOptions.map((role) => <option key={role} value={role}>{getRoleName(role)}</option>)}
                         </select>
                       </FilterControl>
                       <FilterControl label="Status">
@@ -1050,7 +1064,7 @@ export default function Accounts() {
                             <div style={{ fontSize:11.5,color:C.muted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{account.username}</div>
                             <div style={{ fontSize:11.5,color:C.faint,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{account.email}</div>
                           </div>
-                          <span style={{ justifySelf:"start",padding:"4px 8px",borderRadius:999,background:C.goldFaint,color:C.gold,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",whiteSpace:"nowrap" }}>{ROLE_LABELS[account.role] || account.role}</span>
+                          <span style={{ justifySelf:"start",padding:"4px 8px",borderRadius:999,background:C.goldFaint,color:C.gold,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",whiteSpace:"nowrap" }}>{getRoleName(account.role)}</span>
                           <span style={{ fontSize:11.5,color:C.muted }}>{account.scope_type === "assigned" ? `${Array.isArray(account.outlet_scope) ? account.outlet_scope.length : 0} outlets` : "All"}</span>
                           <span style={{ justifySelf:"start",padding:"4px 8px",borderRadius:999,background:inactive ? C.redFaint : C.greenFaint,color:inactive ? C.red : C.green,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em" }}>{inactive ? "Inactive" : "Active"}</span>
                           <div style={{ display:"flex",alignItems:"center",gap:7,justifyContent:"flex-start" }}>
@@ -1166,7 +1180,7 @@ export default function Accounts() {
                           const role = e.target.value;
                           setForm({ ...form, role, scope_type: defaultScopeForRole(role), outlet_scope: defaultScopeForRole(role) === "all" ? [] : form.outlet_scope });
                         }} style={inputStyle()}>
-                          {assignableRoles.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
+                          {assignableRoles.map((role) => <option key={role} value={role}>{getRoleName(role)}</option>)}
                         </select>
                       </Field>
                       <Field label="Scope">

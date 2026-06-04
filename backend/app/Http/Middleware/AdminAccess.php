@@ -79,7 +79,17 @@ class AdminAccess
 
     public static function permissionsForRole(?string $role): array
     {
-        return self::ROLE_PERMISSIONS[self::normalizeRole($role)] ?? [];
+        $roleSlug = self::normalizeRole($role);
+
+        return Cache::remember("role_{$roleSlug}_permissions", now()->addHours(24), function () use ($roleSlug) {
+            $dbRole = \App\Models\Role::with('permissions')->where('slug', $roleSlug)->first();
+            
+            if ($dbRole) {
+                return $dbRole->permissions->pluck('slug')->toArray();
+            }
+
+            return self::ROLE_PERMISSIONS[$roleSlug] ?? [];
+        });
     }
 
     public function handle(Request $request, Closure $next, string $permission = 'view_admin'): Response

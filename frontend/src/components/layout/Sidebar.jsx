@@ -52,6 +52,7 @@ const NAV_GROUPS = [
     label: "Administration",
     items: [
       { id: "accounts", label: "Account Manager", icon: UserCog, iconStyle: "lucide", permission: "manage_accounts" },
+      { id: "roles", label: "Roles & Permissions", icon: Settings, iconStyle: "lucide", permission: "manage_accounts" },
     ],
   },
 ];
@@ -63,6 +64,7 @@ const NAV_ROUTES = {
   "function-rooms": "/admin/function-rooms",
   reports: "/admin/reports",
   accounts: "/admin/accounts",
+  roles: "/admin/roles",
   "seat-map": "/admin/seatmap",
 };
 

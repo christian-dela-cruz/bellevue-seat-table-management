@@ -6,6 +6,7 @@ import {
   Edit3,
   Eye,
   EyeOff,
+  GripVertical,
   Layers,
   MoreHorizontal,
   Plus,
@@ -21,6 +22,9 @@ import Sidebar from "../../../components/layout/Sidebar";
 import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import { authAPI } from "../../../services/authAPI";
 import { venueAPI } from "../../../services/venueAPI";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const C = {
   page: "#F7F4EE",
@@ -43,6 +47,26 @@ const F = {
   body: "'Inter','Helvetica Neue',Arial,sans-serif",
   label: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
+
+function SortableRow({ id, disabled, level, className, style, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled
+  });
+
+  const combinedStyle = {
+    ...style,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    ...(isDragging ? { position: 'relative', zIndex: 99, boxShadow: '0 5px 15px rgba(0,0,0,0.15)', opacity: 0.9, background: level ? "rgba(250,248,244,0.92)" : C.surface } : {}),
+  };
+
+  return (
+    <tr ref={setNodeRef} style={combinedStyle} className={className}>
+      {children(attributes, listeners, isDragging)}
+    </tr>
+  );
+}
 
 const emptyForm = {
   parent_id: "",
@@ -924,6 +948,63 @@ export default function FunctionRooms() {
   const canManage = authAPI.hasPermission("manage_venues");
   const drawerVisible = drawerOpen || drawerClosing;
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
+    if (!active || !over || active.id === over.id) return;
+
+    const oldIndex = groupedRows.findIndex((r) => String(r.room.id) === String(active.id));
+    const newIndex = groupedRows.findIndex((r) => String(r.room.id) === String(over.id));
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const activeItem = groupedRows[oldIndex].room;
+      const sortedRooms = [...rooms].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+      const rawOldIndex = sortedRooms.findIndex(r => String(r.id) === String(activeItem.id));
+      
+      let rawNewIndex = 0;
+      if (newIndex === 0) {
+        rawNewIndex = 0;
+      } else if (newIndex === groupedRows.length - 1) {
+        rawNewIndex = sortedRooms.length - 1;
+      } else {
+        const nextItem = groupedRows[newIndex < oldIndex ? newIndex : newIndex + 1].room;
+        rawNewIndex = sortedRooms.findIndex(r => String(r.id) === String(nextItem.id));
+        if (rawNewIndex > rawOldIndex) rawNewIndex--;
+      }
+      
+      if (rawOldIndex !== -1) {
+        const item = sortedRooms.splice(rawOldIndex, 1)[0];
+        sortedRooms.splice(rawNewIndex, 0, item);
+      }
+      
+      const updates = [];
+      const updatedRooms = rooms.map(r => {
+        const sortedIndex = sortedRooms.findIndex(sr => String(sr.id) === String(r.id));
+        if (sortedIndex !== -1) {
+          const expected = sortedIndex + 1; // Strict 1, 2, 3, 4...
+          if (r.display_order !== expected) {
+            updates.push({ id: r.id, display_order: expected });
+            return { ...r, display_order: expected };
+          }
+        }
+        return r;
+      });
+      
+      setRooms(updatedRooms);
+      try {
+        await Promise.all(updates.map(u => venueAPI.update(u.id, { display_order: u.display_order })));
+        loadRooms();
+      } catch(err) {
+        console.error("Failed to reindex orders", err);
+        loadRooms();
+      }
+    }
+  };
+
   const loadRooms = async () => {
     setLoading(true);
     try {
@@ -1755,125 +1836,156 @@ export default function FunctionRooms() {
             </div>
 
             <div className="function-room-table-wrap">
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1040, tableLayout: "fixed" }}>
-                <thead>
-                  <tr style={{ background: C.surface }}>
-                    {[
-                      { label: "Venue Structure", width: "42%", align: "left" },
-                      { label: "Status", width: "11%", align: "left" },
-                      { label: "Display Settings", width: "23%", align: "left" },
-                      { label: "Order", width: "8%", align: "center" },
-                      { label: "Manage", width: "16%", align: "right" },
-                    ].map((column) => (
-                      <th key={column.label} style={{ width: column.width, padding: "11px 14px", textAlign: column.align, color: C.faint, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", borderBottom: `1px solid ${C.divider}` }}>{column.label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={5} style={{ padding: 22, color: C.muted }}>Loading venues...</td></tr>
-                  ) : groupedRows.length === 0 ? (
-                    <tr><td colSpan={5} style={{ padding: 22, color: C.muted }}>No venues match the current filters.</td></tr>
-                  ) : groupedRows.map(({ room, level, childCount, parent }) => (
-                    <tr key={`${room.id}-${level}`} className="function-room-row" style={{ background: level ? "rgba(250,248,244,0.52)" : C.surface }}>
-                      <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: level ? 26 : 0 }}>
-                          {level ? (
-                            <span style={{ width: 14, color: C.faint, display: "inline-flex", justifyContent: "center" }}><ChevronRight size={14} /></span>
-                          ) : childCount ? (
-                            <button
-                              type="button"
-                              onClick={() => toggleParentExpanded(room.id)}
-                              aria-label={`${expandedParents.has(Number(room.id)) ? "Collapse" : "Expand"} ${room.display_name || room.name}`}
-                              style={{ width: 18, height: 18, border: "none", background: "transparent", color: C.gold, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transform: expandedParents.has(Number(room.id)) ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.18s ease" }}
-                            >
-                              <ChevronRight size={15} />
-                            </button>
-                          ) : <span style={{ width: 18 }} />}
-                          <div style={{ width: level ? 38 : 46, height: level ? 38 : 46, borderRadius: 10, background: room.type === "dining" ? "#15110C" : C.soft, overflow: "hidden", flexShrink: 0, border: `1px solid ${C.border}`, display: "grid", placeItems: "center" }}>
-                            {room.image ? (
-                              <img
-                                src={imageUrl(room.image)}
-                                alt=""
-                                loading="lazy"
-                                decoding="async"
-                                draggable={false}
-                                style={{
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: room.type === "dining" ? "contain" : "cover",
-                                  objectPosition: room.image_position || "center 50%",
-                                  imageRendering: "auto",
-                                }}
-                              />
-                            ) : <Camera size={17} style={{ color: C.faint }} />}
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                              <strong style={{ color: C.text, fontSize: level ? 12.5 : 13.5, fontWeight: level ? 560 : 640, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                <span style={{ color: C.gold, opacity: 0.8, marginRight: 6, fontSize: '0.9em' }}>#{room.id}</span>
-                                {room.display_name || room.name}
-                              </strong>
-                              {!level && (
-                                <Badge tone={room.type === "dining" ? "gold" : "neutral"} compact>
-                                  {room.type === "dining" ? "Dining" : childCount ? `${childCount} sub-room${childCount > 1 ? "s" : ""}` : "Function"}
-                                </Badge>
-                              )}
-                            </div>
-                            <div style={{ marginTop: 3, color: C.muted, fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {level && parent ? `${parent.display_name || parent.name} · ` : ""}{room.slug || "No slug"} · {room.wing}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
-                        <Badge tone={room.is_active ? "green" : "red"}>{room.is_active ? "Enabled" : "Disabled"}</Badge>
-                      </td>
-                      <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
-                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                          <Badge tone={room.is_visible ? "green" : "neutral"} compact>{room.is_visible ? "Visible" : "Hidden"}</Badge>
-                          <Badge tone={room.show_on_landing ? "gold" : "neutral"} compact>{room.show_on_landing ? "Landing" : "No landing"}</Badge>
-                          <Badge tone={room.reservations_enabled ? "green" : "red"} compact>{room.reservations_enabled ? "Reservable" : "Unavailable"}</Badge>
-                        </div>
-                      </td>
-                      <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}`, color: C.text, fontWeight: 560, fontSize: 12.5, textAlign: "center" }}>{room.display_order}</td>
-                      <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}`, textAlign: "right" }}>
-                        <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end", alignItems: "center", position: "relative", minWidth: 132 }}>
-                          <button className="function-room-action" type="button" onClick={() => beginEdit(room)} style={{ ...buttonBase(), minWidth: 84, color: C.gold }} title="Edit venue"><Edit3 size={14} /> Edit</button>
-                          <button
-                            className="function-room-action"
-                            type="button"
-                            disabled={!canManage}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setOpenMenuId((current) => current === room.id ? null : room.id);
-                            }}
-                            style={{ ...buttonBase(), width: 38, minWidth: 38, padding: 0 }}
-                            aria-label={`Open actions for ${room.display_name || room.name}`}
-                            aria-expanded={openMenuId === room.id}
-                          >
-                            <MoreHorizontal size={16} />
-                          </button>
-                          {openMenuId === room.id && (
-                            <div
-                              role="menu"
-                              onClick={(event) => event.stopPropagation()}
-                              style={{ position: "absolute", top: 40, right: 0, zIndex: 20, width: 210, padding: 6, borderRadius: 12, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 18px 46px rgba(24,20,14,0.16)", display: "grid", gap: 2 }}
-                            >
-                              <MenuAction icon={room.is_active ? ToggleRight : ToggleLeft} label={room.is_active ? "Disable venue" : "Enable venue"} onClick={() => requestToggle(room, "is_active")} />
-                              <MenuAction icon={room.is_visible ? EyeOff : Eye} label={room.is_visible ? "Hide from guests" : "Show to guests"} onClick={() => requestToggle(room, "is_visible")} />
-                              <MenuAction icon={room.show_on_landing ? EyeOff : Eye} label={room.show_on_landing ? "Remove from landing" : "Add to landing"} onClick={() => requestToggle(room, "show_on_landing")} />
-                              <MenuAction icon={room.reservations_enabled ? ToggleRight : ToggleLeft} label={room.reservations_enabled ? "Disable reservations" : "Enable reservations"} onClick={() => requestToggle(room, "reservations_enabled")} />
-                              <div style={{ height: 1, background: C.divider, margin: "4px 3px" }} />
-                              <MenuAction icon={Trash2} label="Delete venue" danger onClick={() => requestDelete(room)} />
-                            </div>
-                          )}
-                        </div>
-                      </td>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1040, tableLayout: "fixed" }}>
+                  <thead>
+                    <tr style={{ background: C.surface }}>
+                      {[
+                        { label: "Venue Structure", width: "42%", align: "left" },
+                        { label: "Status", width: "11%", align: "left" },
+                        { label: "Display Settings", width: "23%", align: "left" },
+                        { label: "Order", width: "8%", align: "center" },
+                        { label: "Manage", width: "16%", align: "right" },
+                      ].map((column) => (
+                        <th key={column.label} style={{ width: column.width, padding: "11px 14px", textAlign: column.align, color: C.faint, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", borderBottom: `1px solid ${C.divider}` }}>{column.label}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <SortableContext items={groupedRows.map(r => String(r.room.id))} strategy={verticalListSortingStrategy}>
+                    <tbody>
+                      {loading ? (
+                        <tr><td colSpan={5} style={{ padding: 22, color: C.muted }}>Loading venues...</td></tr>
+                      ) : groupedRows.length === 0 ? (
+                        <tr><td colSpan={5} style={{ padding: 22, color: C.muted }}>No venues match the current filters.</td></tr>
+                      ) : groupedRows.map(({ room, level, childCount, parent }) => (
+                        <SortableRow
+                          key={`${room.id}-${level}`}
+                          id={String(room.id)}
+                          disabled={sortBy !== "display_order" || search.length > 0}
+                          level={level}
+                          className="function-room-row"
+                          style={{ background: level ? "rgba(250,248,244,0.52)" : C.surface }}
+                        >
+                          {(attributes, listeners, isDragging) => (
+                            <>
+                              <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: level ? 26 : 0 }}>
+                                  {level ? (
+                                    <span style={{ width: 14, color: C.faint, display: "inline-flex", justifyContent: "center" }}><ChevronRight size={14} /></span>
+                                  ) : childCount ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleParentExpanded(room.id)}
+                                      aria-label={`${expandedParents.has(Number(room.id)) ? "Collapse" : "Expand"} ${room.display_name || room.name}`}
+                                      style={{ width: 18, height: 18, border: "none", background: "transparent", color: C.gold, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transform: expandedParents.has(Number(room.id)) ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.18s ease" }}
+                                    >
+                                      <ChevronRight size={15} />
+                                    </button>
+                                  ) : <span style={{ width: 18 }} />}
+                                  <div style={{ width: level ? 38 : 46, height: level ? 38 : 46, borderRadius: 10, background: room.type === "dining" ? "#15110C" : C.soft, overflow: "hidden", flexShrink: 0, border: `1px solid ${C.border}`, display: "grid", placeItems: "center" }}>
+                                    {room.image ? (
+                                      <img
+                                        src={imageUrl(room.image)}
+                                        alt=""
+                                        loading="lazy"
+                                        decoding="async"
+                                        draggable={false}
+                                        style={{
+                                          width: "100%",
+                                          height: "100%",
+                                          objectFit: room.type === "dining" ? "contain" : "cover",
+                                          objectPosition: room.image_position || "center 50%",
+                                          imageRendering: "auto",
+                                        }}
+                                      />
+                                    ) : <Camera size={17} style={{ color: C.faint }} />}
+                                  </div>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                      <strong style={{ color: C.text, fontSize: level ? 12.5 : 13.5, fontWeight: level ? 560 : 640, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                        <span style={{ color: C.gold, opacity: 0.8, marginRight: 6, fontSize: '0.9em' }}>#{room.id}</span>
+                                        {room.display_name || room.name}
+                                      </strong>
+                                      {!level && (
+                                        <Badge tone={room.type === "dining" ? "gold" : "neutral"} compact>
+                                          {room.type === "dining" ? "Dining" : childCount ? `${childCount} sub-room${childCount > 1 ? "s" : ""}` : "Function"}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div style={{ marginTop: 3, color: C.muted, fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                      {level && parent ? `${parent.display_name || parent.name} · ` : ""}{room.slug || "No slug"} · {room.wing}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
+                                <Badge tone={room.is_active ? "green" : "red"}>{room.is_active ? "Enabled" : "Disabled"}</Badge>
+                              </td>
+                              <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
+                                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                                  <Badge tone={room.is_visible ? "green" : "neutral"} compact>{room.is_visible ? "Visible" : "Hidden"}</Badge>
+                                  <Badge tone={room.show_on_landing ? "gold" : "neutral"} compact>{room.show_on_landing ? "Landing" : "No landing"}</Badge>
+                                  <Badge tone={room.reservations_enabled ? "green" : "red"} compact>{room.reservations_enabled ? "Reservable" : "Unavailable"}</Badge>
+                                </div>
+                              </td>
+                              <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}`, color: C.text, fontWeight: 560, fontSize: 12.5, textAlign: "center" }}>
+                                {sortBy === "display_order" && !search ? (
+                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                                    <span
+                                      {...attributes}
+                                      {...listeners}
+                                      style={{ cursor: isDragging ? "grabbing" : "grab", color: C.muted, display: "flex", alignItems: "center", padding: 4 }}
+                                      title="Drag to reorder"
+                                    >
+                                      <GripVertical size={14} />
+                                    </span>
+                                    <span>{room.display_order}</span>
+                                  </div>
+                                ) : (
+                                  room.display_order
+                                )}
+                              </td>
+                              <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}`, textAlign: "right" }}>
+                                <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end", alignItems: "center", position: "relative", minWidth: 132 }}>
+                                  <button className="function-room-action" type="button" onClick={() => beginEdit(room)} style={{ ...buttonBase(), minWidth: 84, color: C.gold }} title="Edit venue"><Edit3 size={14} /> Edit</button>
+                                  <button
+                                    className="function-room-action"
+                                    type="button"
+                                    disabled={!canManage}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setOpenMenuId((current) => current === room.id ? null : room.id);
+                                    }}
+                                    style={{ ...buttonBase(), width: 38, minWidth: 38, padding: 0 }}
+                                    aria-label={`Open actions for ${room.display_name || room.name}`}
+                                    aria-expanded={openMenuId === room.id}
+                                  >
+                                    <MoreHorizontal size={16} />
+                                  </button>
+                                  {openMenuId === room.id && (
+                                    <div
+                                      role="menu"
+                                      onClick={(event) => event.stopPropagation()}
+                                      style={{ position: "absolute", top: 40, right: 0, zIndex: 20, width: 210, padding: 6, borderRadius: 12, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 18px 46px rgba(24,20,14,0.16)", display: "grid", gap: 2 }}
+                                    >
+                                      <MenuAction icon={room.is_active ? ToggleRight : ToggleLeft} label={room.is_active ? "Disable venue" : "Enable venue"} onClick={() => requestToggle(room, "is_active")} />
+                                      <MenuAction icon={room.is_visible ? EyeOff : Eye} label={room.is_visible ? "Hide from guests" : "Show to guests"} onClick={() => requestToggle(room, "is_visible")} />
+                                      <MenuAction icon={room.show_on_landing ? EyeOff : Eye} label={room.show_on_landing ? "Remove from landing" : "Add to landing"} onClick={() => requestToggle(room, "show_on_landing")} />
+                                      <MenuAction icon={room.reservations_enabled ? ToggleRight : ToggleLeft} label={room.reservations_enabled ? "Disable reservations" : "Enable reservations"} onClick={() => requestToggle(room, "reservations_enabled")} />
+                                      <div style={{ height: 1, background: C.divider, margin: "4px 3px" }} />
+                                      <MenuAction icon={Trash2} label="Delete venue" danger onClick={() => requestDelete(room)} />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </SortableRow>
+                      ))}
+                    </tbody>
+                  </SortableContext>
+                </table>
+              </DndContext>
             </div>
           </section>
         </main>

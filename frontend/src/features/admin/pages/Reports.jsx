@@ -3396,7 +3396,7 @@ export default function Reports() {
 
         {/* Print Footer */}
         <div style={{ borderTop: "1px solid #8C6B2A", marginTop: 40, paddingTop: 10, display: "flex", justifyContent: "space-between", fontSize: "8pt", color: C.muted }}>
-          <span>Bellevue Luxury Hotel Group · Confidential Management Report</span>
+          <span>The Bellevue Manila · Confidential Management Report</span>
           <span>End of Document</span>
         </div>
       </div>
