@@ -43,7 +43,7 @@ class ReservationService
 
         $this->recordTransaction(
             $reservation,
-            'status_changed',
+            'approved',
             $fromStatus,
             $reservation->status,
             'Reservation approved and selected seat/table reserved.',
@@ -69,7 +69,7 @@ class ReservationService
 
         $this->recordTransaction(
             $reservation,
-            'status_changed',
+            'rejected',
             $fromStatus,
             $reservation->status,
             'Reservation rejected by admin.',
@@ -94,11 +94,38 @@ class ReservationService
 
         $this->recordTransaction(
             $reservation,
-            'status_changed',
+            'reverted',
             $fromStatus,
             $reservation->status,
             'Rejected reservation reverted to pending review.',
             [],
+            $actor
+        );
+
+        return $reservation->fresh(['venue']);
+    }
+
+    /**
+     * Cancel a reservation by admin.
+     */
+    public function cancelReservation(Reservation $reservation, string $reason, ?array $actor = null): Reservation
+    {
+        $fromStatus = $reservation->status;
+        $reservation->update([
+            'status' => 'cancelled',
+            'cancellation_reason' => $reason,
+            'cancelled_at' => now(),
+        ]);
+
+        $reservation = $reservation->fresh(['venue']);
+
+        $this->recordTransaction(
+            $reservation,
+            'cancelled_by_admin',
+            $fromStatus,
+            $reservation->status,
+            'Reservation cancelled by admin.',
+            ['reason' => $reason],
             $actor
         );
 
@@ -492,7 +519,7 @@ class ReservationService
         string $direction = 'desc',
         ?array $admin = null
     ): \Illuminate\Pagination\LengthAwarePaginator {
-        return $this->scopedReservationQuery($admin)->with(['venue'])->orderBy($sort, $direction)
+        return $this->scopedReservationQuery($admin)->with(['venue', 'transactions'])->orderBy($sort, $direction)
             ->paginate($perPage, ['*'], 'page', $page)
             ->through(
                 function ($reservation) {
@@ -501,7 +528,9 @@ class ReservationService
                         : '';
                     $submittedAt = preg_replace('/\s+/', ' ', $submittedAt);
 
-                    return [
+                    $auditData = $this->resolveAuditData($reservation);
+
+                    return array_merge([
                         'id'               => $reservation->reference_code,
                         'db_id'            => $reservation->id,
                         'reference_code'    => $reservation->reference_code,
@@ -557,7 +586,7 @@ class ReservationService
                         'public_room_name' => $reservation->public_room_name,
                         'internal_room_name' => $reservation->internal_room_name,
                         'assignment_status' => $reservation->assignment_status,
-                    ];
+                    ], $auditData);
                 }
             );
     }
@@ -567,10 +596,11 @@ class ReservationService
      */
     public function getAllReservations(): array
     {
-        return Reservation::orderBy('submitted_at', 'desc')
+        return Reservation::with(['venue', 'transactions'])->orderBy('submitted_at', 'desc')
             ->get()
             ->map(function ($reservation) {
-                return [
+                $auditData = $this->resolveAuditData($reservation);
+                return array_merge([
                     'id'               => $reservation->reference_code,
                     'db_id'            => $reservation->id,
                     'name'             => $reservation->name,
@@ -612,7 +642,7 @@ class ReservationService
                     'public_room_name' => $reservation->public_room_name,
                     'internal_room_name' => $reservation->internal_room_name,
                     'assignment_status' => $reservation->assignment_status,
-                ];
+                ], $auditData);
             })
             ->toArray();
     }
@@ -720,7 +750,11 @@ class ReservationService
             ->filter()
             ->unique('id')
             ->values();
-        $statusTransactions = $transactions->where('action', 'status_changed');
+        // Match both legacy 'status_changed' and new semantic action types
+        $statusActions = ['status_changed', 'approved', 'rejected', 'reverted', 'cancelled_by_admin', 'cancelled_by_guest'];
+        $statusTransactions = $transactions->filter(
+            fn (ReservationTransaction $t) => in_array($t->action, $statusActions, true)
+        );
 
         $venueCount = $reservations
             ->filter(fn (Reservation $reservation) => filled($reservation->venue_id))
@@ -741,11 +775,17 @@ class ReservationService
                 'reservations' => $reservations->count(),
                 'outlets' => $venueCount + $unassignedRoomCount,
                 'status_changes' => $statusTransactions->count(),
-                'approvals' => $statusTransactions->where('to_status', 'reserved')->count(),
-                'rejections' => $statusTransactions->where('to_status', 'rejected')->count(),
+                'approvals' => $statusTransactions->filter(
+                    fn (ReservationTransaction $t) => $t->action === 'approved' || ($t->action === 'status_changed' && $t->to_status === 'reserved')
+                )->count(),
+                'rejections' => $statusTransactions->filter(
+                    fn (ReservationTransaction $t) => $t->action === 'rejected' || ($t->action === 'status_changed' && $t->to_status === 'rejected')
+                )->count(),
                 'reverts' => $statusTransactions->filter(
-                    fn (ReservationTransaction $transaction) => $transaction->from_status === 'rejected'
-                        && $transaction->to_status === 'pending'
+                    fn (ReservationTransaction $t) => $t->action === 'reverted' || ($t->from_status === 'rejected' && $t->to_status === 'pending')
+                )->count(),
+                'cancellations' => $statusTransactions->filter(
+                    fn (ReservationTransaction $t) => in_array($t->action, ['cancelled_by_admin', 'cancelled_by_guest'], true) || $t->to_status === 'cancelled'
                 )->count(),
                 'latest_at' => optional($transactions->first()?->created_at)->toISOString(),
             ],
@@ -1454,6 +1494,47 @@ class ReservationService
             'approved' => $reservations->where('status', 'approved')->count(),
             'rejected' => $reservations->where('status', 'rejected')->count(),
             'cancelled' => $reservations->where('status', 'cancelled')->count(),
+        ];
+    }
+
+    /**
+     * Resolve audit actor names and roles for key actions.
+     */
+    private function resolveAuditData(Reservation $reservation): array
+    {
+        $transactions = $reservation->transactions;
+        if (!$transactions) {
+            return [
+                'approved_by' => null,
+                'rejected_by' => null,
+                'cancelled_by' => null,
+                'last_action_by' => null,
+                'last_action_date' => null,
+            ];
+        }
+
+        $approvedTx = $transactions->first(fn ($t) => $t->action === 'approved' || ($t->action === 'status_changed' && $t->to_status === 'reserved'));
+        $rejectedTx = $transactions->first(fn ($t) => $t->action === 'rejected' || ($t->action === 'status_changed' && $t->to_status === 'rejected'));
+        $cancelledTx = $transactions->first(fn ($t) => in_array($t->action, ['cancelled_by_admin', 'cancelled_by_guest'], true) || $t->to_status === 'cancelled');
+        $lastTx = $transactions->first();
+
+        $formatActor = function ($tx) {
+            if (!$tx) return null;
+            if ($tx->action === 'cancelled_by_guest') {
+                return 'Guest';
+            }
+            $name = $tx->actor_name;
+            $role = $tx->actor_role;
+            if (!$name) return 'System';
+            return $role ? "{$name} ({$role})" : $name;
+        };
+
+        return [
+            'approved_by' => $formatActor($approvedTx),
+            'rejected_by' => $formatActor($rejectedTx),
+            'cancelled_by' => $formatActor($cancelledTx),
+            'last_action_by' => $formatActor($lastTx),
+            'last_action_date' => $lastTx ? optional($lastTx->created_at)->toISOString() : null,
         ];
     }
 }

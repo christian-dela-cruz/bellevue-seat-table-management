@@ -2,7 +2,7 @@ import { useState } from "react";
 
 const C = {
   primary: "#1B2A4A",
-  secondary: "#C9A74D", 
+  secondary: "#C9A74D",
   text: "#374151",
   textLight: "#9CA3AF",
   border: "#E5E7EB",
@@ -55,17 +55,17 @@ export default function AdminNavbar({ onLogout }) {
             🏨
           </div>
           <div>
-            <h1 style={{ 
-              margin: 0, 
-              fontSize: "20px", 
+            <h1 style={{
+              margin: 0,
+              fontSize: "20px",
               fontWeight: 700,
               fontFamily: "'Cormorant Garamond', Georgia, serif",
             }}>
               The Bellevue Manila
             </h1>
-            <p style={{ 
-              margin: "4px 0 0 0", 
-              fontSize: "12px", 
+            <p style={{
+              margin: "4px 0 0 0",
+              fontSize: "12px",
               opacity: 0.8,
               textTransform: "uppercase",
               letterSpacing: "1px",

@@ -89,8 +89,8 @@ function SidebarCollapseBtn({ onClick, isOpen }) {
         padding: 0,
         boxSizing: "border-box",
         flexShrink: 0,
-        boxShadow: hovered 
-          ? "0 4px 10px rgba(140,107,42,0.16)" 
+        boxShadow: hovered
+          ? "0 4px 10px rgba(140,107,42,0.16)"
           : "0 2px 6px rgba(0,0,0,0.05)",
         cursor: "pointer",
         display: "flex",
@@ -101,10 +101,10 @@ function SidebarCollapseBtn({ onClick, isOpen }) {
         outline: "none",
       }}
     >
-      <Icon 
-        size={12} 
-        color="#8C6B2A" 
-        strokeWidth={2.5} 
+      <Icon
+        size={12}
+        color="#8C6B2A"
+        strokeWidth={2.5}
         style={{
           transition: "transform 0.2s ease",
           transform: hovered ? (isOpen ? "translateX(-1px)" : "translateX(1px)") : "none"
@@ -397,7 +397,7 @@ export default function Sidebar({
   activeNav,
   onNavChange,
   isOpen = true,
-  onToggle = () => {},
+  onToggle = () => { },
 }) {
   const navigate = useNavigate();
   const [pinnedOpen, setPinnedOpen] = useState(() => {

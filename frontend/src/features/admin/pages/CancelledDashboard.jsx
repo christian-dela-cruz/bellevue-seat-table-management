@@ -202,14 +202,212 @@ function DetailModal({ reservation, onClose }) {
     } catch { return dt; }
   };
 
+  const formatFieldName = (field) => {
+    const map = {
+      assigned_room_id: "Assigned Room",
+      room: "Room",
+      internal_room_name: "Internal Room Name",
+      public_room_name: "Public Room Name",
+      table_number: "Table",
+      seat_number: "Seat",
+      seat_id: "Seat ID",
+      name: "Guest Name",
+      email: "Guest Email",
+      phone: "Guest Phone",
+      guests_count: "Guests",
+      event_date: "Event Date",
+      event_time: "Event Time",
+      event_area: "Event Area",
+      setup_tables: "Setup Tables",
+      setup_chairs: "Setup Chairs",
+      setup_requirements: "Setup Requirements",
+      special_requests: "Special Requests",
+      type: "Reservation Type",
+      is_standalone: "Is Standalone",
+      assignment_status: "Assignment Status"
+    };
+    return map[field] || field.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  const formatValue = (field, value) => {
+    if (value === null || value === undefined || value === "") return "None";
+    if (field === "is_standalone") return value ? "Yes" : "No";
+    if (field === "event_date") {
+      try {
+        return new Date(value + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      } catch {
+        return value;
+      }
+    }
+    return String(value);
+  };
+
+  const formatHistoryAction = (action) => String(action || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase()) || "Transaction";
+
+  const getActorLabel = (item) => {
+    if (item.action === 'cancelled_by_guest') {
+      return 'Guest';
+    }
+    const name = item.actor_name;
+    const role = item.actor_role;
+    if (!name) return 'System';
+    return role ? `${name} (${role})` : name;
+  };
+
+  const getTransactionNotes = (item) => {
+    if (item.action === 'cancelled_by_admin' && item.metadata?.reason) {
+      return item.metadata.reason;
+    }
+    if (item.action === 'cancelled_by_guest' && item.metadata?.reason) {
+      return item.metadata.reason;
+    }
+    return item.notes || '';
+  };
+
+  const cancelTx = Array.isArray(reservation.transactions)
+    ? reservation.transactions.find(t => ["cancelled_by_admin", "cancelled_by_guest"].includes(t.action) || t.to_status === "cancelled")
+    : null;
+  const isCancelledByGuest = cancelTx ? cancelTx.action === "cancelled_by_guest" : true;
+  const cancelledBy = cancelTx ? getActorLabel(cancelTx) : (reservation.cancelled_by || "Guest");
+
+  const renderActivityTimeline = () => {
+    const historyItems = Array.isArray(reservation.transactions)
+      ? [...reservation.transactions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      : [];
+
+    if (historyItems.length === 0) {
+      return (
+        <div style={{ fontFamily: F.body, fontSize: 11, color: C.textSecondary }}>
+          No activity history recorded yet.
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 0, position: "relative", paddingLeft: 14 }}>
+        <div style={{
+          position: "absolute",
+          left: 4,
+          top: 8,
+          bottom: 8,
+          width: 1.5,
+          background: C.divider,
+        }} />
+
+        {historyItems.map((item, idx) => {
+          const actor = getActorLabel(item);
+          const notes = getTransactionNotes(item);
+          const isLast = idx === historyItems.length - 1;
+
+          let markerColor = C.gold;
+          let markerBg = C.goldFaint;
+          if (item.action?.includes('approve') || item.action === 'status_changed' && item.to_status === 'reserved') {
+            markerColor = C.green;
+            markerBg = C.greenFaint;
+          } else if (item.action?.includes('reject') || item.action?.includes('cancel')) {
+            markerColor = C.accent;
+            markerBg = C.accentFaint;
+          }
+
+          return (
+            <div key={item.id || `${item.action}-${idx}`} style={{
+              position: "relative",
+              paddingBottom: isLast ? 0 : 16,
+            }}>
+              <div style={{
+                position: "absolute",
+                left: -14.5,
+                top: 4,
+                width: 9,
+                height: 9,
+                borderRadius: "50%",
+                background: markerColor,
+                border: `2px solid ${C.surfaceBase}`,
+                boxShadow: `0 0 0 2px ${markerBg}`,
+                zIndex: 2,
+              }} />
+
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <span style={{
+                    fontFamily: F.display,
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    color: C.textPrimary,
+                    textTransform: "capitalize"
+                  }}>
+                    {formatHistoryAction(item.action)}
+                  </span>
+                  <span style={{ fontFamily: F.body, fontSize: 9.5, color: C.textTertiary, whiteSpace: "nowrap" }}>
+                    {fmtDateTime(item.created_at)}
+                  </span>
+                </div>
+
+                <div style={{ fontFamily: F.body, fontSize: 10.5, color: C.textSecondary, marginTop: 3 }}>
+                  <span style={{ fontWeight: 600, color: C.textPrimary }}>{actor}</span>
+                  {notes && (
+                    <div style={{
+                      marginTop: 4,
+                      padding: "5px 8px",
+                      background: C.surfaceBase,
+                      border: `1px solid ${C.borderDefault}`,
+                      borderRadius: 6,
+                      fontSize: 10.5,
+                      color: C.textSecondary,
+                      fontStyle: "italic",
+                      lineHeight: 1.35,
+                      whiteSpace: "pre-wrap"
+                    }}>
+                      &ldquo;{notes}&rdquo;
+                    </div>
+                  )}
+                </div>
+
+                {item.metadata?.changes && Object.keys(item.metadata.changes).length > 0 && (
+                  <ul style={{
+                    margin: "5px 0 0 0",
+                    paddingLeft: 18,
+                    fontFamily: F.body,
+                    fontSize: 10,
+                    color: C.textSecondary,
+                    listStyleType: "disc",
+                  }}>
+                    {Object.entries(item.metadata.changes).map(([field, diff]) => (
+                      <li key={field} style={{ marginBottom: 2 }}>
+                        <strong style={{ color: C.textPrimary }}>{formatFieldName(field)}</strong>:{" "}
+                        <span style={{ textDecoration: "line-through", color: C.textTertiary }}>
+                          {formatValue(field, diff.from)}
+                        </span>{" "}
+                        &rarr;{" "}
+                        <span style={{ fontWeight: 600, color: C.gold }}>
+                          {formatValue(field, diff.to)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const resRows = [
     ["Reference",  reservation.reference_code || "—"],
     ["Room",       reservation.room || reservation.venue?.name || "No room assigned"],
-    ["Table",      reservation.table_number ? `Table ${reservation.table_number}` : "—"],
+    ["Table",      reservation.table_number ? (String(reservation.table_number).toUpperCase() === "STANDALONE" ? "Standalone Seat" : `Table ${reservation.table_number}`) : "—"],
     ["Seat",       (reservation.seat || reservation.seat_number) ? `Seat ${reservation.seat || reservation.seat_number}` : "—"],
     ["Guests",     (reservation.guests_count || reservation.guests) ? `${reservation.guests_count || reservation.guests} guest${(reservation.guests_count || reservation.guests) !== 1 ? "s" : ""}` : "—"],
     ["Event Date", fmtDate(reservation.event_date)],
     ["Event Time", fmtTime(reservation.event_time)],
+    ...((reservation.event_area || reservation.eventArea) ? [["Event Area", reservation.event_area || reservation.eventArea]] : []),
+    ...((reservation.setup_tables ?? reservation.setupTables) ? [["Tables Needed", reservation.setup_tables ?? reservation.setupTables]] : []),
+    ...((reservation.setup_chairs ?? reservation.setupChairs) ? [["Chairs Needed", reservation.setup_chairs ?? reservation.setupChairs]] : []),
+    ...((reservation.setup_requirements || reservation.setupRequirements) ? [["Setup Requirements", reservation.setup_requirements || reservation.setupRequirements]] : []),
   ];
 
   const guestRows = [
@@ -225,21 +423,19 @@ function DetailModal({ reservation, onClose }) {
         position: "fixed", inset: 0,
         background: C.modalOverlay,
         zIndex: 4000,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 20,
+        display: "flex", justifyContent: "flex-end",
         backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div style={{
-        background: C.surfaceBase, borderRadius: 14,
-        width: "100%", maxWidth: 520,
-        maxHeight: "92vh",
-        boxShadow: "0 24px 80px rgba(0,0,0,0.16)",
-        border: `1px solid ${C.borderDefault}`,
+        background: C.surfaceBase,
+        width: "100%", maxWidth: 800,
+        height: "100%",
+        boxShadow: "-16px 0 40px rgba(0,0,0,0.16)",
+        borderLeft: `1px solid ${C.borderDefault}`,
         fontFamily: F.body,
-        animation: "modalIn 0.20s cubic-bezier(0.16,1,0.3,1)",
-        overflow: "hidden",
+        animation: "drawerSlideIn 0.3s cubic-bezier(0.16,1,0.3,1)",
         display: "flex", flexDirection: "column",
       }}>
         <div style={{ height: 2, background: `linear-gradient(90deg,transparent 0%,${C.accent}80 30%,${C.accent}80 70%,transparent 100%)`, flexShrink: 0 }} />
@@ -280,74 +476,158 @@ function DetailModal({ reservation, onClose }) {
 
         {/* Body */}
         <div style={{ padding: "18px 22px 24px", overflowY: "auto", flex: 1 }}>
-
-          {/* Cancellation reason */}
-          <div style={{
-            padding: "14px 16px", borderRadius: 10, marginBottom: 20,
-            background: C.accentFaint,
-            border: `1px solid ${C.accentBorder}`,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 300px", gap: 20, alignItems: "start" }}>
+            
+            {/* Left Column: Core Data cards */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              
+              {/* Reservation Details Card */}
               <div style={{
-                width: 22, height: 22, borderRadius: 5,
-                background: `${C.accent}15`,
+                background: C.surfaceInput,
+                border: `1px solid ${C.borderDefault}`,
+                borderRadius: 12,
+                padding: "16px 18px",
+              }}>
+                <SectionLabel style={{ marginTop: 0, marginBottom: 12 }}>Reservation Details</SectionLabel>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px 20px" }}>
+                  {resRows.filter(([label]) => label !== "Setup Requirements").map(([label, value]) => (
+                    <div key={label} style={{
+                      display: "flex", flexDirection: "column", gap: 4,
+                      padding: "6px 0",
+                      borderBottom: `1px solid ${C.divider}`,
+                    }}>
+                      <span style={{ fontFamily: F.label, fontSize: 8, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>{label}</span>
+                      <span style={{ fontFamily: F.body, fontSize: 12.5, color: label === "Reference" ? C.gold : C.textPrimary, fontWeight: label === "Reference" ? 700 : 500, lineHeight: 1.4 }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Setup Requirements (Full Width below details grid if present) */}
+                {(reservation.setup_requirements || reservation.setupRequirements) ? (
+                  <div style={{
+                    display: "flex", flexDirection: "column", gap: 4,
+                    padding: "10px 0 0",
+                    marginTop: 12,
+                    borderTop: `1.5px dashed ${C.divider}`,
+                  }}>
+                    <span style={{ fontFamily: F.label, fontSize: 8, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Setup Requirements</span>
+                    <div style={{
+                      fontFamily: F.body, fontSize: 12, color: C.textSecondary, lineHeight: 1.55,
+                      background: C.surfaceBase, padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.borderDefault}`,
+                      whiteSpace: "pre-wrap"
+                    }}>
+                      {reservation.setup_requirements || reservation.setupRequirements}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Guest Information Card */}
+              <div style={{
+                background: C.surfaceInput,
+                border: `1px solid ${C.borderDefault}`,
+                borderRadius: 12,
+                padding: "16px 18px",
+              }}>
+                <SectionLabel style={{ marginTop: 0, marginBottom: 12 }}>Guest Information</SectionLabel>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px 20px" }}>
+                  {guestRows.filter(([label]) => label !== "Special Requests").map(([label, value]) => (
+                    <div key={label} style={{
+                      display: "flex", flexDirection: "column", gap: 4,
+                      padding: "6px 0",
+                      borderBottom: `1px solid ${C.divider}`,
+                    }}>
+                      <span style={{ fontFamily: F.label, fontSize: 8, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>{label}</span>
+                      <span style={{ fontFamily: F.body, fontSize: 12.5, color: C.textPrimary, fontWeight: 500, lineHeight: 1.4 }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Special Requests (Full Width below) */}
+                <div style={{
+                  display: "flex", flexDirection: "column", gap: 4,
+                  padding: "10px 0 0",
+                  marginTop: 12,
+                  borderTop: `1.5px dashed ${C.divider}`,
+                }}>
+                  <span style={{ fontFamily: F.label, fontSize: 8, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Special Requests</span>
+                  <div style={{
+                    fontFamily: F.body, fontSize: 12, color: reservation.special_requests ? C.textPrimary : C.textTertiary, lineHeight: 1.55,
+                    background: C.surfaceBase, padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.borderDefault}`,
+                    fontStyle: reservation.special_requests ? "normal" : "italic"
+                  }}>
+                    {reservation.special_requests || "None specified"}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Right Column: Actions / Info Sidebar */}
+            <aside style={{ position: "sticky", top: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+              
+              {/* Cancellation Reason Card */}
+              <div style={{
+                padding: "14px 16px", borderRadius: 12,
+                background: C.accentFaint,
                 border: `1px solid ${C.accentBorder}`,
-                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
               }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+                  <div style={{
+                    width: 22, height: 22, borderRadius: 5,
+                    background: `${C.accent}15`,
+                    border: `1px solid ${C.accentBorder}`,
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                  }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                  </div>
+                  <div style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: C.accent, fontWeight: 700 }}>
+                    {isCancelledByGuest ? "Guest's Reason" : "Admin's Reason"}
+                  </div>
+                </div>
+                <div style={{ fontFamily: F.body, fontSize: 12.5, color: C.textPrimary, lineHeight: 1.6, paddingLeft: 2 }}>
+                  {reservation.cancellation_reason || <span style={{ color: C.textSecondary, fontStyle: "italic" }}>No reason provided</span>}
+                </div>
+                {reservation.cancelled_at && (
+                  <div style={{
+                    marginTop: 10, paddingTop: 10,
+                    borderTop: `1px solid ${C.accentBorder}`,
+                    fontFamily: F.label, fontSize: 8.5, letterSpacing: "0.10em",
+                    textTransform: "uppercase", color: C.textTertiary, fontWeight: 800,
+                  }}>
+                    Cancelled on: <span style={{ color: C.textSecondary, fontWeight: 600 }}>{fmtDateTime(reservation.cancelled_at)}</span>
+                  </div>
+                )}
               </div>
-              <div style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: C.accent, fontWeight: 700 }}>
-                Guest's Reason for Cancellation
-              </div>
-            </div>
-            <div style={{ fontFamily: F.body, fontSize: 13, color: C.textPrimary, lineHeight: 1.65, paddingLeft: 2 }}>
-              {reservation.cancellation_reason || <span style={{ color: C.textSecondary, fontStyle: "italic" }}>No reason provided</span>}
-            </div>
-            {reservation.cancelled_at && (
+
+              {/* History & Tracking */}
               <div style={{
-                marginTop: 10, paddingTop: 10,
-                borderTop: `1px solid ${C.accentBorder}`,
-                fontFamily: F.label, fontSize: 9, letterSpacing: "0.10em",
-                textTransform: "uppercase", color: C.textTertiary, fontWeight: 700,
+                background: C.surfaceInput,
+                border: `1px solid ${C.borderDefault}`,
+                borderRadius: 12,
+                padding: "14px 16px",
+                maxHeight: 350,
+                overflowY: "auto",
               }}>
-                Cancelled on: <span style={{ color: C.textSecondary, fontWeight: 500 }}>{fmtDateTime(reservation.cancelled_at)}</span>
+                <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary, display: "block", marginBottom: 10 }}>
+                  Reservation Activity & Audit Trail
+                </span>
+                {renderActivityTimeline()}
               </div>
-            )}
-          </div>
 
-          <SectionLabel>Reservation Details</SectionLabel>
-          {resRows.map(([label, value], i, arr) => (
-            <div key={label} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-              padding: "8px 0",
-              borderBottom: i < arr.length - 1 ? `1px solid ${C.divider}` : "none",
-            }}>
-              <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary, minWidth: 100, flexShrink: 0 }}>{label}</span>
-              <span style={{ fontFamily: F.body, fontSize: 12.5, color: label === "Reference" ? C.gold : C.textPrimary, fontWeight: label === "Reference" ? 700 : 500, textAlign: "right", maxWidth: 280, lineHeight: 1.5, letterSpacing: label === "Reference" ? "0.06em" : "normal" }}>{value}</span>
-            </div>
-          ))}
+              {/* Disclaimer */}
+              <div style={{
+                padding: "10px 14px", borderRadius: 8,
+                background: C.accentFaint,
+                border: `1px solid ${C.accentBorder}`,
+                fontFamily: F.body, fontSize: 11.5, color: C.textSecondary, lineHeight: 1.55,
+              }}>
+                This reservation was <strong style={{ color: C.textPrimary }}>cancelled by {isCancelledByGuest ? "the guest" : `admin (${cancelledBy})`}</strong> and cannot be modified. Contact the guest directly if you need to reinstate this booking.
+              </div>
 
-          <SectionLabel style={{ marginTop: 18 }}>Guest Information</SectionLabel>
-          {guestRows.map(([label, value], i, arr) => (
-            <div key={label} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-              padding: "8px 0",
-              borderBottom: i < arr.length - 1 ? `1px solid ${C.divider}` : "none",
-            }}>
-              <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary, minWidth: 100, flexShrink: 0 }}>{label}</span>
-              <span style={{ fontFamily: F.body, fontSize: 12.5, color: C.textPrimary, fontWeight: 500, textAlign: "right", maxWidth: 280, lineHeight: 1.5 }}>{value}</span>
-            </div>
-          ))}
-
-          <div style={{
-            marginTop: 18, padding: "10px 14px", borderRadius: 8,
-            background: C.accentFaint,
-            border: `1px solid ${C.accentBorder}`,
-            fontFamily: F.body, fontSize: 12, color: C.textSecondary, lineHeight: 1.6,
-          }}>
-            This reservation was <strong style={{ color: C.textPrimary }}>cancelled by the guest</strong> and cannot be modified from here. Contact the guest directly if you need to reinstate this booking.
+            </aside>
           </div>
         </div>
       </div>

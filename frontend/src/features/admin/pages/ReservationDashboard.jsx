@@ -5,7 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
-import { fetchReservations, approveReservation, rejectReservation, revertReservation, updateReservation, getReservationStats } from "../../../utils/api";
+import { fetchReservations, approveReservation, rejectReservation, revertReservation, cancelReservation, updateReservation, getReservationStats } from "../../../utils/api";
 import { authAPI } from "../../../services/authAPI";
 import { venueAPI } from "../../../services/venueAPI";
 import { ADMIN_OUTLET_GROUPS, buildOutletGroupsFromVenues, canonicalOutletName, getScopedOutletGroups, getScopedOutletRooms, buildDynamicOutletTree, resolveOutletChildren } from "../../../constants/outletCatalog";
@@ -238,6 +238,101 @@ function notificationStatus(reservation) {
   if (notification.action === "notification_failed") return "Failed";
   return "Sent";
 }
+
+const formatFieldName = (field) => {
+  const map = {
+    assigned_room_id: "Assigned Room",
+    room: "Room",
+    internal_room_name: "Internal Room Name",
+    public_room_name: "Public Room Name",
+    table_number: "Table",
+    seat_number: "Seat",
+    seat_id: "Seat ID",
+    name: "Guest Name",
+    email: "Guest Email",
+    phone: "Guest Phone",
+    guests_count: "Guests",
+    event_date: "Event Date",
+    event_time: "Event Time",
+    event_area: "Event Area",
+    setup_tables: "Setup Tables",
+    setup_chairs: "Setup Chairs",
+    setup_requirements: "Setup Requirements",
+    special_requests: "Special Requests",
+    type: "Reservation Type",
+    is_standalone: "Is Standalone",
+    assignment_status: "Assignment Status"
+  };
+  return map[field] || field.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+};
+
+const formatValue = (field, value) => {
+  if (value === null || value === undefined || value === "") return "None";
+  if (field === "is_standalone") return value ? "Yes" : "No";
+  if (field === "event_date") {
+    try {
+      return new Date(value + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return value;
+    }
+  }
+  return String(value);
+};
+
+const lastActionSummary = (reservation) => {
+  const history = reservation.transaction_history;
+  if (!history || !Array.isArray(history) || history.length === 0) {
+    return "No activity";
+  }
+  const lastTx = history[0];
+  
+  const formatActionName = (action) => {
+    const map = {
+      approved: "Approved",
+      rejected: "Rejected",
+      reverted: "Reverted to pending",
+      cancelled_by_admin: "Cancelled by admin",
+      cancelled_by_guest: "Cancelled by guest",
+      room_assigned: "Room assigned",
+      room_changed: "Room changed",
+      table_seat_changed: "Table/seat changed",
+      guest_details_updated: "Guest details updated",
+      edited: "Details edited",
+      notification_sent: "Notification sent",
+      notification_failed: "Notification failed",
+      notification_acknowledged: "Notification ack"
+    };
+    return map[action] || action.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  const getActorLabel = (tx) => {
+    if (tx.action === 'cancelled_by_guest') {
+      return 'Guest';
+    }
+    const name = tx.actor_name;
+    const role = tx.actor_role;
+    if (!name) return 'System';
+    return role ? `${name} (${role})` : name;
+  };
+
+  const fmtTimeOnly = (value) => {
+    if (!value) return "";
+    try {
+      return new Date(value).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit"
+      });
+    } catch {
+      return "";
+    }
+  };
+
+  const actionName = formatActionName(lastTx.action);
+  const actor = getActorLabel(lastTx);
+  const time = fmtTimeOnly(lastTx.created_at);
+
+  return `${actionName} by ${actor}${time ? ` · ${time}` : ""}`;
+};
 
 function priorityForReservation(reservation, now = new Date()) {
   const status = String(reservation?.status || "").toLowerCase();
@@ -1215,11 +1310,100 @@ function SaveChangesConfirmModal({ reservation, changes, onConfirm, onCancel, lo
   );
 }
 
-function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUpdate, canManage, canAdjust, venueRows }) {
+function CancelConfirmModal({ reservation, onConfirm, onCancel, loading }) {
+  const [reason, setReason] = useState("");
+  const [focused, setFocused] = useState(false);
+  const isValid = reason.trim().length >= 3;
+  return (
+    <div
+      style={{
+        position:"fixed",inset:0,
+        background:"rgba(0,0,0,0.60)",
+        zIndex:5100,
+        display:"flex",alignItems:"center",justifyContent:"center",
+        padding:20,
+        backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",
+      }}
+      onClick={(e)=>{if(e.target===e.currentTarget&&!loading)onCancel();}}
+    >
+      <div style={{
+        background:C.surfaceBase,borderRadius:14,
+        width:"100%",maxWidth:460,
+        boxShadow:"0 20px 60px rgba(0,0,0,0.20)",
+        border:`1px solid ${C.borderDefault}`,
+        fontFamily:F.body,
+        animation:"modalIn 0.20s cubic-bezier(0.16,1,0.3,1)",
+        overflow:"hidden",
+      }}>
+        <div style={{height:2,background:`linear-gradient(90deg,transparent 0%,${C.red}90 30%,${C.red}90 70%,transparent 100%)`}}/>
+        <div style={{background:C.headerGradient,padding:"18px 22px 16px",borderBottom:`1px solid ${C.divider}`}}>
+          <div style={{fontFamily:F.label,fontSize:9,letterSpacing:"0.22em",color:C.red,fontWeight:700,textTransform:"uppercase",marginBottom:5,opacity:0.85}}>
+            Cancel Reservation
+          </div>
+          <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.textPrimary,lineHeight:1.2}}>
+            {reservation.name||"Reservation"}
+          </div>
+          <div style={{fontFamily:F.body,fontSize:11,color:C.textSecondary,marginTop:4}}>
+            {reservation.reference_code} · {reservation.room || "—"}
+          </div>
+        </div>
+        <div style={{padding:"20px 22px 24px"}}>
+          <div style={{padding:"10px 14px",borderRadius:8,marginBottom:14,background:C.redFaint,border:`1px solid ${C.redBorder}`,fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.65}}>
+            This will cancel the reservation, notify the guest via email, and record the cancellation in the audit trail. This action cannot be undone.
+          </div>
+          <div style={{marginBottom:16}}>
+            <span style={{display:"block",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",color:C.textTertiary,marginBottom:7}}>
+              Cancellation Reason *
+            </span>
+            <textarea
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Provide a reason for cancellation (min 3 characters)..."
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              style={{
+                width:"100%",padding:"10px 12px",
+                border:`1.5px solid ${focused ? C.redBorder : C.borderDefault}`,
+                borderRadius:8,background:C.surfaceInput,
+                fontFamily:F.body,fontSize:13,color:C.textPrimary,
+                outline:"none",resize:"vertical",minHeight:78,
+                boxShadow:focused ? `0 0 0 3px ${C.redFaint}` : "none",
+              }}
+            />
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={onCancel} disabled={loading} style={{flex:1,padding:"11px",background:"transparent",border:`1px solid ${C.borderDefault}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textSecondary,cursor:loading?"not-allowed":"pointer"}}>
+              Go Back
+            </button>
+            <button
+              onClick={() => onConfirm(reason.trim())}
+              disabled={loading || !isValid}
+              style={{
+                flex:2,padding:"11px",
+                background:loading||!isValid?"rgba(160,56,56,0.35)":C.red,
+                border:"none",borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,
+                letterSpacing:"0.14em",textTransform:"uppercase",color:"#fff",
+                cursor:loading||!isValid?"not-allowed":"pointer",
+                display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+                transition:"all 0.18s",
+              }}
+            >
+              {loading?<><Spinner/>Cancelling...</>:"Confirm Cancellation"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCancel, onUpdate, canManage, canAdjust, venueRows }) {
   const [actionLoading,setActionLoading]=useState(null);
   const [showRejectModal,setShowRejectModal]=useState(false);
   const [showRevertModal,setShowRevertModal]=useState(false);
   const [showApproveModal,setShowApproveModal]=useState(false);
+  const [showCancelModal,setShowCancelModal]=useState(false);
   const [isEditing,setIsEditing]=useState(false);
   const [showSaveModal,setShowSaveModal]=useState(false);
   const [editError,setEditError]=useState("");
@@ -1355,11 +1539,19 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
     onClose();
   };
 
-  const handleRevertConfirm=async()=>{
+   const handleRevertConfirm=async()=>{
     setActionLoading("revert");
     await onRevert(reservation);
     setActionLoading(null);
     setShowRevertModal(false);
+    onClose();
+  };
+
+  const handleCancelConfirm=async(reason)=>{
+    setActionLoading("cancel");
+    await onCancel(reservation, reason);
+    setActionLoading(null);
+    setShowCancelModal(false);
     onClose();
   };
 
@@ -1483,6 +1675,150 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
   const formatHistoryAction = (action) => String(action || "")
     .replace(/_/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase()) || "Transaction";
+
+  const getActorLabel = (item) => {
+    if (item.action === 'cancelled_by_guest') {
+      return 'Guest';
+    }
+    const name = item.actor_name;
+    const role = item.actor_role;
+    if (!name) return 'System';
+    return role ? `${name} (${role})` : name;
+  };
+
+  const getTransactionNotes = (item) => {
+    if (item.action === 'cancelled_by_admin' && item.metadata?.reason) {
+      return item.metadata.reason;
+    }
+    if (item.action === 'cancelled_by_guest' && item.metadata?.reason) {
+      return item.metadata.reason;
+    }
+    return item.notes || '';
+  };
+
+  const renderActivityTimeline = () => {
+    const historyItems = Array.isArray(reservation.transaction_history)
+      ? [...reservation.transaction_history].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      : [];
+
+    if (historyItems.length === 0) {
+      return (
+        <div style={{ fontFamily: F.body, fontSize: 11, color: C.textSecondary }}>
+          No activity history recorded yet.
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 0, position: "relative", paddingLeft: 14 }}>
+        <div style={{
+          position: "absolute",
+          left: 4,
+          top: 8,
+          bottom: 8,
+          width: 1.5,
+          background: C.divider,
+        }} />
+
+        {historyItems.map((item, idx) => {
+          const actor = getActorLabel(item);
+          const notes = getTransactionNotes(item);
+          const isLast = idx === historyItems.length - 1;
+
+          let markerColor = C.gold;
+          let markerBg = C.goldFaint;
+          if (item.action?.includes('approve') || (item.action === 'status_changed' && item.to_status === 'reserved')) {
+            markerColor = C.green;
+            markerBg = C.greenFaint;
+          } else if (item.action?.includes('reject') || item.action?.includes('cancel')) {
+            markerColor = C.red;
+            markerBg = C.redFaint;
+          }
+
+          return (
+            <div key={item.id || `${item.action}-${idx}`} style={{
+              position: "relative",
+              paddingBottom: isLast ? 0 : 16,
+            }}>
+              <div style={{
+                position: "absolute",
+                left: -14.5,
+                top: 4,
+                width: 9,
+                height: 9,
+                borderRadius: "50%",
+                background: markerColor,
+                border: `2px solid ${C.surfaceBase}`,
+                boxShadow: `0 0 0 2px ${markerBg}`,
+                zIndex: 2,
+              }} />
+
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <span style={{
+                    fontFamily: F.display,
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    color: C.textPrimary,
+                    textTransform: "capitalize"
+                  }}>
+                    {formatHistoryAction(item.action)}
+                  </span>
+                  <span style={{ fontFamily: F.body, fontSize: 9.5, color: C.textTertiary, whiteSpace: "nowrap" }}>
+                    {fmtDateTime(item.created_at)}
+                  </span>
+                </div>
+
+                <div style={{ fontFamily: F.body, fontSize: 10.5, color: C.textSecondary, marginTop: 3 }}>
+                  <span style={{ fontWeight: 600, color: C.textPrimary }}>{actor}</span>
+                  {notes && (
+                    <div style={{
+                      marginTop: 4,
+                      padding: "5px 8px",
+                      background: C.surfaceInput,
+                      border: `1px solid ${C.borderDefault}`,
+                      borderRadius: 6,
+                      fontSize: 10.5,
+                      color: C.textSecondary,
+                      fontStyle: "italic",
+                      lineHeight: 1.35,
+                      whiteSpace: "pre-wrap"
+                    }}>
+                      &ldquo;{notes}&rdquo;
+                    </div>
+                  )}
+                </div>
+
+                {item.metadata?.changes && Object.keys(item.metadata.changes).length > 0 && (
+                  <ul style={{
+                    margin: "5px 0 0 0",
+                    paddingLeft: 18,
+                    fontFamily: F.body,
+                    fontSize: 10,
+                    color: C.textSecondary,
+                    listStyleType: "disc",
+                  }}>
+                    {Object.entries(item.metadata.changes).map(([field, diff]) => (
+                      <li key={field} style={{ marginBottom: 2 }}>
+                        <strong style={{ color: C.textPrimary }}>{formatFieldName(field)}</strong>:{" "}
+                        <span style={{ textDecoration: "line-through", color: C.textTertiary }}>
+                          {formatValue(field, diff.from)}
+                        </span>{" "}
+                        &rarr;{" "}
+                        <span style={{ fontWeight: 600, color: C.gold }}>
+                          {formatValue(field, diff.to)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
   const editSummaryRows = [
     ["Reference", reservation.reference_code || "-"],
     ["Room", form.room || "-"],
@@ -1877,6 +2213,25 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
                         Modify Details
                       </button>
                     )}
+                    {["pending", "approved", "reserved"].includes((reservation.status || "").toLowerCase()) && canManage && (
+                      <button
+                        onClick={() => setShowCancelModal(true)}
+                        disabled={!!actionLoading}
+                        style={{
+                          width:"100%",marginTop:8,padding:"9px",
+                          background:"transparent",border:`1px solid ${C.redBorder}`,
+                          borderRadius:8,fontFamily:F.label,fontSize:9,fontWeight:700,
+                          letterSpacing:"0.14em",textTransform:"uppercase",
+                          color:C.red,cursor:actionLoading?"not-allowed":"pointer",
+                          transition:"all 0.18s",
+                          display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+                        }}
+                        onMouseEnter={(e)=>{if(!actionLoading)e.currentTarget.style.background=C.redFaint;}}
+                        onMouseLeave={(e)=>{if(!actionLoading)e.currentTarget.style.background="transparent";}}
+                      >
+                        {actionLoading==="cancel"?<><Spinner/>Cancelling...</>:"Cancel Reservation"}
+                      </button>
+                    )}
                   </div>
 
                   {/* History & Tracking */}
@@ -1885,37 +2240,13 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
                     border: `1px solid ${C.borderDefault}`,
                     borderRadius: 12,
                     padding: "14px 16px",
-                    maxHeight: 240,
+                    maxHeight: 350,
                     overflowY: "auto",
                   }}>
                     <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary,display:"block",marginBottom:10}}>
-                      History & Tracking Logs
+                      Reservation Activity & Audit Trail
                     </span>
-                    {historyItems.length ? (
-                      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                        {historyItems.map((item,i)=>(
-                          <div key={item.id || `${item.action}-${i}`} style={{
-                            paddingBottom:i<historyItems.length-1?8:0,
-                            borderBottom:i<historyItems.length-1?`1px solid ${C.divider}`:"none",
-                          }}>
-                            <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}>
-                              <span style={{fontFamily:F.body,fontSize:11.5,fontWeight:700,color:C.textPrimary,lineHeight:1.3}}>{formatHistoryAction(item.action)}</span>
-                              <span style={{fontFamily:F.body,fontSize:9.5,color:C.textTertiary,whiteSpace:"nowrap"}}>{fmtDateTime(item.created_at)}</span>
-                            </div>
-                            <div style={{fontFamily:F.body,fontSize:10.5,color:C.textSecondary,lineHeight:1.4,marginTop:2}}>
-                              {(item.from_status || item.to_status) && (
-                                <span style={{textTransform:"capitalize"}}>{item.from_status || "-"} {"->"} {item.to_status || "-"}</span>
-                              )}
-                              {item.notes ? <span>{item.from_status || item.to_status ? " - " : ""}{item.notes}</span> : null}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{fontFamily:F.body,fontSize:11,color:C.textSecondary}}>
-                        No transaction history recorded yet.
-                      </div>
-                    )}
+                    {renderActivityTimeline()}
                   </div>
 
                 </aside>
@@ -1961,6 +2292,14 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onUp
           onConfirm={handleSaveConfirm}
           onCancel={()=>setShowSaveModal(false)}
           loading={actionLoading==="save"}
+        />
+      )}
+      {showCancelModal && (
+        <CancelConfirmModal
+          reservation={reservation}
+          onConfirm={handleCancelConfirm}
+          onCancel={()=>setShowCancelModal(false)}
+          loading={actionLoading==="cancel"}
         />
       )}
     </>
@@ -2621,6 +2960,40 @@ export default function ReservationDashboard() {
     }
   };
 
+  const handleCancel = async (reservation, reason) => {
+    try {
+      const result = await cancelReservation(reservation.db_id || reservation.id, reason);
+      if (result.success) {
+        const now = new Date().toISOString();
+        const updatedFields = {
+          status: "cancelled",
+          reservation_state: "inactive",
+          previous_status: reservation.status,
+          status_last_changed_at: result.status_last_changed_at || now,
+          cancelled_at: result.cancelled_at || now,
+          cancellation_reason: reason,
+          transaction_history: result.transaction_history || reservation.transaction_history
+        };
+        setReservations(prev =>
+          prev.map(r => r.id === reservation.id ? {
+            ...r,
+            ...updatedFields
+          } : r)
+        );
+        setSelectedReservation(prev => prev && prev.id === reservation.id ? {
+          ...prev,
+          ...updatedFields
+        } : prev);
+        optimisticSeatUpdate(reservation, "available");
+        setToast({ message: `Reservation cancelled. Notification email sent to ${reservation.email}.`, type: "success" });
+      } else {
+        setToast({ message: result.message || "Failed to cancel reservation", type: "error" });
+      }
+    } catch {
+      setToast({ message: "Error cancelling reservation", type: "error" });
+    }
+  };
+
   const handleUpdateDetails = async (reservation, payload) => {
     try {
       const result = await updateReservation(reservation.db_id || reservation.id, payload);
@@ -3245,7 +3618,7 @@ export default function ReservationDashboard() {
                                     ["Request Age", reservation._requestAge],
                                     ["Guests", `${reservation.guests_count || reservation.guests || 0} pax`],
                                     ["Type", String(reservation.type || "whole").replace(/_/g," ")],
-                                    ["Last Action", reservation._lastAction ? transactionLabel(reservation._lastAction.action) : "No activity"],
+                                    ["Last Action", lastActionSummary(reservation)],
                                     ["Notify", reservation._notificationStatus],
                                   ].map(([label,value])=>(
                                     <div key={label} style={{minWidth:0}}>
@@ -3298,6 +3671,7 @@ export default function ReservationDashboard() {
             onApprove={handleApprove}
             onReject={handleReject}
             onRevert={handleRevert}
+            onCancel={handleCancel}
             onUpdate={handleUpdateDetails}
             canManage={canManageReservations}
             canAdjust={canAdjustReservations}

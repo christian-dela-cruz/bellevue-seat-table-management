@@ -162,7 +162,28 @@ class AdminReservationController extends Controller
         }
 
         $reservation->load(['venue', 'seats']);
-        return response()->json($reservation);
+        $data = $reservation->toArray();
+        $data['transaction_history'] = $reservation->transactions()
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->map(fn ($t) => [
+                'id' => $t->id,
+                'action' => $t->action,
+                'from_status' => $t->from_status,
+                'to_status' => $t->to_status,
+                'notes' => $t->notes,
+                'metadata' => $t->metadata,
+                'actor_admin_id' => $t->actor_admin_id,
+                'actor_name' => $t->actor_name,
+                'actor_role' => $t->actor_role,
+                'actor_email' => $t->actor_email,
+                'created_at' => optional($t->created_at)->toISOString(),
+            ])
+            ->values()
+            ->toArray();
+
+        return response()->json($data);
     }
 
     public function update(Request $request, Reservation $reservation): JsonResponse
@@ -298,18 +319,73 @@ class AdminReservationController extends Controller
         }
 
         if (!empty($changes)) {
-            $this->reservationService->recordTransaction(
-                $reservation,
-                'details_updated',
-                $reservation->status,
-                $reservation->status,
-                'Reservation details updated by admin.',
-                [
-                    'changes' => $changes,
-                    'updated_by' => $admin['username'] ?? $admin['email'] ?? null,
-                ],
-                $admin
-            );
+            $roomChanges = array_intersect_key($changes, array_flip(['assigned_room_id', 'room', 'internal_room_name', 'public_room_name']));
+            $seatChanges = array_intersect_key($changes, array_flip(['table_number', 'seat_number', 'seat_id']));
+            $guestChanges = array_intersect_key($changes, array_flip(['name', 'email', 'phone']));
+            $genericChanges = array_diff_key($changes, array_flip(array_merge(['assigned_room_id', 'room', 'internal_room_name', 'public_room_name', 'table_number', 'seat_number', 'seat_id', 'name', 'email', 'phone'])));
+
+            if (!empty($roomChanges)) {
+                $isNewAssignment = empty($original['assigned_room_id']) && empty($original['room']);
+                $actionType = $isNewAssignment ? 'room_assigned' : 'room_changed';
+                
+                $this->reservationService->recordTransaction(
+                    $reservation,
+                    $actionType,
+                    $reservation->status,
+                    $reservation->status,
+                    $isNewAssignment ? 'Room/outlet assigned by admin.' : 'Assigned room/outlet changed by admin.',
+                    [
+                        'changes' => $roomChanges,
+                        'updated_by' => $admin['username'] ?? $admin['email'] ?? null,
+                    ],
+                    $admin
+                );
+            }
+
+            if (!empty($seatChanges)) {
+                $this->reservationService->recordTransaction(
+                    $reservation,
+                    'table_seat_changed',
+                    $reservation->status,
+                    $reservation->status,
+                    'Table or seat assignments updated by admin.',
+                    [
+                        'changes' => $seatChanges,
+                        'updated_by' => $admin['username'] ?? $admin['email'] ?? null,
+                    ],
+                    $admin
+                );
+            }
+
+            if (!empty($guestChanges)) {
+                $this->reservationService->recordTransaction(
+                    $reservation,
+                    'guest_details_updated',
+                    $reservation->status,
+                    $reservation->status,
+                    'Guest contact details updated by admin.',
+                    [
+                        'changes' => $guestChanges,
+                        'updated_by' => $admin['username'] ?? $admin['email'] ?? null,
+                    ],
+                    $admin
+                );
+            }
+
+            if (!empty($genericChanges)) {
+                $this->reservationService->recordTransaction(
+                    $reservation,
+                    'edited',
+                    $reservation->status,
+                    $reservation->status,
+                    'Reservation details edited by admin.',
+                    [
+                        'changes' => $genericChanges,
+                        'updated_by' => $admin['username'] ?? $admin['email'] ?? null,
+                    ],
+                    $admin
+                );
+            }
         }
 
         broadcast(new ReservationUpdated($reservation))->toOthers();
@@ -573,6 +649,84 @@ class AdminReservationController extends Controller
                 'reverted_at' => optional($reservation->reverted_at)->toISOString(),
                 'transaction_history' => $reservation->transactions()->latest()->limit(8)->get(),
             ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function cancel(Request $request, int $id): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'reason' => 'required|string|min:3|max:2000',
+            ]);
+
+            $reservation = Reservation::findOrFail($id);
+            $admin = $this->currentAdmin($request);
+
+            if (!$this->reservationService->canAccessReservation($admin, $reservation)) {
+                return $this->scopeDeniedResponse();
+            }
+
+            if (!in_array($reservation->status, ['pending', 'approved', 'reserved'], true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only pending, approved, or reserved reservations can be cancelled.',
+                ], 422);
+            }
+
+            $reservation = $this->reservationService->cancelReservation($reservation, $validated['reason'], $admin);
+
+            // Send cancellation email to the client
+            try {
+                Mail::to($reservation->email)
+                    ->send(new ReservationStatusMail($reservation, 'cancelled', $validated['reason']));
+                $this->reservationService->recordTransaction(
+                    $reservation,
+                    'notification_sent',
+                    $reservation->status,
+                    $reservation->status,
+                    'Cancellation email sent to guest.',
+                    ['channel' => 'email', 'type' => 'reservation_cancelled_by_admin'],
+                    $admin
+                );
+            } catch (\Exception $e) {
+                \Log::error('Failed to send cancellation email: ' . $e->getMessage());
+                $this->reservationService->recordTransaction(
+                    $reservation,
+                    'notification_failed',
+                    $reservation->status,
+                    $reservation->status,
+                    'Cancellation email failed to send.',
+                    ['channel' => 'email', 'type' => 'reservation_cancelled_by_admin', 'error' => $e->getMessage()],
+                    $admin
+                );
+            }
+
+            try {
+                broadcast(new ReservationUpdated($reservation))->toOthers();
+                WebsocketBroadcaster::broadcast('reservations', 'ReservationUpdated', [
+                    'reservation' => $reservation
+                ]);
+            } catch (\Throwable $broadcastError) {
+                \Log::warning('Reservation cancel broadcast failed: ' . $broadcastError->getMessage());
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Reservation cancelled successfully',
+                'reservation_id' => $reservation->reference_code,
+                'status' => $reservation->status,
+                'reservation_state' => $reservation->reservation_state,
+                'cancellation_reason' => $reservation->cancellation_reason,
+                'cancelled_at' => optional($reservation->cancelled_at)->toISOString(),
+                'transaction_history' => $reservation->transactions()->latest()->limit(8)->get(),
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }

@@ -262,6 +262,16 @@ function actionLabel(value) {
   return String(value || "-").replace(/_/g, " ");
 }
 
+function getPerformedBy(row) {
+  if (row.actor_name) {
+    return row.actor_role ? `${row.actor_name} (${row.actor_role})` : row.actor_name;
+  }
+  if (row.action === "cancelled_by_guest") {
+    return "Guest";
+  }
+  return "System";
+}
+
 function outletGroup(outlet) {
   const wing = String(outlet?.wing || "").toLowerCase();
   const type = String(outlet?.type || "").toLowerCase();
@@ -674,7 +684,7 @@ function TransactionMonitor({ transactionReport, isGlobal, sort, onSort }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
               <thead>
                 <tr style={{ background: C.soft, color: C.faint, textTransform: "uppercase", letterSpacing: "0.10em", fontSize: 10 }}>
-                  {["Time", "Reference", "Guest", "Outlet / Room", "Change", "Action", "Notes"].map((header) => (
+                  {["Time", "Reference", "Guest", "Outlet / Room", "Change", "Action", "Performed By", "Notes"].map((header) => (
                     <th key={header} style={tableHeadStyle()}>{header}</th>
                   ))}
                 </tr>
@@ -682,7 +692,7 @@ function TransactionMonitor({ transactionReport, isGlobal, sort, onSort }) {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: "16px 12px", color: C.muted }}>No transactions found for this date range.</td>
+                    <td colSpan={8} style={{ padding: "16px 12px", color: C.muted }}>No transactions found for this date range.</td>
                   </tr>
                 ) : visibleRows.map((row) => {
                   const reservation = row.reservation || {};
@@ -710,6 +720,7 @@ function TransactionMonitor({ transactionReport, isGlobal, sort, onSort }) {
                         </div>
                       </td>
                       <td style={cellStyle()}>{actionLabel(row.action)}</td>
+                      <td style={cellStyle()}>{getPerformedBy(row)}</td>
                       <td style={{ ...cellStyle(), whiteSpace: "normal", minWidth: 220 }}>{row.notes || "-"}</td>
                     </tr>
                   );
@@ -1624,7 +1635,12 @@ export default function Reports() {
         "Table Number",
         "Seat Number",
         "Special Requests",
-        "Submitted At"
+        "Submitted At",
+        "Approved By",
+        "Rejected By",
+        "Cancelled By",
+        "Last Action By",
+        "Last Action Date"
       ];
 
       const filteredRes = reservations.filter(r => {
@@ -1657,7 +1673,12 @@ export default function Reports() {
         r.table_number || "-",
         r.seat_number || "-",
         r.special_requests || "-",
-        r.submitted_at || r.created_at || "-"
+        r.submitted_at || r.created_at || "-",
+        r.approved_by || "-",
+        r.rejected_by || "-",
+        r.cancelled_by || "-",
+        r.last_action_by || "-",
+        r.last_action_date || "-"
       ]);
 
       return csvIncludeHeaders ? [headers, ...dataRows] : dataRows;
@@ -3342,6 +3363,7 @@ export default function Reports() {
                   <th>Venue / Location</th>
                   <th>Change Description</th>
                   <th>Action taken</th>
+                  <th>Performed By</th>
                   <th>Coordinator notes</th>
                 </tr>
               </thead>
@@ -3362,6 +3384,7 @@ export default function Reports() {
                         }
                       </td>
                       <td>{actionLabel(row.action)}</td>
+                      <td>{getPerformedBy(row)}</td>
                       <td style={{ fontSize: "8.5pt" }}>{row.notes || "-"}</td>
                     </tr>
                   );

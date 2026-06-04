@@ -104,6 +104,7 @@ Route::prefix('admin/reservations')->group(function () {
     Route::patch('/{id}/approve', [AdminReservationController::class, 'approve'])->middleware(AdminAccess::class . ':manage_reservations');
     Route::patch('/{id}/reject', [AdminReservationController::class, 'reject'])->middleware(AdminAccess::class . ':manage_reservations');
     Route::patch('/{id}/revert', [AdminReservationController::class, 'revert'])->middleware(AdminAccess::class . ':manage_reservations');
+    Route::patch('/{id}/cancel', [AdminReservationController::class, 'cancel'])->middleware(AdminAccess::class . ':manage_reservations');
     Route::delete('/{id}', [AdminReservationController::class, 'destroy'])->middleware(AdminAccess::class . ':delete_reservations');
 });
 

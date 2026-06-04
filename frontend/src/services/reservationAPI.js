@@ -31,6 +31,9 @@ export const reservationAPI = {
   // Revert rejected reservation to pending
   revert: (id) => api.patch(`/admin/reservations/${id}/revert`),
 
+  // Cancel reservation (admin)
+  cancel: (id, reason) => api.patch(`/admin/reservations/${id}/cancel`, { reason }),
+
   // Update operational coordination metadata
   updateCoordination: (id, coordinationData) => api.patch(`/admin/reservations/${id}/coordination`, coordinationData),
 

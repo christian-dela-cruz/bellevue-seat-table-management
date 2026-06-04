@@ -186,6 +186,46 @@ export async function revertReservation(reservationId) {
   }
 }
 
+// Cancel a reservation by admin
+export async function cancelReservation(reservationId, reason = '') {
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/reservations/${reservationId}/cancel`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ reason })
+    });
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return {
+          success: false,
+          message: response.status === 403
+            ? 'You are not authorized to cancel reservations.'
+            : 'Please log in again before cancelling reservations.',
+        };
+      }
+      const errorBody = await response.json().catch(() => ({}));
+      return { success: false, message: errorBody.message || `HTTP error! status: ${response.status}` };
+    }
+
+    const result = await response.json();
+
+    // Update localStorage as backup
+    const reservations = JSON.parse(localStorage.getItem('bellevue_reservations') || '[]');
+    const updatedReservations = reservations.map(r =>
+      r.id === reservationId
+        ? { ...r, status: 'cancelled', reservation_state: 'inactive', cancellation_reason: reason, cancelled_at: new Date().toISOString() }
+        : r
+    );
+    localStorage.setItem('bellevue_reservations', JSON.stringify(updatedReservations));
+
+    return result;
+  } catch (error) {
+    console.error('[API] Failed to cancel reservation:', error);
+    return { success: false, message: 'Failed to cancel reservation' };
+  }
+}
+
 // Create a new reservation in database
 export async function createReservation(reservationData) {
   try {

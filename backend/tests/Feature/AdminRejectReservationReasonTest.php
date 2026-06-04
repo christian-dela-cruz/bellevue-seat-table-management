@@ -129,14 +129,14 @@ class AdminRejectReservationReasonTest extends TestCase
 
         $this->assertDatabaseHas('reservation_transactions', [
             'reservation_id' => $rejectedReservation->id,
-            'action' => 'status_changed',
+            'action' => 'rejected',
             'from_status' => 'pending',
             'to_status' => 'rejected',
         ]);
 
         $this->assertDatabaseHas('reservation_transactions', [
             'reservation_id' => $reservedReservation->id,
-            'action' => 'status_changed',
+            'action' => 'approved',
             'from_status' => 'pending',
             'to_status' => 'reserved',
         ]);
@@ -180,21 +180,21 @@ class AdminRejectReservationReasonTest extends TestCase
 
         $this->assertDatabaseHas('reservations', [
             'id' => $reservation->id,
-            'status' => 'rejected',
+            'status' => 'cancelled',
             'cancellation_reason' => 'Unable to attend due to schedule conflict',
         ]);
 
         $this->assertDatabaseHas('reservation_transactions', [
             'reservation_id' => $reservation->id,
-            'action' => 'status_changed',
+            'action' => 'cancelled_by_guest',
             'from_status' => 'approved',
-            'to_status' => 'rejected',
+            'to_status' => 'cancelled',
         ]);
 
         $this->assertDatabaseHas('reservation_transactions', [
             'reservation_id' => $reservation->id,
             'action' => 'notification_sent',
-            'to_status' => 'rejected',
+            'to_status' => 'cancelled',
         ]);
 
         Mail::assertSent(ReservationStatusMail::class, function (ReservationStatusMail $mail) use ($reservation) {
@@ -242,7 +242,7 @@ class AdminRejectReservationReasonTest extends TestCase
 
         $this->assertDatabaseHas('reservation_transactions', [
             'reservation_id' => $reservation->id,
-            'action' => 'status_changed',
+            'action' => 'reverted',
             'from_status' => 'rejected',
             'to_status' => 'pending',
         ]);
@@ -737,8 +737,26 @@ class AdminRejectReservationReasonTest extends TestCase
 
         $this->assertDatabaseHas('reservation_transactions', [
             'reservation_id' => $reservation->id,
-            'action' => 'details_updated',
-            'notes' => 'Reservation details updated by admin.',
+            'action' => 'guest_details_updated',
+            'notes' => 'Guest contact details updated by admin.',
+        ]);
+
+        $this->assertDatabaseHas('reservation_transactions', [
+            'reservation_id' => $reservation->id,
+            'action' => 'table_seat_changed',
+            'notes' => 'Table or seat assignments updated by admin.',
+        ]);
+
+        $this->assertDatabaseHas('reservation_transactions', [
+            'reservation_id' => $reservation->id,
+            'action' => 'room_assigned',
+            'notes' => 'Room/outlet assigned by admin.',
+        ]);
+
+        $this->assertDatabaseHas('reservation_transactions', [
+            'reservation_id' => $reservation->id,
+            'action' => 'edited',
+            'notes' => 'Reservation details edited by admin.',
         ]);
     }
 
@@ -916,6 +934,48 @@ class AdminRejectReservationReasonTest extends TestCase
             'setup_tables' => 8,
             'setup_chairs' => 40,
             'setup_requirements' => 'Projector, registration table, and stage lighting.',
+        ]);
+    }
+
+    public function test_admin_can_cancel_reservation_with_audit_trail(): void
+    {
+        Mail::fake();
+
+        $venue = $this->createVenue();
+        $reservation = $this->createReservation($venue, [
+            'status' => 'approved',
+        ]);
+
+        $headers = $this->adminHeaders();
+
+        $this->patchJson("/api/admin/reservations/{$reservation->id}/cancel", [
+            'reason' => 'Duplicate booking found',
+        ], $headers)
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('status', 'cancelled')
+            ->assertJsonPath('cancellation_reason', 'Duplicate booking found');
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'status' => 'cancelled',
+            'cancellation_reason' => 'Duplicate booking found',
+        ]);
+
+        $this->assertDatabaseHas('reservation_transactions', [
+            'reservation_id' => $reservation->id,
+            'action' => 'cancelled_by_admin',
+            'from_status' => 'approved',
+            'to_status' => 'cancelled',
+            'notes' => 'Reservation cancelled by admin.',
+        ]);
+
+        $this->assertDatabaseHas('reservation_transactions', [
+            'reservation_id' => $reservation->id,
+            'action' => 'notification_sent',
+            'from_status' => 'cancelled',
+            'to_status' => 'cancelled',
+            'notes' => 'Cancellation email sent to guest.',
         ]);
     }
 }

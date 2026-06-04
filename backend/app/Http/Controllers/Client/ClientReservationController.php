@@ -57,7 +57,7 @@ class ClientReservationController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $reservations = Reservation::with('venue')
+        $reservations = Reservation::with(['venue', 'transactions'])
             ->when($request->filled('venue_id'), function ($query) use ($request) {
                 $query->where('venue_id', $request->query('venue_id'));
             })
@@ -556,7 +556,7 @@ class ClientReservationController extends Controller
             $fromStatus = $reservation->status;
 
             $reservation->update([
-                'status' => 'rejected',
+                'status' => 'cancelled',
                 'rejection_reason' => null,
                 'cancellation_reason' => $cancelReason,
                 'cancelled_at' => now(),
@@ -564,7 +564,7 @@ class ClientReservationController extends Controller
 
             ReservationTransaction::create([
                 'reservation_id' => $reservation->id,
-                'action' => 'status_changed',
+                'action' => 'cancelled_by_guest',
                 'from_status' => $fromStatus,
                 'to_status' => $reservation->status,
                 'notes' => 'Reservation cancelled by guest.',
