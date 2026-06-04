@@ -1,21 +1,13 @@
-import { fetchAPI } from "./apiConfig";
+import api from "./api.js";
 
 export const roleAPI = {
-  getAll: () => fetchAPI("/admin/roles"),
+  getAll: () => api.get("/admin/roles"),
   
-  getPermissions: () => fetchAPI("/admin/roles/permissions"),
+  getPermissions: () => api.get("/admin/roles/permissions"),
   
-  create: (data) => fetchAPI("/admin/roles", {
-    method: "POST",
-    body: JSON.stringify(data)
-  }),
+  create: (data) => api.post("/admin/roles", data),
   
-  update: (id, data) => fetchAPI(`/admin/roles/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(data)
-  }),
+  update: (id, data) => api.put(`/admin/roles/${id}`, data),
   
-  delete: (id) => fetchAPI(`/admin/roles/${id}`, {
-    method: "DELETE"
-  })
+  delete: (id) => api.delete(`/admin/roles/${id}`)
 };

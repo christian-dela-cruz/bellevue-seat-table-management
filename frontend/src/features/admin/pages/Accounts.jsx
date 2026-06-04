@@ -41,16 +41,6 @@ const DEFAULT_FORM = {
   outlet_scope: [],
 };
 
-const DEFAULT_FORM = {
-  name: "",
-  email: "",
-  username: "",
-  password: "",
-  role: "staff",
-  scope_type: "all",
-  outlet_scope: [],
-};
-
 const SORT_OPTIONS = [
   { value: "name_asc", label: "Name, A to Z" },
   { value: "name_desc", label: "Name, Z to A" },
@@ -198,20 +188,22 @@ function paginationButtonStyle(disabled = false) {
 }
 
 function roleOptionsFor(currentUser, availableRoles) {
-  if (!currentUser || !availableRoles) return [];
-  // Admin can only assign roles with a lower level than themselves
-  const userLevel = currentUser.dbRole?.level || 0; // Assume 0 if unknown
+  if (!currentUser || !availableRoles || !availableRoles.length) return [];
+  // Look up the current user's level from the roles list
+  const currentRole = availableRoles.find(r => r.slug === currentUser.role);
+  const userLevel = currentRole ? currentRole.level : 0;
   return availableRoles.filter(r => r.level < userLevel).map(r => r.slug);
 }
 
 function canManageAccount(currentUser, account, availableRoles) {
   if (!currentUser || !account || currentUser.id === account.id) return false;
   
-  const userLevel = currentUser.dbRole?.level || 0;
+  // Look up both users' levels from the roles list
+  const currentRole = availableRoles?.find(r => r.slug === currentUser.role);
+  const userLevel = currentRole ? currentRole.level : 0;
   
-  // Find the target account's role level
   const targetRole = availableRoles?.find(r => r.slug === account.role);
-  const targetLevel = targetRole ? targetRole.level : 100; // If unknown, assume high level to protect it
+  const targetLevel = targetRole ? targetRole.level : 100;
   
   return userLevel > targetLevel;
 }
@@ -542,7 +534,7 @@ function ScopeSelector({ value, disabled, onChange, tree = [] }) {
   );
 }
 
-function ConfirmStatusModal({ account, loading, onCancel, onConfirm }) {
+function ConfirmStatusModal({ account, loading, onCancel, onConfirm, getRoleName }) {
   if (!account) return null;
   const inactive = account.is_active === false;
   const action = inactive ? "Enable" : "Disable";
@@ -763,7 +755,7 @@ export default function Accounts() {
   };
 
   const beginEdit = (account) => {
-    if (!canManageAccount(currentUser, account)) {
+    if (!canManageAccount(currentUser, account, availableRoles)) {
       setToast({ type: "error", message: "You cannot modify this account." });
       return;
     }
@@ -842,7 +834,7 @@ export default function Accounts() {
   };
 
   const requestStatusToggle = (account) => {
-    if (!canManageAccount(currentUser, account)) {
+    if (!canManageAccount(currentUser, account, availableRoles)) {
       setToast({ type:"error", message:"You cannot modify this account." });
       return;
     }
@@ -1054,7 +1046,7 @@ export default function Accounts() {
                         </div>
                       )}
                       {paginatedAccounts.map((account) => {
-                        const manageable = canManageAccount(currentUser, account);
+                        const manageable = canManageAccount(currentUser, account, availableRoles);
                         const inactive = account.is_active === false;
 
                         return (
@@ -1127,6 +1119,7 @@ export default function Accounts() {
             loading={loading}
             onCancel={()=>setStatusTarget(null)}
             onConfirm={confirmStatusToggle}
+            getRoleName={getRoleName}
           />
 
           {drawerVisible && (
