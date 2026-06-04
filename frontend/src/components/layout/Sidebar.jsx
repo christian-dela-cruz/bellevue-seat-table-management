@@ -80,7 +80,7 @@ function SidebarCollapseBtn({ onClick, isOpen }) {
       title={isOpen ? "Collapse sidebar" : "Expand sidebar"}
       style={{
         position: "absolute",
-        top: 44, // Align exactly on the header divider border line
+        top: 50, // Align exactly on the header divider border line
         right: -12, // Float exactly over the border (half of button width)
         transform: "translateY(-50%)",
         width: 24,

@@ -92,6 +92,51 @@ class AdminAccess
         });
     }
 
+    public static function permissionsForAdmin(?\App\Models\Admin $admin): array
+    {
+        if (!$admin) {
+            return [];
+        }
+
+        $roleSlug = self::normalizeRole($admin->role);
+
+        if ($roleSlug === 'super_admin' || $admin->id === 0) {
+            return self::permissionsForRole('super_admin');
+        }
+
+        return Cache::remember("admin_{$admin->id}_effective_permissions", now()->addHours(24), function () use ($admin, $roleSlug) {
+            $rolePermissions = self::permissionsForRole($roleSlug);
+
+            $overrides = \App\Models\AdminPermissionOverride::with('permission')
+                ->where('admin_id', $admin->id)
+                ->get();
+
+            $allowOverrides = [];
+            $denyOverrides = [];
+
+            foreach ($overrides as $override) {
+                if ($override->permission) {
+                    if ($override->effect === 'allow') {
+                        $allowOverrides[] = $override->permission->slug;
+                    } else {
+                        $denyOverrides[] = $override->permission->slug;
+                    }
+                }
+            }
+
+            // Effective = (Role + Allow) - Deny
+            $effective = array_unique(array_merge($rolePermissions, $allowOverrides));
+            $effective = array_diff($effective, $denyOverrides);
+
+            return array_values($effective);
+        });
+    }
+
+    public static function invalidateAdminCache(\App\Models\Admin $admin): void
+    {
+        Cache::forget("admin_{$admin->id}_effective_permissions");
+    }
+
     public function handle(Request $request, Closure $next, string $permission = 'view_admin'): Response
     {
         $token = $request->bearerToken() ?: $request->header('X-Admin-Token');
@@ -112,7 +157,7 @@ class AdminAccess
             ], 401);
         }
 
-        $permissions = self::permissionsForRole($admin['role'] ?? null);
+        $permissions = $admin['permissions'] ?? [];
 
         if (!in_array($permission, $permissions, true)) {
             return response()->json([

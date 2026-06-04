@@ -40,4 +40,14 @@ class Admin extends Model
     {
         return $this->belongsTo(Role::class, 'role', 'slug');
     }
+
+    public function permissionOverrides()
+    {
+        return $this->hasMany(AdminPermissionOverride::class);
+    }
+
+    public function auditLogs()
+    {
+        return $this->hasMany(AuditLog::class);
+    }
 }

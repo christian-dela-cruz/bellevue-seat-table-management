@@ -52,7 +52,16 @@ class RoleController extends Controller
             $role->permissions()->sync($permissionIds);
         }
 
-        return response()->json($role->load('permissions'), 201);
+        $actor = $request->attributes->get('admin');
+        \App\Models\AuditLog::create([
+            'action' => 'created',
+            'model_type' => Role::class,
+            'model_id' => $role->id,
+            'admin_id' => $actor['id'] ?? null,
+            'new_values' => $role->load('permissions')->toArray(),
+        ]);
+
+        return response()->json($role, 201);
     }
 
     public function update(Request $request, $id)
@@ -67,6 +76,7 @@ class RoleController extends Controller
             'permissions.*' => 'exists:permissions,slug',
         ]);
 
+        $oldValues = $role->load('permissions')->toArray();
         $updateData = [];
         if (isset($validated['name'])) $updateData['name'] = $validated['name'];
         if (isset($validated['description'])) $updateData['description'] = $validated['description'];
@@ -79,11 +89,24 @@ class RoleController extends Controller
         $role->update($updateData);
 
         if (isset($validated['permissions'])) {
+            if ($role->is_system) {
+                return response()->json(['message' => 'Cannot modify permissions of system roles'], 403);
+            }
             $permissionIds = Permission::whereIn('slug', $validated['permissions'])->pluck('id')->toArray();
             $role->permissions()->sync($permissionIds);
         }
         
         Cache::forget("role_{$role->slug}_permissions");
+
+        $actor = $request->attributes->get('admin');
+        \App\Models\AuditLog::create([
+            'action' => 'updated',
+            'model_type' => Role::class,
+            'model_id' => $role->id,
+            'admin_id' => $actor['id'] ?? null,
+            'old_values' => $oldValues,
+            'new_values' => $role->fresh()->load('permissions')->toArray(),
+        ]);
 
         return response()->json($role->load('permissions'));
     }
@@ -100,8 +123,19 @@ class RoleController extends Controller
             return response()->json(['message' => 'Cannot delete role assigned to users'], 400);
         }
 
+        $oldValues = $role->toArray();
+        
         Cache::forget("role_{$role->slug}_permissions");
         $role->delete();
+
+        $actor = $request->attributes->get('admin');
+        \App\Models\AuditLog::create([
+            'action' => 'deleted',
+            'model_type' => Role::class,
+            'model_id' => $role->id,
+            'admin_id' => $actor['id'] ?? null,
+            'old_values' => $oldValues,
+        ]);
 
         return response()->json(null, 204);
     }

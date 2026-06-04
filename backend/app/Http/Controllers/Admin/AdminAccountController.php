@@ -59,6 +59,9 @@ class AdminAccountController extends Controller
             'scope_type' => ['required', Rule::in(['all', 'assigned'])],
             'outlet_scope' => ['nullable', 'array'],
             'outlet_scope.*' => ['nullable'],
+            'overrides' => ['nullable', 'array'],
+            'overrides.*.permission_id' => ['required', 'exists:permissions,id'],
+            'overrides.*.effect' => ['required', Rule::in(['allow', 'deny'])],
         ]);
         $scopeType = $this->scopeTypeForRole($validated['role'], $validated['scope_type']);
 
@@ -79,6 +82,24 @@ class AdminAccountController extends Controller
             'outlet_scope' => $scopeType === 'assigned'
                 ? array_values($validated['outlet_scope'] ?? [])
                 : [],
+        ]);
+
+        if (!empty($validated['overrides'])) {
+            foreach ($validated['overrides'] as $override) {
+                $admin->permissionOverrides()->create([
+                    'permission_id' => $override['permission_id'],
+                    'effect' => $override['effect'],
+                    'granted_by_admin_id' => $actor['id'] ?? null,
+                ]);
+            }
+        }
+
+        \App\Models\AuditLog::create([
+            'action' => 'created',
+            'model_type' => Admin::class,
+            'model_id' => $admin->id,
+            'admin_id' => $actor['id'] ?? null,
+            'new_values' => $admin->toArray(),
         ]);
 
         return response()->json([
@@ -109,6 +130,9 @@ class AdminAccountController extends Controller
             'scope_type' => ['sometimes', 'required', Rule::in(['all', 'assigned'])],
             'outlet_scope' => ['nullable', 'array'],
             'outlet_scope.*' => ['nullable'],
+            'overrides' => ['nullable', 'array'],
+            'overrides.*.permission_id' => ['required', 'exists:permissions,id'],
+            'overrides.*.effect' => ['required', Rule::in(['allow', 'deny'])],
         ]);
 
         $updates = collect($validated)->only(['name', 'email', 'username', 'scope_type'])->toArray();
@@ -140,7 +164,32 @@ class AdminAccountController extends Controller
                 : [];
         }
 
+        $oldValues = $admin->toArray();
         $admin->update($updates);
+
+        if (array_key_exists('overrides', $validated)) {
+            $admin->permissionOverrides()->delete();
+            if (!empty($validated['overrides'])) {
+                foreach ($validated['overrides'] as $override) {
+                    $admin->permissionOverrides()->create([
+                        'permission_id' => $override['permission_id'],
+                        'effect' => $override['effect'],
+                        'granted_by_admin_id' => $actor['id'] ?? null,
+                    ]);
+                }
+            }
+        }
+
+        AdminAccess::invalidateAdminCache($admin);
+
+        \App\Models\AuditLog::create([
+            'action' => 'updated',
+            'model_type' => Admin::class,
+            'model_id' => $admin->id,
+            'admin_id' => $actor['id'] ?? null,
+            'old_values' => $oldValues,
+            'new_values' => $admin->fresh()->toArray(),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -268,6 +317,7 @@ class AdminAccountController extends Controller
     private function formatAdmin(Admin $admin): array
     {
         $role = AdminAccess::normalizeRole($admin->role);
+        $admin->load('permissionOverrides.permission');
 
         return [
             'id' => $admin->id,
@@ -275,7 +325,14 @@ class AdminAccountController extends Controller
             'email' => $admin->email,
             'username' => $admin->username,
             'role' => $role,
-            'permissions' => AdminAccess::permissionsForRole($role),
+            'permissions' => AdminAccess::permissionsForAdmin($admin),
+            'overrides' => $admin->permissionOverrides->map(function ($override) {
+                return [
+                    'permission_id' => $override->permission_id,
+                    'permission_slug' => $override->permission ? $override->permission->slug : null,
+                    'effect' => $override->effect,
+                ];
+            })->values(),
             'scope_type' => $admin->scope_type ?: 'all',
             'outlet_scope' => $admin->scope_type === 'assigned' ? ($admin->outlet_scope ?: []) : [],
             'is_active' => (bool) $admin->is_active,

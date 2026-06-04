@@ -1,0 +1,703 @@
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { Check, ChevronRight, X, User, Shield, Map, Lock, ClipboardCheck, Search, ChevronDown, ChevronRight as ChevronRightIcon, RotateCcw, AlertCircle } from "lucide-react";
+
+const C = {
+  pageBg: "#F7F4EE",
+  surface: "#FFFFFF",
+  surfaceSoft: "#FAF8F4",
+  border: "rgba(0,0,0,0.08)",
+  divider: "rgba(0,0,0,0.05)",
+  gold: "#8C6B2A",
+  goldFaint: "rgba(140,107,42,0.08)",
+  green: "#2E7A5A",
+  greenFaint: "rgba(46,122,90,0.08)",
+  red: "#A03838",
+  redFaint: "rgba(160,56,56,0.08)",
+  text: "#18140E",
+  muted: "#7A7060",
+  faint: "rgba(24,20,14,0.42)",
+  shadow: "0 2px 8px rgba(44,36,24,0.035)",
+  shadowSoft: "0 1px 5px rgba(44,36,24,0.025)",
+};
+
+const F = {
+  body: "'Inter','Helvetica Neue',Arial,sans-serif",
+  label: "'Inter','Helvetica Neue',Arial,sans-serif",
+};
+
+function Spinner({ color = C.gold, size = 14 }) {
+  return (
+    <span
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        border: `2px solid ${color}33`,
+        borderTopColor: color,
+        display: "inline-block",
+        animation: "accountSpin 0.75s linear infinite",
+      }}
+    />
+  );
+}
+
+function inputStyle(hasError) {
+  return {
+    width: "100%",
+    minHeight: 40,
+    border: `1px solid ${hasError ? C.red : C.border}`,
+    borderRadius: 8,
+    padding: "8px 12px",
+    fontFamily: F.body,
+    fontSize: 13,
+    color: C.text,
+    background: C.surface,
+    outline: "none",
+    transition: "border 0.2s ease",
+  };
+}
+
+function Field({ label, children, error }) {
+  return (
+    <label style={{ display: "grid", gap: 5 }}>
+      <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.faint }}>{label}</span>
+      {children}
+      {error && <span style={{ fontSize: 11, color: C.red }}>{error}</span>}
+    </label>
+  );
+}
+
+// Custom Switch Component
+function Switch({ checked, onChange, disabled }) {
+  return (
+    <div
+      onClick={() => !disabled && onChange(!checked)}
+      style={{
+        width: 36,
+        height: 20,
+        borderRadius: 20,
+        background: checked ? C.green : C.border,
+        position: "relative",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+        transition: "background 0.2s ease"
+      }}
+    >
+      <div
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: "#fff",
+          position: "absolute",
+          top: 2,
+          left: checked ? 18 : 2,
+          transition: "left 0.2s ease",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+        }}
+      />
+    </div>
+  );
+}
+
+// Tri-state checkbox ref helper
+function TriStateCheckbox({ checked, indeterminate, onChange }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} style={{ width: 15, height: 15, accentColor: C.gold, cursor: "pointer" }} />;
+}
+
+const STEPS = [
+  { id: 1, title: "Account & Role", icon: <User size={14} /> },
+  { id: 2, title: "Access Scope", icon: <Map size={14} /> },
+  { id: 3, title: "Permissions", icon: <Shield size={14} /> },
+  { id: 4, title: "Review", icon: <ClipboardCheck size={14} /> },
+];
+
+export default function AccountWizard({
+  isOpen,
+  isClosing,
+  onClose,
+  editingAccount,
+  initialForm,
+  availableRoles,
+  assignableRoles,
+  outletTree,
+  permissionsList,
+  onSave,
+  loading,
+  setHasUnsavedChanges
+}) {
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState(initialForm);
+  const [useRoleDefaults, setUseRoleDefaults] = useState(true);
+  const [overrides, setOverrides] = useState([]); // [{ permission_id, effect }]
+
+  // Scopes state
+  const [scopeSearch, setScopeSearch] = useState("");
+  const [expandedNodes, setExpandedNodes] = useState({
+    "main-wing": true,
+    "tower-wing": true,
+    "dining": true,
+    "laguna-ballroom": true,
+    "twenty-twenty-function-room": true,
+    "tower-ballroom": true,
+    "grand-ballroom": true,
+  });
+  const [reviewScopeExpanded, setReviewScopeExpanded] = useState(false);
+
+  useEffect(() => {
+    setForm(initialForm);
+    setStep(1);
+
+    if (editingAccount && editingAccount.overrides && editingAccount.overrides.length > 0) {
+      setUseRoleDefaults(false);
+      setOverrides(editingAccount.overrides.map(o => ({
+        permission_id: o.permission_id,
+        effect: o.effect
+      })));
+    } else {
+      setUseRoleDefaults(true);
+      setOverrides([]);
+    }
+  }, [initialForm, editingAccount, isOpen]);
+
+  useEffect(() => {
+    const formChanged = JSON.stringify(form) !== JSON.stringify(initialForm);
+    const overridesChanged = editingAccount
+      ? JSON.stringify(overrides) !== JSON.stringify(editingAccount.overrides?.map(o => ({ permission_id: o.permission_id, effect: o.effect })) || [])
+      : overrides.length > 0;
+
+    setHasUnsavedChanges(formChanged || overridesChanged);
+  }, [form, overrides, initialForm, editingAccount, setHasUnsavedChanges]);
+
+  // We moved the early return down to avoid breaking hook rules
+  const roleRequiresAssignedScope = (role) => ["outlet_manager", "supervisor", "staff"].includes(role);
+
+  const getRoleName = (slug) => {
+    const r = availableRoles.find(ar => ar.slug === slug);
+    return r ? r.name : slug;
+  };
+
+  const currentRole = availableRoles.find(r => r.slug === form.role);
+  const currentRolePermissions = currentRole?.permissions || [];
+  const currentRolePermSlugs = currentRolePermissions.map(p => p.slug);
+
+  // Group permissions by module
+  const groupedPermissions = useMemo(() => {
+    return permissionsList.reduce((acc, perm) => {
+      const mod = perm.module || "General";
+      if (!acc[mod]) acc[mod] = [];
+      acc[mod].push(perm);
+      return acc;
+    }, {});
+  }, [permissionsList]);
+
+  const handleNext = () => setStep(s => Math.min(4, s + 1));
+  const handlePrev = () => setStep(s => Math.max(1, s - 1));
+
+  const toggleOverride = (permission_id, grantAccess) => {
+    const perm = permissionsList.find(p => p.id === permission_id);
+    if (!perm) return;
+    const isDefaultGranted = currentRolePermSlugs.includes(perm.slug);
+
+    // If the requested state matches the role default, remove any override.
+    if (grantAccess === isDefaultGranted) {
+      setOverrides(prev => prev.filter(o => o.permission_id !== permission_id));
+      return;
+    }
+
+    // Otherwise, create/update the override (if granting, effect is 'allow', else 'deny')
+    const effect = grantAccess ? 'allow' : 'deny';
+    setOverrides(prev => {
+      const existing = prev.find(o => o.permission_id === permission_id);
+      if (existing) {
+        return prev.map(o => o.permission_id === permission_id ? { ...o, effect } : o);
+      }
+      return [...prev, { permission_id, effect }];
+    });
+  };
+
+  const resetAllOverrides = () => {
+    setUseRoleDefaults(true);
+    setOverrides([]);
+  };
+
+  const getEffectiveAccess = (permission_id) => {
+    const perm = permissionsList.find(p => p.id === permission_id);
+    if (!perm) return false;
+    const isDefaultGranted = currentRolePermSlugs.includes(perm.slug);
+
+    const override = overrides.find(o => o.permission_id === permission_id);
+    if (override) {
+      return override.effect === 'allow';
+    }
+    return isDefaultGranted;
+  };
+
+  // --- Scope selection logic ---
+  const allLeafVenues = useMemo(() => {
+    const leaves = [];
+    const traverse = (node) => {
+      if (node.value) leaves.push(node);
+      if (node.children) node.children.forEach(traverse);
+    };
+    outletTree.forEach(traverse);
+    return leaves;
+  }, [outletTree]);
+
+  const getLeafValues = (node) => {
+    if (node.value) return [node.value];
+    if (node.children) return node.children.flatMap(getLeafValues);
+    return [];
+  };
+
+  const toggleNode = (node, isChecked) => {
+    const leaves = getLeafValues(node);
+    setForm(prev => {
+      const nextScope = isChecked
+        ? Array.from(new Set([...prev.outlet_scope, ...leaves]))
+        : prev.outlet_scope.filter(v => !leaves.includes(v));
+      return { ...prev, outlet_scope: nextScope };
+    });
+  };
+
+  const renderNode = (node, depth = 0) => {
+    const leaves = getLeafValues(node);
+    if (leaves.length === 0) return null;
+
+    if (scopeSearch) {
+      const hasMatchingDescendant = (n) => {
+        if (n.label.toLowerCase().includes(scopeSearch.toLowerCase())) return true;
+        if (n.children) return n.children.some(hasMatchingDescendant);
+        return false;
+      };
+      if (!hasMatchingDescendant(node)) return null;
+    }
+
+    const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+    const isExpanded = expandedNodes[node.id] !== false;
+
+    const selectedCount = leaves.filter(v => form.outlet_scope.includes(v)).length;
+    const isChecked = selectedCount === leaves.length;
+    const isIndeterminate = selectedCount > 0 && selectedCount < leaves.length;
+
+    return (
+      <div key={node.id} style={{ display: "flex", flexDirection: "column" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: `6px 14px 6px ${14 + depth * 20}px`,
+            background: (isChecked || isIndeterminate) ? C.goldFaint : "transparent",
+            minHeight: 36,
+            transition: "background 0.2s ease"
+          }}
+        >
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={() => setExpandedNodes(prev => ({ ...prev, [node.id]: !isExpanded }))}
+              style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", color: C.muted, width: 16, height: 16, justifyContent: "center" }}
+            >
+              {isExpanded ? <ChevronDown size={14} /> : <ChevronRightIcon size={14} />}
+            </button>
+          ) : (
+            <div style={{ width: 16 }} />
+          )}
+
+          <TriStateCheckbox
+            checked={isChecked}
+            indeterminate={isIndeterminate}
+            onChange={(e) => toggleNode(node, e.target.checked)}
+          />
+
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: hasChildren ? 650 : 400,
+              color: isChecked ? C.text : C.muted,
+              cursor: "pointer",
+              userSelect: "none",
+              flex: 1,
+              marginLeft: 4
+            }}
+            onClick={() => toggleNode(node, !isChecked)}
+          >
+            {node.label}
+          </span>
+
+          {hasChildren && (
+            <span style={{ fontSize: 10, color: C.muted, background: C.border, padding: "2px 6px", borderRadius: 10, fontWeight: 600 }}>
+              {selectedCount}/{leaves.length}
+            </span>
+          )}
+        </div>
+
+        {hasChildren && isExpanded && (
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {node.children.map(child => renderNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const isNextDisabled = () => {
+    if (step === 1) return !form.name || !form.email || !form.username || (!editingAccount && !form.password) || !form.role;
+    if (step === 2) return form.scope_type === "assigned" && (!form.outlet_scope || form.outlet_scope.length === 0);
+    return false;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({ ...form, overrides: useRoleDefaults ? [] : overrides });
+  };
+
+  // Build a nested object for the Review step's scope summary
+  const groupedSelectedOutlets = useMemo(() => {
+    const grouped = {};
+    outletTree.forEach(wing => {
+      const leaves = [];
+      const traverse = (n) => { if (n.value) leaves.push(n); if (n.children) n.children.forEach(traverse); };
+      traverse(wing);
+      const selected = leaves.filter(l => form.outlet_scope.includes(l.value));
+      if (selected.length > 0) {
+        grouped[wing.label] = selected;
+      }
+    });
+    return grouped;
+  }, [form.outlet_scope, outletTree]);
+
+  if (!isOpen && !isClosing) return null;
+
+  return (
+    <div className={`account-drawer-backdrop${isClosing ? " is-closing" : ""}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }} style={{ position: "fixed", inset: 0, zIndex: 7000, background: "rgba(24,20,14,0.28)", display: "flex", justifyContent: "flex-end", backdropFilter: "blur(2px)" }}>
+      <aside style={{ width: "min(500px, 100vw)", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column" }}>
+
+        {/* Header (Fixed) */}
+        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div>
+            <div style={{ color: C.gold, fontSize: 9, fontWeight: 750, letterSpacing: "0.16em", textTransform: "uppercase" }}>Account Wizard</div>
+            <h2 style={{ margin: "2px 0 0", color: C.text, fontSize: 20, fontWeight: 640 }}>{editingAccount ? "Edit Account" : "Create Account"}</h2>
+          </div>
+          <button type="button" onClick={onClose} style={{ minWidth: 32, height: 32, padding: 0, border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: C.muted }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Stepper (Fixed) */}
+        <div style={{ display: "flex", padding: "12px 20px", background: C.surfaceSoft, borderBottom: `1px solid ${C.divider}`, gap: 8, flexShrink: 0 }}>
+          {STEPS.map((s, i) => (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", flex: 1, gap: 8, opacity: step >= s.id ? 1 : 0.4 }}>
+              <div style={{ width: 22, height: 22, borderRadius: "50%", background: step >= s.id ? C.gold : C.divider, color: step >= s.id ? "#fff" : C.muted, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {step > s.id ? <Check size={11} /> : s.icon}
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 700, color: step >= s.id ? C.text : C.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
+                <span style={{ display: "none", '@media (min-width: 480px)': { display: 'inline' } }}>{s.title}</span>
+              </span>
+              {i < STEPS.length - 1 && <div style={{ flex: 1, height: 2, background: step > s.id ? C.gold : C.divider, borderRadius: 2 }} />}
+            </div>
+          ))}
+        </div>
+
+        {/* Scrollable Content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+
+          {step === 1 && (
+            <div style={{ display: "grid", gap: 24 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 650, color: C.text }}>Account & Role</h3>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: C.muted }}>Enter the staff member’s login information and select their default access role.</p>
+              </div>
+
+              <div style={{ display: "grid", gap: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+                  <Field label="Full Name">
+                    <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={inputStyle(!form.name)} />
+                  </Field>
+                  <Field label="Email Address">
+                    <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={inputStyle(!form.email)} />
+                  </Field>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+                  <Field label="Username">
+                    <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} style={inputStyle(!form.username)} />
+                  </Field>
+                  <Field label={editingAccount ? "New Password" : "Password"}>
+                    <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editingAccount ? "Leave blank to keep current" : ""} style={inputStyle(!editingAccount && !form.password)} />
+                  </Field>
+                </div>
+                {editingAccount && (
+                  <div style={{ fontSize: 11, color: C.muted, marginTop: -6, paddingLeft: 2 }}>
+                    Leave blank if the password should not change.
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Field label="Role Selection" />
+                <div style={{ display: "grid", gap: 8, marginTop: 4 }}>
+                  {assignableRoles.map(roleSlug => {
+                    const r = availableRoles.find(ar => ar.slug === roleSlug);
+                    if (!r) return null;
+                    const isSelected = form.role === r.slug;
+                    return (
+                      <div key={r.slug} onClick={() => setForm({ ...form, role: r.slug, scope_type: roleRequiresAssignedScope(r.slug) ? "assigned" : "all", outlet_scope: roleRequiresAssignedScope(r.slug) ? form.outlet_scope : [] })} style={{ padding: "12px 14px", border: `2px solid ${isSelected ? C.gold : C.divider}`, borderRadius: 10, cursor: "pointer", background: isSelected ? C.goldFaint : C.surface, transition: "all 0.15s ease", display: "flex", gap: 12, alignItems: "center" }}>
+                        <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${isSelected ? C.gold : C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {isSelected && <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.gold }} />}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+                            <div style={{ fontWeight: 650, color: C.text, fontSize: 14 }}>{r.name}</div>
+                            {r.is_system ? <span style={{ fontSize: 9, padding: "2px 6px", background: C.border, color: C.muted, borderRadius: 4, fontWeight: 700 }}>SYSTEM</span> : <span style={{ fontSize: 9, padding: "2px 6px", background: C.greenFaint, color: C.green, borderRadius: 4, fontWeight: 700 }}>CUSTOM</span>}
+                          </div>
+                          <div style={{ fontSize: 12, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.description || "Default access privileges."} • {r.permissions?.length || 0} permissions</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div style={{ display: "grid", gap: 20 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 650, color: C.text }}>Access Scope</h3>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: C.muted }}>Choose which outlets and venues this account can access.</p>
+              </div>
+
+              <div style={{ display: "flex", gap: 12 }}>
+                <label style={{ flex: 1, padding: 12, border: `2px solid ${form.scope_type === "all" ? C.gold : C.divider}`, borderRadius: 10, background: form.scope_type === "all" ? C.goldFaint : C.surface, cursor: roleRequiresAssignedScope(form.role) ? "not-allowed" : "pointer", opacity: roleRequiresAssignedScope(form.role) ? 0.6 : 1, display: "flex", alignItems: "center", gap: 10 }}>
+                  <input type="radio" name="scope_type" value="all" checked={form.scope_type === "all"} disabled={roleRequiresAssignedScope(form.role)} onChange={() => setForm({ ...form, scope_type: "all", outlet_scope: [] })} style={{ accentColor: C.gold, width: 16, height: 16 }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 650, color: C.text }}>All Outlets</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>Unrestricted venue access</div>
+                  </div>
+                </label>
+                <label style={{ flex: 1, padding: 12, border: `2px solid ${form.scope_type === "assigned" ? C.gold : C.divider}`, borderRadius: 10, background: form.scope_type === "assigned" ? C.goldFaint : C.surface, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+                  <input type="radio" name="scope_type" value="assigned" checked={form.scope_type === "assigned"} onChange={() => setForm({ ...form, scope_type: "assigned" })} style={{ accentColor: C.gold, width: 16, height: 16 }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 650, color: C.text }}>Selected Outlets</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>Specific assignments only</div>
+                  </div>
+                </label>
+              </div>
+
+              {form.scope_type === "assigned" && (
+                <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", display: "flex", flexDirection: "column", height: 380 }}>
+                  <div style={{ padding: "10px 14px", background: C.surfaceSoft, borderBottom: `1px solid ${C.divider}`, display: "flex", gap: 10, alignItems: "center" }}>
+                    <Search size={14} color={C.muted} />
+                    <input
+                      placeholder="Search venues..."
+                      value={scopeSearch}
+                      onChange={e => setScopeSearch(e.target.value)}
+                      style={{ border: "none", background: "transparent", outline: "none", fontSize: 13, flex: 1 }}
+                    />
+                    {form.outlet_scope.length > 0 && (
+                      <button type="button" onClick={() => setForm({ ...form, outlet_scope: [] })} style={{ fontSize: 11, background: "transparent", border: "none", color: C.red, cursor: "pointer", fontWeight: 600 }}>Clear all</button>
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1, overflowY: "auto", padding: "10px 0" }}>
+                    {outletTree.map(node => renderNode(node, 0))}
+                  </div>
+                  <div style={{ padding: "8px 14px", background: C.surfaceSoft, borderTop: `1px solid ${C.divider}`, fontSize: 11, color: C.muted, textAlign: "right" }}>
+                    {form.outlet_scope.length} venues selected
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === 3 && (
+            <div style={{ display: "grid", gap: 20 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 650, color: C.text }}>Permissions</h3>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: C.muted }}>Use the selected role’s default permissions or customize access for this account.</p>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 16, border: `1px solid ${useRoleDefaults ? C.gold : C.border}`, borderRadius: 10, background: useRoleDefaults ? C.goldFaint : C.surface, cursor: "pointer", transition: "all 0.2s ease" }} onClick={() => useRoleDefaults ? null : resetAllOverrides()}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 650, color: C.text }}>Use role-default permissions</div>
+                  <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>The account will perfectly match the <strong>{getRoleName(form.role)}</strong> role capabilities.</div>
+                </div>
+                <Switch checked={useRoleDefaults} onChange={checked => {
+                  if (checked) resetAllOverrides();
+                  else setUseRoleDefaults(false);
+                }} />
+              </div>
+
+              {!useRoleDefaults && (
+                <div style={{ animation: "accountSpin 0.2s ease-out", animationName: "rolesFadeIn" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ fontSize: 14, fontWeight: 650, display: "flex", alignItems: "center", gap: 6 }}><Lock size={14} color={C.gold} /> Customized Permissions</div>
+                    <button type="button" onClick={resetAllOverrides} style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: "none", color: C.muted, fontSize: 11, fontWeight: 650, cursor: "pointer", textTransform: "uppercase" }}><RotateCcw size={12} /> Reset to default</button>
+                  </div>
+
+                  <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+                    {Object.entries(groupedPermissions).map(([module, perms]) => (
+                      <div key={module}>
+                        <div style={{ padding: "8px 14px", background: C.surfaceSoft, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.14em", color: C.gold, borderBottom: `1px solid ${C.divider}` }}>{module}</div>
+                        {perms.map((perm, idx) => {
+                          const isDefaultGranted = currentRolePermSlugs.includes(perm.slug);
+                          const isEffective = getEffectiveAccess(perm.id);
+                          const isOverridden = overrides.some(o => o.permission_id === perm.id);
+
+                          return (
+                            <div key={perm.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: idx < perms.length - 1 ? `1px solid ${C.divider}` : "none", background: isOverridden ? "rgba(140,107,42,0.02)" : "transparent" }}>
+                              <div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{perm.name}</span>
+                                  {isOverridden && <span style={{ fontSize: 9, padding: "2px 6px", background: C.gold, color: "#fff", borderRadius: 4, fontWeight: 700 }}>OVERRIDE</span>}
+                                </div>
+                                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{perm.description || perm.slug}</div>
+                                {isOverridden && (
+                                  <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>
+                                    Default for this role is <strong>{isDefaultGranted ? "Allowed" : "Denied"}</strong>.
+                                  </div>
+                                )}
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                                {isOverridden && (
+                                  <button type="button" onClick={() => toggleOverride(perm.id, isDefaultGranted)} title="Revert to role default" style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", display: "flex" }}><RotateCcw size={14} /></button>
+                                )}
+                                <Switch checked={isEffective} onChange={(checked) => toggleOverride(perm.id, checked)} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === 4 && (
+            <div style={{ display: "grid", gap: 20 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 650, color: C.text }}>Review & Save</h3>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: C.muted }}>Confirm the account details, access scope, and effective permissions before saving.</p>
+              </div>
+
+              <div style={{ border: `1px solid ${C.divider}`, borderRadius: 10, overflow: "hidden" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: `1px solid ${C.divider}` }}>
+                  <div style={{ padding: 14, borderRight: `1px solid ${C.divider}` }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Account</div>
+                    <div style={{ fontSize: 14, fontWeight: 650 }}>{form.name}</div>
+                    <div style={{ fontSize: 12, color: C.muted }}>{form.email}</div>
+                    <div style={{ fontSize: 12, color: C.muted }}>@{form.username}</div>
+                  </div>
+                  <div style={{ padding: 14 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Role</div>
+                    <div style={{ fontSize: 14, fontWeight: 650, color: C.gold }}>{getRoleName(form.role)}</div>
+                  </div>
+                </div>
+
+                <div style={{ padding: 14, borderBottom: `1px solid ${C.divider}`, background: C.surfaceSoft }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.1em" }}>Access Scope</div>
+                    <button type="button" onClick={() => setStep(2)} style={{ fontSize: 11, color: C.gold, background: "transparent", border: "none", cursor: "pointer", fontWeight: 650 }}>Edit</button>
+                  </div>
+
+                  {form.scope_type === "all" ? (
+                    <div style={{ fontSize: 13, fontWeight: 600, marginTop: 8 }}>All Outlets and Venues</div>
+                  ) : (
+                    <div style={{ marginTop: 8 }}>
+                      <div
+                        onClick={() => setReviewScopeExpanded(!reviewScopeExpanded)}
+                        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: C.text, cursor: "pointer" }}
+                      >
+                        {reviewScopeExpanded ? <ChevronDown size={14} color={C.muted} /> : <ChevronRightIcon size={14} color={C.muted} />}
+                        {form.outlet_scope.length} outlets and venues assigned
+                      </div>
+
+                      {reviewScopeExpanded && (
+                        <div style={{ marginTop: 10, marginLeft: 20, display: "grid", gap: 8 }}>
+                          {Object.entries(groupedSelectedOutlets).map(([wing, venues]) => (
+                            <div key={wing}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 2 }}>{wing}</div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                {venues.map(v => (
+                                  <span key={v.id} style={{ fontSize: 11, padding: "2px 8px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 4, color: C.text }}>{v.label}</span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ padding: 14, background: C.surfaceSoft }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.1em" }}>Permission Configuration</div>
+                    <button type="button" onClick={() => setStep(3)} style={{ fontSize: 11, color: C.gold, background: "transparent", border: "none", cursor: "pointer", fontWeight: 650 }}>Edit</button>
+                  </div>
+
+                  {useRoleDefaults ? (
+                    <div style={{ fontSize: 13, fontWeight: 600, marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                      <Check size={14} color={C.green} /> Using role defaults ({currentRolePermissions.length} permissions granted)
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 6 }}>Customized Permissions</div>
+                      <div style={{ display: "flex", gap: 16 }}>
+                        <div style={{ fontSize: 12, color: C.muted }}><strong style={{ color: C.green }}>{overrides.filter(o => o.effect === 'allow').length}</strong> explicitly granted</div>
+                        <div style={{ fontSize: 12, color: C.muted }}><strong style={{ color: C.red }}>{overrides.filter(o => o.effect === 'deny').length}</strong> explicitly revoked</div>
+                      </div>
+                      <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Total effective permissions: <strong>{currentRolePermissions.length + overrides.filter(o => o.effect === 'allow').length - overrides.filter(o => o.effect === 'deny').length}</strong></div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* Footer (Fixed) */}
+        <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.divider}`, background: C.surfaceSoft, display: "flex", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button 
+              type="button" 
+              onClick={onClose} 
+              disabled={loading} 
+              style={{ minWidth: 80, height: 36, padding: "0 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+            {step > 1 && (
+              <button 
+                type="button" 
+                onClick={handlePrev} 
+                disabled={loading} 
+                style={{ minWidth: 80, height: 36, padding: "0 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.muted, fontWeight: 700, fontSize: 11, cursor: "pointer" }}
+              >
+                Back
+              </button>
+            )}
+          </div>
+          
+          {step < 4 ? (
+            <button type="button" onClick={handleNext} disabled={isNextDisabled() || loading} style={{ minWidth: 90, height: 36, padding: "0 14px", borderRadius: 8, border: "none", background: C.gold, color: "#fff", fontWeight: 700, fontSize: 11, cursor: isNextDisabled() ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}>Next <ChevronRight size={14} /></button>
+          ) : (
+            <button type="button" onClick={handleSubmit} disabled={loading} style={{ minWidth: 130, height: 36, padding: "0 14px", borderRadius: 8, border: "none", background: C.green, color: "#fff", fontWeight: 700, fontSize: 11, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              {loading && <Spinner color="#fff" size={12} />}
+              {editingAccount ? "Save Changes" : "Create Account"}
+            </button>
+          )}
+        </div>
+
+      </aside>
+    </div>
+  );
+}

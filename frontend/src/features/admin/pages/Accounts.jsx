@@ -6,6 +6,7 @@ import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { venueAPI } from "../../../services/venueAPI";
 import { roleAPI } from "../../../services/roleAPI";
+import AccountWizard from "./AccountWizard";
 
 const C = {
   pageBg: "#F7F4EE",
@@ -274,23 +275,23 @@ function buildOutletScopeTree(venues) {
         id: "main-wing",
         label: "Main Wing",
         children: [
-          { id: "alabang-function-room", label: "Alabang Function Room", value: "Alabang Function Room" },
-          { id: "business-center", label: "Business Center", value: "Business Center" },
+          { id: "alabang-function-room", label: "Alabang Function Room", value: "alabang-function-room" },
+          { id: "business-center", label: "Business Center", value: "business-center" },
           {
             id: "laguna-ballroom",
             label: "Laguna Ballroom",
             children: [
-              { id: "laguna-ballroom-1", label: "Laguna Ballroom 1", value: "Laguna Ballroom 1" },
-              { id: "laguna-ballroom-2", label: "Laguna Ballroom 2", value: "Laguna Ballroom 2" },
+              { id: "laguna-ballroom-1", label: "Laguna Ballroom 1", value: "laguna-ballroom-1" },
+              { id: "laguna-ballroom-2", label: "Laguna Ballroom 2", value: "laguna-ballroom-2" },
             ],
           },
           {
             id: "twenty-twenty-function-room",
             label: "20/20 Function Room",
             children: [
-              { id: "twenty-twenty-a", label: "20/20 Function Room A", value: "20/20 Function Room A" },
-              { id: "twenty-twenty-b", label: "20/20 Function Room B", value: "20/20 Function Room B" },
-              { id: "twenty-twenty-c", label: "20/20 Function Room C", value: "20/20 Function Room C" },
+              { id: "twenty-twenty-a", label: "20/20 Function Room A", value: "twenty-twenty-a" },
+              { id: "twenty-twenty-b", label: "20/20 Function Room B", value: "twenty-twenty-b" },
+              { id: "twenty-twenty-c", label: "20/20 Function Room C", value: "twenty-twenty-c" },
             ],
           },
         ],
@@ -303,18 +304,18 @@ function buildOutletScopeTree(venues) {
             id: "tower-ballroom",
             label: "Tower Ballroom",
             children: [
-              { id: "tower-1", label: "Tower 1", value: "Tower 1" },
-              { id: "tower-2", label: "Tower 2", value: "Tower 2" },
-              { id: "tower-3", label: "Tower 3", value: "Tower 3" },
+              { id: "tower-1", label: "Tower 1", value: "tower-1" },
+              { id: "tower-2", label: "Tower 2", value: "tower-2" },
+              { id: "tower-3", label: "Tower 3", value: "tower-3" },
             ],
           },
           {
             id: "grand-ballroom",
             label: "Grand Ballroom",
             children: [
-              { id: "grand-ballroom-a", label: "Grand Ballroom A", value: "Grand Ballroom A" },
-              { id: "grand-ballroom-b", label: "Grand Ballroom B", value: "Grand Ballroom B" },
-              { id: "grand-ballroom-c", label: "Grand Ballroom C", value: "Grand Ballroom C" },
+              { id: "grand-ballroom-a", label: "Grand Ballroom A", value: "grand-ballroom-a" },
+              { id: "grand-ballroom-b", label: "Grand Ballroom B", value: "grand-ballroom-b" },
+              { id: "grand-ballroom-c", label: "Grand Ballroom C", value: "grand-ballroom-c" },
             ],
           },
         ],
@@ -323,9 +324,9 @@ function buildOutletScopeTree(venues) {
         id: "dining",
         label: "Dining",
         children: [
-          { id: "hanakazu", label: "Hanakazu Japanese Restaurant", value: "Hanakazu Japanese Restaurant" },
-          { id: "qsina", label: "Qsina Restaurant", value: "Qsina Restaurant" },
-          { id: "phoenix-court", label: "Phoenix Court", value: "Phoenix Court" },
+          { id: "hanakazu", label: "Hanakazu Japanese Restaurant", value: "hanakazu" },
+          { id: "qsina", label: "Qsina Restaurant", value: "qsina" },
+          { id: "phoenix-court", label: "Phoenix Court", value: "phoenix-court" },
         ],
       },
     ];
@@ -359,10 +360,10 @@ function buildOutletScopeTree(venues) {
       node.children = childVenues.map((c) => ({
         id: `venue-${c.id}`,
         label: c.display_name || c.name,
-        value: c.name,
+        value: String(c.id),
       }));
     } else {
-      node.value = v.name;
+      node.value = String(v.id);
     }
 
     wingGroups[wing].push(node);
@@ -634,14 +635,16 @@ export default function Accounts() {
   const [page,setPage] = useState(1);
   const [statusTarget,setStatusTarget] = useState(null);
   const [availableRoles, setAvailableRoles] = useState([]);
+  const [permissionsList, setPermissionsList] = useState([]);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerClosing, setDrawerClosing] = useState(false);
   const [initialFormSignature, setInitialFormSignature] = useState(JSON.stringify(DEFAULT_FORM));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState(null);
 
   const drawerVisible = drawerOpen || drawerClosing;
-  const hasUnsavedChanges = drawerVisible && JSON.stringify(form) !== initialFormSignature;
 
   const assignableRoles = useMemo(() => roleOptionsFor(currentUser, availableRoles), [currentUser?.role, availableRoles]);
   const newAccountForm = useMemo(() => ({
@@ -723,14 +726,16 @@ export default function Accounts() {
     if (!canManage) return;
     setLoadingAccounts(true);
     try {
-      const [accountsRes, venuesRes, rolesRes] = await Promise.all([
+      const [accountsRes, venuesRes, rolesRes, permissionsRes] = await Promise.all([
         authAPI.getAccounts(),
         venueAPI.getAll({ include_archived: false, _t: Date.now() }).catch(() => []),
-        roleAPI.getAll().catch(() => ({ data: [] }))
+        roleAPI.getAll().catch(() => ({ data: [] })),
+        roleAPI.getPermissions().catch(() => ({ data: [] }))
       ]);
       setAccounts(accountsRes.data || []);
       setVenues(Array.isArray(venuesRes) ? venuesRes : []);
       setAvailableRoles(Array.isArray(rolesRes) ? rolesRes : (rolesRes.data || []));
+      setPermissionsList(Array.isArray(permissionsRes) ? permissionsRes : (permissionsRes.data || []));
     } catch (error) {
       setToast({ type:"error", message:error.message || "Failed to load accounts." });
     } finally {
@@ -751,7 +756,7 @@ export default function Accounts() {
   }, [page, totalPages]);
 
   useEffect(() => {
-    if (!drawerVisible || showDiscardConfirm) return undefined;
+    if (!drawerVisible || showDiscardConfirm || saveFeedback) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const closeOnEscape = (event) => {
@@ -762,7 +767,7 @@ export default function Accounts() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [drawerVisible, showDiscardConfirm]);
+  }, [drawerVisible, showDiscardConfirm, saveFeedback]);
 
   useEffect(() => {
     if (!showDiscardConfirm) return undefined;
@@ -778,6 +783,20 @@ export default function Accounts() {
     };
   }, [showDiscardConfirm]);
 
+  useEffect(() => {
+    if (!saveFeedback) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setSaveFeedback(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [saveFeedback]);
+
   const resetForm = () => {
     setEditingId(null);
     setForm(newAccountForm);
@@ -789,6 +808,7 @@ export default function Accounts() {
     const draft = newAccountForm;
     setForm(draft);
     setInitialFormSignature(JSON.stringify(draft));
+    setHasUnsavedChanges(false);
     setDrawerOpen(true);
   };
 
@@ -811,6 +831,7 @@ export default function Accounts() {
     };
     setForm(editedForm);
     setInitialFormSignature(JSON.stringify(editedForm));
+    setHasUnsavedChanges(false);
     setDrawerOpen(true);
   };
 
@@ -834,34 +855,23 @@ export default function Accounts() {
     if (!editingId) setForm(newAccountForm);
   }, [newAccountForm, editingId]);
 
-  const submitAccount = async (event) => {
-    event.preventDefault();
-    if (form.scope_type === "assigned" && parseScope(form.outlet_scope).length === 0) {
-      setToast({ type:"error", message:"Select at least one outlet for assigned-scope accounts." });
-      return;
-    }
+  const submitAccount = async (formData) => {
     setLoading(true);
     setActionLabel(editingId ? "Updating account..." : "Creating account...");
 
-    const payload = {
-      name: form.name,
-      email: form.email,
-      username: form.username,
-      role: form.role,
-      scope_type: form.scope_type,
-      outlet_scope: form.scope_type === "assigned" ? parseScope(form.outlet_scope) : [],
-      ...(form.password ? { password: form.password } : {}),
-    };
-
     try {
       if (editingId) {
-        await authAPI.updateAccount(editingId, payload);
+        await authAPI.updateAccount(editingId, formData);
         setToast({ type:"success", message:"Account updated." });
       } else {
-        await authAPI.createAccount(payload);
+        await authAPI.createAccount(formData);
         setToast({ type:"success", message:"Account created." });
       }
       closeDrawer(true);
+      setSaveFeedback({
+        type: editingId ? "update" : "create",
+        account: formData
+      });
       await loadAccounts();
     } catch (error) {
       setToast({ type:"error", message:error.message || "Failed to save account." });
@@ -1160,94 +1170,20 @@ export default function Accounts() {
             getRoleName={getRoleName}
           />
 
-          {drawerVisible && (
-            <div className={`account-drawer-backdrop${drawerClosing ? " is-closing" : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 7000, background: "rgba(24,20,14,0.28)", display: "flex", justifyContent: "flex-end", backdropFilter: "blur(2px)" }}>
-              <aside className="account-drawer" role="dialog" aria-modal="true" aria-label={editingId ? "Edit account" : "Create account"} style={{ width: "min(540px, calc(100vw - 28px))", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column", position: "relative" }}>
-                <LoadingOverlay label={actionLabel && drawerVisible ? actionLabel : ""} />
-                <div style={{ padding: "18px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
-                  <div>
-                    <div style={{ color: C.gold, fontSize: 8.5, fontWeight: 750, letterSpacing: "0.16em", textTransform: "uppercase" }}>Access Control</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 5, flexWrap: "wrap" }}>
-                      <h2 style={{ margin: 0, color: C.text, fontSize: 21, lineHeight: 1.15, fontWeight: 640 }}>{editingId ? "Edit Account" : "Create Account"}</h2>
-                      {hasUnsavedChanges && (
-                        <span style={{ borderRadius: 999, padding: "4px 8px", background: C.goldFaint, color: C.gold, fontSize: 9, fontWeight: 850, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                          Unsaved changes
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => closeDrawer()} style={{ ...paginationButtonStyle(false), minWidth: 36, height: 36, padding: 0 }} aria-label="Close panel"><X size={16} /></button>
-                </div>
-
-                <form onSubmit={submitAccount} style={{ minHeight: 0, flex: 1, display: "flex", flexDirection: "column" }}>
-                  <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "grid", gap: 20 }}>
-                    <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: C.muted }}>
-                      {editingId 
-                        ? "Update operational account configuration, scope access levels, and assignable role privileges."
-                        : "Create operational accounts with a role first, then limit outlet access only when the role requires an assigned scope."}
-                    </p>
-
-                    <FormSection title="Account Information" subtitle="Use a clear staff name and a unique login identity." first>
-                      <div className="account-form-two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        <Field label="Name">
-                          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required style={inputStyle()} />
-                        </Field>
-                        <Field label="Email">
-                          <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required style={inputStyle()} />
-                        </Field>
-                      </div>
-                      <Field label="Username">
-                        <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required style={inputStyle()} />
-                      </Field>
-                      <Field label={editingId ? "New Password" : "Password"}>
-                        <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!editingId} minLength={8} placeholder={editingId ? "Leave blank to keep current" : ""} style={inputStyle()} />
-                        <span style={{ fontSize: 11.5, color: C.muted }}>{editingId ? "Leave blank if the password should not change." : "Use at least 8 characters."}</span>
-                      </Field>
-                    </FormSection>
-
-                    <FormSection title="Role & Permissions" subtitle="Role selection controls account capabilities and visible admin modules.">
-                      <Field label="Role">
-                        <select value={form.role} onChange={(e) => {
-                          const role = e.target.value;
-                          setForm({ ...form, role, scope_type: defaultScopeForRole(role), outlet_scope: defaultScopeForRole(role) === "all" ? [] : form.outlet_scope });
-                        }} style={inputStyle()}>
-                          {assignableRoles.map((role) => <option key={role} value={role}>{getRoleName(role)}</option>)}
-                        </select>
-                      </Field>
-                      <Field label="Scope">
-                        <select value={form.scope_type} disabled={roleRequiresAssignedScope(form.role)} onChange={(e) => setForm({ ...form, scope_type: e.target.value, outlet_scope: e.target.value === "all" ? [] : form.outlet_scope })} style={{ ...inputStyle(), background: roleRequiresAssignedScope(form.role) ? C.surfaceSoft : C.surface }}>
-                          <option value="all">All outlets</option>
-                          <option value="assigned">Assigned outlets</option>
-                        </select>
-                        <span style={{ fontSize: 11.5, color: C.muted }}>
-                          Outlet Manager and Staff accounts must be assigned to specific outlets.
-                        </span>
-                      </Field>
-                    </FormSection>
-
-                    <FormSection title="Outlet Scope" subtitle="Choose the specific outlets this account can work with when assigned scope is required.">
-                      <Field label="Assigned Outlet(s)">
-                        <ScopeSelector
-                          value={form.outlet_scope}
-                          disabled={form.scope_type === "all"}
-                          onChange={(outlet_scope) => setForm({ ...form, outlet_scope })}
-                          tree={outletTree}
-                        />
-                      </Field>
-                    </FormSection>
-                  </div>
-
-                  <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.divider}`, display: "flex", gap: 10, justifyContent: "flex-end", background: C.surfaceSoft }}>
-                    <button type="button" onClick={() => closeDrawer()} style={{ ...paginationButtonStyle(false), minWidth: 100 }}>Cancel</button>
-                    <button disabled={loading} style={{ padding: "0 18px", height: 34, border: "none", borderRadius: 8, background: C.green, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: loading ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                      {loading ? <Spinner color="#FFFFFF" size={12} /> : null}
-                      {loading ? "Saving..." : editingId ? "Update Account" : "Create Account"}
-                    </button>
-                  </div>
-                </form>
-              </aside>
-            </div>
-          )}
+          <AccountWizard
+            isOpen={drawerVisible}
+            isClosing={drawerClosing}
+            onClose={() => closeDrawer()}
+            editingAccount={editingId ? accounts.find(a => a.id === editingId) : null}
+            initialForm={form}
+            availableRoles={availableRoles}
+            assignableRoles={assignableRoles}
+            outletTree={outletTree}
+            permissionsList={permissionsList}
+            onSave={submitAccount}
+            loading={loading}
+            setHasUnsavedChanges={setHasUnsavedChanges}
+          />
 
           {showDiscardConfirm && (
             <div className="account-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowDiscardConfirm(false); }} style={{ position: "fixed", inset: 0, zIndex: 8200, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
@@ -1265,6 +1201,82 @@ export default function Accounts() {
                   <button type="button" onClick={() => setShowDiscardConfirm(false)} style={{ ...paginationButtonStyle(false), minWidth: 120 }}>Keep Editing</button>
                   <button type="button" onClick={() => closeDrawer(true)} style={{ padding: "0 16px", height: 34, border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 140 }}>
                     Discard Changes
+                  </button>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {saveFeedback && (
+            <div className="account-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSaveFeedback(null); }} style={{ position: "fixed", inset: 0, zIndex: 8200, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
+              <section className="account-confirm" role="dialog" aria-modal="true" aria-labelledby="save-feedback-title" style={{ width: "min(440px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", padding: 24 }}>
+                <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                  <span style={{ width: 40, height: 40, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: "rgba(46,122,90,0.08)", color: "#2E7A5A" }}>
+                    <Check size={20} />
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h2 id="save-feedback-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 650 }}>
+                      {saveFeedback.type === "create" ? "Account Created" : "Account Updated"}
+                    </h2>
+                    <p style={{ margin: "6px 0 0", fontSize: 13, color: C.muted }}>
+                      The user account has been configured and saved successfully.
+                    </p>
+                    
+                    <div style={{ marginTop: 16, border: `1px solid ${C.border}`, borderRadius: 10, background: C.surfaceSoft, padding: 14, display: "grid", gap: 10 }}>
+                      <div>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.08em" }}>Full Name</span>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginTop: 1 }}>{saveFeedback.account.name}</div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.08em" }}>Username & Email</span>
+                        <div style={{ fontSize: 13, color: C.muted, marginTop: 1 }}>
+                          @{saveFeedback.account.username} · {saveFeedback.account.email}
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        <div>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.08em" }}>Assigned Role</span>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: C.gold, marginTop: 1 }}>
+                            {getRoleName(saveFeedback.account.role)}
+                          </div>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.08em" }}>Access Scope</span>
+                          <div style={{ fontSize: 13, color: C.text, marginTop: 1 }}>
+                            {saveFeedback.account.scope_type === "all" 
+                              ? "All Outlets" 
+                              : `${saveFeedback.account.outlet_scope?.length || 0} venues`}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+                  <button 
+                    type="button" 
+                    onClick={() => setSaveFeedback(null)} 
+                    style={{ 
+                      padding: "0 16px", 
+                      height: 36, 
+                      border: "none", 
+                      borderRadius: 8, 
+                      background: C.gold, 
+                      color: "#fff", 
+                      fontFamily: F.label, 
+                      fontSize: 10, 
+                      fontWeight: 700, 
+                      letterSpacing: "0.12em", 
+                      textTransform: "uppercase", 
+                      cursor: "pointer",
+                      display: "inline-flex", 
+                      alignItems: "center", 
+                      justifyContent: "center",
+                      minWidth: 140
+                    }}
+                  >
+                    Back to Accounts
                   </button>
                 </div>
               </section>

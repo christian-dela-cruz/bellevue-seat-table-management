@@ -130,7 +130,7 @@ class AuthService
             'username' => $admin->username,
             'email' => $admin->email,
             'role' => $role,
-            'permissions' => AdminAccess::permissionsForRole($role),
+            'permissions' => AdminAccess::permissionsForAdmin($admin),
             'scope_type' => $scopeType,
             'outlet_scope' => $scopeType === 'assigned' ? ($admin->outlet_scope ?: []) : [],
             'is_active' => (bool) $admin->is_active,
