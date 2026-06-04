@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Check, ChevronRight, X, User, Shield, Map, Lock, ClipboardCheck, Search, ChevronDown, ChevronRight as ChevronRightIcon, RotateCcw, AlertCircle } from "lucide-react";
+import { authAPI } from "../../../services/authAPI";
 
 const C = {
   pageBg: "#F7F4EE",
@@ -201,6 +202,12 @@ export default function AccountWizard({
   const toggleOverride = (permission_id, grantAccess) => {
     const perm = permissionsList.find(p => p.id === permission_id);
     if (!perm) return;
+
+    const currentUser = authAPI.getCurrentUser();
+    const isSuperAdmin = currentUser?.role === "super_admin";
+    const hasThisPermission = isSuperAdmin || authAPI.hasPermission(perm.slug);
+    if (!hasThisPermission) return;
+
     const isDefaultGranted = currentRolePermSlugs.includes(perm.slug);
 
     // If the requested state matches the role default, remove any override.
@@ -549,25 +556,35 @@ export default function AccountWizard({
                           const isEffective = getEffectiveAccess(perm.id);
                           const isOverridden = overrides.some(o => o.permission_id === perm.id);
 
+                          const currentUser = authAPI.getCurrentUser();
+                          const isSuperAdmin = currentUser?.role === "super_admin";
+                          const hasThisPermission = isSuperAdmin || authAPI.hasPermission(perm.slug);
+
                           return (
-                            <div key={perm.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: idx < perms.length - 1 ? `1px solid ${C.divider}` : "none", background: isOverridden ? "rgba(140,107,42,0.02)" : "transparent" }}>
+                            <div key={perm.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: idx < perms.length - 1 ? `1px solid ${C.divider}` : "none", background: isOverridden ? "rgba(140,107,42,0.02)" : "transparent", opacity: hasThisPermission ? 1 : 0.6 }}>
                               <div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                   <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{perm.name}</span>
                                   {isOverridden && <span style={{ fontSize: 9, padding: "2px 6px", background: C.gold, color: "#fff", borderRadius: 4, fontWeight: 700 }}>OVERRIDE</span>}
+                                  {!hasThisPermission && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, padding: "2px 6px", background: C.divider, color: C.muted, borderRadius: 4, fontWeight: 700 }}><Lock size={9} /> LOCKED</span>}
                                 </div>
                                 <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{perm.description || perm.slug}</div>
-                                {isOverridden && (
+                                {!hasThisPermission && (
+                                  <div style={{ fontSize: 10, color: C.red, marginTop: 4, fontWeight: 550 }}>
+                                    You do not possess this permission and cannot assign or revoke it.
+                                  </div>
+                                )}
+                                {isOverridden && hasThisPermission && (
                                   <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>
                                     Default for this role is <strong>{isDefaultGranted ? "Allowed" : "Denied"}</strong>.
                                   </div>
                                 )}
                               </div>
                               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                                {isOverridden && (
+                                {isOverridden && hasThisPermission && (
                                   <button type="button" onClick={() => toggleOverride(perm.id, isDefaultGranted)} title="Revert to role default" style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", display: "flex" }}><RotateCcw size={14} /></button>
                                 )}
-                                <Switch checked={isEffective} onChange={(checked) => toggleOverride(perm.id, checked)} />
+                                <Switch checked={isEffective} onChange={(checked) => toggleOverride(perm.id, checked)} disabled={!hasThisPermission} />
                               </div>
                             </div>
                           );
