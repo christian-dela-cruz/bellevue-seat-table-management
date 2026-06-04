@@ -112,7 +112,7 @@ class AdminAccess
             ], 401);
         }
 
-        $permissions = $admin['permissions'] ?? self::permissionsForRole($admin['role'] ?? null);
+        $permissions = self::permissionsForRole($admin['role'] ?? null);
 
         if (!in_array($permission, $permissions, true)) {
             return response()->json([

@@ -337,7 +337,7 @@ export default function AccountSettings() {
 
   useEffect(() => {
     roleAPI.getAll()
-      .then(res => setAvailableRoles(res.data || []))
+      .then(res => setAvailableRoles(Array.isArray(res) ? res : (res.data || [])))
       .catch(() => setAvailableRoles([]));
   }, []);
 

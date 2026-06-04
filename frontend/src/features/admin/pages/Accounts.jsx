@@ -187,23 +187,61 @@ function paginationButtonStyle(disabled = false) {
   };
 }
 
+const FALLBACK_LEVELS = {
+  super_admin: 100,
+  admin: 90,
+  fb_director: 80,
+  outlet_manager: 70,
+  supervisor: 60,
+  staff: 50,
+  viewer: 10,
+};
+
+const ROLE_LABELS = {
+  super_admin: "Super Admin",
+  admin: "Admin",
+  fb_director: "F&B Director",
+  outlet_manager: "Outlet Manager",
+  supervisor: "Supervisor",
+  staff: "Staff",
+  viewer: "Viewer",
+};
+
 function roleOptionsFor(currentUser, availableRoles) {
-  if (!currentUser || !availableRoles || !availableRoles.length) return [];
-  // Look up the current user's level from the roles list
-  const currentRole = availableRoles.find(r => r.slug === currentUser.role);
-  const userLevel = currentRole ? currentRole.level : 0;
-  return availableRoles.filter(r => r.level < userLevel).map(r => r.slug);
+  if (!currentUser) return [];
+  const rolesList = Array.isArray(availableRoles) && availableRoles.length > 0
+    ? availableRoles
+    : Object.keys(FALLBACK_LEVELS).map(slug => ({
+        slug,
+        name: ROLE_LABELS[slug] || slug,
+        level: FALLBACK_LEVELS[slug]
+      }));
+
+  const currentRole = rolesList.find(r => r.slug === currentUser.role);
+  const userLevel = currentRole ? currentRole.level : (FALLBACK_LEVELS[currentUser.role] || 0);
+
+  if (currentUser.role === "super_admin") {
+    return rolesList.map(r => r.slug);
+  }
+  return rolesList.filter(r => r.level < userLevel).map(r => r.slug);
 }
 
 function canManageAccount(currentUser, account, availableRoles) {
   if (!currentUser || !account || currentUser.id === account.id) return false;
   
-  // Look up both users' levels from the roles list
-  const currentRole = availableRoles?.find(r => r.slug === currentUser.role);
-  const userLevel = currentRole ? currentRole.level : 0;
+  const rolesList = Array.isArray(availableRoles) && availableRoles.length > 0
+    ? availableRoles
+    : Object.keys(FALLBACK_LEVELS).map(slug => ({
+        slug,
+        name: ROLE_LABELS[slug] || slug,
+        level: FALLBACK_LEVELS[slug]
+      }));
+
+  const currentRole = rolesList.find(r => r.slug === currentUser.role);
+  const userLevel = currentRole ? currentRole.level : (FALLBACK_LEVELS[currentUser.role] || 0);
   
-  const targetRole = availableRoles?.find(r => r.slug === account.role);
-  const targetLevel = targetRole ? targetRole.level : 100;
+  const targetRole = rolesList.find(r => r.slug === account.role);
+  const targetLevel = targetRole ? targetRole.level : (FALLBACK_LEVELS[account.role] || 0);
   
   return userLevel > targetLevel;
 }
@@ -605,7 +643,7 @@ export default function Accounts() {
   const drawerVisible = drawerOpen || drawerClosing;
   const hasUnsavedChanges = drawerVisible && JSON.stringify(form) !== initialFormSignature;
 
-  const assignableRoles = useMemo(() => roleOptionsFor(currentUser, availableRoles), [currentUser, availableRoles]);
+  const assignableRoles = useMemo(() => roleOptionsFor(currentUser, availableRoles), [currentUser?.role, availableRoles]);
   const newAccountForm = useMemo(() => ({
     ...DEFAULT_FORM,
     role: assignableRoles.includes("staff") ? "staff" : (assignableRoles[0] || ""),
@@ -625,7 +663,7 @@ export default function Accounts() {
   
   const getRoleName = (slug) => {
     const role = availableRoles.find(r => r.slug === slug);
-    return role ? role.name : slug;
+    return role ? role.name : (ROLE_LABELS[slug] || slug);
   };
   const filteredAccounts = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -692,7 +730,7 @@ export default function Accounts() {
       ]);
       setAccounts(accountsRes.data || []);
       setVenues(Array.isArray(venuesRes) ? venuesRes : []);
-      setAvailableRoles(rolesRes.data || []);
+      setAvailableRoles(Array.isArray(rolesRes) ? rolesRes : (rolesRes.data || []));
     } catch (error) {
       setToast({ type:"error", message:error.message || "Failed to load accounts." });
     } finally {

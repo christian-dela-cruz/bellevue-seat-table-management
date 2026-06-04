@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Plus, X, Edit2, ShieldAlert, Check } from "lucide-react";
+import { useEffect, useState, Fragment } from "react";
+import { Plus, X, Edit2, ShieldAlert, Check, Trash2 } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
@@ -33,7 +33,6 @@ const DEFAULT_FORM = {
   name: "",
   description: "",
   level: 50,
-  permissions: []
 };
 
 function Spinner({ color = C.gold, size = 14 }) {
@@ -88,6 +87,9 @@ export default function RolesAndPermissions() {
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
+  const [savingCell, setSavingCell] = useState(null);
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -96,10 +98,11 @@ export default function RolesAndPermissions() {
         roleAPI.getAll(),
         roleAPI.getPermissions()
       ]);
-      setRoles(rolesRes.data || []);
-      setAllPermissions(permsRes.data || []);
+      setRoles(Array.isArray(rolesRes) ? rolesRes : (rolesRes.data || []));
+      setAllPermissions(Array.isArray(permsRes) ? permsRes : (permsRes.data || []));
     } catch (err) {
       console.error("Failed to load roles:", err);
+      setToast({ type: "error", message: "Failed to load roles and permissions." });
     } finally {
       setLoading(false);
     }
@@ -108,6 +111,13 @@ export default function RolesAndPermissions() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const handleCreate = () => {
     setEditingId(null);
@@ -122,10 +132,28 @@ export default function RolesAndPermissions() {
       name: role.name,
       description: role.description || "",
       level: role.level,
-      permissions: (role.permissions || []).map(p => p.slug)
     });
     setError("");
     setDrawerOpen(true);
+  };
+
+  const handleDeleteClick = (role) => {
+    setDeleteConfirmTarget(role);
+  };
+
+  const handleConfirmDelete = async () => {
+    const target = deleteConfirmTarget;
+    if (!target) return;
+    setDeleteConfirmTarget(null);
+    setLoading(true);
+    try {
+      await roleAPI.delete(target.id);
+      setToast({ type: "success", message: `Role "${target.name}" deleted successfully.` });
+      loadData();
+    } catch (err) {
+      setToast({ type: "error", message: err.message || "Failed to delete role." });
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -134,9 +162,23 @@ export default function RolesAndPermissions() {
     setError("");
     try {
       if (editingId) {
-        await roleAPI.update(editingId, form);
+        const existingRole = roles.find(r => r.id === editingId);
+        const existingPerms = (existingRole?.permissions || []).map(p => p.slug);
+        await roleAPI.update(editingId, {
+          name: form.name,
+          description: form.description,
+          level: form.level,
+          permissions: existingPerms
+        });
+        setToast({ type: "success", message: `Role "${form.name}" updated successfully.` });
       } else {
-        await roleAPI.create(form);
+        await roleAPI.create({
+          name: form.name,
+          description: form.description,
+          level: form.level,
+          permissions: []
+        });
+        setToast({ type: "success", message: `Role "${form.name}" created successfully. Use the matrix grid to assign permissions.` });
       }
       setDrawerOpen(false);
       loadData();
@@ -144,6 +186,36 @@ export default function RolesAndPermissions() {
       setError(err.message || "Failed to save role");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTogglePermission = async (role, permSlug, isChecked) => {
+    setSavingCell({ roleId: role.id, permSlug });
+    try {
+      const currentPerms = (role.permissions || []).map(p => p.slug);
+      const newPerms = isChecked
+        ? currentPerms.filter(slug => slug !== permSlug)
+        : [...currentPerms, permSlug];
+        
+      await roleAPI.update(role.id, {
+        name: role.name,
+        level: role.level,
+        permissions: newPerms
+      });
+      
+      setRoles(prev => prev.map(r => {
+        if (r.id === role.id) {
+          const updatedPermissions = allPermissions.filter(p => newPerms.includes(p.slug));
+          return { ...r, permissions: updatedPermissions };
+        }
+        return r;
+      }));
+      setToast({ type: "success", message: `Updated permissions for ${role.name}.` });
+    } catch (err) {
+      console.error(err);
+      setToast({ type: "error", message: err.message || "Failed to update permissions." });
+    } finally {
+      setSavingCell(null);
     }
   };
 
@@ -160,10 +232,8 @@ export default function RolesAndPermissions() {
         @keyframes rolesSpin { to { transform: rotate(360deg); } }
         @keyframes rolesSlideIn { from { opacity: 0; transform: translate3d(34px,0,0); } to { opacity: 1; transform: translate3d(0,0,0); } }
         @keyframes rolesFadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .roles-card { transition: box-shadow 0.16s ease, border-color 0.16s ease !important; }
-        .roles-card:hover { border-color: rgba(140,107,42,0.18) !important; box-shadow: 0 4px 16px rgba(44,36,24,0.06) !important; }
-        .roles-edit-btn { transition: all 0.16s ease !important; }
-        .roles-edit-btn:hover { border-color: rgba(140,107,42,0.28) !important; color: ${C.gold} !important; transform: translateY(-1px); }
+        .perm-row:hover { background: rgba(140,107,42,0.024) !important; }
+        .matrix-th { padding: 16px 12px; text-align: center; min-width: 106px; border-left: 1px solid ${C.divider}; vertical-align: top; }
       `}</style>
 
       <AdminNavbar />
@@ -191,69 +261,157 @@ export default function RolesAndPermissions() {
               }
             />
 
+            {toast && (
+              <div style={{ padding: "10px 13px", borderRadius: 8, background: toast.type === "error" ? C.redFaint : C.greenFaint, color: toast.type === "error" ? C.red : C.green, border: `1px solid ${toast.type === "error" ? "rgba(160,56,56,0.18)" : "rgba(46,122,90,0.18)"}`, fontSize: 13, transition: "all 0.2s ease" }}>
+                {toast.message}
+              </div>
+            )}
+
             {loading ? (
               <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={24} /></div>
             ) : (
-              <div style={{ display: "grid", gap: 14 }}>
-                {roles.map(role => (
-                  <div key={role.id} className="roles-card" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "20px 24px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20, boxShadow: C.shadowSoft }}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-                        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 760, color: C.text, lineHeight: 1.25 }}>{role.name}</h3>
-                        {role.is_system && (
-                          <span style={{ padding: "4px 8px", background: C.goldFaint, border: "1px solid rgba(140,107,42,0.14)", color: C.gold, fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 999 }}>System</span>
-                        )}
-                        <span style={{ padding: "4px 8px", background: C.surfaceSoft, border: `1px solid ${C.border}`, color: C.muted, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 999 }}>Level {role.level}</span>
-                      </div>
-                      <p style={{ margin: "0 0 14px", fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>{role.description || "No description provided."}</p>
-                      
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {(role.permissions || []).slice(0, 5).map(p => (
-                          <span key={p.id} style={{ padding: "4px 10px", background: C.surfaceSoft, border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, color: C.text, fontWeight: 520 }}>{p.name}</span>
+              <div style={{ overflowX: "auto", paddingBottom: 10 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", background: C.surface, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}`, boxShadow: C.shadowSoft, minWidth: 800 }}>
+                  <thead>
+                    <tr style={{ background: C.surfaceSoft, borderBottom: `2px solid ${C.goldFaint}` }}>
+                      <th style={{ padding: "18px 20px", textAlign: "left", fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: C.muted, width: 280 }}>
+                        System Capability
+                      </th>
+                      {roles.map(role => (
+                        <th key={role.id} className="matrix-th">
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 760, color: C.text, display: "block" }}>{role.name}</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
+                              <span style={{ fontSize: 8.5, color: C.muted, background: "rgba(0,0,0,0.035)", padding: "1px 5px", borderRadius: 4, fontWeight: 700 }}>Level {role.level}</span>
+                              {role.is_system && (
+                                <span style={{ fontSize: 8, color: C.gold, background: C.goldFaint, padding: "1px 5px", borderRadius: 4, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em" }}>System</span>
+                              )}
+                            </div>
+                            
+                            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                              <button
+                                type="button"
+                                onClick={() => handleEdit(role)}
+                                title="Edit role info"
+                                style={{ background: "transparent", cursor: "pointer", padding: "3px 5px", borderRadius: 4, color: C.muted, display: "inline-flex", alignItems: "center", justifyContent: "center", border: `1px solid ${C.border}` }}
+                              >
+                                <Edit2 size={10} />
+                              </button>
+                              {!role.is_system && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteClick(role)}
+                                  title="Delete role"
+                                  style={{ cursor: "pointer", padding: "3px 5px", borderRadius: 4, color: C.red, display: "inline-flex", alignItems: "center", justifyContent: "center", border: `1px solid rgba(160,56,56,0.14)`, background: C.redFaint }}
+                                >
+                                  <Trash2 size={10} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(groupedPermissions).map(([module, perms]) => (
+                      <Fragment key={module}>
+                        <tr style={{ background: C.surfaceSoft }}>
+                          <td colSpan={roles.length + 1} style={{ padding: "10px 20px", fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.14em", color: C.gold, borderBottom: `1px solid ${C.border}` }}>
+                            {module}
+                          </td>
+                        </tr>
+                        {perms.map(perm => (
+                          <tr key={perm.slug} className="perm-row" style={{ borderBottom: `1px solid ${C.divider}` }}>
+                            <td style={{ padding: "14px 20px", textAlign: "left" }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{perm.name}</div>
+                              <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{perm.slug}</div>
+                            </td>
+                            {roles.map(role => {
+                              const isChecked = (role.permissions || []).some(p => p.slug === perm.slug);
+                              const isSaving = savingCell && savingCell.roleId === role.id && savingCell.permSlug === perm.slug;
+                              
+                              return (
+                                <td key={role.id} style={{ padding: "10px 12px", textAlign: "center", borderLeft: `1px solid ${C.divider}` }}>
+                                  <div style={{ display: "inline-flex", justifyContent: "center", alignItems: "center", minHeight: 20 }}>
+                                    {isSaving ? (
+                                      <Spinner size={12} />
+                                    ) : (
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() => handleTogglePermission(role, perm.slug, isChecked)}
+                                        style={{
+                                          width: 16,
+                                          height: 16,
+                                          accentColor: C.gold,
+                                          cursor: "pointer",
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
                         ))}
-                        {(role.permissions || []).length > 5 && (
-                          <span style={{ padding: "4px 10px", background: C.surfaceSoft, border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, color: C.muted }}>+{role.permissions.length - 5} more</span>
-                        )}
-                        {(!role.permissions || role.permissions.length === 0) && (
-                          <span style={{ fontSize: 12, color: C.faint, fontStyle: "italic" }}>No permissions assigned</span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <button
-                      type="button"
-                      className="roles-edit-btn"
-                      onClick={() => handleEdit(role)}
-                      style={{ padding: "8px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexShrink: 0 }}
-                    >
-                      <Edit2 size={13} /> Edit
-                    </button>
-                  </div>
-                ))}
-
-                {roles.length === 0 && !loading && (
-                  <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "40px 24px", textAlign: "center", color: C.muted, fontSize: 13 }}>
-                    No roles found. Create your first role to get started.
-                  </div>
-                )}
+                      </Fragment>
+                    ))}
+                    {Object.keys(groupedPermissions).length === 0 && (
+                      <tr>
+                        <td colSpan={roles.length + 1} style={{ padding: "40px 20px", textAlign: "center", color: C.muted, fontSize: 13 }}>
+                          No permissions found in the system.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
         </main>
       </div>
 
-      {/* Drawer */}
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(2px)", zIndex: 8000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, animation: "rolesFadeIn 200ms ease both" }}>
+          <div style={{ width: "min(400px, 100%)", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 24px 80px rgba(0,0,0,0.22)", padding: 20 }}>
+            <h3 style={{ margin: 0, fontSize: 18, color: C.text, fontWeight: 700 }}>Delete Role?</h3>
+            <p style={{ margin: "10px 0 20px", fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
+              Are you sure you want to delete the custom role <strong>{deleteConfirmTarget.name}</strong>? This action cannot be undone and will affect any users assigned to this role.
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmTarget(null)}
+                style={{ padding: "0 16px", height: 34, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 8, color: C.muted, fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                style={{ padding: "0 16px", height: 34, background: C.red, border: "none", borderRadius: 8, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create/Edit Drawer */}
       {drawerOpen && (
         <div
           role="presentation"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setDrawerOpen(false); }}
           style={{ position: "fixed", inset: 0, zIndex: 7000, background: "rgba(24,20,14,0.28)", backdropFilter: "blur(2px)", display: "flex", justifyContent: "flex-end", animation: "rolesFadeIn 220ms ease both" }}
         >
-          <aside style={{ width: "min(560px, calc(100vw - 28px))", background: C.surface, height: "100%", borderLeft: `1px solid ${C.border}`, display: "flex", flexDirection: "column", boxShadow: "0 24px 70px rgba(24,20,14,0.22)", animation: "rolesSlideIn 320ms cubic-bezier(0.22,1,0.36,1) both" }}>
+          <aside style={{ width: "min(480px, calc(100vw - 28px))", background: C.surface, height: "100%", borderLeft: `1px solid ${C.border}`, display: "flex", flexDirection: "column", boxShadow: "0 24px 70px rgba(24,20,14,0.22)", animation: "rolesSlideIn 320ms cubic-bezier(0.22,1,0.36,1) both" }}>
             <div style={{ padding: "18px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
               <div>
                 <div style={{ color: C.gold, fontSize: 8.5, fontWeight: 750, letterSpacing: "0.16em", textTransform: "uppercase" }}>Administration</div>
-                <h2 style={{ margin: "5px 0 0", fontSize: 21, fontWeight: 640, color: C.text, lineHeight: 1.15 }}>{editingId ? "Edit Role" : "Create Role"}</h2>
+                <h2 style={{ margin: "5px 0 0", fontSize: 21, fontWeight: 640, color: C.text, lineHeight: 1.15 }}>{editingId ? "Edit Role Info" : "Create Role"}</h2>
               </div>
               <button type="button" onClick={() => setDrawerOpen(false)} style={{ width: 36, height: 36, border: `1px solid rgba(140,107,42,0.22)`, borderRadius: 8, background: C.surface, color: C.gold, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                 <X size={16} />
@@ -278,33 +436,6 @@ export default function RolesAndPermissions() {
               <Field label="Authority Level (1–100)" hint="Higher levels can manage lower levels. Super Admin is 100.">
                 <input type="number" min="1" max="100" required value={form.level} onChange={e => setForm({...form, level: Number(e.target.value)})} style={inputStyle()} />
               </Field>
-
-              <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 16 }}>
-                <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 760, color: C.text, lineHeight: 1.3 }}>Permissions</h3>
-                <div style={{ display: "grid", gap: 18 }}>
-                  {Object.entries(groupedPermissions).map(([module, perms]) => (
-                    <div key={module}>
-                      <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>{module}</div>
-                      <div style={{ display: "grid", gap: 6 }}>
-                        {perms.map(p => {
-                          const isChecked = form.permissions.includes(p.slug);
-                          return (
-                            <label key={p.slug} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "8px 12px", borderRadius: 8, background: isChecked ? C.goldFaint : "transparent", border: `1px solid ${isChecked ? 'rgba(140,107,42,0.18)' : 'transparent'}`, transition: "all 0.15s ease" }}>
-                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isChecked ? C.gold : C.muted}`, background: isChecked ? C.gold : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s ease" }}>
-                                {isChecked && <Check size={12} color="#fff" strokeWidth={3} />}
-                              </div>
-                              <span style={{ fontSize: 13, color: isChecked ? C.text : C.muted, fontWeight: isChecked ? 600 : 400 }}>{p.name}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                  {Object.keys(groupedPermissions).length === 0 && (
-                    <div style={{ fontSize: 12.5, color: C.muted, fontStyle: "italic" }}>No permissions available in the system.</div>
-                  )}
-                </div>
-              </div>
             </form>
             
             <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.divider}`, display: "flex", gap: 10, justifyContent: "flex-end", background: C.surfaceSoft }}>

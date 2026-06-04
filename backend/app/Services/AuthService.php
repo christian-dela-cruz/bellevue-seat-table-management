@@ -23,8 +23,8 @@ class AuthService
                 'name' => 'Super Administrator',
                 'username' => 'super@admin.com',
                 'email' => 'super@admin.com',
-                'role' => 'viewer',
-                'permissions' => AdminAccess::permissionsForRole('viewer'),
+                'role' => 'super_admin',
+                'permissions' => AdminAccess::permissionsForRole('super_admin'),
                 'scope_type' => 'all',
                 'outlet_scope' => [],
             ];
