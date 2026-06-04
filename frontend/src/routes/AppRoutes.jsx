@@ -17,9 +17,13 @@ import LoginPage from "../features/auth/pages/LoginPage";
 import { authAPI } from "../services/authAPI";
 import SharedNavbar from "../components/SharedNavbar";
 
-function RequireAdminAuth({ children }) {
+function RequireAdminAuth({ children, permission }) {
   if (!authAPI.isAuthenticated()) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (permission && !authAPI.hasPermission(permission)) {
+    return <Navigate to="/admin/reservations" replace />;
   }
 
   return children;
@@ -57,7 +61,7 @@ export default function AppRoutes() {
                 <Route
           path="/admin/seat-map-editor"
           element={
-            <RequireAdminAuth>
+            <RequireAdminAuth permission="manage_seat_maps">
               <UnifiedSeatMapEditor />
             </RequireAdminAuth>
           }
@@ -65,7 +69,7 @@ export default function AppRoutes() {
         <Route
           path="/admin/seatmap"
           element={
-            <RequireAdminAuth>
+            <RequireAdminAuth permission="manage_seat_maps">
               <UnifiedSeatMapEditor />
             </RequireAdminAuth>
           }
@@ -73,7 +77,7 @@ export default function AppRoutes() {
         <Route
           path="/admin/seat-map-editor-20-20A"
           element={
-            <RequireAdminAuth>
+            <RequireAdminAuth permission="manage_seat_maps">
               <UnifiedSeatMapEditor />
             </RequireAdminAuth>
           }
@@ -81,7 +85,7 @@ export default function AppRoutes() {
         <Route
           path="/admin/seat-map-editor-20-20B"
           element={
-            <RequireAdminAuth>
+            <RequireAdminAuth permission="manage_seat_maps">
               <UnifiedSeatMapEditor />
             </RequireAdminAuth>
           }
@@ -89,7 +93,7 @@ export default function AppRoutes() {
         <Route
           path="/admin/seat-map-editor-20-20C"
           element={
-            <RequireAdminAuth>
+            <RequireAdminAuth permission="manage_seat_maps">
               <UnifiedSeatMapEditor />
             </RequireAdminAuth>
           }
@@ -105,7 +109,7 @@ export default function AppRoutes() {
         <Route
           path="/admin/accounts"
           element={
-            <RequireAdminAuth>
+            <RequireAdminAuth permission="manage_accounts">
               <Accounts />
             </RequireAdminAuth>
           }
@@ -113,7 +117,7 @@ export default function AppRoutes() {
         <Route
           path="/admin/roles"
           element={
-            <RequireAdminAuth>
+            <RequireAdminAuth permission="manage_accounts">
               <RolesAndPermissions />
             </RequireAdminAuth>
           }
@@ -129,7 +133,7 @@ export default function AppRoutes() {
         <Route
           path="/admin/reports"
           element={
-            <RequireAdminAuth>
+            <RequireAdminAuth permission="view_outlet_reports">
               <Reports />
             </RequireAdminAuth>
           }
@@ -137,7 +141,7 @@ export default function AppRoutes() {
         <Route
           path="/admin/outlets"
           element={
-            <RequireAdminAuth>
+            <RequireAdminAuth permission="view_outlet_reports">
               <OutletDashboard />
             </RequireAdminAuth>
           }
@@ -145,7 +149,7 @@ export default function AppRoutes() {
         <Route
           path="/admin/function-rooms"
           element={
-            <RequireAdminAuth>
+            <RequireAdminAuth permission="manage_venues">
               <FunctionRooms />
             </RequireAdminAuth>
           }
@@ -153,7 +157,7 @@ export default function AppRoutes() {
         <Route
           path="/admin/outlets/:outletSlug"
           element={
-            <RequireAdminAuth>
+            <RequireAdminAuth permission="view_outlet_reports">
               <OutletDashboard />
             </RequireAdminAuth>
           }

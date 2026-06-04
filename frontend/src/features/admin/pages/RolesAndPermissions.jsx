@@ -98,6 +98,10 @@ export default function RolesAndPermissions() {
   const [toast, setToast] = useState(null);
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState(null);
 
+  const currentUser = authAPI.getCurrentUser();
+  const isSuperAdmin = currentUser?.role === "super_admin";
+  const canEditRolePerms = selectedRole && (!selectedRole.is_system || (isSuperAdmin && selectedRole.slug !== "super_admin"));
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -218,7 +222,7 @@ export default function RolesAndPermissions() {
   };
 
   const togglePermission = (slug) => {
-    if (selectedRole?.is_system) return; // cannot edit system role permissions here
+    if (!canEditRolePerms) return; // cannot edit system role permissions here
     
     setEditingPermissions(prev => {
       const next = prev.includes(slug) ? prev.filter(p => p !== slug) : [...prev, slug];
@@ -401,8 +405,14 @@ export default function RolesAndPermissions() {
                       <div>
                         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 760 }}>{selectedRole.name} Permissions</h3>
                         {selectedRole.is_system && (
-                          <div style={{ fontSize: 12, color: C.red, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                            <ShieldAlert size={14} /> System roles cannot have their default permissions modified.
+                          <div style={{ fontSize: 12, color: !canEditRolePerms ? C.red : C.gold, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                            <ShieldAlert size={14} /> 
+                            {!isSuperAdmin 
+                              ? "System roles cannot have their default permissions modified."
+                              : selectedRole.slug === "super_admin"
+                                ? "The Super Admin role cannot have its default permissions modified to prevent system lockouts."
+                                : "System role default permissions can be modified by Super Admins. Changes will affect all users with this role."
+                            }
                           </div>
                         )}
                       </div>
@@ -424,7 +434,7 @@ export default function RolesAndPermissions() {
                             {perms.map((perm, idx) => {
                               const isChecked = editingPermissions?.includes(perm.slug);
                               return (
-                                <div key={perm.slug} className="perm-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: idx < perms.length - 1 ? `1px solid ${C.divider}` : "none", cursor: selectedRole.is_system ? "default" : "pointer" }} onClick={() => togglePermission(perm.slug)}>
+                                <div key={perm.slug} className="perm-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: idx < perms.length - 1 ? `1px solid ${C.divider}` : "none", cursor: !canEditRolePerms ? "default" : "pointer" }} onClick={() => togglePermission(perm.slug)}>
                                   <div>
                                     <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{perm.name}</div>
                                     <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{perm.description || perm.slug}</div>
@@ -433,9 +443,9 @@ export default function RolesAndPermissions() {
                                     <input 
                                       type="checkbox" 
                                       checked={isChecked} 
-                                      disabled={selectedRole.is_system}
+                                      disabled={!canEditRolePerms}
                                       onChange={() => togglePermission(perm.slug)}
-                                      style={{ width: 18, height: 18, accentColor: C.gold, cursor: selectedRole.is_system ? "not-allowed" : "pointer" }}
+                                      style={{ width: 18, height: 18, accentColor: C.gold, cursor: !canEditRolePerms ? "not-allowed" : "pointer" }}
                                       onClick={e => e.stopPropagation()}
                                     />
                                   </div>

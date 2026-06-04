@@ -36,8 +36,8 @@ const NAV_GROUPS = [
     icon: Building2,
     items: [
       { id: "outlets", label: "Outlet Dashboard", icon: LayoutDashboard, iconStyle: "lucide", permission: "view_outlet_reports" },
-      { id: "function-rooms", label: "Venue Management", icon: Building2, iconStyle: "lucide", permission: "view_admin" },
-      { id: "seat-map", label: "Seat Map", icon: Map, iconStyle: "lucide" },
+      { id: "function-rooms", label: "Venue Management", icon: Building2, iconStyle: "lucide", permission: "manage_venues" },
+      { id: "seat-map", label: "Seat Map", icon: Map, iconStyle: "lucide", permission: "manage_seat_maps" },
     ],
   },
   {
