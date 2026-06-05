@@ -8,9 +8,16 @@ use App\Models\Reservation;
 use App\Models\Venue;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use App\Services\SeatMapService;
 
 class SeatMapController extends Controller
 {
+    protected SeatMapService $seatMapService;
+
+    public function __construct(SeatMapService $seatMapService)
+    {
+        $this->seatMapService = $seatMapService;
+    }
     /**
      * Get seatmap data for a specific venue/room
      */
@@ -48,18 +55,19 @@ class SeatMapController extends Controller
                 $reservations = $this->scheduledReservations($request, $venue->id);
             }
 
-            // Fallback inheritance logic: if parent venue has no layout, try to find a child that has one
-            $payload = $venue->seatmap_payload;
-            $isEmptyPayload = empty($payload) || $payload === '{}' || $payload === '[]' || strlen(trim($payload)) < 5;
+            $seatMap = $this->seatMapService->getLiveLayout($venue->id);
+            $payload = $seatMap ? $seatMap->payload : null;
+            $isEmptyPayload = empty($payload) || $payload === '{}' || $payload === '[]' || (is_string($payload) && strlen(trim($payload)) < 5);
             
             if ($isEmptyPayload) {
-                $childWithLayout = Venue::where('parent_id', $venue->id)
-                    ->whereNotNull('seatmap_payload')
-                    ->where('seatmap_payload', '!=', '{}')
-                    ->where('seatmap_payload', '!=', '[]')
-                    ->first();
-                if ($childWithLayout) {
-                    $payload = $childWithLayout->seatmap_payload;
+                // Find a child venue that has a published seat map
+                $children = Venue::where('parent_id', $venue->id)->get();
+                foreach ($children as $child) {
+                    $childMap = $this->seatMapService->getLiveLayout($child->id);
+                    if ($childMap && !empty($childMap->payload) && $childMap->payload !== '{}' && $childMap->payload !== '[]') {
+                        $payload = $childMap->payload;
+                        break;
+                    }
                 }
             }
 
@@ -145,7 +153,56 @@ class SeatMapController extends Controller
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
+    /**
+     * Get ADMIN seatmap data by venue ID (Draft or fallback to Live)
+     */
+    public function getAdminSeatmapById(Request $request, int $venueId): JsonResponse
+    {
+        try {
+            $venue = Venue::find($venueId);
+            if (!$venue) {
+                return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
+            }
 
+            $seatMap = $this->seatMapService->getAdminLayout($venue->id);
+            $payload = $seatMap ? $seatMap->payload : null;
+            $isEmptyPayload = empty($payload) || $payload === '{}' || $payload === '[]' || (is_string($payload) && strlen(trim($payload)) < 5);
+
+            if ($isEmptyPayload) {
+                // Fallback inheritance logic for admin
+                $children = Venue::where('parent_id', $venue->id)->get();
+                foreach ($children as $child) {
+                    $childMap = $this->seatMapService->getAdminLayout($child->id);
+                    if ($childMap && !empty($childMap->payload) && $childMap->payload !== '{}' && $childMap->payload !== '[]') {
+                        $payload = $childMap->payload;
+                        break;
+                    }
+                }
+            }
+
+            if (empty($payload)) {
+                return response()->json([
+                    'success' => true,
+                    'data' => null,
+                    'is_draft' => false,
+                    'venue' => ['id' => $venue->id, 'name' => $venue->name, 'wing' => $venue->wing]
+                ]);
+            }
+
+            $data = is_string($payload) ? json_decode($payload, true) : $payload;
+            $data = is_array($data) ? $this->layoutWithAvailabilityDefaults($data) : $data;
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'is_draft' => $seatMap && $seatMap->status === 'draft',
+                'version' => $seatMap ? $seatMap->version_number : null,
+                'venue' => ['id' => $venue->id, 'name' => $venue->name, 'wing' => $venue->wing]
+            ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
     /**
      * Save seatmap data for a venue by wing and room
      */
@@ -161,12 +218,18 @@ class SeatMapController extends Controller
                 return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
             }
 
-            $venue->seatmap_payload = json_encode($this->layoutWithAvailabilityDefaults($request->all()));
-            $venue->save();
+            $result = $this->seatMapService->saveDraft($venue->id, $this->layoutWithAvailabilityDefaults($request->all()), $request->user()?->id);
+
+            if ($result === false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Rejected: cannot save empty layout over existing published layout'
+                ], 422);
+            }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Seatmap saved successfully'
+                'message' => 'Draft saved successfully'
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
@@ -184,12 +247,45 @@ class SeatMapController extends Controller
                 return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
             }
 
-            $venue->seatmap_payload = json_encode($this->layoutWithAvailabilityDefaults($request->all()));
-            $venue->save();
+            $result = $this->seatMapService->saveDraft($venue->id, $this->layoutWithAvailabilityDefaults($request->all()), $request->user()?->id);
+
+            if ($result === false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Rejected: cannot save empty layout over existing published layout'
+                ], 422);
+            }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Seatmap saved successfully'
+                'message' => 'Draft saved successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Publish the current draft for a venue
+     */
+    public function publishSeatmapById(Request $request, int $venueId): JsonResponse
+    {
+        try {
+            $venue = Venue::find($venueId);
+            if (!$venue) {
+                return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
+            }
+
+            $published = $this->seatMapService->publishDraft($venue->id, $request->user()?->id);
+
+            if (!$published) {
+                return response()->json(['success' => false, 'message' => 'No draft layout to publish'], 400);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Seatmap published successfully',
+                'version' => $published->version_number
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);

@@ -19,7 +19,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'adjust_reservation_details' => 'Adjust Reservation Details',
             'delete_reservations' => 'Delete Reservations',
             'acknowledge_notifications' => 'Acknowledge Notifications',
-            'manage_seat_maps' => 'Manage Seat Maps',
+            'manage_seat_maps' => 'Manage Seat Maps (Draft)',
+            'publish_seat_maps' => 'Publish Seat Maps',
+            'restore_seat_maps' => 'Restore Seat Map Versions',
             'manage_venues' => 'Manage Venues',
             'view_outlet_reports' => 'View Outlet Reports',
             'view_global_reports' => 'View Global Reports',
@@ -51,6 +53,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'permissions' => [
                     'view_admin', 'manage_reservations', 'adjust_reservation_details',
                     'delete_reservations', 'acknowledge_notifications', 'manage_seat_maps',
+                    'publish_seat_maps', 'restore_seat_maps',
                     'manage_venues', 'view_outlet_reports', 'view_transactions', 'manage_accounts'
                 ],
             ],

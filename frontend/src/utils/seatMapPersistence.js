@@ -1,147 +1,105 @@
 // src/utils/seatMapPersistence.js
-// Shared persistence layer between admin SeatMap (editMode) and client AlabangReserve.
-// Uses localStorage for persistence + BroadcastChannel/custom events for live sync.
-
+// Modified for Staged Publishing Workflow
 const STORAGE_PREFIX = "seatmap";
-const CHANNEL_NAME   = "seatmap_updates";
-const LEGACY_KEY     = "seatMapData";
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
-function buildKey(wing, room) {
-  return `${STORAGE_PREFIX}:${wing}:${room}`;
+function getHeaders() {
+  const token = localStorage.getItem("admin_token") || localStorage.getItem("auth_token") || "";
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
 }
 
-// ─── Per-room save ────────────────────────────────────────────────────────────
-export function saveRoomData(wing, room, tableData) {
-  const key = buildKey(wing, room);
+// ─── ADMIN FETCH (Draft or Published) ─────────────────────────────────────────
+export async function fetchAdminSeatmap(venueId) {
   try {
-    localStorage.setItem(key, JSON.stringify(tableData));
-  } catch (e) {
-    console.warn("[seatMapPersistence] saveRoomData failed:", e);
-  }
-  try {
-    const bc = new BroadcastChannel(CHANNEL_NAME);
-    bc.postMessage({ wing, room, data: tableData });
-    bc.close();
-  } catch {}
-}
-
-// ─── Per-room load ────────────────────────────────────────────────────────────
-export function getRoomData(wing, room, defaultData) {
-  const key = buildKey(wing, room);
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.warn("[seatMapPersistence] getRoomData failed:", e);
-  }
-  return defaultData;
-}
-
-// ─── Whole-map save ───────────────────────────────────────────────────────────
-export function saveSeatMapData(wing, room, data) {
-  try {
-    saveRoomData(wing, room, data);
-    const existing = loadSeatMapData() || {};
-    const updated  = {
-      ...existing,
-      [wing]: { ...(existing[wing] || {}), [room]: data },
-    };
-    localStorage.setItem(LEGACY_KEY, JSON.stringify(updated));
-    return true;
-  } catch (e) {
-    console.warn("[seatMapPersistence] saveSeatMapData failed:", e);
-    return false;
-  }
-}
-
-// ─── Whole-map load ───────────────────────────────────────────────────────────
-export function loadSeatMapData() {
-  try {
-    const raw = localStorage.getItem(LEGACY_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.warn("[seatMapPersistence] loadSeatMapData failed:", e);
+    const res = await fetch(`${API_BASE_URL}/seatmap/admin/id/${venueId}`, {
+      headers: getHeaders()
+    });
+    const data = await res.json();
+    console.log("[DEBUG] fetchAdminSeatmap response data:", data);
+    if (data.success) {
+      return data;
+    } else {
+      console.error("fetchAdminSeatmap returned success: false", data);
+    }
+  } catch (err) {
+    console.error("Failed to fetch admin seatmap:", err);
   }
   return null;
 }
 
-// ─── Subscribe to live changes ────────────────────────────────────────────────
-export function subscribeToSeatMapChanges(callback) {
-  let bc = null;
+// ─── ADMIN SAVE DRAFT ─────────────────────────────────────────────────────────
+export async function saveDraftSeatmap(venueId, data) {
   try {
-    bc = new BroadcastChannel(CHANNEL_NAME);
-    bc.onmessage = (e) => {
-      if (e.data?.wing && e.data?.room && e.data?.data) callback(e.data);
-    };
-  } catch { bc = null; }
-
-  const onStorage = (e) => {
-    if (!e.key?.startsWith(STORAGE_PREFIX + ":")) return;
-    try {
-      const parts = e.key.split(":");
-      const wing  = parts[1];
-      const room  = parts.slice(2).join(":");
-      const data  = JSON.parse(e.newValue);
-      callback({ wing, room, data });
-    } catch {}
-  };
-  window.addEventListener("storage", onStorage);
-
-  const onCustom = (e) => {
-    const { wing, room, data } = e.detail || {};
-    if (wing && room && data) callback({ wing, room, data });
-  };
-  window.addEventListener("seatmap:update", onCustom);
-
-  return () => {
-    bc?.close();
-    window.removeEventListener("storage", onStorage);
-    window.removeEventListener("seatmap:update", onCustom);
-  };
-}
-
-// ─── Dispatch same-tab event ──────────────────────────────────────────
-export function dispatchSeatMapUpdate(wing, room, data, venueId = null) {
-  // 1. Send to backend API
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
-  const token = localStorage.getItem("admin_token") || localStorage.getItem("auth_token") || "";
-  const headers = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const endpoint = venueId 
-    ? `${API_BASE_URL}/seatmap/id/${venueId}` 
-    : `${API_BASE_URL}/seatmap/${encodeURIComponent(wing)}/${encodeURIComponent(room)}`;
-
-  fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(data),
-  }).catch(err => console.error("Failed to save seatmap to backend:", err));
-
-  // 2. Persist to unified key (for legacy clients that haven't refreshed)
-  const key = buildKey(wing, room);
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
+    const res = await fetch(`${API_BASE_URL}/seatmap/admin/id/${venueId}/draft`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    const result = await res.json();
+    return result.success;
   } catch (err) {
-    console.warn("SeatMap: could not save to localStorage", err);
+    console.error("Failed to save draft:", err);
+    return false;
   }
-
-  // 3. Fire storage event for same-tab sync
-  try {
-    window.dispatchEvent(new StorageEvent("storage", {
-      key: key,
-      newValue: JSON.stringify(data),
-    }));
-  } catch {}
-
-  // 4. Fire same-tab custom event (storage events don't fire in the originating tab)
-  window.dispatchEvent(
-    new CustomEvent("seatmap:update", { detail: { wing, room, data } })
-  );
-  const storageKey = buildKey(wing, room);
-  try {
-    window.dispatchEvent(
-      new StorageEvent("storage", { key: storageKey, newValue: JSON.stringify(data) })
-    );
-  } catch {}
 }
+
+// ─── ADMIN PUBLISH ────────────────────────────────────────────────────────────
+export async function publishSeatmap(venueId) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/seatmap/admin/id/${venueId}/publish`, {
+      method: "POST",
+      headers: getHeaders(),
+    });
+    const result = await res.json();
+    
+    // Clear the legacy localStorage keys since we now rely on DB
+    // We optionally keep a single key just to trigger storage events if needed,
+    // but guests should be pulling from the live API now.
+    try {
+      window.dispatchEvent(new CustomEvent("seatmap:published", { detail: { venueId } }));
+      const bc = new BroadcastChannel("seatmap_updates");
+      bc.postMessage({ type: "seatmap:published", venueId });
+      bc.close();
+    } catch {}
+
+    return { success: result.success, message: result.message || "Unknown error" };
+  } catch (err) {
+    console.error("Failed to publish seatmap:", err);
+    return { success: false, message: err.message };
+  }
+}
+
+// ─── LIVE FETCH (Guests) ──────────────────────────────────────────────────────
+export async function fetchLiveSeatmap(venueId, date = '', time = '', guests = 1) {
+  try {
+    let url = `${API_BASE_URL}/seatmap/id/${venueId}`;
+    const params = new URLSearchParams();
+    if (date) params.append('event_date', date);
+    if (time) params.append('event_time', time);
+    if (guests) params.append('guests', guests);
+    
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
+
+    const res = await fetch(url, { headers: getHeaders() });
+    const data = await res.json();
+    if (data.success) {
+      return data;
+    }
+  } catch (err) {
+    console.error("Failed to fetch live seatmap:", err);
+  }
+  return null;
+}
+
+// ─── LEGACY FALLBACKS (Keep so existing code doesn't crash until fully migrated) ───
+export function getRoomData(wing, room, defaultData) {
+  return defaultData;
+}
+export function saveRoomData(wing, room, tableData) {}
+export function dispatchSeatMapUpdate(wing, room, data, venueId = null) {}
+export function subscribeToSeatMapChanges(callback) {
+  return () => {};
+}

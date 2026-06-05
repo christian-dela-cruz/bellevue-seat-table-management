@@ -1390,35 +1390,27 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   }, [tableData, venue, ROOM, classicDate, classicGuests]);
 
   useEffect(() => {
-    // Listen for seatmap updates saved by admin (live sync)
-    const onStorage = e => {
-      if (e.key !== layoutKey(WING, ROOM)) return;
-      try {
-        const parsed = e.newValue ? JSON.parse(e.newValue) : null;
-        if (parsed?.v === 2) {
-          setTableData((current) => isIncomingSeatMapStale(current, parsed) ? current : parsed);
-        }
-      } catch { }
-    };
-    const onSeatMapSaved = e => {
-      const savedRoom = e.detail?.room;
-      if (savedRoom !== ROOM) return;
-
-      try {
-        const parsed = e.detail.payload ? JSON.parse(e.detail.payload) : null;
-        if (parsed?.v === 2) {
-          setTableData((current) => isIncomingSeatMapStale(current, parsed) ? current : parsed);
-        }
-      } catch { }
+    // Listen for seatmap published events to refresh the live map
+    const onSeatMapPublished = e => {
+      const publishedVenueId = e.detail?.venueId;
+      if (publishedVenueId === venue?.id) {
+        fetchAndMerge();
+      }
     };
 
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("seatmap:saved", onSeatMapSaved);
+    const bc = new BroadcastChannel("seatmap_updates");
+    bc.onmessage = e => {
+      if (e.data?.type === "seatmap:published" && e.data?.venueId === venue?.id) {
+        fetchAndMerge();
+      }
+    };
+
+    window.addEventListener("seatmap:published", onSeatMapPublished);
     return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("seatmap:saved", onSeatMapSaved);
+      window.removeEventListener("seatmap:published", onSeatMapPublished);
+      bc.close();
     };
-  }, [ROOM, WING]);
+  }, [venue?.id, fetchAndMerge]);
 
   // Real-time Websocket
   useEffect(() => {

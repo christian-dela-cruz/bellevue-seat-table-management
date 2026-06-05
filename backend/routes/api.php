@@ -82,14 +82,21 @@ Route::prefix('venues')->group(function () {
 
 // Seatmap routes
 Route::prefix('seatmap')->group(function () {
-    // ID-based routes must be registered before the wing/room wildcard route.
-    Route::get('/id/{venueId}', [SeatMapController::class, 'getSeatmapById']);
-    Route::post('/id/{venueId}', [SeatMapController::class, 'saveSeatmapById']);
+    // Admin routes (Drafts and Publishing)
+    Route::prefix('admin')->middleware(AdminAccess::class . ':manage_seat_maps')->group(function () {
+        Route::get('/id/{venueId}', [SeatMapController::class, 'getAdminSeatmapById']);
+        Route::post('/id/{venueId}/draft', [SeatMapController::class, 'saveSeatmapById']);
+        Route::post('/id/{venueId}/publish', [SeatMapController::class, 'publishSeatmapById'])->middleware(AdminAccess::class . ':publish_seat_maps');
+    });
 
+    // Live Guest routes (Published only)
+    Route::get('/id/{venueId}', [SeatMapController::class, 'getSeatmapById']);
+
+    // Legacy fallback routes for wing/room (Admin saves as draft, guest reads as live)
     Route::get('/{wing}/{room}', [SeatMapController::class, 'getSeatmap'])
         ->where('room', '.*');
     Route::post('/{wing}/{room}', [SeatMapController::class, 'saveSeatmap'])
-        ->where('room', '.*');
+        ->where('room', '.*')->middleware(AdminAccess::class . ':manage_seat_maps');
 });
 
 // Room seats routes (alias for seatmap to match frontend expectations)

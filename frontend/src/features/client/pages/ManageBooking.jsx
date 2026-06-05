@@ -2,11 +2,6 @@
 import { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import SeatMap, { STATUS_COLORS } from "../../../components/seatmap/SeatMap";
-import {
-  getRoomData,
-  subscribeToSeatMapChanges,
-  dispatchSeatMapUpdate,
-} from "../../../utils/seatMapPersistence.js";
 import Echo from "../../../utils/websocket.js";
 import bellevueLogo from "../../../assets/bellevue-logo.png";
 import SharedNavbar from "../../../components/SharedNavbar.jsx";

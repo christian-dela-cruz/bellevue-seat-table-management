@@ -1,6 +1,6 @@
 // src/components/seatmap/SeatMap.jsx
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { dispatchSeatMapUpdate } from "../../utils/seatMapPersistence.js";
+import { fetchAdminSeatmap, saveDraftSeatmap, publishSeatmap } from "../../utils/seatMapPersistence.js";
 import { cleanupReservationsForDeletedTable, cleanupReservationsForDeletedSeat, cleanupReservationsForDeletedStandaloneSeat } from "../../utils/reservationCleanup.js";
 import { authAPI } from "../../services/authAPI.js";
 import { getScopedOutletGroups } from "../../constants/outletCatalog.js";
@@ -378,40 +378,7 @@ function withSeatmapSaveMetadata(wing, room, data) {
   };
 }
 
-function saveLayout(wing, room, data) {
-  if (!wing || !room) return;
-  const payloadData = withSeatmapSaveMetadata(wing, room, data || {});
-  const payload = JSON.stringify(payloadData);
-  try {
-    localStorage.setItem(layoutKey(wing, room), payload);
-    window.dispatchEvent(new CustomEvent("seatmap:saved", { detail: { wing, room, payload, data: payloadData } }));
-  } catch (err) {
-    console.warn("SeatMap: could not save to localStorage", err);
-  }
-  return payloadData;
-}
-
-function loadLayout(wing, room) {
-  try {
-    const key = layoutKey(wing, room);
-    let raw = localStorage.getItem(key);
-    if (!raw) {
-      const canonicalRoom = getCanonicalRoomName(room);
-      const fullRoom = canonicalRoom === "Hanakazu" ? "Hanakazu Japanese Restaurant" : canonicalRoom === "Qsina" ? "Qsina Restaurant" : room;
-      const actualWing = getActualWingForRoom(canonicalRoom);
-      raw = localStorage.getItem(`seatmap_layout:${actualWing}:${fullRoom}`)
-         || localStorage.getItem(`seatmap_layout:Main Wing:${fullRoom}`)
-         || localStorage.getItem(`seatmap_layout:Dining:${fullRoom}`)
-         || localStorage.getItem(`seatmap_layout:${actualWing}:${canonicalRoom}`)
-         || localStorage.getItem(`seatmap_layout:Main Wing:${canonicalRoom}`);
-    }
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && parsed.v === 2) return parsed;
-    if (Array.isArray(parsed)) return { tables: parsed, labels: DEFAULT_LABELS, standaloneSeats: [], fixtures: [] };
-    return null;
-  } catch { return null; }
-}
+// Removed old localStorage-based saveLayout and loadLayout
 
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -3125,10 +3092,14 @@ export default function SeatMap({
   const [selectedStandaloneSeats, setSelectedStandaloneSeats] = useState(new Set());
   const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
   const [saved, setSaved]               = useState(false);
+  const [isDraft, setIsDraft]           = useState(false);
+  const [layoutVersion, setLayoutVersion] = useState(1);
   const [tool, setTool]                 = useState("select");
   const [activeDragId, setActiveDragId] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showVenueManager, setShowVenueManager] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [publishError, setPublishError]         = useState("");
 
   // ── Panning & Zooming & Blueprint Guides ────────────────────────────────────
   const [pan, setPan]                   = useState({ x: 0, y: 0 });
@@ -3149,6 +3120,7 @@ export default function SeatMap({
   const [history, setHistory]           = useState({ past: [], future: [] });
 
   const pushHistory = useCallback((currentTables = tables, currentSeats = standaloneSeats, currentLabels = labels, currentFixtures = fixtures) => {
+    userEditedRef.current = true;  // Mark that user has made a real edit
     setHistory(prev => ({
       past: [...prev.past, { 
         tables: JSON.parse(JSON.stringify(currentTables)), 
@@ -3215,6 +3187,8 @@ export default function SeatMap({
   const [activeRoom, setActiveRoom] = useState(room || "Alabang Function Room");
 
   const loadedRef     = useRef(false);
+  const userEditedRef = useRef(false);  // Only true after a real user edit, prevents auto-save race
+  const autoSaveTimerRef = useRef(null);
   const dragging      = useRef(null);
   const canvasRef     = useRef(null);
   const canvasViewportRef = useRef(null);
@@ -3354,100 +3328,108 @@ export default function SeatMap({
   // ── FIX: LOAD — reset counters before loading so new tables get clean IDs ───
   useEffect(() => {
     if (!editMode) return;
-    loadedRef.current = false;
+    if (!activeWing || !activeRoom) return;
 
-    // FIX: Always reset counters when switching rooms to prevent ID collisions
+    // Reset all flags BEFORE starting async fetch
+    loadedRef.current = false;
+    userEditedRef.current = false;
+    if (autoSaveTimerRef.current) { clearTimeout(autoSaveTimerRef.current); autoSaveTimerRef.current = null; }
     _tableCounter = 1;
     _standaloneCounter = 1;
 
-    const stored = loadLayout(activeWing, activeRoom);
-    if (stored) {
-      const norm = normalize(stored.tables).filter(t => t.seats?.length > 0);
-      setTables(norm);
-      // FIX: Derive counters from loaded data so new IDs don't collide
-      norm.forEach(t => {
-        const n = parseInt(t.id?.replace(/\D/g, "")) || 0;
-        if (n >= _tableCounter) _tableCounter = n + 1;
-      });
-      setLabels(stored.labels?.length ? stored.labels : DEFAULT_LABELS);
-      const ss = (stored.standaloneSeats || []).map(s => ({ ...s, status: s.status || "available" }));
-      setStandaloneSeats(ss);
-      ss.forEach(s => {
-        const n = parseInt(s.id?.replace(/\D/g, "")) || 0;
-        if (n >= _standaloneCounter) _standaloneCounter = n + 1;
-      });
-      const fixs = (stored.fixtures || []).map(f => ({ ...f, type: "fixture" }));
-      setFixtures(fixs);
-      fixs.forEach(f => {
-        const n = parseInt(f.id?.replace(/\D/g, "")) || 0;
-        if (n >= _fixtureCounter) _fixtureCounter = n + 1;
-      });
-
-      // Load Editor Configurations
-      if (stored.editor) {
-        if (stored.editor.room_width_cm) setRoomWidth(stored.editor.room_width_cm);
-        if (stored.editor.room_height_cm) setRoomHeight(stored.editor.room_height_cm);
-        if (stored.editor.grid_cm) setGridSize(stored.editor.grid_cm);
-        if (stored.editor.snap_enabled !== undefined) setSnapToGrid(stored.editor.snap_enabled);
-        if (stored.editor.zoom) setZoom(stored.editor.zoom);
-        if (stored.editor.pan) setPan(stored.editor.pan);
-        if (stored.editor.show_grid !== undefined) setShowGrid(stored.editor.show_grid);
-        if (stored.editor.grid_visibility !== undefined) setGridVisibility(stored.editor.grid_visibility);
-        if (stored.editor.smart_guides_enabled !== undefined) setSmartGuidesEnabled(stored.editor.smart_guides_enabled);
-        if (stored.editor.show_rulers !== undefined) setShowRulers(stored.editor.show_rulers);
-      } else {
-        setRoomWidth(1200);
-        setRoomHeight(800);
-        setGridSize(25);
-        setSnapToGrid(true);
-        setZoom(1);
-        setPan({ x: 0, y: 0 });
-        setShowGrid(true);
-        setGridVisibility(30);
-        setSmartGuidesEnabled(true);
-        setShowRulers(true);
-      }
-    } else {
-      setTables([]); setLabels(DEFAULT_LABELS); setStandaloneSeats([]); setFixtures([]);
-      setRoomWidth(1200); setRoomHeight(800); setGridSize(25); setSnapToGrid(true);
-      setZoom(1); setPan({ x: 0, y: 0 });
-      setShowGrid(true); setGridVisibility(30); setSmartGuidesEnabled(true); setShowRulers(true);
-    }
-    setHistory({ past: [], future: [] });
-    setSelected(null);
-    const t = setTimeout(() => { loadedRef.current = true; }, 100);
-    return () => clearTimeout(t);
-  }, [editMode, activeWing, activeRoom, normalize]);
-
-  // ── AUTO-SAVE ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!editMode) return;
-    if (!activeWing || !activeRoom) return;
-    if (!loadedRef.current) return;
-    const completeData = { 
-      tables, 
-      labels, 
-      standaloneSeats,
-      fixtures,
-      editor: {
-        room_width_cm: roomWidth,
-        room_height_cm: roomHeight,
-        grid_cm: gridSize,
-        snap_enabled: snapToGrid,
-        zoom,
-        pan,
-        show_grid: showGrid,
-        grid_visibility: gridVisibility,
-        smart_guides_enabled: smartGuidesEnabled,
-        show_rulers: showRulers
-      }
-    };
-    const savedData = saveLayout(activeWing, activeRoom, completeData);
-    const actualWing = getActualWingForRoom(activeRoom);
     const matchedVenue = venuesList.find(v => v.name === activeRoom);
     const venueId = matchedVenue ? matchedVenue.id : null;
-    dispatchSeatMapUpdate(actualWing, activeRoom, savedData || completeData, venueId);
-  }, [tables, labels, standaloneSeats, fixtures, editMode, activeWing, activeRoom, roomWidth, roomHeight, gridSize, snapToGrid, zoom, pan, showGrid, gridVisibility, smartGuidesEnabled, showRulers, venuesList]);
+    
+    if (!venueId) {
+      // Venue list not loaded yet — don't show empty canvas, just wait
+      return;
+    }
+
+    fetchAdminSeatmap(venueId).then(res => {
+      if (res && res.data) {
+        setIsDraft(res.is_draft || false);
+        setLayoutVersion(res.version || 1);
+        const stored = res.data;
+        const norm = normalize(stored.tables || []).filter(t => t.seats?.length > 0);
+        setTables(norm);
+        norm.forEach(t => {
+          const n = parseInt(t.id?.replace(/\D/g, "")) || 0;
+          if (n >= _tableCounter) _tableCounter = n + 1;
+        });
+        setLabels(stored.labels?.length ? stored.labels : DEFAULT_LABELS);
+        const ss = (stored.standaloneSeats || []).map(s => ({ ...s, status: s.status || "available" }));
+        setStandaloneSeats(ss);
+        ss.forEach(s => {
+          const n = parseInt(s.id?.replace(/\D/g, "")) || 0;
+          if (n >= _standaloneCounter) _standaloneCounter = n + 1;
+        });
+        const fixs = (stored.fixtures || []).map(f => ({ ...f, type: "fixture" }));
+        setFixtures(fixs);
+        fixs.forEach(f => {
+          const n = parseInt(f.id?.replace(/\D/g, "")) || 0;
+          if (n >= _fixtureCounter) _fixtureCounter = n + 1;
+        });
+
+        // Load Editor Configurations
+        if (stored.editor) {
+          if (stored.editor.room_width_cm) setRoomWidth(stored.editor.room_width_cm);
+          if (stored.editor.room_height_cm) setRoomHeight(stored.editor.room_height_cm);
+          if (stored.editor.grid_cm) setGridSize(stored.editor.grid_cm);
+          if (stored.editor.snap_enabled !== undefined) setSnapToGrid(stored.editor.snap_enabled);
+          if (stored.editor.zoom) setZoom(stored.editor.zoom);
+          if (stored.editor.pan) setPan(stored.editor.pan);
+          if (stored.editor.show_grid !== undefined) setShowGrid(stored.editor.show_grid);
+          if (stored.editor.grid_visibility !== undefined) setGridVisibility(stored.editor.grid_visibility);
+          if (stored.editor.smart_guides_enabled !== undefined) setSmartGuidesEnabled(stored.editor.smart_guides_enabled);
+          if (stored.editor.show_rulers !== undefined) setShowRulers(stored.editor.show_rulers);
+        } else {
+          setRoomWidth(1200); setRoomHeight(800); setGridSize(25); setSnapToGrid(true);
+          setZoom(1); setPan({ x: 0, y: 0 }); setShowGrid(true); setGridVisibility(30);
+          setSmartGuidesEnabled(true); setShowRulers(true);
+        }
+      } else {
+        setIsDraft(false); setLayoutVersion(1);
+        setTables([]); setLabels(DEFAULT_LABELS); setStandaloneSeats([]); setFixtures([]);
+        setRoomWidth(1200); setRoomHeight(800); setGridSize(25); setSnapToGrid(true);
+        setZoom(1); setPan({ x: 0, y: 0 });
+        setShowGrid(true); setGridVisibility(30); setSmartGuidesEnabled(true); setShowRulers(true);
+      }
+      setHistory({ past: [], future: [] });
+      setSelected(null);
+      // Mark as loaded AFTER state is set — userEditedRef stays false until a real user action
+      setTimeout(() => { loadedRef.current = true; }, 100);
+    });
+  }, [editMode, activeWing, activeRoom, venuesList, normalize]);
+
+  // ── AUTO-SAVE DRAFT (debounced, only after real user edits) ──────────────────
+  useEffect(() => {
+    if (!editMode || !activeWing || !activeRoom) return;
+    if (!loadedRef.current) return;   // Not loaded yet — skip
+    if (!userEditedRef.current) return; // No real user edit — skip (prevents race condition)
+
+    // Debounce: clear previous timer
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      const completeData = { 
+        tables, labels, standaloneSeats, fixtures,
+        editor: {
+          room_width_cm: roomWidth, room_height_cm: roomHeight, grid_cm: gridSize,
+          snap_enabled: snapToGrid, zoom, pan, show_grid: showGrid, grid_visibility: gridVisibility,
+          smart_guides_enabled: smartGuidesEnabled, show_rulers: showRulers
+        }
+      };
+      const matchedVenue = venuesList.find(v => v.name === activeRoom);
+      const venueId = matchedVenue ? matchedVenue.id : null;
+      if (venueId) {
+        saveDraftSeatmap(venueId, completeData).then(success => {
+          if (success) setIsDraft(true);
+        });
+      }
+    }, 600);
+
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+  }, [tables, labels, standaloneSeats, fixtures, editMode, activeWing, activeRoom, roomWidth, roomHeight, gridSize, snapToGrid, zoom, pan, showGrid, gridVisibility, smartGuidesEnabled, showRulers]);
 
   // ── Client: sync from prop ───────────────────────────────────────────────────
   useEffect(() => {
@@ -4236,7 +4218,33 @@ export default function SeatMap({
   const handleTableSelect     = table => { if (editMode) { setSelected({ type: "table", tableId: table.id }); return; } onTableClick?.(table); };
   const handleSelectRoom      = (w, r) => { setActiveWing(w); setActiveRoom(r); };
   const handleSaveVenue       = newStructure => { setVenueStructure(newStructure); saveVenueStructure(newStructure); };
-  const handleSave            = () => { setSaved(true); setTimeout(() => setSaved(false), 2500); };
+  
+  const [emptyCanvasWarning, setEmptyCanvasWarning] = useState(false);
+  
+  const handlePublishClick = () => {
+    setPublishError("");
+    // Detect empty canvas scenario
+    const isEmpty = tables.length === 0 && standaloneSeats.length === 0;
+    setEmptyCanvasWarning(isEmpty);
+    setShowPublishModal(true);
+  };
+
+  const executePublish = async () => {
+    const matchedVenue = venuesList.find(v => v.name === activeRoom);
+    if (!matchedVenue) return;
+    
+    setPublishError("");
+    const result = await publishSeatmap(matchedVenue.id);
+    if (result && result.success) {
+      setSaved(true);
+      setIsDraft(false);
+      setShowPublishModal(false);
+      setEmptyCanvasWarning(false);
+      setTimeout(() => setSaved(false), 2500);
+    } else {
+      setPublishError(result?.message || "Failed to publish layout. Please try again.");
+    }
+  };
 
   // ─── CLIENT VIEW ──────────────────────────────────────────────────────────────
   if (!editMode) {
@@ -4481,20 +4489,80 @@ export default function SeatMap({
         )}
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          {isDraft ? (
+            <span style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", background: C.goldFaintest, color: C.gold, borderRadius: 5, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", border: `1px solid ${C.borderAccent}` }}>
+              Unpublished Draft
+            </span>
+          ) : (
+            <span style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", background: C.greenFaint, color: C.green, borderRadius: 5, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", border: `1px solid ${C.greenBorder}` }}>
+              Published (v{layoutVersion})
+            </span>
+          )}
+
           {saved && (
             <span style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", background: C.greenFaint, color: C.green, borderRadius: 5, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", border: `1px solid ${C.greenBorder}`, animation: "sm-fadeIn 0.16s ease" }}>
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               Saved
             </span>
           )}
-          <button onClick={handleSave}
-            style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 16px", background: C.gold, color: "#fff", border: "none", borderRadius: 7, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", cursor: "pointer", transition: "background 0.14s", boxShadow: "0 2px 8px rgba(140,107,42,0.20)" }}
-            onMouseEnter={e => e.currentTarget.style.background = C.goldLight} onMouseLeave={e => e.currentTarget.style.background = C.gold}>
+
+          <button onClick={handlePublishClick}
+            disabled={!isDraft}
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 16px", background: isDraft ? C.gold : C.surfaceRaised, color: isDraft ? "#fff" : C.textTertiary, border: `1px solid ${isDraft ? C.gold : C.borderDefault}`, borderRadius: 7, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", cursor: isDraft ? "pointer" : "not-allowed", transition: "all 0.14s", boxShadow: isDraft ? "0 2px 8px rgba(140,107,42,0.20)" : "none" }}
+            onMouseEnter={e => { if (isDraft) e.currentTarget.style.background = C.goldLight; }} 
+            onMouseLeave={e => { if (isDraft) e.currentTarget.style.background = C.gold; }}>
             <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2 2h8l2 2v8a1 1 0 01-1 1H3a1 1 0 01-1-1V2z" stroke="currentColor" strokeWidth="1.3" fill="none"/><rect x="4" y="8" width="6" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.3" fill="none"/><rect x="4.5" y="2" width="4" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.3" fill="none"/></svg>
-            Save Layout
+            {isDraft ? "Publish Layout" : "Up to Date"}
           </button>
         </div>
       </div>
+
+      {showPublishModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(10, 9, 8, 0.6)", backdropFilter: "blur(6px)", zIndex: 100000, display: "flex", alignItems: "center", justifyContent: "center", animation: "sm-fadeIn 0.2s ease" }}>
+          <div style={{ background: C.surfaceRaised, border: `1px solid ${C.borderDefault}`, borderRadius: 16, width: 380, padding: 24, boxShadow: "0 10px 40px rgba(0,0,0,0.2)", animation: "sm-slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: C.goldFaintest, display: "flex", alignItems: "center", justifyContent: "center", color: C.gold }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </div>
+              <h3 style={{ fontFamily: F, fontSize: 16, fontWeight: 700, color: C.textPrimary, margin: 0 }}>Publish Layout?</h3>
+            </div>
+            
+            <p style={{ fontFamily: F, fontSize: 13, color: C.textSecondary, lineHeight: 1.5, margin: "0 0 16px 0" }}>
+              Publishing this layout will instantly update the live guest reservation page. Guests booking right now will immediately see this new layout.
+            </p>
+
+            {emptyCanvasWarning && (
+              <div style={{ padding: "12px 14px", background: "#3a1a1a", border: "1px solid #8b3a3a", borderRadius: 10, color: "#ff9999", fontFamily: F, fontSize: 12, marginBottom: 16, lineHeight: 1.6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff6666" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <strong style={{ color: "#ff6666", fontSize: 13 }}>Empty Layout Warning</strong>
+                </div>
+                This canvas has no tables or seats. Publishing it will <strong>remove</strong> the current guest-facing layout for this room. Guests will see an empty page.
+              </div>
+            )}
+
+            {publishError && (
+              <div style={{ padding: "10px 12px", background: C.redFaint, border: `1px solid ${C.redBorder}`, borderRadius: 8, color: C.red, fontFamily: F, fontSize: 12, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                {publishError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => setShowPublishModal(false)}
+                style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${C.borderStrong}`, borderRadius: 8, color: C.textSecondary, fontFamily: F, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", cursor: "pointer", transition: "all 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.background = C.surfaceHover} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                Cancel
+              </button>
+              <button onClick={executePublish}
+                style={{ padding: "10px 20px", background: C.gold, border: "none", borderRadius: 8, color: "#fff", fontFamily: F, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", cursor: "pointer", transition: "all 0.15s", boxShadow: "0 2px 8px rgba(140,107,42,0.25)" }}
+                onMouseEnter={e => e.currentTarget.style.background = C.goldLight} onMouseLeave={e => e.currentTarget.style.background = C.gold}>
+                Confirm Publish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main editor area */}
       <div style={{ flex: "1 1 0", minHeight: 0, display: "flex", overflow: "hidden" }}>
