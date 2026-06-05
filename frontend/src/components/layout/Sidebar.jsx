@@ -36,8 +36,8 @@ const NAV_GROUPS = [
     icon: Building2,
     items: [
       { id: "outlets", label: "Outlet Dashboard", icon: LayoutDashboard, iconStyle: "lucide", permission: "view_outlet_reports" },
-      { id: "function-rooms", label: "Venue Management", icon: Building2, iconStyle: "lucide", permission: "manage_venues" },
       { id: "seat-map", label: "Seat Map", icon: Map, iconStyle: "lucide", permission: "manage_seat_maps" },
+      { id: "function-rooms", label: "Venue Management", icon: Building2, iconStyle: "lucide", permission: "manage_venues" },
     ],
   },
   {
@@ -80,7 +80,7 @@ function SidebarCollapseBtn({ onClick, isOpen }) {
       title={isOpen ? "Collapse sidebar" : "Expand sidebar"}
       style={{
         position: "absolute",
-        top: 50, // Align exactly on the header divider border line
+        top: 64, // Align exactly on the header divider border line
         right: -12, // Float exactly over the border (half of button width)
         transform: "translateY(-50%)",
         width: 24,
@@ -514,10 +514,12 @@ export default function Sidebar({
 
       <div
         style={{
+          height: 64,
+          boxSizing: "border-box",
           display: "flex",
           alignItems: "center",
           justifyContent: effectiveOpen ? "space-between" : "center",
-          padding: effectiveOpen ? "16px 12px 15px 18px" : "16px 0",
+          padding: effectiveOpen ? "0 12px 0 18px" : "0",
           borderBottom: "1px solid rgba(140,107,42,0.09)",
           flexShrink: 0,
           overflow: "hidden",
@@ -526,31 +528,38 @@ export default function Sidebar({
         {effectiveOpen ? (
           <div
             style={{
+              display: "flex",
+              flexDirection: "column",
               fontFamily: F.body,
-              fontSize: 15,
-              fontWeight: 800,
-              color: "#18140E",
-              letterSpacing: 0.3,
-              lineHeight: 1.3,
-              whiteSpace: "nowrap",
               overflow: "hidden",
             }}
           >
             <span
               style={{
-                color: "#8C6B2A",
-                fontSize: 9.5,
-                fontFamily: F.body,
-                letterSpacing: 2,
-                fontWeight: 700,
+                color: "#18140E",
+                fontSize: 14.5,
+                fontWeight: 600,
+                letterSpacing: 0.2,
+                lineHeight: 1.2,
               }}
             >
-              ADMIN PANEL
+              Seat & Table
+            </span>
+            <span
+              style={{
+                color: "#7A7060",
+                fontSize: 11.5,
+                fontWeight: 500,
+                letterSpacing: 0.1,
+                lineHeight: 1.2,
+              }}
+            >
+              Reservation System
             </span>
           </div>
         ) : (
-          <span style={{ color: "#8C6B2A", fontSize: 10, fontWeight: 800, fontFamily: F.body, letterSpacing: 0.5 }}>
-            AP
+          <span style={{ color: "#8C6B2A", fontSize: 12, fontWeight: 800, fontFamily: F.body, letterSpacing: 0.5 }}>
+            S&T
           </span>
         )}
       </div>
@@ -566,22 +575,7 @@ export default function Sidebar({
           overflowX: "hidden",
         }}
       >
-        {effectiveOpen && (
-          <div
-            style={{
-              padding: "0 20px",
-              marginBottom: 10,
-              fontSize: 9,
-              letterSpacing: "0.24em",
-              color: "#9B9285",
-              fontFamily: F.body,
-              fontWeight: 700,
-              textTransform: "uppercase",
-            }}
-          >
-            Navigation
-          </div>
-        )}
+
         {visibleGroups.map((group) => (
           <NavGroup
             key={group.id}
