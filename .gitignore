@@ -30,6 +30,8 @@ dist-ssr
 *.sw?
 .codex-chrome-admin-debug/ 
 
-#Mailhog
+# Mail tools
 /mailhog-data
 MailHog.exe
+backend/tools/mail/mailpit.exe
+backend/tools/mail/mailpit.db
