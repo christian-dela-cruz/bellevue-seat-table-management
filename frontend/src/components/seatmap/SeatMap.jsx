@@ -1496,6 +1496,7 @@ function LeftSidebarPanel({
   const [architectureExpanded, setArchitectureExpanded] = useState(false);
   const [fixturesExpanded, setFixturesExpanded] = useState(false);
   const [annotationsExpanded, setAnnotationsExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState("rooms"); // "rooms" or "library"
 
   const [wingsExpanded, setWingsExpanded] = useState(() => 
     Object.fromEntries(venueStructure.map(w => [w.id, true]))
@@ -1634,32 +1635,43 @@ function LeftSidebarPanel({
   return (
     <div className="sm-scroll" style={{ width: 240, flexShrink: 0, alignSelf: "stretch", background: C.sidebarBg, borderRight: `1px solid ${C.sidebarBorder}`, display: "flex", flexDirection: "column", overflowY: "auto", overflowX: "hidden", userSelect: "none" }}>
       
-      {/* 1. ROOM NAVIGATOR */}
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        <div 
-          onClick={() => setRoomsExpanded(!roomsExpanded)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "12px 14px 10px",
-            background: C.surfaceRaised,
-            cursor: "pointer",
-            userSelect: "none"
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ transform: roomsExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block", fontSize: 7, color: C.gold }}>▶</span>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", color: C.gold, textTransform: "uppercase", fontFamily: F }}>
-              Room Navigator
-            </span>
-          </div>
+      {/* SEGMENTED TAB CONTROL */}
+      <div style={{ padding: "12px 14px 10px", background: C.surfaceRaised, borderBottom: `1px solid ${C.divider}` }}>
+        <div style={{ display: "flex", background: "rgba(0,0,0,0.04)", borderRadius: 8, padding: 3, border: `1px solid ${C.borderDefault}` }}>
+          <button 
+            onClick={() => setActiveTab("rooms")}
+            style={{ 
+              flex: 1, padding: "6px 0", border: "none", borderRadius: 6, cursor: "pointer",
+              fontFamily: F, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
+              transition: "all 0.15s",
+              background: activeTab === "rooms" ? C.surfaceBase : "transparent",
+              color: activeTab === "rooms" ? C.gold : C.textSecondary,
+              boxShadow: activeTab === "rooms" ? C.cardShadow : "none"
+            }}
+          >
+            Rooms
+          </button>
+          <button 
+            onClick={() => setActiveTab("library")}
+            style={{ 
+              flex: 1, padding: "6px 0", border: "none", borderRadius: 6, cursor: "pointer",
+              fontFamily: F, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
+              transition: "all 0.15s",
+              background: activeTab === "library" ? C.surfaceBase : "transparent",
+              color: activeTab === "library" ? C.gold : C.textSecondary,
+              boxShadow: activeTab === "library" ? C.cardShadow : "none"
+            }}
+          >
+            Library
+          </button>
         </div>
+      </div>
 
-        {roomsExpanded && (
-          <div style={{ display: "flex", flexDirection: "column", borderBottom: `1px solid ${C.divider}`, paddingBottom: 10 }}>
-            {/* Current Context Badge */}
-            <div style={{ padding: "0 14px 10px" }}>
+      {/* 1. ROOM NAVIGATOR */}
+      {activeTab === "rooms" && (
+        <div style={{ display: "flex", flexDirection: "column", paddingBottom: 10 }}>
+          {/* Current Context Badge */}
+          <div style={{ padding: "14px 14px 10px" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "8px 10px", background: "rgba(140, 107, 42, 0.05)", borderRadius: 6, border: `1px solid ${C.borderAccent}` }}>
                 <div style={{ fontSize: 7, color: C.textTertiary, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Active Venue Context</div>
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: F }}>
@@ -1723,19 +1735,13 @@ function LeftSidebarPanel({
                 </button>
               </div>
             )}
-          </div>
-        )}
-      </div>
-
-      {/* Divider */}
-      <div style={{ height: 1, background: C.divider }} />
+        </div>
+      )}
 
       {/* 2. STUDIO LIBRARY */}
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "12px 14px 10px" }}>
-          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", color: C.gold, textTransform: "uppercase", fontFamily: F, marginBottom: 8 }}>
-            Studio Library
-          </div>
+      {activeTab === "library" && (
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "14px 14px 10px" }}>
           
           {/* Search input bar */}
           <div style={{ position: "relative" }}>
@@ -2058,6 +2064,7 @@ function LeftSidebarPanel({
 
         </div>
       </div>
+      )}
 
     </div>
   );
