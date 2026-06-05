@@ -112,6 +112,7 @@ class ClientReservationController extends Controller
             'type'             => 'required|in:whole,individual,standalone',
             'is_standalone'    => 'nullable|boolean',
             'seat_id'          => 'nullable|string|max:50',
+            'consent_accepted' => 'nullable|boolean',
         ]);
 
         $originalRoom = $request->input('room');

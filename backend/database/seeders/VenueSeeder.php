@@ -151,6 +151,48 @@ class VenueSeeder extends Seeder
             'display_order' => 102,
             'reservation_route' => '/phoenix-court',
         ]);
+
+        $this->upsertVenue([
+            'name' => 'Pastry Corner',
+            'slug' => 'pastry-corner',
+            'wing' => 'Dining',
+            'type' => 'dining',
+            'category' => 'dining',
+            'capacity' => 50,
+            'price_per_hour' => 0.00,
+            'description' => 'Pastry Corner',
+            'image' => 'function-rooms/pastry-corner-1780045591.png',
+            'display_order' => 103,
+            'reservation_route' => '/pastry-corner',
+        ]);
+
+        $this->upsertVenue([
+            'name' => 'Vue Bar',
+            'slug' => 'vue-bar',
+            'wing' => 'Dining',
+            'type' => 'dining',
+            'category' => 'dining',
+            'capacity' => 100,
+            'price_per_hour' => 0.00,
+            'description' => 'Vue Bar',
+            'image' => 'function-rooms/vue-bar-1780046224.png',
+            'display_order' => 104,
+            'reservation_route' => '/vue-bar',
+        ]);
+
+        $this->upsertVenue([
+            'name' => 'Johnny\'s Steak and Grill',
+            'slug' => 'johnnys-steak-and-grill',
+            'wing' => 'Dining',
+            'type' => 'dining',
+            'category' => 'dining',
+            'capacity' => 80,
+            'price_per_hour' => 0.00,
+            'description' => 'Johnny\'s Steak and Grill',
+            'image' => 'function-rooms/johnny-s-steak-and-grill-1780046070.png',
+            'display_order' => 105,
+            'reservation_route' => '/johnnys-steak-and-grill',
+        ]);
     }
 
     private function upsertVenue(array $data): Venue

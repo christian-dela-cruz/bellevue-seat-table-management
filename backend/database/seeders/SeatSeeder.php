@@ -61,34 +61,16 @@ class SeatSeeder extends Seeder
     {
         $seats = [];
         
-        // Table T1 (8 seats)
-        for ($i = 1; $i <= 8; $i++) {
-            $seats[] = [
-                'table_number' => 'T1',
-                'seat_number' => "Seat $i",
-                'x_position' => 100 + ($i - 1) * 40,
-                'y_position' => 100,
-            ];
-        }
-        
-        // Table T2 (8 seats)
-        for ($i = 1; $i <= 8; $i++) {
-            $seats[] = [
-                'table_number' => 'T2',
-                'seat_number' => "Seat $i",
-                'x_position' => 100 + ($i - 1) * 40,
-                'y_position' => 200,
-            ];
-        }
-        
-        // Table T3 (8 seats)
-        for ($i = 1; $i <= 8; $i++) {
-            $seats[] = [
-                'table_number' => 'T3',
-                'seat_number' => "Seat $i",
-                'x_position' => 100 + ($i - 1) * 40,
-                'y_position' => 300,
-            ];
+        // Table T1 to T4 (8 seats each)
+        for ($table = 1; $table <= 4; $table++) {
+            for ($i = 1; $i <= 8; $i++) {
+                $seats[] = [
+                    'table_number' => "T$table",
+                    'seat_number' => "Seat $i",
+                    'x_position' => 100 + ($i - 1) * 40,
+                    'y_position' => 100 * $table,
+                ];
+            }
         }
         
         return $seats;
@@ -98,8 +80,8 @@ class SeatSeeder extends Seeder
     {
         $seats = [];
         
-        // Create more tables for the larger ballroom
-        for ($table = 1; $table <= 5; $table++) {
+        // Create 4 tables (T1-T4) for the larger ballroom
+        for ($table = 1; $table <= 4; $table++) {
             for ($seat = 1; $seat <= 10; $seat++) {
                 $seats[] = [
                     'table_number' => "T$table",
@@ -117,13 +99,13 @@ class SeatSeeder extends Seeder
     {
         $seats = [];
         
-        // Tables A, B, C (6 seats each)
-        foreach (['A', 'B', 'C'] as $tableLetter) {
+        // Tables T1 to T4 (6 seats each)
+        for ($table = 1; $table <= 4; $table++) {
             for ($i = 1; $i <= 6; $i++) {
                 $seats[] = [
-                    'table_number' => "T$tableLetter",
+                    'table_number' => "T$table",
                     'seat_number' => "Seat $i",
-                    'x_position' => 80 + (ord($tableLetter) - ord('A')) * 150,
+                    'x_position' => 80 + ($table - 1) * 150,
                     'y_position' => 80 + ($i - 1) * 35,
                 ];
             }
@@ -136,8 +118,8 @@ class SeatSeeder extends Seeder
     {
         $seats = [];
         
-        // Business Center has fewer, more professional seating
-        for ($table = 1; $table <= 3; $table++) {
+        // Business Center has 4 tables (T1-T4)
+        for ($table = 1; $table <= 4; $table++) {
             for ($seat = 1; $seat <= 4; $seat++) {
                 $seats[] = [
                     'table_number' => "T$table",
@@ -155,8 +137,8 @@ class SeatSeeder extends Seeder
     {
         $seats = [];
         
-        // Large ballroom with many tables
-        for ($table = 1; $table <= 8; $table++) {
+        // Large ballroom with 4 tables (T1-T4)
+        for ($table = 1; $table <= 4; $table++) {
             for ($seat = 1; $seat <= 12; $seat++) {
                 $seats[] = [
                     'table_number' => "T$table",
@@ -173,10 +155,10 @@ class SeatSeeder extends Seeder
     private function createDefaultSeats(int $capacity): array
     {
         $seats = [];
-        $tablesNeeded = ceil($capacity / 8); // 8 seats per table
+        $tablesNeeded = 4; // Exactly 4 tables
         
         for ($table = 1; $table <= $tablesNeeded; $table++) {
-            $seatsInTable = min(8, $capacity - ($table - 1) * 8);
+            $seatsInTable = 8; // 8 seats per table
             
             for ($seat = 1; $seat <= $seatsInTable; $seat++) {
                 $seats[] = [

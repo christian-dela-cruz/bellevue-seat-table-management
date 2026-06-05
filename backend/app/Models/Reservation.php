@@ -51,6 +51,7 @@ class Reservation extends Model
         'public_room_name',
         'internal_room_name',
         'assignment_status',
+        'consent_accepted',
     ];
 
     protected $casts = [

@@ -556,6 +556,7 @@ class ReservationService
                         'reverted_at'      => optional($reservation->reverted_at)->toISOString(),
                         'transaction_history' => $this->formatTransactionHistory($reservation),
                         'type'             => $reservation->type,
+                        'consent_accepted' => $reservation->consent_accepted,
                         'rejection_reason' => $reservation->rejection_reason,
                         'submittedAt'      => $submittedAt,
                         'submittedTimestamp' => $reservation->submitted_at
@@ -625,6 +626,7 @@ class ReservationService
                     'reverted_at'      => optional($reservation->reverted_at)->toISOString(),
                     'transaction_history' => $this->formatTransactionHistory($reservation),
                     'type'             => $reservation->type,
+                    'consent_accepted' => $reservation->consent_accepted,
                     'rejectionReason'  => $reservation->rejection_reason,
                     'submittedAt'      => $reservation->submitted_at->format('M j, Y · g:i A'),
                     'submittedTimestamp' => $reservation->submitted_at->timestamp,

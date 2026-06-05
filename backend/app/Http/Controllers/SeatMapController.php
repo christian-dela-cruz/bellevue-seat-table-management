@@ -89,10 +89,20 @@ class SeatMapController extends Controller
                 
                 // Legacy dynamic build
                 $tables = [];
+                $tableIndex = 0;
                 foreach ($seats as $seat) {
                     $tableNumber = $seat->table_number;
                     if (!isset($tables[$tableNumber])) {
-                        $tables[$tableNumber] = ['id' => $tableNumber, 'seats' => []];
+                        // Arrange in a generic grid
+                        $col = $tableIndex % 4;
+                        $row = floor($tableIndex / 4);
+                        $tables[$tableNumber] = [
+                            'id' => $tableNumber,
+                            'x' => 150 + ($col * 250),
+                            'y' => 150 + ($row * 250),
+                            'seats' => []
+                        ];
+                        $tableIndex++;
                     }
                     $tables[$tableNumber]['seats'][] = [
                         'id' => $seat->seat_number,
@@ -181,11 +191,47 @@ class SeatMapController extends Controller
             }
 
             if (empty($payload)) {
-                return response()->json([
-                    'success' => true,
-                    'data' => null,
-                    'is_draft' => false,
-                    'venue' => ['id' => $venue->id, 'name' => $venue->name, 'wing' => $venue->wing]
+                // If strictly no layout exists, check if legacy Seats exist as a fallback
+                $seats = Seat::where('venue_id', $venue->id)->get();
+                if ($seats->isEmpty()) {
+                    return response()->json([
+                        'success' => true,
+                        'data' => null,
+                        'is_draft' => false,
+                        'venue' => ['id' => $venue->id, 'name' => $venue->name, 'wing' => $venue->wing]
+                    ]);
+                }
+                
+                // Legacy dynamic build
+                $tables = [];
+                $tableIndex = 0;
+                foreach ($seats as $seat) {
+                    $tableNumber = $seat->table_number;
+                    if (!isset($tables[$tableNumber])) {
+                        // Arrange in a generic grid
+                        $col = $tableIndex % 4;
+                        $row = floor($tableIndex / 4);
+                        $tables[$tableNumber] = [
+                            'id' => $tableNumber,
+                            'x' => 150 + ($col * 250),
+                            'y' => 150 + ($row * 250),
+                            'seats' => []
+                        ];
+                        $tableIndex++;
+                    }
+                    $tables[$tableNumber]['seats'][] = [
+                        'id' => $seat->seat_number,
+                        'num' => $seat->seat_number,
+                        'status' => 'available',
+                        'x' => $seat->x_position,
+                        'y' => $seat->y_position,
+                    ];
+                }
+                $payload = json_encode([
+                    'v' => 2,
+                    'tables' => array_values($tables),
+                    'labels' => null,
+                    'standaloneSeats' => []
                 ]);
             }
 

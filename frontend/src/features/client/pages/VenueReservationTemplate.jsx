@@ -862,7 +862,7 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
               Your personal information is secure and will only be used to process and coordinate your reservation and guest requests.
             </div>
 
-            <button onClick={onSubmit} disabled={!canSubmit}
+            <button onClick={() => onSubmit(consentAccepted)} disabled={!canSubmit}
               style={{
                 width: "100%",
                 padding: "11px",
@@ -1365,6 +1365,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   const todayDate = new Date().toISOString().split("T")[0];
   const [classicDate, setClassicDate] = useState(todayDate);
   const [classicGuests, setClassicGuests] = useState(2);
+  const [classicConsentAccepted, setClassicConsentAccepted] = useState(false);
   const [slots, setSlots] = useState([]);
   const [slotMessage, setSlotMessage] = useState("");
 
@@ -1551,7 +1552,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
     setModal("details");
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (consentAccepted = false) => {
     if (!formData) return;
     if (!isVenueReservable) {
       setError("This venue is currently not available for online reservations.");
@@ -1597,6 +1598,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
         event_time: formData.eventTime,
         special_requests: formData.specialRequests,
         type: mode,
+        consent_accepted: consentAccepted,
         ...(venue.type !== "dining" ? {
           event_area: formData.eventArea || "",
           setup_tables: formData.setupTables ? Number(formData.setupTables) : null,
@@ -1623,7 +1625,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
     }
   };
 
-  const handleClassicSubmit = async (e) => {
+  const handleClassicSubmit = async (e, classicConsentAccepted = false) => {
     e.preventDefault();
     if (!isVenueReservable) {
       setError("This venue is currently not available for online reservations.");
