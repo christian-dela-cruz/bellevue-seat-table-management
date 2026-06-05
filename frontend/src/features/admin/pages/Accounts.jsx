@@ -867,6 +867,7 @@ export default function Accounts() {
         await authAPI.createAccount(formData);
         setToast({ type:"success", message:"Account created." });
       }
+      setLoading(false);
       closeDrawer(true);
       setSaveFeedback({
         type: editingId ? "update" : "create",
@@ -874,9 +875,9 @@ export default function Accounts() {
       });
       await loadAccounts();
     } catch (error) {
+      setLoading(false);
       setToast({ type:"error", message:error.message || "Failed to save account." });
     } finally {
-      setLoading(false);
       setActionLabel("");
     }
   };
