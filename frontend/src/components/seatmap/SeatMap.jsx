@@ -984,7 +984,7 @@ export const TABLE_PRESETS = [
   { id: "bar-height-table", label: "Bar-height Table", shape: "rect", width: 150, height: 70, defaultSeatCount: 4, minSeatCount: 0, maxSeatCount: 6, defaultSeatSpacing: 8, defaultChairStyle: "bar-stool" },
   { id: "communal-dining", label: "Communal Table", shape: "rect", width: 280, height: 100, defaultSeatCount: 10, minSeatCount: 0, maxSeatCount: 12, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" },
   { id: "vip-sofa-table", label: "VIP Sofa Table", shape: "rect", width: 160, height: 90, defaultSeatCount: 6, minSeatCount: 0, maxSeatCount: 8, defaultSeatSpacing: 10, defaultChairStyle: "sofa-chair" },
-  { id: "custom-table", label: "Custom Table", shape: "rect", width: 110, height: 70, defaultSeatCount: 4, minSeatCount: 0, maxSeatCount: 16, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" }
+  { id: "custom-table", label: "Custom Table", shape: "rect", width: 110, height: 70, defaultSeatCount: 4, minSeatCount: 0, maxSeatCount: 8, defaultSeatSpacing: 8, defaultChairStyle: "standard-dining" }
 ];
 
 // ─── CHAIR STYLES ─────────────────────────────────────────────────────────────
@@ -2630,7 +2630,7 @@ function InspectorPanel({
         const presetId = selectedTable.editor?.preset_id || "custom-table";
         const preset = TABLE_PRESETS.find(p => p.id === presetId) || TABLE_PRESETS.find(p => p.id === "custom-table");
         const minChairs = preset?.minSeatCount ?? 0;
-        const maxChairs = preset?.maxSeatCount ?? 16;
+        const maxChairs = preset?.maxSeatCount ?? 8;
         const seatCount = selectedTable.seats?.length || 0;
 
         return (
@@ -4728,7 +4728,7 @@ export default function SeatMap({
                 const presetId = selectedTable.editor?.preset_id || "custom-table";
                 const preset = TABLE_PRESETS.find(p => p.id === presetId) || TABLE_PRESETS.find(p => p.id === "custom-table");
                 const minChairs = preset?.minSeatCount ?? 0;
-                const maxChairs = preset?.maxSeatCount ?? 16;
+                const maxChairs = preset?.maxSeatCount ?? 8;
                 const seatCount = selectedTable.seats?.length || 0;
                 const isLocked = selectedTable.editor?.locked || false;
 

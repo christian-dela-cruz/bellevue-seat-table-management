@@ -66,10 +66,19 @@ function imageUrl(image) {
   const value = String(image).trim();
   if (!value) return "";
   if (/^(https?:|data:|blob:)/i.test(value)) return value;
+  
   const apiRoot = API_BASE_URL.replace(/\/api\/?$/, "");
-  if (value.startsWith("/")) return `${apiRoot}${value}`;
-  if (value.includes("/")) return `${apiRoot}/${value.replace(/^\/+/, "")}`;
-  return `${apiRoot}/images/${value}`;
+  let cleanPath = value.replace(/\\/g, "/").replace(/^\/+/, "");
+  
+  if (!cleanPath.includes("/")) {
+    return `${apiRoot}/images/${cleanPath}`;
+  }
+  
+  if (cleanPath.startsWith("function-rooms/") && !cleanPath.startsWith("images/")) {
+    cleanPath = "images/" + cleanPath;
+  }
+  
+  return `${apiRoot}/${cleanPath}`;
 }
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────

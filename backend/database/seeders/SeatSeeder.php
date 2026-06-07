@@ -44,16 +44,19 @@ class SeatSeeder extends Seeder
                 $seats = $this->createDefaultSeats($venue->capacity);
         }
         
-        // Insert seats into database
+        // Insert or update seats in database to prevent duplicates
         foreach ($seats as $seat) {
-            Seat::create([
-                'venue_id' => $venue->id,
-                'table_number' => $seat['table_number'],
-                'seat_number' => $seat['seat_number'],
-                'x_position' => $seat['x_position'],
-                'y_position' => $seat['y_position'],
-                'status' => 'available',
-            ]);
+            Seat::updateOrCreate(
+                [
+                    'venue_id' => $venue->id,
+                    'table_number' => $seat['table_number'],
+                    'seat_number' => $seat['seat_number'],
+                ],
+                [
+                    'x_position' => $seat['x_position'],
+                    'y_position' => $seat['y_position'],
+                ]
+            );
         }
     }
     

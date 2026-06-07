@@ -378,9 +378,17 @@ function imageUrl(image) {
   if (!image) return "";
   if (/^(https?:|data:|blob:)/i.test(image)) return image;
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "");
-  if (image.startsWith("/")) return `${apiRoot}${image}`;
-  if (image.includes("/")) return `${apiRoot}/${image.replace(/^\/+/, "")}`;
-  return `${apiRoot}/images/${image}`;
+  let cleanPath = String(image).replace(/\\/g, "/").replace(/^\/+/, "");
+  
+  if (!cleanPath.includes("/")) {
+    return `${apiRoot}/images/${cleanPath}`;
+  }
+  
+  if (cleanPath.startsWith("function-rooms/") && !cleanPath.startsWith("images/")) {
+    cleanPath = "images/" + cleanPath;
+  }
+  
+  return `${apiRoot}/${cleanPath}`;
 }
 
 async function compressImageIfNeeded(file, maxDimension = 1200, quality = 0.85) {

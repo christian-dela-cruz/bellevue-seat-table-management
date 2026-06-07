@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import bellevueLogo from "../../../assets/bellevue-logo.png";
 import hanakazuLogo from "../../../assets/hanakazu-landing-logo.png";
-import qsinaLogo from "../../../assets/qsina-landing-logo.png";
+import qsinaLogo from "../../../assets/qsina-card-logo.png";
 import phoenixCourtLogo from "../../../assets/phoenix-landing-logo.png";
 import johnnyLogo from "../../../assets/johnny-landing-logo.png";
 import pastryCornerLogo from "../../../assets/pastrycorner-landing-logo.png";
@@ -156,15 +156,24 @@ const diningLogoMap = {
 function resolveRoomImage(image) {
   if (!image) return businessCenterImg;
   if (/^(https?:|data:|blob:)/i.test(image)) return image;
+  
   const key = String(image).split("/").pop();
-  // Bypass static local assets if the path is a custom folder/server directory or URL
   const isCustomPath = String(image).includes("/");
   if (!isCustomPath && roomImageMap[key]) return roomImageMap[key];
   
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "");
-  if (String(image).startsWith("/")) return `${apiRoot}${image}`;
-  if (String(image).includes("/")) return `${apiRoot}/${String(image).replace(/^\/+/, "")}`;
-  return `${apiRoot}/images/${image}`;
+  
+  let cleanPath = String(image).replace(/\\/g, "/").replace(/^\/+/, "");
+  
+  if (!cleanPath.includes("/")) {
+    return `${apiRoot}/images/${cleanPath}`;
+  }
+  
+  if (cleanPath.startsWith("function-rooms/") && !cleanPath.startsWith("images/")) {
+    cleanPath = "images/" + cleanPath;
+  }
+  
+  return `${apiRoot}/${cleanPath}`;
 }
 
 function roomRoute(room) {
@@ -182,7 +191,11 @@ function resolveDiningLogo(room) {
   const key = canonicalRoomName(room?.display_name || room?.name);
   const slugKey = canonicalRoomName(String(room?.slug || "").replace(/-/g, " "));
 
-  // Prioritize dynamic custom uploads (starts with http/data/blob or contains a path slash '/')
+  // Prioritize static branded logo first if available
+  const mappedLogo = diningLogoMap[key] || diningLogoMap[slugKey];
+  if (mappedLogo) return mappedLogo;
+
+  // Fallback to custom upload if no static logo exists
   const isCustomUploaded = room?.image && (
     /^(https?:|data:|blob:)/i.test(String(room.image)) || 
     String(room.image).includes("/")
@@ -191,8 +204,6 @@ function resolveDiningLogo(room) {
     return resolveRoomImage(room.image);
   }
 
-  const mappedLogo = diningLogoMap[key] || diningLogoMap[slugKey];
-  if (mappedLogo) return mappedLogo;
   if (room?.image && /^(https?:|data:|blob:|\/)/i.test(String(room.image))) return resolveRoomImage(room.image);
   return fallbackDiningOutlets.find((outlet) => canonicalRoomName(outlet.title) === key)?.logo || null;
 }
@@ -411,6 +422,7 @@ function buildDiningOutletsFromConfig(rooms = []) {
         disabled: !match.reservations_enabled,
         logo: resolveDiningLogo(match) || outlet.logo,
         mark: match.display_name || outlet.mark,
+        image: match.image ? resolveRoomImage(match.image) : null,
       };
     })
     .filter(Boolean);
@@ -424,6 +436,7 @@ function buildDiningOutletsFromConfig(rooms = []) {
       disabled: !room.reservations_enabled,
       logo: resolveDiningLogo(room),
       mark: room.display_name || room.name,
+      image: room.image ? resolveRoomImage(room.image) : null,
     }));
 
   return [...mappedFallbacks, ...configuredExtras];
@@ -438,21 +451,23 @@ function VenueCard({ item, variant = "event", isInteractive = true }) {
       className={`reservation-card reservation-card--${variant}${item.rooms?.length ? " reservation-card--has-rooms" : ""}${disabled ? " reservation-card--disabled" : ""}`}
       aria-disabled={disabled}
     >
-      {variant === "dining" ? (
+      {variant === "dining" && !item.image ? (
         <span className="reservation-card__brand-surface" aria-hidden="true" />
       ) : (
         <>
-          <img
-            src={item.image}
-            alt=""
-            aria-hidden="true"
-            className="reservation-card__image"
-            decoding="async"
-            loading="lazy"
-            style={item.imageFocus ? { objectPosition: item.imageFocus } : undefined}
-            draggable="false"
-          />
-          <span className="reservation-card__shade" />
+          {item.image && (
+            <img
+              src={item.image}
+              alt=""
+              aria-hidden="true"
+              className="reservation-card__image"
+              decoding="async"
+              loading="lazy"
+              style={item.imageFocus ? { objectPosition: item.imageFocus } : undefined}
+              draggable="false"
+            />
+          )}
+          <span className="reservation-card__shade" style={variant === "dining" ? { opacity: 0.85 } : undefined} />
         </>
       )}
       <button
@@ -1311,7 +1326,7 @@ export default function ReservationLanding() {
           display: block;
           width: 100%;
           height: 100%;
-          object-fit: contain;
+          object-fit: cover;
           object-position: center;
           filter: none;
           image-rendering: auto;

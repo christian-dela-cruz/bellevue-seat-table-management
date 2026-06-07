@@ -147,7 +147,7 @@ class VenueSeeder extends Seeder
             'capacity' => 250,
             'price_per_hour' => 0.00,
             'description' => 'Chinese restaurant dining outlet for table reservations.',
-            'image' => 'phoenix-court.webp',
+            'image' => 'phoenix-court.jpeg',
             'display_order' => 102,
             'reservation_route' => '/phoenix-court',
         ]);
@@ -161,7 +161,7 @@ class VenueSeeder extends Seeder
             'capacity' => 50,
             'price_per_hour' => 0.00,
             'description' => 'Pastry Corner',
-            'image' => 'function-rooms/pastry-corner-1780045591.png',
+            'image' => '/images/function-rooms/pastry-corner-1780045591.png',
             'display_order' => 103,
             'reservation_route' => '/pastry-corner',
         ]);
@@ -175,7 +175,7 @@ class VenueSeeder extends Seeder
             'capacity' => 100,
             'price_per_hour' => 0.00,
             'description' => 'Vue Bar',
-            'image' => 'function-rooms/vue-bar-1780046224.png',
+            'image' => '/images/function-rooms/vue-bar-1780046224.png',
             'display_order' => 104,
             'reservation_route' => '/vue-bar',
         ]);
@@ -189,7 +189,7 @@ class VenueSeeder extends Seeder
             'capacity' => 80,
             'price_per_hour' => 0.00,
             'description' => 'Johnny\'s Steak and Grill',
-            'image' => 'function-rooms/johnny-s-steak-and-grill-1780046070.png',
+            'image' => '/images/function-rooms/johnny-s-steak-and-grill-1780046070.png',
             'display_order' => 105,
             'reservation_route' => '/johnnys-steak-and-grill',
         ]);
