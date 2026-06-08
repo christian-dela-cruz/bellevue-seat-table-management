@@ -134,3 +134,10 @@ Route::prefix('reservations')->group(function () {
     Route::delete('/{id}', [ClientReservationController::class, 'destroy']);
     Route::post('/{reservation}/notify', [ClientReservationController::class, 'notify'])->middleware(AdminAccess::class . ':manage_reservations');
 });
+
+
+// Client Display Settings routes
+Route::prefix('client-display')->group(function () {
+    Route::get('/', [\App\Http\Controllers\ClientDisplaySettingController::class, 'index']);
+    Route::put('/{section}', [\App\Http\Controllers\ClientDisplaySettingController::class, 'updateSection'])->middleware(\App\Http\Middleware\AdminAccess::class . ':manage_venues');
+});

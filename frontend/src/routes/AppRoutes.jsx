@@ -12,6 +12,7 @@ import AccountSettings from "../features/admin/pages/AccountSettings";
 import Reports from "../features/admin/pages/Reports";
 import OutletDashboard from "../features/admin/pages/OutletDashboard";
 import FunctionRooms from "../features/admin/pages/FunctionRooms";
+import ClientDisplaySettings from "../features/admin/pages/ClientDisplaySettings";
 import ForgotCode from "../features/client/pages/ForgotCode";
 import LoginPage from "../features/auth/pages/LoginPage";
 import { authAPI } from "../services/authAPI";
@@ -151,6 +152,14 @@ export default function AppRoutes() {
           element={
             <RequireAdminAuth permission="manage_venues">
               <FunctionRooms />
+            </RequireAdminAuth>
+          }
+        />
+        <Route
+          path="/admin/client-display"
+          element={
+            <RequireAdminAuth permission="manage_venues">
+              <ClientDisplaySettings />
             </RequireAdminAuth>
           }
         />

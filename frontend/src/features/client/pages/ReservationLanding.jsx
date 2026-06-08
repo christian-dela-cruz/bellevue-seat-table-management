@@ -14,6 +14,7 @@ import grandBallroomImg from "../../../assets/grand-ballroom-hires.jpg";
 import towerBallroomImg from "../../../assets/tower-ballroom-hires.jpg";
 import businessCenterImg from "../../../assets/business-center-hires.jpg";
 import { venueAPI } from "../../../services/venueAPI";
+import clientDisplayAPI from "../../../services/clientDisplayAPI";
 
 const fallbackDiningOutlets = [
   {
@@ -343,7 +344,7 @@ function uniqueConfiguredRooms(rooms = []) {
   return Array.from(byKey.values());
 }
 
-function buildEventVenuesFromConfig(rooms = []) {
+export function buildEventVenuesFromConfig(rooms = []) {
   const visible = uniqueConfiguredRooms(rooms)
     .filter((room) => room.type === "function_room" && room.is_active && room.is_visible && !isArchivedRoom(room))
     .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0) || String(a.name).localeCompare(String(b.name)));
@@ -386,7 +387,7 @@ function buildEventVenuesFromConfig(rooms = []) {
     });
 }
 
-function buildDiningOutletsFromConfig(rooms = []) {
+export function buildDiningOutletsFromConfig(rooms = []) {
   const configuredDining = uniqueConfiguredRooms(rooms)
     .filter((room) => room.type === "dining" && !room.parent_id && !isArchivedRoom(room))
     .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0) || String(a.name).localeCompare(String(b.name)));
@@ -473,7 +474,7 @@ function StableImage({ src, alt, className, style, decoding, loading, draggable,
   );
 }
 
-function VenueCard({ item, variant = "event", isInteractive = true, index = 0 }) {
+export function VenueCard({ item, variant = "event", isInteractive = true, index = 0 }) {
   const navigate = useNavigate();
   const disabled = item.disabled || !item.route || !isInteractive;
 
@@ -561,6 +562,7 @@ export default function ReservationLanding() {
   });
   const [diningOutlets, setDiningOutlets] = useState(fallbackDiningOutlets);
   const [eventVenues, setEventVenues] = useState(null);
+  const [displaySettings, setDisplaySettings] = useState({ dining: {}, events: {} });
   const isLight = theme === "light";
 
   const toggleTheme = () => {
@@ -574,19 +576,50 @@ export default function ReservationLanding() {
   useEffect(() => {
     let mounted = true;
     const loadConfiguredRooms = () => {
-      venueAPI.getAll({ _t: Date.now() })
-        .then((rooms) => {
+      Promise.all([
+        venueAPI.getAll({ _t: Date.now() }).catch(() => []),
+        clientDisplayAPI.getAll().catch(() => [])
+      ]).then(([rooms, settings]) => {
           if (!mounted) return;
           const venueRows = Array.isArray(rooms) ? rooms : [];
-          setDiningOutlets(buildDiningOutletsFromConfig(venueRows));
-          setEventVenues(buildEventVenuesFromConfig(venueRows));
-        })
-        .catch(() => {
-          if (mounted) {
-            setDiningOutlets(fallbackDiningOutlets);
-            setEventVenues(fallbackEventVenues);
+          const settingsMap = { dining: {}, events: {} };
+          if (Array.isArray(settings)) {
+            settings.forEach(s => settingsMap[s.section] = s);
           }
-        });
+          setDisplaySettings(settingsMap);
+
+          let dining = buildDiningOutletsFromConfig(venueRows);
+          let events = buildEventVenuesFromConfig(venueRows);
+
+          const ds = settingsMap.dining;
+          if (ds?.hidden_ids) dining = dining.filter(d => !ds.hidden_ids.includes(d.title));
+          if (ds?.ordered_ids) {
+            dining.sort((a, b) => {
+              const idxA = ds.ordered_ids.indexOf(a.title);
+              const idxB = ds.ordered_ids.indexOf(b.title);
+              if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+              if (idxA !== -1) return -1;
+              if (idxB !== -1) return 1;
+              return 0;
+            });
+          }
+
+          const es = settingsMap.events;
+          if (es?.hidden_ids) events = events.filter(e => !es.hidden_ids.includes(e.title));
+          if (es?.ordered_ids) {
+            events.sort((a, b) => {
+              const idxA = es.ordered_ids.indexOf(a.title);
+              const idxB = es.ordered_ids.indexOf(b.title);
+              if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+              if (idxA !== -1) return -1;
+              if (idxB !== -1) return 1;
+              return 0;
+            });
+          }
+
+          setDiningOutlets(dining);
+          setEventVenues(events);
+      });
     };
 
     loadConfiguredRooms();
@@ -671,7 +704,10 @@ export default function ReservationLanding() {
               </button>
             </div>
 
-            <div className="reservation-grid reservation-grid--dining">
+            <div 
+              className="reservation-grid reservation-grid--dining"
+              style={displaySettings.dining?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.dining.desktop_columns}, minmax(0, 1fr))` } : undefined}
+            >
               {diningOutlets.map((outlet) => (
                 <VenueCard key={outlet.title} item={outlet} variant="dining" />
               ))}
@@ -686,7 +722,10 @@ export default function ReservationLanding() {
               </div>
             </div>
 
-            <div className="reservation-grid reservation-grid--events">
+            <div 
+              className="reservation-grid reservation-grid--events"
+              style={displaySettings.events?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.events.desktop_columns}, minmax(0, 1fr))` } : undefined}
+            >
               {eventVenues === null ? (
                 <div className="reservation-empty-state">
                   <strong>Loading configured venues.</strong>
