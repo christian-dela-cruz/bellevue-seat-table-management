@@ -1522,8 +1522,14 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
     return`${hr%12||12}:${min} ${hr>=12?"PM":"AM"}`;
   };
   const fmtDateTime=(value)=>{
-    if(!value)return"—";
-    try{return new Date(value).toLocaleString("en-US",{year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}
+    if(!value || value === "—" || value === "-") return"—";
+    let parseValue = value;
+    if (typeof value === 'string' && value.includes(' ') && !value.includes('T')) {
+      parseValue = value.replace(' ', 'T');
+    }
+    const d = new Date(parseValue);
+    if(isNaN(d.getTime())) return "—";
+    try{return d.toLocaleString("en-US",{year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}
     catch{return value;}
   };
 
@@ -1651,8 +1657,9 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
     ["Room",       reservation.room||"—"],
     ["Type",       isStandaloneReservation ? "Standalone Seat" : reservation.type === "whole" ? "Whole Table" : "Individual Seat"],
     ...(!isStandaloneReservation ? [["Table", formatTableNumber(reservation.table_number)]] : []),
-    ["Seat",       (reservation.seat||reservation.seat_number)?`Seat ${reservation.seat||reservation.seat_number}`:"—"],
+    ["Seat",       (reservation.seat||reservation.seat_number) ? (String(reservation.seat||reservation.seat_number).trim().toLowerCase().startsWith("seat") ? String(reservation.seat||reservation.seat_number).trim() : `Seat ${String(reservation.seat||reservation.seat_number).trim()}`) : "—"],
     ["Guests",     (reservation.guests_count || reservation.guests) ? `${reservation.guests_count || reservation.guests} guest${(reservation.guests_count || reservation.guests) !== 1 ? "s" : ""}` : "—"],
+    ["Date Created", fmtDateTime(reservation.submittedTimestamp ? Number(reservation.submittedTimestamp) * 1000 : (reservation.created_at || reservation.createdAt || reservation.submitted_at || reservation.submittedAt))],
     ["Event Date", fmtDate(reservation.event_date)],
     ["Event Time", fmtTime(reservation.event_time)],
     ...((reservation.event_area || reservation.eventArea) ? [["Event Area", reservation.event_area || reservation.eventArea]] : []),

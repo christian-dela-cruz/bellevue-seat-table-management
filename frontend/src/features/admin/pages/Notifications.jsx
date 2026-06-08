@@ -548,7 +548,7 @@ function DetailModal({ res, onClose, onApprove, onDecline, approvingIds, declini
     ["Room", getOutletName(res)],
     ["Type", res.type==="whole"?"Whole Table":res.type==="standalone"?"Standalone Seat":res.type==="individual"?"Individual Seat":res.type||"-"],
     ["Table", res.table_number??res.table?`Table ${res.table_number||res.table}`:"-"],
-    ["Seat", res.seat_number??res.seat?`Seat ${res.seat_number||res.seat}`:"-"],
+    ["Seat", res.seat_number??res.seat ? (String(res.seat_number??res.seat).trim().toLowerCase().startsWith("seat") ? String(res.seat_number??res.seat).trim() : `Seat ${String(res.seat_number??res.seat).trim()}`) : "-"],
     ["Guests", (res.guests_count||res.guests||1)>0?`${res.guests_count||res.guests||1} guest${(res.guests_count||res.guests||1)!==1?"s":""}`:"-"],
     ["Event Date", fmtDate(res.event_date||res.eventDate||res.reservationDate)],
     ["Event Time", fmtTime(res.event_time||res.eventTime||res.reservationTime)],

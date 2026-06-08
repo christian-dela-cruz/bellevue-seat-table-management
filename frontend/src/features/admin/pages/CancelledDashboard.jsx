@@ -196,9 +196,15 @@ function DetailModal({ reservation, onClose }) {
     return `${hr % 12 || 12}:${min} ${hr >= 12 ? "PM" : "AM"}`;
   };
   const fmtDateTime = (dt) => {
-    if (!dt) return "—";
+    if(!dt || dt === "—" || dt === "-") return"—";
+    let parseValue = dt;
+    if (typeof dt === 'string' && dt.includes(' ') && !dt.includes('T')) {
+      parseValue = dt.replace(' ', 'T');
+    }
+    const d = new Date(parseValue);
+    if(isNaN(d.getTime())) return "—";
     try {
-      return new Date(dt).toLocaleDateString("en-US", {
+      return d.toLocaleDateString("en-US", {
         year: "numeric", month: "long", day: "numeric",
         hour: "numeric", minute: "2-digit",
       });
@@ -403,8 +409,9 @@ function DetailModal({ reservation, onClose }) {
     ["Reference",  reservation.reference_code || "—"],
     ["Room",       reservation.room || reservation.venue?.name || "No room assigned"],
     ["Table",      reservation.table_number ? (String(reservation.table_number).toUpperCase() === "STANDALONE" ? "Standalone Seat" : `Table ${reservation.table_number}`) : "—"],
-    ["Seat",       (reservation.seat || reservation.seat_number) ? `Seat ${reservation.seat || reservation.seat_number}` : "—"],
+    ["Seat",       (reservation.seat || reservation.seat_number) ? (String(reservation.seat || reservation.seat_number).trim().toLowerCase().startsWith("seat") ? String(reservation.seat || reservation.seat_number).trim() : `Seat ${String(reservation.seat || reservation.seat_number).trim()}`) : "—"],
     ["Guests",     (reservation.guests_count || reservation.guests) ? `${reservation.guests_count || reservation.guests} guest${(reservation.guests_count || reservation.guests) !== 1 ? "s" : ""}` : "—"],
+    ["Date Created", fmtDateTime(reservation.submittedTimestamp ? Number(reservation.submittedTimestamp) * 1000 : (reservation.created_at || reservation.createdAt || reservation.submitted_at || reservation.submittedAt))],
     ["Event Date", fmtDate(reservation.event_date)],
     ["Event Time", fmtTime(reservation.event_time)],
     ...((reservation.event_area || reservation.eventArea) ? [["Event Area", reservation.event_area || reservation.eventArea]] : []),
