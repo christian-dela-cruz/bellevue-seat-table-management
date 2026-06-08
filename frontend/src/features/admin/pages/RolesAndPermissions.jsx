@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { Plus, X, Edit2, ShieldAlert, Check, Trash2, Shield, Users, Search, AlertTriangle } from "lucide-react";
+import { Plus, X, Edit2, ShieldAlert, Check, Trash2, Shield, Users, Search, AlertTriangle, Info, ChevronDown, ChevronRight } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
@@ -24,6 +24,129 @@ const C = {
   shadow: "0 2px 8px rgba(44,36,24,0.035)",
   shadowSoft: "0 1px 5px rgba(44,36,24,0.025)",
 };
+
+// Custom Switch Component
+function Switch({ checked, indeterminate, onChange, disabled }) {
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!disabled) onChange(!checked);
+      }}
+      style={{
+        width: 36,
+        height: 20,
+        borderRadius: 20,
+        background: indeterminate ? C.gold : checked ? C.gold : C.border,
+        position: "relative",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+        transition: "background 0.2s ease"
+      }}
+    >
+      <div
+        style={{
+          width: indeterminate ? 10 : 16,
+          height: indeterminate ? 4 : 16,
+          borderRadius: indeterminate ? 2 : "50%",
+          background: "#fff",
+          position: "absolute",
+          top: indeterminate ? 8 : 2,
+          left: indeterminate ? 13 : checked ? 18 : 2,
+          transition: "all 0.2s ease",
+          boxShadow: indeterminate ? "none" : "0 1px 3px rgba(0,0,0,0.2)"
+        }}
+      />
+    </div>
+  );
+}
+
+const OPERATIONAL_GROUPS = [
+  {
+    title: "Admin Access",
+    description: "Basic access to the admin portal and permitted dashboard modules.",
+    permissions: ["View Admin Panel"]
+  },
+  {
+    title: "Reservation Operations",
+    description: "Controls reservation queue work, booking decisions, guest detail adjustments, and reservation lifecycle actions.",
+    permissions: ["Manage Reservations", "Adjust Reservation Details", "Delete Reservations", "Acknowledge Notifications"]
+  },
+  {
+    title: "Seat Map Operations",
+    description: "Controls draft editing, publishing, and recovery of seat map layouts used by guest reservation pages.",
+    permissions: ["Manage Seat Maps (Draft)", "Publish Seat Maps", "Restore Seat Map Versions"]
+  },
+  {
+    title: "Venue & Outlet Operations",
+    description: "Controls outlet, venue, room, and subroom setup used by guest-facing reservation flows.",
+    permissions: ["Manage Venues"]
+  },
+  {
+    title: "Reports & Analytics",
+    description: "Controls access to operational dashboards, outlet reports, global reports, and transaction views.",
+    permissions: ["View Outlet Reports", "View Global Reports", "View Transactions"]
+  },
+  {
+    title: "Account Administration",
+    description: "Controls admin accounts, roles, scopes, permission overrides, and system-level user access.",
+    permissions: ["Manage Accounts", "Manage System Users"]
+  }
+];
+
+const PERMISSION_DESCRIPTIONS = {
+  "View Admin Panel": "Allows the account to access the admin portal and view permitted admin modules.",
+  "Manage Reservations": "Allows the account to approve, reject, revert, cancel, and process reservation requests.",
+  "Adjust Reservation Details": "Allows the account to edit reservation details such as guest information, schedule, notes, coordination fields, assigned room, table, or seat details.",
+  "Delete Reservations": "Allows the account to permanently delete reservation records. This should be limited to high-level administrators.",
+  "Acknowledge Notifications": "Allows the account to mark admin notifications as acknowledged after reviewing them.",
+  "Manage Seat Maps (Draft)": "Allows the account to create and edit seat map draft layouts for outlets, venues, rooms, and subrooms.",
+  "Publish Seat Maps": "Allows the account to publish approved seat map layouts so they become visible on the guest reservation pages.",
+  "Restore Seat Map Versions": "Allows the account to restore a previous published seat map version when a layout needs to be rolled back.",
+  "Manage Venues": "Allows the account to create, edit, archive, activate, deactivate, and configure outlets, venues, rooms, and subrooms.",
+  "View Outlet Reports": "Allows the account to view outlet and venue performance reports, reservation summaries, and operational dashboards.",
+  "View Global Reports": "Allows the account to view system-wide reports across all outlets, venues, and reservation areas.",
+  "View Transactions": "Allows the account to view transaction-related records, reservation activity, and operational logs where available.",
+  "Manage Accounts": "Allows the account to create, edit, deactivate, reactivate, and configure admin accounts, roles, scopes, and permission overrides.",
+  "Manage System Users": "Allows the account to manage higher-level system user access and user administration settings.",
+};
+
+function PermissionTooltip({ perm }) {
+  const [show, setShow] = useState(false);
+  const desc = PERMISSION_DESCRIPTIONS[perm.name] || perm.description || "No description has been added for this permission yet.";
+
+  return (
+    <div 
+      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      onFocus={() => setShow(true)}
+      onBlur={() => setShow(false)}
+    >
+      <Info size={13} color={C.muted} style={{ cursor: "help", opacity: 0.7, outline: "none" }} tabIndex={0} />
+      {show && (
+        <div style={{
+          position: "absolute",
+          left: 24,
+          top: "50%",
+          transform: "translateY(-50%)",
+          background: C.surfaceSoft,
+          border: `1px solid ${C.border}`,
+          borderRadius: 8,
+          boxShadow: C.shadow,
+          width: 240,
+          padding: "12px 14px",
+          zIndex: 100,
+          animation: "rolesFadeIn 150ms ease-out",
+          pointerEvents: "none",
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 4 }}>{perm.name}</div>
+          <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.4 }}>{desc}</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const F = {
   body: "'Inter','Helvetica Neue',Arial,sans-serif",
@@ -97,6 +220,23 @@ export default function RolesAndPermissions() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState(null);
+
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("roles_collapsed_groups");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleCollapse = (groupTitle) => {
+    setCollapsedGroups(prev => {
+      const next = { ...prev, [groupTitle]: !prev[groupTitle] };
+      sessionStorage.setItem("roles_collapsed_groups", JSON.stringify(next));
+      return next;
+    });
+  };
 
   const currentUser = authAPI.getCurrentUser();
   const isSuperAdmin = currentUser?.role === "super_admin";
@@ -222,12 +362,54 @@ export default function RolesAndPermissions() {
   };
 
   const togglePermission = (slug) => {
-    if (!canEditRolePerms) return; // cannot edit system role permissions here
+    if (!canEditRolePerms) return;
     
     setEditingPermissions(prev => {
-      const next = prev.includes(slug) ? prev.filter(p => p !== slug) : [...prev, slug];
-      const original = (selectedRole?.permissions || []).map(p => p.slug);
+      let next = prev.includes(slug) ? prev.filter(p => p !== slug) : [...prev, slug];
       
+      if (!prev.includes(slug) && slug !== "view_admin_panel") {
+        if (!next.includes("view_admin_panel")) {
+          next.push("view_admin_panel");
+        }
+      }
+      
+      if (prev.includes(slug) && slug === "view_admin_panel") {
+        if (next.length > 0) {
+          setToast({ type: "error", message: "Cannot disable View Admin Panel while other permissions are active." });
+          return prev;
+        }
+      }
+
+      const original = (selectedRole?.permissions || []).map(p => p.slug);
+      const isChanged = next.length !== original.length || !next.every(n => original.includes(n));
+      setHasUnsavedPerms(isChanged);
+      return next;
+    });
+  };
+
+  const toggleGroup = (groupPerms) => {
+    if (!canEditRolePerms) return;
+    
+    setEditingPermissions(prev => {
+      const groupSlugs = groupPerms.map(p => p.slug);
+      const activeInGroup = groupSlugs.filter(s => prev.includes(s));
+      
+      let next = [...prev];
+      if (activeInGroup.length === groupSlugs.length) {
+        next = next.filter(s => !groupSlugs.includes(s));
+        if (groupSlugs.includes("view_admin_panel") && next.length > 0) {
+           setToast({ type: "error", message: "Cannot disable View Admin Panel while permissions in other groups are active." });
+           return prev;
+        }
+      } else {
+        const missing = groupSlugs.filter(s => !prev.includes(s));
+        next = [...next, ...missing];
+        if (!next.includes("view_admin_panel") && groupSlugs.length > 0) {
+          next.push("view_admin_panel");
+        }
+      }
+      
+      const original = (selectedRole?.permissions || []).map(p => p.slug);
       const isChanged = next.length !== original.length || !next.every(n => original.includes(n));
       setHasUnsavedPerms(isChanged);
       return next;
@@ -252,13 +434,13 @@ export default function RolesAndPermissions() {
     }
   };
 
-  const groupedPermissions = useMemo(() => {
-    return allPermissions.reduce((acc, perm) => {
-      const mod = perm.module || "General";
-      if (!acc[mod]) acc[mod] = [];
-      acc[mod].push(perm);
-      return acc;
-    }, {});
+  const operationalGroupings = useMemo(() => {
+    return OPERATIONAL_GROUPS.map(group => {
+      return {
+        ...group,
+        perms: group.permissions.map(permName => allPermissions.find(p => p.name === permName)).filter(Boolean)
+      };
+    }).filter(g => g.perms.length > 0);
   }, [allPermissions]);
 
   const filteredRoles = useMemo(() => {
@@ -426,35 +608,73 @@ export default function RolesAndPermissions() {
                       )}
                     </div>
                     
-                    <div style={{ padding: 24, display: "grid", gap: 24 }}>
-                      {Object.entries(groupedPermissions).map(([module, perms]) => (
-                        <div key={module}>
-                          <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.14em", color: C.gold, marginBottom: 12 }}>{module}</div>
-                          <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
-                            {perms.map((perm, idx) => {
-                              const isChecked = editingPermissions?.includes(perm.slug);
-                              return (
-                                <div key={perm.slug} className="perm-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: idx < perms.length - 1 ? `1px solid ${C.divider}` : "none", cursor: !canEditRolePerms ? "default" : "pointer" }} onClick={() => togglePermission(perm.slug)}>
-                                  <div>
-                                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{perm.name}</div>
-                                    <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{perm.description || perm.slug}</div>
+                    <div style={{ padding: 24, display: "grid", gap: 20 }}>
+                      {operationalGroupings.map(group => {
+                        const activeInGroupCount = group.perms.filter(p => editingPermissions?.includes(p.slug)).length;
+                        const isGroupOn = activeInGroupCount === group.perms.length;
+                        const isGroupPartial = activeInGroupCount > 0 && activeInGroupCount < group.perms.length;
+                        const isCollapsed = collapsedGroups[group.title];
+
+                        return (
+                          <div key={group.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadowSoft, overflow: "hidden", display: "flex", flexDirection: "column", transition: "box-shadow 0.2s ease" }}>
+                            {/* Card Header */}
+                            <div 
+                              style={{ padding: "16px 20px", background: C.surfaceSoft, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}
+                              onClick={() => toggleCollapse(group.title)}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: 12, paddingRight: 20 }}>
+                                <button type="button" style={{ background: "transparent", border: "none", color: C.muted, display: "flex", alignItems: "center", padding: 0, cursor: "pointer", outline: "none" }}>
+                                  {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                                </button>
+                                <div>
+                                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
+                                    {group.title}
+                                    <span style={{ fontSize: 10, background: C.divider, padding: "2px 6px", borderRadius: 10, color: C.muted, fontWeight: 650 }}>{group.perms.length}</span>
                                   </div>
-                                  <div>
-                                    <input 
-                                      type="checkbox" 
-                                      checked={isChecked} 
-                                      disabled={!canEditRolePerms}
-                                      onChange={() => togglePermission(perm.slug)}
-                                      style={{ width: 18, height: 18, accentColor: C.gold, cursor: !canEditRolePerms ? "not-allowed" : "pointer" }}
-                                      onClick={e => e.stopPropagation()}
-                                    />
-                                  </div>
+                                  <div style={{ fontSize: 12, color: C.muted, marginTop: 4, lineHeight: 1.4 }}>{group.description}</div>
                                 </div>
-                              )
-                            })}
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 14 }} onClick={e => e.stopPropagation()}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
+                                  {isGroupPartial ? "PARTIAL" : isGroupOn ? "ALL ENABLED" : "DISABLED"} ({activeInGroupCount}/{group.perms.length})
+                                </span>
+                                <Switch 
+                                  checked={isGroupOn}
+                                  indeterminate={isGroupPartial}
+                                  disabled={!canEditRolePerms}
+                                  onChange={() => toggleGroup(group.perms)}
+                                />
+                              </div>
+                            </div>
+                            
+                            {/* Card Body */}
+                            {!isCollapsed && (
+                              <div style={{ borderTop: `1px solid ${C.divider}` }}>
+                                {group.perms.map((perm, idx) => {
+                                  const isChecked = editingPermissions?.includes(perm.slug);
+                                  return (
+                                    <div key={perm.slug} className="perm-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: idx < group.perms.length - 1 ? `1px solid ${C.divider}` : "none" }}>
+                                      <div>
+                                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, display: "flex", alignItems: "center", gap: 6 }}>
+                                          {perm.name}
+                                          <PermissionTooltip perm={perm} />
+                                        </div>
+                                      </div>
+                                      <div style={{ display: "flex", alignItems: "center" }}>
+                                        <Switch 
+                                          checked={isChecked} 
+                                          disabled={!canEditRolePerms}
+                                          onChange={() => togglePermission(perm.slug)}
+                                        />
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (

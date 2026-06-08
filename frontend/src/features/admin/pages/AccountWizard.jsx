@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Check, ChevronRight, X, User, Shield, Map, Lock, ClipboardCheck, Search, ChevronDown, ChevronRight as ChevronRightIcon, RotateCcw, AlertCircle } from "lucide-react";
+import { Check, ChevronRight, X, User, Shield, Map, Lock, ClipboardCheck, Search, ChevronDown, ChevronRight as ChevronRightIcon, RotateCcw, AlertCircle, Info } from "lucide-react";
 import { authAPI } from "../../../services/authAPI";
 
 const C = {
@@ -77,7 +77,7 @@ function Switch({ checked, onChange, disabled }) {
         width: 36,
         height: 20,
         borderRadius: 20,
-        background: checked ? C.green : C.border,
+        background: checked ? C.gold : C.border,
         position: "relative",
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.6 : 1,
@@ -110,6 +110,93 @@ function TriStateCheckbox({ checked, indeterminate, onChange }) {
   return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} style={{ width: 15, height: 15, accentColor: C.gold, cursor: "pointer" }} />;
 }
 
+const OPERATIONAL_GROUPS = [
+  {
+    title: "Admin Access",
+    description: "Basic access to the admin portal and permitted dashboard modules.",
+    permissions: ["View Admin Panel"]
+  },
+  {
+    title: "Reservation Operations",
+    description: "Controls reservation queue work, booking decisions, guest detail adjustments, and reservation lifecycle actions.",
+    permissions: ["Manage Reservations", "Adjust Reservation Details", "Delete Reservations", "Acknowledge Notifications"]
+  },
+  {
+    title: "Seat Map Operations",
+    description: "Controls draft editing, publishing, and recovery of seat map layouts used by guest reservation pages.",
+    permissions: ["Manage Seat Maps (Draft)", "Publish Seat Maps", "Restore Seat Map Versions"]
+  },
+  {
+    title: "Venue & Outlet Operations",
+    description: "Controls outlet, venue, room, and subroom setup used by guest-facing reservation flows.",
+    permissions: ["Manage Venues"]
+  },
+  {
+    title: "Reports & Analytics",
+    description: "Controls access to operational dashboards, outlet reports, global reports, and transaction views.",
+    permissions: ["View Outlet Reports", "View Global Reports", "View Transactions"]
+  },
+  {
+    title: "Account Administration",
+    description: "Controls admin accounts, roles, scopes, permission overrides, and system-level user access.",
+    permissions: ["Manage Accounts", "Manage System Users"]
+  }
+];
+
+const PERMISSION_DESCRIPTIONS = {
+  "View Admin Panel": "Allows the account to access the admin portal and view permitted admin modules.",
+  "Manage Reservations": "Allows the account to approve, reject, revert, cancel, and process reservation requests.",
+  "Adjust Reservation Details": "Allows the account to edit reservation details such as guest information, schedule, notes, coordination fields, assigned room, table, or seat details.",
+  "Delete Reservations": "Allows the account to permanently delete reservation records. This should be limited to high-level administrators.",
+  "Acknowledge Notifications": "Allows the account to mark admin notifications as acknowledged after reviewing them.",
+  "Manage Seat Maps (Draft)": "Allows the account to create and edit seat map draft layouts for outlets, venues, rooms, and subrooms.",
+  "Publish Seat Maps": "Allows the account to publish approved seat map layouts so they become visible on the guest reservation pages.",
+  "Restore Seat Map Versions": "Allows the account to restore a previous published seat map version when a layout needs to be rolled back.",
+  "Manage Venues": "Allows the account to create, edit, archive, activate, deactivate, and configure outlets, venues, rooms, and subrooms.",
+  "View Outlet Reports": "Allows the account to view outlet and venue performance reports, reservation summaries, and operational dashboards.",
+  "View Global Reports": "Allows the account to view system-wide reports across all outlets, venues, and reservation areas.",
+  "View Transactions": "Allows the account to view transaction-related records, reservation activity, and operational logs where available.",
+  "Manage Accounts": "Allows the account to create, edit, deactivate, reactivate, and configure admin accounts, roles, scopes, and permission overrides.",
+  "Manage System Users": "Allows the account to manage higher-level system user access and user administration settings.",
+};
+
+function PermissionTooltip({ perm }) {
+  const [show, setShow] = useState(false);
+  const desc = PERMISSION_DESCRIPTIONS[perm.name] || perm.description || "No description has been added for this permission yet.";
+
+  return (
+    <div 
+      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      onFocus={() => setShow(true)}
+      onBlur={() => setShow(false)}
+    >
+      <Info size={13} color={C.muted} style={{ cursor: "help", opacity: 0.7, outline: "none" }} tabIndex={0} />
+      {show && (
+        <div style={{
+          position: "absolute",
+          left: 24,
+          top: "50%",
+          transform: "translateY(-50%)",
+          background: C.surfaceSoft,
+          border: `1px solid ${C.border}`,
+          borderRadius: 8,
+          boxShadow: C.shadow,
+          width: 240,
+          padding: "12px 14px",
+          zIndex: 100,
+          animation: "rolesFadeIn 150ms ease-out",
+          pointerEvents: "none",
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 4 }}>{perm.name}</div>
+          <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.4 }}>{desc}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const STEPS = [
   { id: 1, title: "Account & Role", icon: <User size={14} /> },
   { id: 2, title: "Access Scope", icon: <Map size={14} /> },
@@ -135,6 +222,23 @@ export default function AccountWizard({
   const [form, setForm] = useState(initialForm);
   const [useRoleDefaults, setUseRoleDefaults] = useState(true);
   const [overrides, setOverrides] = useState([]); // [{ permission_id, effect }]
+
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("account_wizard_collapsed_groups");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleCollapse = (groupTitle) => {
+    setCollapsedGroups(prev => {
+      const next = { ...prev, [groupTitle]: !prev[groupTitle] };
+      sessionStorage.setItem("account_wizard_collapsed_groups", JSON.stringify(next));
+      return next;
+    });
+  };
 
   // Scopes state
   const [scopeSearch, setScopeSearch] = useState("");
@@ -186,44 +290,79 @@ export default function AccountWizard({
   const currentRolePermissions = currentRole?.permissions || [];
   const currentRolePermSlugs = currentRolePermissions.map(p => p.slug);
 
-  // Group permissions by module
-  const groupedPermissions = useMemo(() => {
-    return permissionsList.reduce((acc, perm) => {
-      const mod = perm.module || "General";
-      if (!acc[mod]) acc[mod] = [];
-      acc[mod].push(perm);
-      return acc;
-    }, {});
+  const operationalGroupings = useMemo(() => {
+    return OPERATIONAL_GROUPS.map(group => {
+      return {
+        ...group,
+        perms: group.permissions.map(permName => permissionsList.find(p => p.name === permName)).filter(Boolean)
+      };
+    }).filter(g => g.perms.length > 0);
   }, [permissionsList]);
 
   const handleNext = () => setStep(s => Math.min(4, s + 1));
   const handlePrev = () => setStep(s => Math.max(1, s - 1));
 
+  const updateEffectiveAccess = (updaterFn) => {
+    const currentUser = authAPI.getCurrentUser();
+    const isSuperAdmin = currentUser?.role === "super_admin";
+
+    setOverrides(prev => {
+      let effectiveSlugs = permissionsList
+        .filter(p => {
+          const isDefault = currentRolePermSlugs.includes(p.slug);
+          const override = prev.find(o => o.permission_id === p.id);
+          return override ? override.effect === 'allow' : isDefault;
+        })
+        .map(p => p.slug);
+      
+      let nextSlugs = updaterFn([...effectiveSlugs]);
+      
+      return permissionsList.map(p => {
+        const canEdit = isSuperAdmin || authAPI.hasPermission(p.slug);
+        const wantsOn = canEdit ? nextSlugs.includes(p.slug) : effectiveSlugs.includes(p.slug);
+        const isDefaultOn = currentRolePermSlugs.includes(p.slug);
+        if (wantsOn !== isDefaultOn) {
+          return { permission_id: p.id, effect: wantsOn ? 'allow' : 'deny' };
+        }
+        return null;
+      }).filter(Boolean);
+    });
+  };
+
   const toggleOverride = (permission_id, grantAccess) => {
     const perm = permissionsList.find(p => p.id === permission_id);
     if (!perm) return;
 
-    const currentUser = authAPI.getCurrentUser();
-    const isSuperAdmin = currentUser?.role === "super_admin";
-    const hasThisPermission = isSuperAdmin || authAPI.hasPermission(perm.slug);
-    if (!hasThisPermission) return;
-
-    const isDefaultGranted = currentRolePermSlugs.includes(perm.slug);
-
-    // If the requested state matches the role default, remove any override.
-    if (grantAccess === isDefaultGranted) {
-      setOverrides(prev => prev.filter(o => o.permission_id !== permission_id));
-      return;
-    }
-
-    // Otherwise, create/update the override (if granting, effect is 'allow', else 'deny')
-    const effect = grantAccess ? 'allow' : 'deny';
-    setOverrides(prev => {
-      const existing = prev.find(o => o.permission_id === permission_id);
-      if (existing) {
-        return prev.map(o => o.permission_id === permission_id ? { ...o, effect } : o);
+    updateEffectiveAccess(prev => {
+      let next = grantAccess ? [...prev, perm.slug] : prev.filter(s => s !== perm.slug);
+      
+      if (grantAccess && perm.slug !== "view_admin_panel") {
+        if (!next.includes("view_admin_panel")) next.push("view_admin_panel");
       }
-      return [...prev, { permission_id, effect }];
+      
+      if (!grantAccess && perm.slug === "view_admin_panel") {
+        if (next.length > 0) return prev;
+      }
+      return next;
+    });
+  };
+
+  const toggleOverrideGroup = (groupPerms, isGroupOn) => {
+    updateEffectiveAccess(prev => {
+      let next = [...prev];
+      const groupSlugs = groupPerms.map(p => p.slug);
+      
+      if (isGroupOn) {
+        next = next.filter(s => !groupSlugs.includes(s));
+        if (groupSlugs.includes("view_admin_panel") && next.length > 0) return prev;
+      } else {
+        const missing = groupSlugs.filter(s => !prev.includes(s));
+        next = [...next, ...missing];
+        if (!next.includes("view_admin_panel") && groupSlugs.length > 0) {
+          next.push("view_admin_panel");
+        }
+      }
+      return next;
     });
   };
 
@@ -546,51 +685,95 @@ export default function AccountWizard({
                     <div style={{ fontSize: 14, fontWeight: 650, display: "flex", alignItems: "center", gap: 6 }}><Lock size={14} color={C.gold} /> Customized Permissions</div>
                     <button type="button" onClick={resetAllOverrides} style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: "none", color: C.muted, fontSize: 11, fontWeight: 650, cursor: "pointer", textTransform: "uppercase" }}><RotateCcw size={12} /> Reset to default</button>
                   </div>
+                  <div style={{ padding: 24, display: "grid", gap: 20 }}>
+                    {operationalGroupings.map((group) => {
+                      const activeInGroupCount = group.perms.filter(p => getEffectiveAccess(p.id)).length;
+                      const isGroupOn = activeInGroupCount === group.perms.length;
+                      const isGroupPartial = activeInGroupCount > 0 && activeInGroupCount < group.perms.length;
+                      const isCollapsed = collapsedGroups[group.title];
 
-                  <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
-                    {Object.entries(groupedPermissions).map(([module, perms]) => (
-                      <div key={module}>
-                        <div style={{ padding: "8px 14px", background: C.surfaceSoft, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.14em", color: C.gold, borderBottom: `1px solid ${C.divider}` }}>{module}</div>
-                        {perms.map((perm, idx) => {
-                          const isDefaultGranted = currentRolePermSlugs.includes(perm.slug);
-                          const isEffective = getEffectiveAccess(perm.id);
-                          const isOverridden = overrides.some(o => o.permission_id === perm.id);
+                      const currentUser = authAPI.getCurrentUser();
+                      const isSuperAdmin = currentUser?.role === "super_admin";
 
-                          const currentUser = authAPI.getCurrentUser();
-                          const isSuperAdmin = currentUser?.role === "super_admin";
-                          const hasThisPermission = isSuperAdmin || authAPI.hasPermission(perm.slug);
-
-                          return (
-                            <div key={perm.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: idx < perms.length - 1 ? `1px solid ${C.divider}` : "none", background: isOverridden ? "rgba(140,107,42,0.02)" : "transparent", opacity: hasThisPermission ? 1 : 0.6 }}>
+                      return (
+                        <div key={group.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadowSoft, overflow: "hidden", display: "flex", flexDirection: "column", transition: "box-shadow 0.2s ease" }}>
+                          <div 
+                            style={{ padding: "16px 20px", background: C.surfaceSoft, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}
+                            onClick={() => toggleCollapse(group.title)}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, paddingRight: 20 }}>
+                              <button type="button" style={{ background: "transparent", border: "none", color: C.muted, display: "flex", alignItems: "center", padding: 0, cursor: "pointer", outline: "none" }}>
+                                {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                              </button>
                               <div>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{perm.name}</span>
-                                  {isOverridden && <span style={{ fontSize: 9, padding: "2px 6px", background: C.gold, color: "#fff", borderRadius: 4, fontWeight: 700 }}>OVERRIDE</span>}
-                                  {!hasThisPermission && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, padding: "2px 6px", background: C.divider, color: C.muted, borderRadius: 4, fontWeight: 700 }}><Lock size={9} /> LOCKED</span>}
+                                <div style={{ fontSize: 14, fontWeight: 700, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
+                                  {group.title}
+                                  <span style={{ fontSize: 10, background: C.divider, padding: "2px 6px", borderRadius: 10, color: C.muted, fontWeight: 650 }}>{group.perms.length}</span>
                                 </div>
-                                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{perm.description || perm.slug}</div>
-                                {!hasThisPermission && (
-                                  <div style={{ fontSize: 10, color: C.red, marginTop: 4, fontWeight: 550 }}>
-                                    You do not possess this permission and cannot assign or revoke it.
-                                  </div>
-                                )}
-                                {isOverridden && hasThisPermission && (
-                                  <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>
-                                    Default for this role is <strong>{isDefaultGranted ? "Allowed" : "Denied"}</strong>.
-                                  </div>
-                                )}
-                              </div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                                {isOverridden && hasThisPermission && (
-                                  <button type="button" onClick={() => toggleOverride(perm.id, isDefaultGranted)} title="Revert to role default" style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", display: "flex" }}><RotateCcw size={14} /></button>
-                                )}
-                                <Switch checked={isEffective} onChange={(checked) => toggleOverride(perm.id, checked)} disabled={!hasThisPermission} />
+                                <div style={{ fontSize: 12, color: C.muted, marginTop: 4, lineHeight: 1.4 }}>{group.description}</div>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    ))}
+                            <div style={{ display: "flex", alignItems: "center", gap: 14 }} onClick={e => e.stopPropagation()}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
+                                {isGroupPartial ? "PARTIAL" : isGroupOn ? "ALL ENABLED" : "DISABLED"} ({activeInGroupCount}/{group.perms.length})
+                              </span>
+                              <Switch 
+                                checked={isGroupOn}
+                                indeterminate={isGroupPartial}
+                                disabled={false}
+                                onChange={() => toggleOverrideGroup(group.perms, isGroupOn)}
+                              />
+                            </div>
+                          </div>
+                          
+                          {!isCollapsed && (
+                            <div style={{ borderTop: `1px solid ${C.divider}` }}>
+                              {group.perms.map((perm, idx) => {
+                                const isEffective = getEffectiveAccess(perm.id);
+                                const isOverridden = overrides.some(o => o.permission_id === perm.id);
+                                const hasThisPermission = isSuperAdmin || authAPI.hasPermission(perm.slug);
+                                const isDefaultGranted = currentRolePermSlugs.includes(perm.slug);
+
+                                return (
+                                  <div key={perm.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: idx < group.perms.length - 1 ? `1px solid ${C.divider}` : "none", background: isOverridden ? "rgba(140,107,42,0.02)" : "transparent", opacity: hasThisPermission ? 1 : 0.6 }}>
+                                    <div>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                        <span style={{ fontSize: 13, fontWeight: 600, color: C.text, display: "flex", alignItems: "center", gap: 6 }}>
+                                          {perm.name}
+                                          <PermissionTooltip perm={perm} />
+                                        </span>
+                                        {isOverridden && <span style={{ fontSize: 9, padding: "2px 6px", background: C.gold, color: "#fff", borderRadius: 4, fontWeight: 700 }}>OVERRIDE</span>}
+                                        {!hasThisPermission && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, padding: "2px 6px", background: C.divider, color: C.muted, borderRadius: 4, fontWeight: 700 }}><Lock size={9} /> LOCKED</span>}
+                                      </div>
+                                      {!hasThisPermission && (
+                                        <div style={{ fontSize: 10, color: C.red, marginTop: 4, fontWeight: 550 }}>
+                                          You do not possess this permission and cannot assign or revoke it.
+                                        </div>
+                                      )}
+                                      {isOverridden && hasThisPermission && (
+                                        <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>
+                                          Default for this role is <strong>{isDefaultGranted ? "Allowed" : "Denied"}</strong>.
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                                      {isOverridden && hasThisPermission && (
+                                        <button type="button" onClick={() => toggleOverride(perm.id, isDefaultGranted)} title="Revert to role default" style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", display: "flex" }}><RotateCcw size={14} /></button>
+                                      )}
+                                      <Switch 
+                                        checked={isEffective} 
+                                        disabled={!hasThisPermission}
+                                        onChange={(checked) => toggleOverride(perm.id, checked)}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
