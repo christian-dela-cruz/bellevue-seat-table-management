@@ -776,7 +776,7 @@ export default function RolesAndPermissions() {
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} style={{ flex: 1, overflowY: "auto", padding: 20, display: "grid", gap: 20 }}>
+            <form onSubmit={handleSubmit} style={{ flex: 1, overflowY: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 24 }}>
               {error && (
                 <div style={{ padding: 12, background: C.redFaint, border: "1px solid rgba(160,56,56,0.18)", borderRadius: 9, color: C.red, fontSize: 12.5, lineHeight: 1.45, display: "flex", alignItems: "center", gap: 8 }}>
                   <ShieldAlert size={16} /> {error}
