@@ -3618,7 +3618,7 @@ export default function ReservationDashboard() {
                                     <>
                                       <span style={{color:C.textTertiary,fontSize:11}}>·</span>
                                       <span style={{fontFamily:F.body,fontSize:11,color:seatTextColor,fontWeight:seatTextWeight}}>
-                                        Seat {reservation.seat||reservation.seat_number}
+                                        {String(reservation.seat||reservation.seat_number).trim().toLowerCase().startsWith("seat") ? String(reservation.seat||reservation.seat_number).trim() : `Seat ${String(reservation.seat||reservation.seat_number).trim()}`}
                                       </span>
                                     </>
                                   )}

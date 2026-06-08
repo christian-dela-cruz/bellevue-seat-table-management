@@ -35,3 +35,5 @@ dist-ssr
 MailHog.exe
 backend/tools/mail/mailpit.exe
 backend/tools/mail/mailpit.db
+backend/tools/mail/mailpit.db-wal
+backend/tools/mail/mailpit.db-shm
