@@ -422,9 +422,10 @@ function ScaledCanvas({ virtualW, virtualH, children, onScale, remountKey, fitMo
   }, [virtualW, virtualH, remountKey, fitMode]);
 
   const renderedH = Math.round(virtualH * scale);
+  const renderedW = Math.round(virtualW * scale);
   return (
-    <div ref={sizerRef} style={{ width: "100%", position: "relative" }}>
-      <div style={{ width: "100%", height: renderedH, position: "relative", overflow: "hidden" }}>
+    <div ref={sizerRef} style={{ width: "100%", height: "100%", position: "relative", display: "flex", justifyContent: "center", alignItems: "center" }}>
+      <div style={{ width: renderedW, height: renderedH, position: "relative", overflow: "hidden", flexShrink: 0 }}>
         <div style={{
           position: "absolute", top: 0, left: 0,
           width: virtualW, height: virtualH,
@@ -3440,6 +3441,10 @@ export default function SeatMap({
       setLabels(tableData.labels?.length ? tableData.labels : DEFAULT_LABELS);
       setStandaloneSeats(tableData.standaloneSeats || []);
       setFixtures(tableData.fixtures || []);
+      if (tableData.editor) {
+        if (tableData.editor.room_width_cm) setRoomWidth(tableData.editor.room_width_cm);
+        if (tableData.editor.room_height_cm) setRoomHeight(tableData.editor.room_height_cm);
+      }
     } else if (tableData.tables) {
       setTables(normalize(tableData.tables).filter(t => t.seats?.length > 0));
       setLabels(tableData.labels?.length ? tableData.labels : DEFAULT_LABELS);
@@ -4248,33 +4253,25 @@ export default function SeatMap({
 
   // ─── CLIENT VIEW ──────────────────────────────────────────────────────────────
   if (!editMode) {
-    const SEAT_OFF = 46, PAD = 40;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    tables.forEach(t => { const tw = t.width || 110, th = t.height || 70; minX = Math.min(minX, t.x - SEAT_OFF); minY = Math.min(minY, t.y - SEAT_OFF); maxX = Math.max(maxX, t.x + tw + SEAT_OFF); maxY = Math.max(maxY, t.y + th + SEAT_OFF); });
-    standaloneSeats.forEach(s => { minX = Math.min(minX, s.x); minY = Math.min(minY, s.y); maxX = Math.max(maxX, s.x + 38); maxY = Math.max(maxY, s.y + 38); });
-    labels.forEach(l => { const lw = l.type === "screen" ? 120 : 100, lh = l.type === "screen" ? 32 : 26; minX = Math.min(minX, l.x); minY = Math.min(minY, l.y); maxX = Math.max(maxX, l.x + lw); maxY = Math.max(maxY, l.y + lh); });
-    fixtures.forEach(f => { const fw = f.width || 80, fh = f.height || 60; minX = Math.min(minX, f.x); minY = Math.min(minY, f.y); maxX = Math.max(maxX, f.x + fw); maxY = Math.max(maxY, f.y + fh); });
-    if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 1400; maxY = 780; }
-    const VIRTUAL_W = virtualWidth  || Math.max(maxX - minX + PAD * 2, 500);
-    const VIRTUAL_H = virtualHeight || Math.max(maxY - minY + PAD * 2, 400);
-    const ox = -minX + PAD, oy = -minY + PAD;
+    const VIRTUAL_W = virtualWidth || roomWidth || 1200;
+    const VIRTUAL_H = virtualHeight || roomHeight || 800;
     return (
-      <div style={{ width: "100%", background: T.canvasBg, transition: "background 0.30s" }}>
+      <div style={{ width: "100%", height: "100%", background: T.canvasBg, transition: "background 0.30s" }}>
         <ScaledCanvas virtualW={VIRTUAL_W} virtualH={VIRTUAL_H} fitMode="contain" remountKey={0}>
           <div style={{ position: "absolute", top: 0, left: 0, width: VIRTUAL_W, height: VIRTUAL_H }}>
-            {labels.map(l => <StaticLabel key={`${wing}-${room}-label-${l.id}`} item={{ ...l, x: l.x + ox, y: l.y + oy }} T={T} />)}
+            {labels.map(l => <StaticLabel key={`${wing}-${room}-label-${l.id}`} item={l} T={T} />)}
             {fixtures.map((f, index) => (
-              <FixtureNode key={`${wing}-${room}-fixture-${f.id}-${index}`} fixture={{ ...f, x: f.x + ox, y: f.y + oy }}
+              <FixtureNode key={`${wing}-${room}-fixture-${f.id}-${index}`} fixture={f}
                 editMode={false} isSelected={false} onSelect={() => {}} onDragStart={() => {}} isDragging={false} T={T} />
             ))}
             {standaloneSeats.map(s => (
-              <StandaloneSeat key={`${wing}-${room}-standalone-${s.id}`} seat={{ ...s, x: s.x + ox, y: s.y + oy }}
+              <StandaloneSeat key={`${wing}-${room}-standalone-${s.id}`} seat={s}
                 editMode={false} isSelected={selectedSeat ? selectedSeat.id === s.id : false}
                 isDragging={false} onDragStart={() => {}} onSelect={() => {}}
                 onSeatClick={mode === "individual" ? onSeatClick : undefined} T={T} />
             ))}
             {tables.map(t => (
-              <TableNode key={`${wing}-${room}-table-${t.id}`} table={{ ...t, x: t.x + ox, y: t.y + oy }}
+              <TableNode key={`${wing}-${room}-table-${t.id}`} table={t}
                 editMode={false} isTableSelected={highlightedTable ? highlightedTable.id === t.id : false}
                 selectedSeatId={selectedSeat ? selectedSeat.id : null}
                 onSelectTable={handleTableSelect} onDragStart={() => {}} onResizeStart={() => {}}

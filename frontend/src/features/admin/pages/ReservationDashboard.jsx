@@ -1514,8 +1514,12 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
   };
   const fmtTime=(t)=>{
     if(!t)return"—";
-    const[h,m]=t.split(":");const hr=parseInt(h);
-    return`${hr%12||12}:${m} ${hr>=12?"PM":"AM"}`;
+    if (typeof t === "string" && /AM|PM/i.test(t)) return t;
+    const parts=t.split(":");
+    if(parts.length < 2) return t;
+    const hr=parseInt(parts[0])||0;
+    const min=parts[1].substring(0,2);
+    return`${hr%12||12}:${min} ${hr>=12?"PM":"AM"}`;
   };
   const fmtDateTime=(value)=>{
     if(!value)return"—";

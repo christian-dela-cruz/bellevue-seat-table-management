@@ -318,6 +318,52 @@ function RoomDropdown({ rooms, onRoomClick, C }) {
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "transform 0.2s", transform: open ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}>
           <polyline points="6 9 12 15 18 9"/>
         </svg>
+
+// ── RESPONSIVE ───────────────────────────────────────────────────────────────
+function useIsMobile(bp = 768) {
+  const [m, setM] = useState(() => typeof window !== "undefined" ? window.innerWidth < bp : false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width:${bp - 1}px)`);
+    const h = (e) => setM(e.matches);
+    mq.addEventListener("change", h); setM(mq.matches);
+    return () => mq.removeEventListener("change", h);
+  }, [bp]);
+  return m;
+}
+
+// ── SVG ICONS ─────────────────────────────────────────────────────────────────
+const ChevLeft = ({ size = 14, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+);
+const ChevRight = ({ size = 14, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+);
+
+// ── ROOM DROPDOWN ─────────────────────────────────────────────────────────────
+function RoomDropdown({ rooms, onRoomClick, C }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+  const valid = rooms.filter(r => r && r.trim());
+  return (
+    <div ref={wrapRef} style={{ position: "relative" }}>
+      <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px 5px 10px", background: open ? C.goldFaint : "transparent", border: `1px solid ${open ? C.gold : C.goldBorder}`, fontSize: 11, fontWeight: 600, color: open ? C.gold : C.textMuted, cursor: "pointer", transition: "all 0.18s", fontFamily: FONT, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap", outline: "none" }}
+        onMouseEnter={e => { e.currentTarget.style.background = C.goldFaint; e.currentTarget.style.color = C.gold; e.currentTarget.style.borderColor = C.gold; }}
+        onMouseLeave={e => { if (!open) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.textMuted; e.currentTarget.style.borderColor = C.goldBorder; } }}>
+        <span>Sub-rooms ({valid.length})</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "transform 0.2s", transform: open ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}>
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
       </button>
       {open && (
         <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 120, background: C.surface, border: `1px solid ${C.goldBorder}`, boxShadow: "0 12px 40px rgba(0,0,0,0.22)", minWidth: "100%", overflow: "hidden" }}>
@@ -336,9 +382,42 @@ function RoomDropdown({ rooms, onRoomClick, C }) {
   );
 }
 
+// ── STABLE IMAGE ──────────────────────────────────────────────────────────────
+function StableImage({ src, alt, hov, priority }) {
+  const [loaded, setLoaded] = useState(false);
+  const imgRef = useRef(null);
+
+  useEffect(() => {
+    if (imgRef.current && imgRef.current.complete) {
+      setLoaded(true);
+    }
+  }, []);
+
+  return (
+    <div style={{ width: "100%", height: "100%", position: "absolute", inset: 0, background: "rgba(0,0,0,0.05)" }}>
+      <img
+        ref={imgRef}
+        src={src}
+        alt={alt}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          display: "block",
+          opacity: loaded ? 1 : 0,
+          transition: "opacity 0.4s ease, transform 0.55s cubic-bezier(0.25,0.46,0.45,0.94)",
+          transform: hov ? "scale(1.06)" : "scale(1)"
+        }}
+      />
+    </div>
+  );
+}
 
 // ── VENUE CARD ────────────────────────────────────────────────────────────────
-function VenueCard({ venue, onClick, C, isDark, hideSpacer }) {
+function VenueCard({ venue, onClick, C, isDark, hideSpacer, priorityImg }) {
   const [hov, setHov] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const hasSubRooms    = venue.rooms?.length > 0;
@@ -357,12 +436,11 @@ function VenueCard({ venue, onClick, C, isDark, hideSpacer }) {
           onClick={() => {
             if (reserveEnabled) onClick(venue.id, selectedRoom ? { subRoom: selectedRoom } : {});
           }}
-          style={{ height: 220, position: "relative", overflow: "hidden", cursor: reserveEnabled ? "pointer" : "default", flexShrink: 0 }}
+          style={{ height: 220, position: "relative", overflow: "hidden", cursor: reserveEnabled ? "pointer" : "default", flexShrink: 0, background: C.surfaceEl }}
         >
-          <img src={venue.img} alt={venue.name}
-            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.55s cubic-bezier(0.25,0.46,0.45,0.94)", transform: hov ? "scale(1.06)" : "scale(1)" }} />
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,rgba(0,0,0,0)35%,rgba(0,0,0,0.72)100%)" }} />
-          <div style={{ position: "absolute", bottom: 14, left: 16, right: 16 }}>
+          <StableImage src={venue.img} alt={venue.name} hov={hov} priority={priorityImg} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,rgba(0,0,0,0)35%,rgba(0,0,0,0.72)100%)", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", bottom: 14, left: 16, right: 16, pointerEvents: "none" }}>
             <p style={{ fontFamily: FONT, fontSize: 17, fontWeight: 600, color: "#FFFFFF", margin: 0, lineHeight: 1.25, letterSpacing: "-0.2px" }}>{venue.name}</p>
           </div>
         </div>

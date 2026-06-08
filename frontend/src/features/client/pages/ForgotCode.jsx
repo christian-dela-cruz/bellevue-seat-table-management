@@ -263,10 +263,12 @@ export default function ForgotCode() {
 
   const fmtTime = (t) => {
     if (!t) return "—";
+    if (typeof t === "string" && /AM|PM/i.test(t)) return t;
     const [h, m] = String(t).split(":");
     const hr  = parseInt(h, 10) || 0;
     const hr12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
-    return `${hr12}:${m || "00"} ${hr < 12 ? "AM" : "PM"}`;
+    const min = m ? m.substring(0, 2) : "00";
+    return `${hr12}:${min} ${hr < 12 ? "AM" : "PM"}`;
   };
 
   // ── Search handler ──────────────────────────────────────────────────────────

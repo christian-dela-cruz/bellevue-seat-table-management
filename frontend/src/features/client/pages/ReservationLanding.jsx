@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import bellevueLogo from "../../../assets/bellevue-logo.png";
 import hanakazuLogo from "../../../assets/hanakazu-landing-logo.png";
@@ -442,7 +442,38 @@ function buildDiningOutletsFromConfig(rooms = []) {
   return [...mappedFallbacks, ...configuredExtras];
 }
 
-function VenueCard({ item, variant = "event", isInteractive = true }) {
+
+function StableImage({ src, alt, className, style, decoding, loading, draggable, ariaHidden, priority }) {
+  const [loaded, setLoaded] = useState(false);
+  const imgRef = useRef(null);
+
+  useEffect(() => {
+    if (imgRef.current && imgRef.current.complete) {
+      setLoaded(true);
+    }
+  }, [src]);
+
+  return (
+    <img
+      ref={imgRef}
+      src={src}
+      alt={alt || ""}
+      aria-hidden={ariaHidden}
+      className={className}
+      decoding={decoding || "async"}
+      loading={priority ? "eager" : (loading || "lazy")}
+      draggable={draggable}
+      onLoad={() => setLoaded(true)}
+      style={{
+        ...style,
+        opacity: loaded ? 1 : 0,
+        transition: "opacity 0.35s ease, filter 0.4s ease, transform 0.4s ease",
+      }}
+    />
+  );
+}
+
+function VenueCard({ item, variant = "event", isInteractive = true, index = 0 }) {
   const navigate = useNavigate();
   const disabled = item.disabled || !item.route || !isInteractive;
 
@@ -456,13 +487,13 @@ function VenueCard({ item, variant = "event", isInteractive = true }) {
       ) : (
         <>
           {item.image && (
-            <img
+            <StableImage
               src={item.image}
               alt=""
-              aria-hidden="true"
+              ariaHidden="true"
               className="reservation-card__image"
               decoding="async"
-              loading="lazy"
+              priority={variant === "dining" && index < 3}
               style={item.imageFocus ? { objectPosition: item.imageFocus } : undefined}
               draggable="false"
             />
@@ -485,7 +516,7 @@ function VenueCard({ item, variant = "event", isInteractive = true }) {
         <div className="reservation-card__brand" aria-hidden="true">
           <span className="reservation-card__logo">
             {item.logo ? (
-              <img src={item.logo} alt="" decoding="async" draggable="false" />
+              <StableImage src={item.logo} alt="" decoding="async" draggable="false" priority={variant === "dining" && index < 3} />
             ) : (
               <span>{item.mark}</span>
             )}
