@@ -1487,19 +1487,23 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
     if (mode === "whole") return selectedTable || null;
     if (selectedTable) return selectedTable;
     if (selectedSeat && tables.length) {
+      if (selectedSeat.parentTableId && selectedSeat.parentTableId !== "STANDALONE") {
+        return tables.find(t => t.id === selectedSeat.parentTableId) || null;
+      }
       return tables.find(t => t.seats && t.seats.some(s => s.id === selectedSeat.id));
     }
     return null;
   };
 
   const isStandaloneSelected = () => {
+    if (selectedSeat?.parentTableId === "STANDALONE") return true;
     if (selectedSeat && tableData?.standaloneSeats) {
       return tableData.standaloneSeats.some(s => s.id === selectedSeat.id);
     }
     return false;
   };
 
-  const handleSeatClick = (seat) => {
+  const handleSeatClick = (seat, tableId) => {
     if (!isVenueReservable) {
       alert("This venue is currently not available for online reservations.");
       return;
@@ -1513,7 +1517,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
       return;
     }
     setSelectedTable(null);
-    setSelectedSeat(seat);
+    setSelectedSeat({ ...seat, parentTableId: tableId || "STANDALONE" });
   };
 
   const handleTableClick = (table) => {

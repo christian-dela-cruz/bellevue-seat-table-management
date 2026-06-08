@@ -4266,14 +4266,14 @@ export default function SeatMap({
             ))}
             {standaloneSeats.map(s => (
               <StandaloneSeat key={`${wing}-${room}-standalone-${s.id}`} seat={s}
-                editMode={false} isSelected={selectedSeat ? selectedSeat.id === s.id : false}
+                editMode={false} isSelected={selectedSeat ? (selectedSeat.parentTableId ? selectedSeat.id === s.id && selectedSeat.parentTableId === "STANDALONE" : selectedSeat.id === s.id) : false}
                 isDragging={false} onDragStart={() => {}} onSelect={() => {}}
                 onSeatClick={mode === "individual" ? onSeatClick : undefined} T={T} />
             ))}
             {tables.map(t => (
               <TableNode key={`${wing}-${room}-table-${t.id}`} table={t}
                 editMode={false} isTableSelected={highlightedTable ? highlightedTable.id === t.id : false}
-                selectedSeatId={selectedSeat ? selectedSeat.id : null}
+                selectedSeatId={selectedSeat ? (selectedSeat.parentTableId ? (selectedSeat.parentTableId === t.id ? selectedSeat.id : null) : selectedSeat.id) : null}
                 onSelectTable={handleTableSelect} onDragStart={() => {}} onResizeStart={() => {}}
                 onSeatClick={handleSeatClick} isDragging={false} T={T} wing={wing} room={room} mode={mode} />
             ))}
