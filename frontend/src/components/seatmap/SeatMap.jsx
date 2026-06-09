@@ -1465,6 +1465,18 @@ function LeftSidebarPanel({
   const [fixturesExpanded, setFixturesExpanded] = useState(false);
   const [annotationsExpanded, setAnnotationsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState("rooms"); // "rooms" or "library"
+  
+  const [subsExpanded, setSubsExpanded] = useState({
+    tables: true,
+    chairs: true,
+    walls: true,
+    doors: true,
+    displays: true,
+    airflow: true,
+    fixtures: true,
+    labels: true
+  });
+  const toggleSub = (key) => setSubsExpanded(prev => ({ ...prev, [key]: !prev[key] }));
 
   const [wingsExpanded, setWingsExpanded] = useState(() => 
     Object.fromEntries(venueStructure.map(w => [w.id, true]))
@@ -1586,25 +1598,43 @@ function LeftSidebarPanel({
     );
   };
 
-  const SubSectionHeader = ({ title }) => (
-    <div style={{
-      fontSize: 8,
-      fontWeight: 700,
-      letterSpacing: "0.08em",
-      color: C.gold,
-      textTransform: "uppercase",
-      fontFamily: F,
-      marginTop: 8,
-      marginBottom: 6,
-      paddingLeft: 2
-    }}>{title}</div>
+  const SubSectionHeader = ({ title, isOpen, onClick }) => (
+    <div 
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginTop: 8,
+        marginBottom: 6,
+        padding: "4px 2px",
+        cursor: "pointer",
+        userSelect: "none"
+      }}
+    >
+      <span style={{ 
+        transform: isOpen ? "rotate(90deg)" : "rotate(0deg)", 
+        transition: "transform 0.15s", 
+        display: "inline-block", 
+        fontSize: 7,
+        color: C.gold
+      }}>▶</span>
+      <div style={{
+        fontSize: 8,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        color: C.gold,
+        textTransform: "uppercase",
+        fontFamily: F
+      }}>{title}</div>
+    </div>
   );
 
   return (
     <div className="sm-scroll" style={{ width: 240, flexShrink: 0, alignSelf: "stretch", background: C.sidebarBg, borderRight: `1px solid ${C.sidebarBorder}`, display: "flex", flexDirection: "column", overflowY: "auto", overflowX: "hidden", userSelect: "none" }}>
       
       {/* SEGMENTED TAB CONTROL */}
-      <div style={{ padding: "12px 14px 10px", background: C.surfaceRaised, borderBottom: `1px solid ${C.divider}` }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 10, padding: "12px 14px 10px", background: C.surfaceRaised, borderBottom: `1px solid ${C.divider}` }}>
         <div style={{ display: "flex", background: "rgba(0,0,0,0.04)", borderRadius: 8, padding: 3, border: `1px solid ${C.borderDefault}` }}>
           <button 
             onClick={() => setActiveTab("rooms")}
@@ -1754,7 +1784,8 @@ function LeftSidebarPanel({
                 <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.divider}` }}>
                   {filteredTables.length > 0 && (
                     <div>
-                      <SubSectionHeader title="Table Presets" />
+                      <SubSectionHeader title="Table Presets" isOpen={searchQuery || subsExpanded.tables} onClick={() => toggleSub("tables")} />
+                      {(searchQuery || subsExpanded.tables) && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                         {filteredTables.map(preset => (
                           <button 
@@ -1777,12 +1808,14 @@ function LeftSidebarPanel({
                           </button>
                         ))}
                       </div>
+                      )}
                     </div>
                   )}
 
                   {filteredChairs.length > 0 && (
                     <div style={{ marginTop: filteredTables.length > 0 ? 6 : 0 }}>
-                      <SubSectionHeader title="Standalone Chairs" />
+                      <SubSectionHeader title="Standalone Chairs" isOpen={searchQuery || subsExpanded.chairs} onClick={() => toggleSub("chairs")} />
+                      {(searchQuery || subsExpanded.chairs) && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                         {filteredChairs.map(preset => (
                           <button 
@@ -1805,6 +1838,7 @@ function LeftSidebarPanel({
                           </button>
                         ))}
                       </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1825,7 +1859,8 @@ function LeftSidebarPanel({
                 <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.divider}` }}>
                   {filteredWalls.length > 0 && (
                     <div>
-                      <SubSectionHeader title="Walls &amp; Dividers" />
+                      <SubSectionHeader title="Walls &amp; Dividers" isOpen={searchQuery || subsExpanded.walls} onClick={() => toggleSub("walls")} />
+                      {(searchQuery || subsExpanded.walls) && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                         {filteredWalls.map(preset => (
                           <button 
@@ -1848,12 +1883,14 @@ function LeftSidebarPanel({
                           </button>
                         ))}
                       </div>
+                      )}
                     </div>
                   )}
 
                   {filteredDoors.length > 0 && (
                     <div style={{ marginTop: filteredWalls.length > 0 ? 6 : 0 }}>
-                      <SubSectionHeader title="Doors &amp; Openings" />
+                      <SubSectionHeader title="Doors &amp; Openings" isOpen={searchQuery || subsExpanded.doors} onClick={() => toggleSub("doors")} />
+                      {(searchQuery || subsExpanded.doors) && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                         {filteredDoors.map(preset => (
                           <button 
@@ -1876,6 +1913,7 @@ function LeftSidebarPanel({
                           </button>
                         ))}
                       </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1896,7 +1934,8 @@ function LeftSidebarPanel({
                 <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.divider}` }}>
                   {filteredDisplays.length > 0 && (
                     <div>
-                      <SubSectionHeader title="Displays &amp; TVs" />
+                      <SubSectionHeader title="Displays &amp; TVs" isOpen={searchQuery || subsExpanded.displays} onClick={() => toggleSub("displays")} />
+                      {(searchQuery || subsExpanded.displays) && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                         {filteredDisplays.map(preset => (
                           <button 
@@ -1919,12 +1958,14 @@ function LeftSidebarPanel({
                           </button>
                         ))}
                       </div>
+                      )}
                     </div>
                   )}
 
                   {filteredAirflow.length > 0 && (
                     <div style={{ marginTop: filteredDisplays.length > 0 ? 6 : 0 }}>
-                      <SubSectionHeader title="Airflow &amp; Cooling" />
+                      <SubSectionHeader title="Airflow &amp; Cooling" isOpen={searchQuery || subsExpanded.airflow} onClick={() => toggleSub("airflow")} />
+                      {(searchQuery || subsExpanded.airflow) && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                         {filteredAirflow.map(preset => (
                           <button 
@@ -1947,12 +1988,14 @@ function LeftSidebarPanel({
                           </button>
                         ))}
                       </div>
+                      )}
                     </div>
                   )}
 
                   {filteredFixtures.length > 0 && (
                     <div style={{ marginTop: (filteredDisplays.length > 0 || filteredAirflow.length > 0) ? 6 : 0 }}>
-                      <SubSectionHeader title="General Fixtures" />
+                      <SubSectionHeader title="General Fixtures" isOpen={searchQuery || subsExpanded.fixtures} onClick={() => toggleSub("fixtures")} />
+                      {(searchQuery || subsExpanded.fixtures) && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 180, overflowY: "auto" }} className="sm-scroll">
                         {filteredFixtures.map(preset => (
                           <button 
@@ -1975,6 +2018,7 @@ function LeftSidebarPanel({
                           </button>
                         ))}
                       </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1994,7 +2038,8 @@ function LeftSidebarPanel({
               {isAnnotationsOpen && (
                 <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
                   <div>
-                    <SubSectionHeader title="Labels &amp; Markers" />
+                    <SubSectionHeader title="Labels &amp; Markers" isOpen={searchQuery || subsExpanded.labels} onClick={() => toggleSub("labels")} />
+                    {(searchQuery || subsExpanded.labels) && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                       {filteredLabels.map(preset => (
                         <button 
@@ -2017,6 +2062,7 @@ function LeftSidebarPanel({
                         </button>
                       ))}
                     </div>
+                    )}
                   </div>
                 </div>
               )}

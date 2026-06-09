@@ -491,7 +491,7 @@ export default function Sidebar({
         overflow: "visible",
         boxShadow: "4px 0 18px rgba(55,39,17,0.026)",
         position: "relative",
-        zIndex: 5,
+        zIndex: 100,
       }}
     >
       <style>{`
