@@ -8,6 +8,7 @@ use App\Http\Controllers\VenueController;
 use App\Http\Controllers\Admin\AdminReservationController;
 use App\Http\Controllers\Admin\AdminAccountController;
 use App\Http\Controllers\Admin\AdminReportController;
+use App\Http\Controllers\EventController;
 use App\Http\Controllers\Client\ClientReservationController;
 use App\Http\Middleware\AdminAccess;
 
@@ -60,6 +61,20 @@ Route::prefix('admin/reports')->group(function () {
 Route::prefix('admin/notifications')->group(function () {
     Route::get('/acknowledgments', [AdminReservationController::class, 'acknowledgments'])->middleware(AdminAccess::class . ':view_admin');
     Route::post('/acknowledgments', [AdminReservationController::class, 'acknowledgeNotification'])->middleware(AdminAccess::class . ':acknowledge_notifications');
+});
+
+// Admin Event routes
+Route::prefix('admin/events')->group(function () {
+    Route::get('/', [EventController::class, 'index'])->middleware(AdminAccess::class . ':manage_venues');
+    Route::post('/', [EventController::class, 'store'])->middleware(AdminAccess::class . ':manage_venues');
+    Route::put('/{event}', [EventController::class, 'update'])->middleware(AdminAccess::class . ':manage_venues');
+    Route::delete('/{event}', [EventController::class, 'destroy'])->middleware(AdminAccess::class . ':manage_venues');
+});
+
+// Public Event routes
+Route::prefix('events')->group(function () {
+    Route::get('/', [EventController::class, 'index']);
+    Route::get('/{slug}', [EventController::class, 'show']);
 });
 
 // Venue routes

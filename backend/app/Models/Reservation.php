@@ -14,6 +14,7 @@ class Reservation extends Model
         'email',
         'phone',
         'venue_id',
+        'event_id',
         'room',
         'table_number',
         'seat_number',
@@ -107,6 +108,11 @@ class Reservation extends Model
     public function venue(): BelongsTo
     {
         return $this->belongsTo(Venue::class);
+    }
+
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(Event::class);
     }
 
     public function assignedRoom(): BelongsTo

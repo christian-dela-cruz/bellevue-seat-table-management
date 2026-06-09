@@ -12,6 +12,8 @@ import AccountSettings from "../features/admin/pages/AccountSettings";
 import Reports from "../features/admin/pages/Reports";
 import OutletDashboard from "../features/admin/pages/OutletDashboard";
 import FunctionRooms from "../features/admin/pages/FunctionRooms";
+import EventManagement from "../features/admin/pages/EventManagement";
+import EventBooking from "../features/client/pages/EventBooking";
 import ForgotCode from "../features/client/pages/ForgotCode";
 import LoginPage from "../features/auth/pages/LoginPage";
 import { authAPI } from "../services/authAPI";
@@ -155,6 +157,14 @@ export default function AppRoutes() {
           }
         />
         <Route
+          path="/admin/events"
+          element={
+            <RequireAdminAuth permission="manage_venues">
+              <EventManagement />
+            </RequireAdminAuth>
+          }
+        />
+        <Route
           path="/admin/outlets/:outletSlug"
           element={
             <RequireAdminAuth permission="view_outlet_reports">
@@ -164,6 +174,7 @@ export default function AppRoutes() {
         />
         <Route path="/forgot-code" element={<ForgotCode />} />  
         <Route path="/login" element={<LoginPage />} />  
+        <Route path="/events/:slug" element={<EventBooking />} />
         <Route path="/:venueSlug" element={<DynamicVenueReservation />} />
 
       </Routes>

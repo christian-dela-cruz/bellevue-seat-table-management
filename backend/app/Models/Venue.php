@@ -59,6 +59,11 @@ class Venue extends Model
         return $this->hasMany(Venue::class, 'parent_id')->orderBy('display_order')->orderBy('name');
     }
 
+    public function events(): HasMany
+    {
+        return $this->hasMany(Event::class);
+    }
+
     public function reservations(): HasMany
     {
         return $this->hasMany(Reservation::class);
