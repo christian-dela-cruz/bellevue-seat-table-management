@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronRight as ChevronRightIcon, Search, UserPlus, X } from "lucide-react";
+import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronRight as ChevronRightIcon, Search, UserPlus, X, AlertTriangle } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
@@ -1191,7 +1191,7 @@ export default function Accounts() {
               <section className="account-confirm" role="dialog" aria-modal="true" aria-labelledby="discard-changes-title" style={{ width: "min(420px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", padding: 20 }}>
                 <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}>
                   <span style={{ width: 38, height: 38, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: C.redFaint, color: C.red }}>
-                    <X size={18} />
+                    <AlertTriangle size={18} />
                   </span>
                   <div>
                     <h2 id="discard-changes-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 650 }}>Discard unsaved changes?</h2>

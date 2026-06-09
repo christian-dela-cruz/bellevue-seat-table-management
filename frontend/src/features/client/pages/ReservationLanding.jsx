@@ -644,8 +644,18 @@ export default function ReservationLanding() {
             </div>
 
             <div 
-              className="reservation-grid reservation-grid--dining"
-              style={displaySettings.dining?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.dining.desktop_columns}, minmax(0, 1fr))` } : undefined}
+              className={`reservation-grid reservation-grid--dining ${displaySettings.dining?.layout_engine === 'flex' ? 'reservation-grid--flex' : ''}`}
+              style={
+                displaySettings.dining?.layout_engine === 'flex'
+                ? {
+                    display: "flex",
+                    flexWrap: "wrap",
+                    justifyContent: displaySettings.dining.flex_alignment || "center",
+                    "--card-width": `${displaySettings.dining.card_width || 240}px`,
+                    "--card-stretch": displaySettings.dining.stretch_to_fill ? "1" : "0"
+                  }
+                : (displaySettings.dining?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.dining.desktop_columns}, minmax(0, 1fr))` } : undefined)
+              }
             >
               {diningOutlets.map((outlet) => (
                 <VenueCard key={outlet.title} item={outlet} variant="dining" />
@@ -662,8 +672,18 @@ export default function ReservationLanding() {
             </div>
 
             <div 
-              className="reservation-grid reservation-grid--events"
-              style={displaySettings.events?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.events.desktop_columns}, minmax(0, 1fr))` } : undefined}
+              className={`reservation-grid reservation-grid--events ${displaySettings.events?.layout_engine === 'flex' ? 'reservation-grid--flex' : ''}`}
+              style={
+                displaySettings.events?.layout_engine === 'flex'
+                ? {
+                    display: "flex",
+                    flexWrap: "wrap",
+                    justifyContent: displaySettings.events.flex_alignment || "center",
+                    "--card-width": `${displaySettings.events.card_width || 240}px`,
+                    "--card-stretch": displaySettings.events.stretch_to_fill ? "1" : "0"
+                  }
+                : (displaySettings.events?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.events.desktop_columns}, minmax(0, 1fr))` } : undefined)
+              }
             >
               {eventVenues === null ? (
                 <div className="reservation-empty-state">
@@ -1155,6 +1175,12 @@ export default function ReservationLanding() {
           grid-template-columns: repeat(3, minmax(0, 1fr));
           grid-auto-rows: clamp(170px, 15vh, 220px);
           min-height: 0;
+        }
+
+        .reservation-grid--flex .reservation-card {
+          width: var(--card-width, auto);
+          max-width: 100%;
+          flex-grow: var(--card-stretch, 0);
         }
 
         .reservation-card {
@@ -1695,17 +1721,20 @@ export default function ReservationLanding() {
             min-height: 420px;
           }
 
-          .reservation-grid--dining,
           .reservation-grid--events {
             height: auto;
+          }
+
+          .reservation-grid--events {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
           .reservation-grid--dining {
             grid-template-columns: repeat(3, minmax(0, 1fr));
           }
 
-          .reservation-grid--events {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+          .reservation-card--dining {
+            aspect-ratio: 4 / 3;
           }
 
           .reservation-card--event {
@@ -1768,7 +1797,6 @@ export default function ReservationLanding() {
             gap: 7px;
           }
 
-          .reservation-grid--dining,
           .reservation-grid--events {
             grid-template-columns: 1fr;
           }
@@ -1777,13 +1805,7 @@ export default function ReservationLanding() {
             aspect-ratio: 1.62 / 1;
           }
 
-          .reservation-grid--dining {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
 
-          .reservation-card--dining {
-            aspect-ratio: 4 / 3;
-          }
         }
 
         @media (max-width: 460px) {

@@ -21,7 +21,8 @@ import {
   Wand2,
   Grid,
   Monitor,
-  RotateCcw
+  RotateCcw,
+  AlertTriangle
 } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
@@ -1007,6 +1008,7 @@ export default function FunctionRooms() {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [expandedParents, setExpandedParents] = useState(() => new Set());
   const [pendingLayoutChanges, setPendingLayoutChanges] = useState({});
+  const [pendingSettingsChanges, setPendingSettingsChanges] = useState({});
   const [layoutFeedback, setLayoutFeedback] = useState(null);
   
   // View Modes & Grid config
@@ -1138,10 +1140,17 @@ export default function FunctionRooms() {
     if (oldIndex !== -1 && newIndex !== -1) {
       const newArray = arrayMove(list, oldIndex, newIndex);
       
+      // We must preserve the existing global display_order slots for this subset
+      // rather than blindly assigning 1, 2, 3... which would overwrite and collide with other venues.
+      const availableSlots = list
+        .map(v => v._original?.display_order || 0)
+        .sort((a, b) => a - b);
+      
       const updates = [];
       newArray.forEach((item, idx) => {
-        if (item._original && item._original.display_order !== idx + 1) {
-           updates.push({ id: item._original.id, display_order: idx + 1 });
+        const targetOrder = availableSlots[idx];
+        if (item._original && item._original.display_order !== targetOrder) {
+           updates.push({ id: item._original.id, display_order: targetOrder });
         }
       });
       
@@ -1182,11 +1191,24 @@ export default function FunctionRooms() {
     setSaving(true);
     setError("");
     try {
+      const promises = [];
+      
       const updates = Object.entries(pendingLayoutChanges).map(([id, changes]) => {
         return venueAPI.update(id, changes);
       });
-      await Promise.all(updates);
+      promises.push(...updates);
+
+      if (Object.keys(pendingSettingsChanges).length > 0) {
+        for (const [section, changes] of Object.entries(pendingSettingsChanges)) {
+          const newSettings = clientSettings[section] || {};
+          promises.push(clientDisplayAPI.updateSection(section, newSettings));
+        }
+      }
+
+      await Promise.all(promises);
+      
       setPendingLayoutChanges({});
+      setPendingSettingsChanges({});
       await loadRooms();
       notifyVenueConfigUpdated();
       setLayoutFeedback({ type: "save_success" });
@@ -1201,20 +1223,19 @@ export default function FunctionRooms() {
   const cancelLayoutChanges = () => {
     if (!canManage) return;
     setPendingLayoutChanges({});
+    setPendingSettingsChanges({});
     loadRooms(); // Reload to revert optimistic UI state
     setLayoutFeedback({ type: "cancel_success" });
   };
 
-  const updateClientSetting = async (section, key, value) => {
+  const updateClientSetting = (section, key, value) => {
     const newSettings = { ...(clientSettings[section] || {}), [key]: value };
     setClientSettings(prev => ({ ...prev, [section]: newSettings }));
-    try {
-      await clientDisplayAPI.updateSection(section, newSettings);
-      notifyVenueConfigUpdated();
-    } catch (err) {
-      console.error(err);
-      setError("Failed to save grid configuration.");
-    }
+    
+    setPendingSettingsChanges(prev => ({
+      ...prev,
+      [section]: { ...(prev[section] || {}), [key]: value }
+    }));
   };
 
   const handleGridAutoResize = (section) => {
@@ -1887,10 +1908,14 @@ export default function FunctionRooms() {
     try {
       if (confirmAction.type === "delete") {
         await venueAPI.delete(confirmAction.room.id);
+        const deletedRoomName = confirmAction.room.display_name || confirmAction.room.name;
         setConfirmAction(null);
         await loadRooms();
         notifyVenueConfigUpdated();
-        setToast("Venue deleted.");
+        setSaveFeedback({
+          type: "delete",
+          venueName: deletedRoomName,
+        });
       } else if (confirmAction.type === "save" || confirmAction.type === "save_draft") {
         const isDraft = confirmAction.type === "save_draft";
         const payload = {
@@ -2313,6 +2338,7 @@ export default function FunctionRooms() {
                 {["dining", "events"].map(section => {
                   const title = section === "dining" ? "Dining Outlets" : "Event Venues";
                   const settings = clientSettings[section] || { desktop_columns: 3 };
+                  const layoutEngine = settings.layout_engine || "grid";
                   const list = section === "dining" ? diningOrderedVenues : eventOrderedVenues;
                   
                   return (
@@ -2328,60 +2354,139 @@ export default function FunctionRooms() {
                           </div>
 
                           <div style={{ marginBottom: 24 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                              <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Desktop Columns</label>
-                              <span style={{ fontSize: 12, color: C.muted }}>{settings.desktop_columns} Columns</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="1" max="6"
-                              value={settings.desktop_columns}
-                              onChange={(e) => updateClientSetting(section, 'desktop_columns', parseInt(e.target.value))}
-                              style={{ width: "100%", accentColor: C.gold }}
-                            />
+                            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 12 }}>Layout Engine</label>
+                            <select
+                              value={layoutEngine}
+                              onChange={(e) => updateClientSetting(section, 'layout_engine', e.target.value)}
+                              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 13, outline: "none", cursor: "pointer" }}
+                            >
+                              <option value="grid">Standard Grid (Default)</option>
+                              <option value="flex">Advanced Flexbox</option>
+                            </select>
+                            <p style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>
+                              {layoutEngine === "grid" ? "Strict grid layout defined by column count." : "Dynamic layout with strict card sizing and auto-wrapping."}
+                            </p>
                           </div>
 
-                          <button 
-                            onClick={() => handleGridAutoResize(section)}
-                            style={{
-                              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                              width: "100%", padding: "10px", borderRadius: 8,
-                              background: C.goldFaint, color: C.gold,
-                              border: `1px solid rgba(140,107,42,0.2)`,
-                              fontSize: 13, fontWeight: 600, cursor: "pointer",
-                              transition: "background 0.2s"
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(140,107,42,0.12)'}
-                            onMouseLeave={e => e.currentTarget.style.background = C.goldFaint}
-                          >
-                            <Wand2 size={16} /> Auto Resize Grid
-                          </button>
-                          <p style={{ fontSize: 11.5, color: C.muted, marginTop: 12, lineHeight: 1.45 }}>
-                            Click to automatically set the ideal number of columns based on how many venues are visible.
-                          </p>
+                          {layoutEngine === "grid" ? (
+                            <>
+                              <div style={{ marginBottom: 24 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                                  <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Desktop Columns</label>
+                                  <span style={{ fontSize: 12, color: C.muted }}>{settings.desktop_columns} Columns</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="1" max="6"
+                                  value={settings.desktop_columns}
+                                  onChange={(e) => updateClientSetting(section, 'desktop_columns', parseInt(e.target.value))}
+                                  style={{ width: "100%", accentColor: C.gold }}
+                                />
+                              </div>
+
+                              <button 
+                                onClick={() => handleGridAutoResize(section)}
+                                style={{
+                                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                  width: "100%", padding: "10px", borderRadius: 8,
+                                  background: C.goldFaint, color: C.gold,
+                                  border: `1px solid rgba(140,107,42,0.2)`,
+                                  fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                  transition: "background 0.2s"
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(140,107,42,0.12)'}
+                                onMouseLeave={e => e.currentTarget.style.background = C.goldFaint}
+                              >
+                                <Wand2 size={16} /> Auto Resize Grid
+                              </button>
+                              <p style={{ fontSize: 11.5, color: C.muted, marginTop: 12, lineHeight: 1.45 }}>
+                                Click to automatically set the ideal number of columns based on how many venues are visible.
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <div style={{ marginBottom: 24 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                                  <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Card Width</label>
+                                  <span style={{ fontSize: 12, color: C.muted }}>{settings.card_width || 240}px</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="150" max="600" step="10"
+                                  value={settings.card_width || 240}
+                                  onChange={(e) => updateClientSetting(section, 'card_width', parseInt(e.target.value))}
+                                  style={{ width: "100%", accentColor: C.gold }}
+                                />
+                              </div>
+
+                              <div style={{ marginBottom: 24 }}>
+                                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                                  <input 
+                                    type="checkbox"
+                                    checked={settings.stretch_to_fill || false}
+                                    onChange={(e) => updateClientSetting(section, 'stretch_to_fill', e.target.checked)}
+                                    style={{ accentColor: C.gold, width: 16, height: 16 }}
+                                  />
+                                  <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Stretch to Fill</span>
+                                </label>
+                                <p style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.45, marginLeft: 26 }}>
+                                  Cards will stretch wider than the base width to fill any remaining horizontal space perfectly.
+                                </p>
+                              </div>
+
+                              <div style={{ marginBottom: 24 }}>
+                                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 12 }}>Row Alignment</label>
+                                <select
+                                  value={settings.flex_alignment || "center"}
+                                  onChange={(e) => updateClientSetting(section, 'flex_alignment', e.target.value)}
+                                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 13, outline: "none", cursor: "pointer" }}
+                                >
+                                  <option value="center">Center</option>
+                                  <option value="flex-start">Left</option>
+                                  <option value="flex-end">Right</option>
+                                </select>
+                              </div>
+                            </>
+                          )}
                         </div>
 
                         {/* Live Preview Area */}
                         <div style={{ background: C.surface, padding: 32, borderRadius: 12, border: `1px solid ${C.border}` }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
                             <Monitor size={18} color={C.muted} />
-                            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: C.text }}>Visual Live Preview</h3>
+                            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: C.text }}>Visual Live Preview {section === "dining" && "(Auto-Stretching Row)"}</h3>
                           </div>
 
                           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleGridDragEnd(e, section)}>
                             <SortableContext items={list.map(v => v.title)} strategy={rectSortingStrategy}>
                               <div 
                                 className={`reservation-grid reservation-grid--${section === "events" ? "events" : "dining"}`}
-                                style={{
-                                  display: "grid",
-                                  gap: "clamp(14px, 1.25vw, 24px)",
-                                  gridTemplateColumns: `repeat(${settings.desktop_columns}, minmax(0, 1fr))`,
-                                  background: "#fffaf1",
-                                  padding: 32,
-                                  borderRadius: 16,
-                                  border: "1px solid rgba(0,0,0,0.05)",
-                                  boxShadow: "inset 0 2px 20px rgba(0,0,0,0.02)"
-                                }}
+                                style={
+                                  layoutEngine === "flex"
+                                  ? {
+                                      display: "flex",
+                                      flexWrap: "wrap",
+                                      justifyContent: settings.flex_alignment || "center",
+                                      gap: "clamp(14px, 1.25vw, 24px)",
+                                      background: "#fffaf1",
+                                      padding: 32,
+                                      borderRadius: 16,
+                                      border: "1px solid rgba(0,0,0,0.05)",
+                                      boxShadow: "inset 0 2px 20px rgba(0,0,0,0.02)",
+                                      "--card-width": `${settings.card_width || 240}px`,
+                                      "--card-stretch": settings.stretch_to_fill ? "1" : "0"
+                                    }
+                                  : {
+                                      display: "grid",
+                                      gap: "clamp(14px, 1.25vw, 24px)",
+                                      gridTemplateColumns: `repeat(${settings.desktop_columns}, minmax(0, 1fr))`,
+                                      background: "#fffaf1",
+                                      padding: 32,
+                                      borderRadius: 16,
+                                      border: "1px solid rgba(0,0,0,0.05)",
+                                      boxShadow: "inset 0 2px 20px rgba(0,0,0,0.02)"
+                                    }
+                                }
                               >
                                 {list.map((v) => {
                                   const isHidden = v._original ? !v._original.show_on_landing : false;
@@ -2427,9 +2532,16 @@ export default function FunctionRooms() {
               }
               .reservation-card--dining {
                 aspect-ratio: 4 / 3;
+                width: var(--card-width, auto);
+                max-width: 100%;
+                flex-grow: var(--card-stretch, 0);
               }
               .reservation-card--event {
                 min-height: 140px;
+                aspect-ratio: 1.7 / 1;
+                width: var(--card-width, auto);
+                max-width: 100%;
+                flex-grow: var(--card-stretch, 0);
               }
               .reservation-card__image {
                 position: absolute;
@@ -2510,7 +2622,7 @@ export default function FunctionRooms() {
         </main>
       </div>
 
-      {Object.keys(pendingLayoutChanges).length > 0 && (
+      {(Object.keys(pendingLayoutChanges).length > 0 || Object.keys(pendingSettingsChanges).length > 0) && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 6000, background: C.surface, border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 24px", display: "flex", alignItems: "center", gap: 16, boxShadow: "0 12px 40px rgba(201,168,76,0.2)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: "50%", background: "rgba(201,168,76,0.15)", color: C.gold }}>
@@ -3033,7 +3145,7 @@ export default function FunctionRooms() {
           <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="discard-changes-title" style={{ width: "min(420px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", padding: 20 }}>
             <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}>
               <span style={{ width: 38, height: 38, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: C.redFaint, color: C.red }}>
-                <X size={18} />
+                <AlertTriangle size={18} />
               </span>
               <div>
                 <h2 id="discard-changes-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 650 }}>Discard unsaved changes?</h2>
@@ -3079,26 +3191,28 @@ export default function FunctionRooms() {
         <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSuccessAndDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 8200, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
           <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="save-feedback-title" style={{ width: "min(460px, 100%)", borderRadius: 14, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 24px 60px rgba(24,20,14,0.18)", padding: "26px 28px" }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 12 }}>
-              <span style={{ width: 44, height: 44, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, rgba(46,122,90,0.08), rgba(46,122,90,0.15))", color: C.green }}>
-                <CheckCircle2 size={24} />
+              <span style={{ width: 44, height: 44, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", background: (saveFeedback.type === "delete" || saveFeedback.type === "draft_deleted") ? "linear-gradient(135deg, rgba(160,56,56,0.08), rgba(160,56,56,0.15))" : "linear-gradient(135deg, rgba(46,122,90,0.08), rgba(46,122,90,0.15))", color: (saveFeedback.type === "delete" || saveFeedback.type === "draft_deleted") ? C.red : C.green }}>
+                {(saveFeedback.type === "delete" || saveFeedback.type === "draft_deleted") ? <Trash2 size={24} /> : <CheckCircle2 size={24} />}
               </span>
               <div>
                 <h2 id="save-feedback-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 700, fontFamily: F.label, letterSpacing: "-0.01em" }}>
                   {saveFeedback.type === "create" ? "Venue Created" 
                    : saveFeedback.type === "update" ? "Venue Updated"
                    : saveFeedback.type === "draft_saved" ? "Draft Saved"
+                   : saveFeedback.type === "delete" ? "Venue Deleted"
                    : "Draft Deleted"}
                 </h2>
                 <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.5, color: C.muted }}>
                   {saveFeedback.type === "draft_saved" 
                    ? "Your draft has been saved. It is hidden from the client view until you publish it."
-                   : saveFeedback.type === "draft_deleted"
-                   ? "The drafted venue has been completely deleted."
+                   : saveFeedback.type === "draft_deleted" || saveFeedback.type === "delete"
+                   ? "The venue has been completely removed from the system."
                    : "Changes have been saved successfully and are now reflected in the venue directory."}
                 </p>
               </div>
             </div>
 
+            {saveFeedback.type !== "delete" && saveFeedback.type !== "draft_deleted" && (
             <div style={{ marginTop: 22, display: "grid", gap: 14, padding: "16px 0", borderTop: `1px solid ${C.divider}`, borderBottom: `1px solid ${C.divider}` }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 20px" }}>
                 <div>
@@ -3142,6 +3256,7 @@ export default function FunctionRooms() {
                 </div>
               </div>
             </div>
+            )}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 22 }}>
               <button

@@ -16,6 +16,18 @@ class VenueStoreRequest extends FormRequest
     }
 
     /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (empty($this->slug) && $this->name) {
+            $this->merge([
+                'slug' => \Illuminate\Support\Str::slug($this->name),
+            ]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
@@ -27,7 +39,7 @@ class VenueStoreRequest extends FormRequest
         return [
             'parent_id' => 'nullable|exists:venues,id',
             'name' => 'required|string|max:255',
-            'slug' => ['nullable', 'string', 'max:255', Rule::unique('venues', 'slug')->where('is_archived', false)],
+            'slug' => ['nullable', 'string', 'max:255', Rule::unique('venues', 'slug')],
             'display_name' => 'nullable|string|max:255',
             'wing' => $isDraft ? 'nullable|string|max:255' : 'required|string|max:255',
             'type' => $isDraft ? 'nullable|string|max:255' : 'required|string|max:255',

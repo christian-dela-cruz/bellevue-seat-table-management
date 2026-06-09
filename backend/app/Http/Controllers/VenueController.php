@@ -176,10 +176,16 @@ class VenueController extends Controller
         try {
             $isDraft = $request->input('is_draft', false);
 
+            if (empty($request->slug) && $request->name) {
+                $request->merge([
+                    'slug' => Str::slug($request->name),
+                ]);
+            }
+
             $validated = $request->validate([
                 'parent_id' => 'sometimes|nullable|exists:venues,id',
                 'name' => 'sometimes|required|string|max:255',
-                'slug' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('venues', 'slug')->ignore($id)->where('is_archived', false)],
+                'slug' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('venues', 'slug')->ignore($id)],
                 'display_name' => 'sometimes|nullable|string|max:255',
                 'wing' => $isDraft ? 'sometimes|nullable|string|max:255' : 'sometimes|required|string|max:255',
                 'type' => $isDraft ? 'sometimes|nullable|string|max:255' : 'sometimes|required|string|max:255',
