@@ -344,9 +344,9 @@ function uniqueConfiguredRooms(rooms = []) {
   return Array.from(byKey.values());
 }
 
-export function buildEventVenuesFromConfig(rooms = []) {
+export function buildEventVenuesFromConfig(rooms = [], options = {}) {
   const visible = uniqueConfiguredRooms(rooms)
-    .filter((room) => room.type === "function_room" && room.is_active && room.is_visible && !isArchivedRoom(room))
+    .filter((room) => room.type === "function_room" && room.is_active && room.is_visible && !room.is_draft && !isArchivedRoom(room))
     .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0) || String(a.name).localeCompare(String(b.name)));
 
   const parentKeyById = new Map();
@@ -369,68 +369,34 @@ export function buildEventVenuesFromConfig(rooms = []) {
   });
 
   return visible
-    .filter((room) => !room.parent_id && room.show_on_landing && !knownChildParentKey(room))
+    .filter((room) => !room.parent_id && (options.ignoreVisibility || room.show_on_landing) && !knownChildParentKey(room))
     .map((room) => {
       const parentKey = knownParentKey(room) || canonicalRoomName(room.display_name || room.name);
       const children = (byParent.get(parentKey) || [])
         .filter((child) => Number(child.id) !== Number(room.id))
-        .filter((child) => child.is_active && child.is_visible && child.reservations_enabled)
+        .filter((child) => child.is_active && child.is_visible && child.reservations_enabled && !child.is_draft)
         .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0));
       return {
         title: room.display_name || room.name,
         image: resolveRoomImage(room.image),
         route: roomRoute(room),
-        disabled: !(room.is_active && room.is_visible && room.reservations_enabled),
+        disabled: !(room.is_active && room.is_visible && room.reservations_enabled && !room.is_draft),
         imageFocus: room.image_position || "center 50%",
         rooms: [], // Do NOT show child/subrooms as selectable links
+        _original: room,
       };
     });
 }
 
-export function buildDiningOutletsFromConfig(rooms = []) {
+export function buildDiningOutletsFromConfig(rooms = [], options = {}) {
   const configuredDining = uniqueConfiguredRooms(rooms)
     .filter((room) => room.type === "dining" && !room.parent_id && !isArchivedRoom(room))
     .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0) || String(a.name).localeCompare(String(b.name)));
 
   if (!configuredDining.length) return fallbackDiningOutlets;
 
-  const configuredByKey = new Map();
-  configuredDining.forEach((room) => {
-    const keys = [
-      diningKey(room),
-      canonicalRoomName(room.display_name || room.name),
-      canonicalRoomName(room.name),
-      canonicalRoomName(room.slug),
-      canonicalRoomName(String(room.slug || "").replace(/-/g, " ")),
-      canonicalRoomName(room.reservation_route),
-    ].filter(Boolean);
-    keys.forEach((key) => configuredByKey.set(key, room));
-  });
-
-  const usedIds = new Set();
-  const mappedFallbacks = fallbackDiningOutlets
-    .map((outlet) => {
-      const outletKey = diningAliases[canonicalRoomName(outlet.title)] || canonicalRoomName(outlet.title);
-      const match = configuredByKey.get(outletKey)
-        || configuredByKey.get(canonicalRoomName(outlet.title))
-        || configuredByKey.get(canonicalRoomName(outlet.route));
-      if (!match) return null;
-      usedIds.add(match.id);
-      if (!match.is_active || !match.is_visible || !match.show_on_landing) return null;
-      return {
-        title: match.display_name || outlet.title,
-        route: match.reservations_enabled ? roomRoute(match) : null,
-        disabled: !match.reservations_enabled,
-        logo: resolveDiningLogo(match) || outlet.logo,
-        mark: match.display_name || outlet.mark,
-        image: match.image ? resolveRoomImage(match.image) : null,
-      };
-    })
-    .filter(Boolean);
-
-  const configuredExtras = configuredDining
-    .filter((room) => !usedIds.has(room.id))
-    .filter((room) => room.is_active && room.is_visible && room.show_on_landing)
+  return configuredDining
+    .filter((room) => room.is_active && room.is_visible && !room.is_draft && (options.ignoreVisibility || room.show_on_landing))
     .map((room) => ({
       title: room.display_name || room.name,
       route: room.reservations_enabled ? roomRoute(room) : null,
@@ -438,9 +404,8 @@ export function buildDiningOutletsFromConfig(rooms = []) {
       logo: resolveDiningLogo(room),
       mark: room.display_name || room.name,
       image: room.image ? resolveRoomImage(room.image) : null,
+      _original: room,
     }));
-
-  return [...mappedFallbacks, ...configuredExtras];
 }
 
 
@@ -590,32 +555,6 @@ export default function ReservationLanding() {
 
           let dining = buildDiningOutletsFromConfig(venueRows);
           let events = buildEventVenuesFromConfig(venueRows);
-
-          const ds = settingsMap.dining;
-          if (ds?.hidden_ids) dining = dining.filter(d => !ds.hidden_ids.includes(d.title));
-          if (ds?.ordered_ids) {
-            dining.sort((a, b) => {
-              const idxA = ds.ordered_ids.indexOf(a.title);
-              const idxB = ds.ordered_ids.indexOf(b.title);
-              if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-              if (idxA !== -1) return -1;
-              if (idxB !== -1) return 1;
-              return 0;
-            });
-          }
-
-          const es = settingsMap.events;
-          if (es?.hidden_ids) events = events.filter(e => !es.hidden_ids.includes(e.title));
-          if (es?.ordered_ids) {
-            events.sort((a, b) => {
-              const idxA = es.ordered_ids.indexOf(a.title);
-              const idxB = es.ordered_ids.indexOf(b.title);
-              if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-              if (idxA !== -1) return -1;
-              if (idxB !== -1) return 1;
-              return 0;
-            });
-          }
 
           setDiningOutlets(dining);
           setEventVenues(events);

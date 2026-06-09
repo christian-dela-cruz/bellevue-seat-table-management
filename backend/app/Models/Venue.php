@@ -32,6 +32,7 @@ class Venue extends Model
         'reservation_route',
         'image_position',
         'metadata',
+        'is_draft',
     ];
 
     protected $casts = [
@@ -45,6 +46,7 @@ class Venue extends Model
         'child_selectable' => 'boolean',
         'price_per_hour' => 'decimal:2',
         'metadata' => 'array',
+        'is_draft' => 'boolean',
     ];
 
     public function parent(): BelongsTo

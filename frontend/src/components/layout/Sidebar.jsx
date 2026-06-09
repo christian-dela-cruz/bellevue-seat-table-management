@@ -39,7 +39,6 @@ const NAV_GROUPS = [
       { id: "outlets", label: "Outlet Dashboard", icon: LayoutDashboard, iconStyle: "lucide", permission: "view_outlet_reports" },
       { id: "seat-map", label: "Seat Map", icon: Map, iconStyle: "lucide", permission: "manage_seat_maps" },
       { id: "function-rooms", label: "Venue Management", icon: Building2, iconStyle: "lucide", permission: "manage_venues" },
-      { id: "client-display", label: "Client Page Display", icon: LayoutTemplate, iconStyle: "lucide", permission: "manage_venues" },
     ],
   },
   {
@@ -68,7 +67,6 @@ const NAV_ROUTES = {
   accounts: "/admin/accounts",
   roles: "/admin/roles",
   "seat-map": "/admin/seatmap",
-  "client-display": "/admin/client-display",
 };
 
 function SidebarCollapseBtn({ onClick, isOpen }) {

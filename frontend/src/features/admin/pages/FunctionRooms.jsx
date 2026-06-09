@@ -16,6 +16,12 @@ import {
   ToggleRight,
   Upload,
   X,
+  LayoutGrid,
+  List,
+  Wand2,
+  Grid,
+  Monitor,
+  RotateCcw
 } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
@@ -23,8 +29,10 @@ import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import { authAPI } from "../../../services/authAPI";
 import { venueAPI } from "../../../services/venueAPI";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy, arrayMove, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import clientDisplayAPI from "../../../services/clientDisplayAPI";
+import { buildDiningOutletsFromConfig, buildEventVenuesFromConfig, VenueCard } from "../../client/pages/ReservationLanding";
 
 const C = {
   page: "#F7F4EE",
@@ -68,6 +76,50 @@ function SortableRow({ id, disabled, level, className, style, children }) {
   );
 }
 
+function SortableVenueCard({ id, item, variant: rawVariant, isHidden, onToggleHide }) {
+  // Map plural "events" to singular "event" for CSS class consistency
+  const variant = rawVariant === "events" ? "event" : rawVariant;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    position: "relative",
+    opacity: isHidden ? 0.4 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <div style={{ pointerEvents: "none" }}>
+        <VenueCard item={item} variant={variant} isInteractive={false} />
+      </div>
+      <button 
+        type="button"
+        onPointerDown={(e) => { e.stopPropagation(); }}
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleHide(id); }}
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 10,
+          zIndex: 20,
+          background: isHidden ? "#111" : "#fff",
+          color: isHidden ? "#fff" : "#111",
+          border: "1px solid rgba(0,0,0,0.1)",
+          borderRadius: 8,
+          padding: "4px 8px",
+          fontSize: 10,
+          fontWeight: 700,
+          cursor: "pointer",
+          pointerEvents: "auto",
+        }}
+      >
+        {isHidden ? <EyeOff size={14} /> : "Hide"}
+      </button>
+    </div>
+  );
+}
+
 const emptyForm = {
   parent_id: "",
   name: "",
@@ -89,6 +141,7 @@ const emptyForm = {
   reservation_route: "",
   image_position: "center 50%",
   metadata: {},
+  is_draft: false,
   availability_enabled: true,
   availability_start_time: "08:00",
   availability_end_time: "23:00",
@@ -953,6 +1006,17 @@ export default function FunctionRooms() {
   const [confirmAction, setConfirmAction] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [expandedParents, setExpandedParents] = useState(() => new Set());
+  const [pendingLayoutChanges, setPendingLayoutChanges] = useState({});
+  const [layoutFeedback, setLayoutFeedback] = useState(null);
+  
+  // View Modes & Grid config
+  const [viewMode, setViewMode] = useState("table"); // "table" | "grid"
+  const [gridSection, setGridSection] = useState("dining"); // "dining" | "events"
+  const [clientSettings, setClientSettings] = useState({
+    dining: { desktop_columns: 6, tablet_columns: 2, mobile_columns: 1 },
+    events: { desktop_columns: 3, tablet_columns: 2, mobile_columns: 1 }
+  });
+
   const canManage = authAPI.hasPermission("manage_venues");
   const drawerVisible = drawerOpen || drawerClosing;
 
@@ -1003,21 +1067,38 @@ export default function FunctionRooms() {
       });
       
       setRooms(updatedRooms);
-      try {
-        await Promise.all(updates.map(u => venueAPI.update(u.id, { display_order: u.display_order })));
-        loadRooms();
-      } catch(err) {
-        console.error("Failed to reindex orders", err);
-        loadRooms();
-      }
+      
+      setPendingLayoutChanges(current => {
+        const newChanges = { ...current };
+        updates.forEach(u => {
+          newChanges[u.id] = { ...(newChanges[u.id] || {}), display_order: u.display_order };
+        });
+        return newChanges;
+      });
     }
   };
 
   const loadRooms = async () => {
     setLoading(true);
     try {
-      const data = await venueAPI.getAll({ include_archived: false, _t: Date.now() });
+      const [data, settingsRes] = await Promise.all([
+        venueAPI.getAll({ include_archived: false, _t: Date.now() }),
+        clientDisplayAPI.getAll().catch(() => [])
+      ]);
       setRooms(Array.isArray(data) ? data : []);
+      
+      const newSettings = {
+        dining: { desktop_columns: 6, tablet_columns: 2, mobile_columns: 1 },
+        events: { desktop_columns: 3, tablet_columns: 2, mobile_columns: 1 }
+      };
+      if (Array.isArray(settingsRes)) {
+        settingsRes.forEach(s => {
+          if (newSettings[s.section]) {
+            newSettings[s.section] = { ...newSettings[s.section], ...s };
+          }
+        });
+      }
+      setClientSettings(newSettings);
     } catch (err) {
       setError(err.message || "Unable to load venue configuration.");
     } finally {
@@ -1026,6 +1107,129 @@ export default function FunctionRooms() {
   };
 
   useEffect(() => { loadRooms(); }, []);
+
+  // Auto-dismiss toast after 4 seconds
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(""), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  const diningParsedVenues = useMemo(() => buildDiningOutletsFromConfig(rooms, { ignoreVisibility: true }), [rooms]);
+  const eventParsedVenues = useMemo(() => buildEventVenuesFromConfig(rooms, { ignoreVisibility: true }), [rooms]);
+
+  const diningOrderedVenues = useMemo(() => {
+    return [...diningParsedVenues].sort((a, b) => (a._original?.display_order || 0) - (b._original?.display_order || 0));
+  }, [diningParsedVenues]);
+
+  const eventOrderedVenues = useMemo(() => {
+    return [...eventParsedVenues].sort((a, b) => (a._original?.display_order || 0) - (b._original?.display_order || 0));
+  }, [eventParsedVenues]);
+
+  const handleGridDragEnd = (event, section) => {
+    const { active, over } = event;
+    if (!active || !over || active.id === over.id) return;
+    if (!canManage) return;
+
+    const list = section === "dining" ? diningOrderedVenues : eventOrderedVenues;
+    const oldIndex = list.findIndex(v => v.title === active.id);
+    const newIndex = list.findIndex(v => v.title === over.id);
+    
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newArray = arrayMove(list, oldIndex, newIndex);
+      
+      const updates = [];
+      newArray.forEach((item, idx) => {
+        if (item._original && item._original.display_order !== idx + 1) {
+           updates.push({ id: item._original.id, display_order: idx + 1 });
+        }
+      });
+      
+      // Optimistically update
+      setRooms(current => current.map(r => {
+        const update = updates.find(u => Number(u.id) === Number(r.id));
+        return update ? { ...r, display_order: update.display_order } : r;
+      }));
+
+      setPendingLayoutChanges(current => {
+        const newChanges = { ...current };
+        updates.forEach(u => {
+          newChanges[u.id] = { ...(newChanges[u.id] || {}), display_order: u.display_order };
+        });
+        return newChanges;
+      });
+    }
+  };
+
+  const handleGridToggleHide = (id, section) => {
+    const list = section === "dining" ? diningOrderedVenues : eventOrderedVenues;
+    const venue = list.find(v => v.title === id);
+    const originalRoom = venue?._original;
+    if (!originalRoom || !canManage) return;
+    
+    const nextValue = !originalRoom.show_on_landing;
+    
+    setRooms(current => current.map(r => Number(r.id) === Number(originalRoom.id) ? { ...r, show_on_landing: nextValue } : r));
+
+    setPendingLayoutChanges(current => ({
+      ...current,
+      [originalRoom.id]: { ...(current[originalRoom.id] || {}), show_on_landing: nextValue }
+    }));
+  };
+
+  const saveLayoutChanges = async () => {
+    if (!canManage) return;
+    setSaving(true);
+    setError("");
+    try {
+      const updates = Object.entries(pendingLayoutChanges).map(([id, changes]) => {
+        return venueAPI.update(id, changes);
+      });
+      await Promise.all(updates);
+      setPendingLayoutChanges({});
+      await loadRooms();
+      notifyVenueConfigUpdated();
+      setLayoutFeedback({ type: "save_success" });
+    } catch (err) {
+      console.error("Failed to save layout changes", err);
+      setError("Failed to save layout changes. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancelLayoutChanges = () => {
+    if (!canManage) return;
+    setPendingLayoutChanges({});
+    loadRooms(); // Reload to revert optimistic UI state
+    setLayoutFeedback({ type: "cancel_success" });
+  };
+
+  const updateClientSetting = async (section, key, value) => {
+    const newSettings = { ...(clientSettings[section] || {}), [key]: value };
+    setClientSettings(prev => ({ ...prev, [section]: newSettings }));
+    try {
+      await clientDisplayAPI.updateSection(section, newSettings);
+      notifyVenueConfigUpdated();
+    } catch (err) {
+      console.error(err);
+      setError("Failed to save grid configuration.");
+    }
+  };
+
+  const handleGridAutoResize = (section) => {
+    const list = section === "dining" ? diningOrderedVenues : eventOrderedVenues;
+    const visibleCount = list.filter(v => v._original ? v._original.show_on_landing : true).length || list.length;
+    let opt = visibleCount;
+    if (section === "dining") {
+        if (opt > 6) opt = Math.ceil(opt / 2);
+    } else {
+        if (opt > 4) opt = Math.ceil(opt / 2);
+    }
+    if (opt < 1) opt = 1;
+    updateClientSetting(section, 'desktop_columns', opt);
+    setToast(`Grid columns auto-set to ${opt} for ${section === "dining" ? "dining outlets" : "event venues"}.`);
+  };
 
   useEffect(() => {
     if (!drawerVisible || confirmAction || saveFeedback || showDiscardConfirm) return undefined;
@@ -1402,50 +1606,86 @@ export default function FunctionRooms() {
     }));
   };
 
-  const validate = () => {
+  const validate = (isDraft = false) => {
     if (!form.name.trim()) return "Venue name is required.";
-    if (!form.slug.trim()) return "Venue slug/code is required.";
-    const duplicateSlug = uniqueRooms.find((room) => String(room.slug || "").toLowerCase() === form.slug.toLowerCase() && (!editing || Number(room.id) !== Number(editing.id)));
-    if (duplicateSlug) return "Venue slug/code must be unique.";
-    if (form.reservation_route && !String(form.reservation_route).startsWith("/")) return "Reservation route must start with /.";
-    const duplicateRoute = form.reservation_route
-      ? uniqueRooms.find((room) => String(room.reservation_route || "").toLowerCase() === form.reservation_route.toLowerCase() && (!editing || Number(room.id) !== Number(editing.id)))
-      : null;
-    if (duplicateRoute) return "Reservation route must be unique.";
-    if (form.parent_id && editing && String(form.parent_id) === String(editing.id)) return "A venue cannot be assigned as its own parent.";
-    if (Number.isNaN(Number(form.display_order))) return "Display order must be numeric.";
-    if (Number(form.availability_interval_minutes) < 15) return "Reservation interval must be at least 15 minutes.";
-    if (form.availability_start_time && form.availability_end_time && form.availability_start_time === form.availability_end_time) return "Opening and closing time cannot be the same.";
-    const periods = normalizeSchedulePeriods(form.availability_periods, form);
-    if (periods.length === 0) return "At least one reservation period is required.";
-    for (const period of periods) {
-      if (!period.days.length) return `${period.label || "A schedule period"} needs at least one day.`;
-      if (!period.start_time || !period.end_time) return `${period.label || "A schedule period"} needs start and end times.`;
-      if (period.start_time === period.end_time) return `${period.label || "A schedule period"} cannot start and end at the same time.`;
-      if (!isEarlierTime(period.start_time, period.end_time)) return `${period.label || "A schedule period"} start and end times cannot be the same.`;
-      if (Number(period.interval_minutes) < 15) return `${period.label || "A schedule period"} interval must be at least 15 minutes.`;
+    
+    if (!isDraft) {
+      if (!form.slug.trim()) return "Venue slug/code is required.";
+      const duplicateSlug = uniqueRooms.find((room) => String(room.slug || "").toLowerCase() === form.slug.toLowerCase() && (!editing || Number(room.id) !== Number(editing.id)));
+      if (duplicateSlug) return "Venue slug/code must be unique.";
+      if (form.reservation_route && !String(form.reservation_route).startsWith("/")) return "Reservation route must start with /.";
+      const duplicateRoute = form.reservation_route
+        ? uniqueRooms.find((room) => String(room.reservation_route || "").toLowerCase() === form.reservation_route.toLowerCase() && (!editing || Number(room.id) !== Number(editing.id)))
+        : null;
+      if (duplicateRoute) return "Reservation route must be unique.";
+      if (form.parent_id && editing && String(form.parent_id) === String(editing.id)) return "A venue cannot be assigned as its own parent.";
+      if (Number.isNaN(Number(form.display_order))) return "Display order must be numeric.";
+      if (Number(form.availability_interval_minutes) < 15) return "Reservation interval must be at least 15 minutes.";
+      if (form.availability_start_time && form.availability_end_time && form.availability_start_time === form.availability_end_time) return "Opening and closing time cannot be the same.";
+      
+      const periods = normalizeSchedulePeriods(form.availability_periods, form);
+      if (periods.length === 0) return "At least one reservation period is required.";
+      for (const period of periods) {
+        if (!period.days.length) return `${period.label || "A schedule period"} needs at least one day.`;
+        if (!period.start_time || !period.end_time) return `${period.label || "A schedule period"} needs start and end times.`;
+        if (period.start_time === period.end_time) return `${period.label || "A schedule period"} cannot start and end at the same time.`;
+        if (!isEarlierTime(period.start_time, period.end_time)) return `${period.label || "A schedule period"} start and end times cannot be the same.`;
+        if (Number(period.interval_minutes) < 15) return `${period.label || "A schedule period"} interval must be at least 15 minutes.`;
+      }
+      for (const override of normalizeScheduleOverrides(form.availability_overrides)) {
+        if (!override.date) return `${overrideTitle(override)} needs a calendar date.`;
+        if (["block_time", "special_hours"].includes(override.type)) {
+          if (!override.start_time || !override.end_time) return `${overrideTitle(override)} needs start and end times.`;
+          if (!isEarlierTime(override.start_time, override.end_time)) return `${overrideTitle(override)} start and end times cannot be the same.`;
+        }
+        if (override.type === "capacity" && Number(override.slot_capacity || 0) <= 0 && Number(override.max_reservations_per_slot || 0) <= 0) {
+          return "Capacity adjustment needs a slot capacity or max bookings value.";
+        }
+        if (override.type === "capacity" && override.start_time && override.end_time && !isEarlierTime(override.start_time, override.end_time)) {
+          return "Capacity adjustment start and end times cannot be the same.";
+        }
+      }
     }
-    for (const override of normalizeScheduleOverrides(form.availability_overrides)) {
-      if (!override.date) return `${overrideTitle(override)} needs a calendar date.`;
-      if (["block_time", "special_hours"].includes(override.type)) {
-        if (!override.start_time || !override.end_time) return `${overrideTitle(override)} needs start and end times.`;
-        if (!isEarlierTime(override.start_time, override.end_time)) return `${overrideTitle(override)} start and end times cannot be the same.`;
-      }
-      if (override.type === "capacity" && Number(override.slot_capacity || 0) <= 0 && Number(override.max_reservations_per_slot || 0) <= 0) {
-        return "Capacity adjustment needs a slot capacity or max bookings value.";
-      }
-      if (override.type === "capacity" && override.start_time && override.end_time && !isEarlierTime(override.start_time, override.end_time)) {
-        return "Capacity adjustment start and end times cannot be the same.";
-      }
-    }
+    
     if (imageFile && !["image/jpeg", "image/png", "image/webp"].includes(imageFile.type)) return "Image must be JPG, PNG, or WEBP.";
     return "";
+  };
+
+  const requestSaveDraft = (event) => {
+    if (event) event.preventDefault();
+    if (!canManage) return;
+    const validationError = validate(true);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    
+    setConfirmAction({
+      type: "save_draft",
+      title: "Save as Draft?",
+      message: "Saving as a draft will keep this venue hidden from the client view until you are ready to publish it.",
+      label: "Save Draft",
+      tone: "green",
+    });
+  };
+
+  const requestCancelDraft = (event) => {
+    if (event) event.preventDefault();
+    if (!canManage) return;
+    
+    setConfirmAction({
+      type: "cancel_draft",
+      title: "Delete Draft?",
+      message: "Are you sure you want to delete this draft? This action cannot be undone.",
+      label: "Delete Draft",
+      tone: "red",
+    });
   };
 
   const saveRoom = (event) => {
     if (event) event.preventDefault();
     if (!canManage) return;
-    const validationError = validate();
+    const validationError = validate(false);
     if (validationError) {
       setError(validationError);
       return;
@@ -1651,7 +1891,8 @@ export default function FunctionRooms() {
         await loadRooms();
         notifyVenueConfigUpdated();
         setToast("Venue deleted.");
-      } else if (confirmAction.type === "save") {
+      } else if (confirmAction.type === "save" || confirmAction.type === "save_draft") {
+        const isDraft = confirmAction.type === "save_draft";
         const payload = {
           ...form,
           parent_id: form.type === "dining" ? null : (form.parent_id ? Number(form.parent_id) : null),
@@ -1661,6 +1902,7 @@ export default function FunctionRooms() {
           display_name: form.display_name || form.name,
           slug: form.slug || slugify(form.name),
           reservation_route: form.reservation_route || routeFromSlug(form.slug || form.name),
+          is_draft: isDraft,
           metadata: {
             ...(form.metadata || {}),
             availability: availabilityPayload(form),
@@ -1677,11 +1919,23 @@ export default function FunctionRooms() {
         setConfirmAction(null);
         
         setSaveFeedback({
-          type: editing ? "update" : "create",
+          type: isDraft ? "draft_saved" : (editing ? "update" : "create"),
           venueName: finalSaved.display_name || finalSaved.name,
           slug: finalSaved.slug,
           reservationRoute: finalSaved.reservation_route,
           venue: finalSaved,
+        });
+      } else if (confirmAction.type === "cancel_draft") {
+        if (editing) {
+          await venueAPI.delete(editing.id);
+        }
+        setConfirmAction(null);
+        await loadRooms();
+        notifyVenueConfigUpdated();
+        
+        setSaveFeedback({
+          type: "draft_deleted",
+          venueName: editing?.display_name || editing?.name || "Draft",
         });
       } else {
         await venueAPI.update(confirmAction.room.id, statePayloadForAction(confirmAction));
@@ -1783,14 +2037,66 @@ export default function FunctionRooms() {
             C={C}
             F={F}
             actions={canManage && (
-              <button type="button" onClick={beginCreate} style={{ ...buttonBase(), minHeight: 40, border: "none", background: C.gold, color: "#fff", padding: "0 14px" }}>
-                <Plus size={14} /> New Venue
-              </button>
+              <div style={{ display: "flex", gap: 10 }}>
+                <div style={{ display: "flex", background: C.soft, border: `1px solid ${C.border}`, borderRadius: 9, padding: 3 }}>
+                  <button type="button" onClick={() => setViewMode("table")} style={{ ...buttonBase(), border: "none", minHeight: 32, padding: "0 12px", background: viewMode === "table" ? C.surface : "transparent", color: viewMode === "table" ? C.text : C.muted, boxShadow: viewMode === "table" ? "0 2px 5px rgba(0,0,0,0.06)" : "none", textTransform: "none", letterSpacing: "normal", fontSize: 13, gap: 6, fontWeight: viewMode === "table" ? 600 : 500 }}>
+                    <List size={14} /> List
+                  </button>
+                  <button type="button" onClick={() => setViewMode("grid")} style={{ ...buttonBase(), border: "none", minHeight: 32, padding: "0 12px", background: viewMode === "grid" ? C.surface : "transparent", color: viewMode === "grid" ? C.text : C.muted, boxShadow: viewMode === "grid" ? "0 2px 5px rgba(0,0,0,0.06)" : "none", textTransform: "none", letterSpacing: "normal", fontSize: 13, gap: 6, fontWeight: viewMode === "grid" ? 600 : 500 }}>
+                    <LayoutGrid size={14} /> Landing Display
+                  </button>
+                </div>
+                <button type="button" onClick={beginCreate} style={{ ...buttonBase(), minHeight: 40, border: "none", background: C.gold, color: "#fff", padding: "0 14px" }}>
+                  <Plus size={14} /> New Venue
+                </button>
+              </div>
             )}
           />
 
-          {toast && <div style={{ marginBottom: 14, padding: "9px 12px", borderRadius: 10, background: C.greenFaint, color: C.green, border: "1px solid rgba(46,122,90,0.16)", fontSize: 12.5 }}>{toast}</div>}
-          {error && !drawerOpen && <div style={{ marginBottom: 14, padding: "9px 12px", borderRadius: 10, background: C.redFaint, color: C.red, border: "1px solid rgba(160,56,56,0.16)", fontSize: 12.5 }}>{error}</div>}
+          {toast && (
+            <div style={{
+              marginBottom: 14, padding: "10px 14px", borderRadius: 10,
+              background: C.greenFaint, color: C.green,
+              border: "1px solid rgba(46,122,90,0.16)", fontSize: 12.5,
+              display: "flex", alignItems: "center", gap: 10,
+              animation: "toastSlideIn 0.28s ease both",
+              fontWeight: 550,
+            }}>
+              <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>{toast}</span>
+              <button
+                type="button"
+                onClick={() => setToast("")}
+                style={{ background: "none", border: "none", color: C.green, cursor: "pointer", padding: 2, display: "flex", opacity: 0.6 }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+          {error && !drawerOpen && (
+            <div style={{
+              marginBottom: 14, padding: "10px 14px", borderRadius: 10,
+              background: C.redFaint, color: C.red,
+              border: "1px solid rgba(160,56,56,0.16)", fontSize: 12.5,
+              display: "flex", alignItems: "center", gap: 10,
+              fontWeight: 550,
+            }}>
+              <span style={{ flex: 1 }}>{error}</span>
+              <button
+                type="button"
+                onClick={() => setError("")}
+                style={{ background: "none", border: "none", color: C.red, cursor: "pointer", padding: 2, display: "flex", opacity: 0.6 }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+          <style>{`
+            @keyframes toastSlideIn {
+              from { opacity: 0; transform: translateY(-8px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
 
           <div className="function-room-stats" style={{ display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 12, marginBottom: 16 }}>
             <SummaryCard icon={Layers} label="Configured Venues" value={stats.total} />
@@ -1801,7 +2107,9 @@ export default function FunctionRooms() {
           </div>
 
           <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "visible" }}>
-            <div className="function-room-toolbar" style={{ display: "grid", gridTemplateColumns: "minmax(240px,1fr) repeat(6, minmax(128px, auto))", gap: 10, padding: 14, borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
+            {viewMode === "table" ? (
+              <>
+                <div className="function-room-toolbar" style={{ display: "grid", gridTemplateColumns: "minmax(240px,1fr) repeat(6, minmax(128px, auto))", gap: 10, padding: 14, borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
               <div style={{ position: "relative" }}>
                 <Search size={15} style={{ position: "absolute", left: 11, top: 12, color: C.faint }} />
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search venues, slugs, wings" style={{ ...inputStyle(), paddingLeft: 34 }} />
@@ -1927,7 +2235,11 @@ export default function FunctionRooms() {
                                 </div>
                               </td>
                               <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
-                                <Badge tone={room.is_active ? "green" : "red"}>{room.is_active ? "Enabled" : "Disabled"}</Badge>
+                                {room.is_draft ? (
+                                  <Badge tone="neutral">Draft</Badge>
+                                ) : (
+                                  <Badge tone={room.is_active ? "green" : "red"}>{room.is_active ? "Enabled" : "Disabled"}</Badge>
+                                )}
                               </td>
                               <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
                                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
@@ -1995,9 +2307,230 @@ export default function FunctionRooms() {
                 </table>
               </DndContext>
             </div>
+            </>
+            ) : (
+              <div style={{ padding: 24, minHeight: 600 }}>
+                {["dining", "events"].map(section => {
+                  const title = section === "dining" ? "Dining Outlets" : "Event Venues";
+                  const settings = clientSettings[section] || { desktop_columns: 3 };
+                  const list = section === "dining" ? diningOrderedVenues : eventOrderedVenues;
+                  
+                  return (
+                    <div key={section} style={{ marginBottom: 40 }}>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 20, paddingBottom: 12, borderBottom: `1px solid ${C.divider}` }}>{title}</h2>
+                      
+                      <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 24 }}>
+                        {/* Configuration Sidebar */}
+                        <div style={{ background: C.soft, padding: 20, borderRadius: 12, border: `1px solid ${C.border}`, alignSelf: "start" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+                            <Grid size={18} color={C.gold} />
+                            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: C.text }}>Grid Configuration</h3>
+                          </div>
+
+                          <div style={{ marginBottom: 24 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                              <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Desktop Columns</label>
+                              <span style={{ fontSize: 12, color: C.muted }}>{settings.desktop_columns} Columns</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="1" max="6"
+                              value={settings.desktop_columns}
+                              onChange={(e) => updateClientSetting(section, 'desktop_columns', parseInt(e.target.value))}
+                              style={{ width: "100%", accentColor: C.gold }}
+                            />
+                          </div>
+
+                          <button 
+                            onClick={() => handleGridAutoResize(section)}
+                            style={{
+                              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                              width: "100%", padding: "10px", borderRadius: 8,
+                              background: C.goldFaint, color: C.gold,
+                              border: `1px solid rgba(140,107,42,0.2)`,
+                              fontSize: 13, fontWeight: 600, cursor: "pointer",
+                              transition: "background 0.2s"
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(140,107,42,0.12)'}
+                            onMouseLeave={e => e.currentTarget.style.background = C.goldFaint}
+                          >
+                            <Wand2 size={16} /> Auto Resize Grid
+                          </button>
+                          <p style={{ fontSize: 11.5, color: C.muted, marginTop: 12, lineHeight: 1.45 }}>
+                            Click to automatically set the ideal number of columns based on how many venues are visible.
+                          </p>
+                        </div>
+
+                        {/* Live Preview Area */}
+                        <div style={{ background: C.surface, padding: 32, borderRadius: 12, border: `1px solid ${C.border}` }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+                            <Monitor size={18} color={C.muted} />
+                            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: C.text }}>Visual Live Preview</h3>
+                          </div>
+
+                          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleGridDragEnd(e, section)}>
+                            <SortableContext items={list.map(v => v.title)} strategy={rectSortingStrategy}>
+                              <div 
+                                className={`reservation-grid reservation-grid--${section === "events" ? "events" : "dining"}`}
+                                style={{
+                                  display: "grid",
+                                  gap: "clamp(14px, 1.25vw, 24px)",
+                                  gridTemplateColumns: `repeat(${settings.desktop_columns}, minmax(0, 1fr))`,
+                                  background: "#fffaf1",
+                                  padding: 32,
+                                  borderRadius: 16,
+                                  border: "1px solid rgba(0,0,0,0.05)",
+                                  boxShadow: "inset 0 2px 20px rgba(0,0,0,0.02)"
+                                }}
+                              >
+                                {list.map((v) => {
+                                  const isHidden = v._original ? !v._original.show_on_landing : false;
+                                  return (
+                                    <SortableVenueCard 
+                                      key={v.title}
+                                      id={v.title}
+                                      item={v}
+                                      variant={section === "events" ? "event" : section}
+                                      isHidden={isHidden}
+                                      onToggleHide={(id) => handleGridToggleHide(id, section)}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </SortableContext>
+                          </DndContext>
+
+                          <p style={{ fontSize: 12.5, color: C.muted, marginTop: 24, textAlign: "center" }}>
+                            Drag and drop the cards above to reorder them. Click "Hide" to toggle visibility.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
+          
+          {viewMode === "grid" && (
+            <style dangerouslySetInnerHTML={{__html: `
+              .reservation-card {
+                position: relative;
+                overflow: hidden;
+                display: block;
+                width: 100%;
+                border-radius: 12px;
+                background: #17130e;
+                text-align: left;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                transition: transform 0.2s;
+              }
+              .reservation-card--dining {
+                aspect-ratio: 4 / 3;
+              }
+              .reservation-card--event {
+                min-height: 140px;
+              }
+              .reservation-card__image {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+              }
+              .reservation-card__shade {
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0.7));
+              }
+              .reservation-card__brand {
+                position: absolute;
+                inset: 0;
+                z-index: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              .reservation-card__logo {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+                height: 100%;
+              }
+              .reservation-card__logo img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+              }
+              .reservation-card__logo span {
+                color: #c4a35a;
+                font-family: serif;
+                font-size: 16px;
+                font-weight: 600;
+              }
+              .reservation-card__meta {
+                position: absolute;
+                left: 14px;
+                right: 14px;
+                bottom: 14px;
+                z-index: 3;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+              }
+              .reservation-card__title {
+                color: #fff;
+                font-weight: 600;
+                font-size: 14px;
+              }
+              .reservation-card__rooms {
+                display: flex;
+                gap: 4px;
+              }
+              .reservation-card__room {
+                background: rgba(0,0,0,0.5);
+                color: #fff;
+                border: 1px solid rgba(255,255,255,0.2);
+                border-radius: 4px;
+                padding: 2px 6px;
+                font-size: 10px;
+              }
+              .reservation-card--disabled {
+                opacity: 0.5;
+              }
+              .reservation-card__brand-surface {
+                position: absolute;
+                inset: 0;
+                background: #17130e;
+              }
+            `}} />
+          )}
+
         </main>
       </div>
+
+      {Object.keys(pendingLayoutChanges).length > 0 && (
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 6000, background: C.surface, border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 24px", display: "flex", alignItems: "center", gap: 16, boxShadow: "0 12px 40px rgba(201,168,76,0.2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: "50%", background: "rgba(201,168,76,0.15)", color: C.gold }}>
+              <Edit3 size={14} />
+            </span>
+            <div>
+              <strong style={{ color: C.text, fontSize: 14, display: "block" }}>Unsaved Layout Changes</strong>
+              <span style={{ color: C.muted, fontSize: 12 }}>You have pending grid reordering or visibility changes.</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, paddingLeft: 16, borderLeft: `1px solid ${C.divider}` }}>
+            <button type="button" onClick={cancelLayoutChanges} disabled={saving} style={{ ...buttonBase(), background: "transparent", color: C.text, border: `1px solid ${C.border}` }}>
+              Cancel
+            </button>
+            <button type="button" onClick={saveLayoutChanges} disabled={saving} style={{ ...buttonBase(), background: C.gold, color: "#fff", border: "none", minWidth: 120 }}>
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {drawerVisible && (
         <div className={`function-room-drawer-backdrop${drawerClosing ? " is-closing" : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 7000, background: "rgba(24,20,14,0.28)", display: "flex", justifyContent: "flex-end", backdropFilter: "blur(2px)" }}>
@@ -2450,8 +2983,21 @@ export default function FunctionRooms() {
                 </div>
                 <div style={{ display: "flex", gap: 9, flexShrink: 0 }}>
                   <button type="button" onClick={closeDrawer} disabled={saving} style={buttonBase()}>Cancel</button>
+                  
+                  {form.is_draft && editing && (
+                    <button type="button" onClick={requestCancelDraft} disabled={saving} style={{ ...buttonBase(), background: C.redFaint, color: C.red, border: "none" }}>
+                      Delete Draft
+                    </button>
+                  )}
+
+                  {(!editing || form.is_draft) && (
+                    <button type="button" onClick={requestSaveDraft} disabled={!canManage || saving} style={{ ...buttonBase(), background: C.soft, color: C.text, border: `1px solid ${C.border}` }}>
+                      {saving ? "Saving..." : "Save Draft"}
+                    </button>
+                  )}
+
                   <button type="submit" disabled={!canManage || saving} style={{ ...buttonBase(), minWidth: 150, border: "none", background: canManage ? C.gold : C.faint, color: "#fff", cursor: canManage && !saving ? "pointer" : "not-allowed" }}>
-                    {saving ? "Saving..." : editing ? "Save Changes" : "Create Venue"}
+                    {saving ? "Working..." : editing && !form.is_draft ? "Save Changes" : "Publish Venue"}
                   </button>
                 </div>
               </div>
@@ -2504,6 +3050,31 @@ export default function FunctionRooms() {
         </div>
       )}
 
+      {layoutFeedback && (
+        <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setLayoutFeedback(null); }} style={{ position: "fixed", inset: 0, zIndex: 8200, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
+          <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="layout-feedback-title" style={{ width: "min(420px, 100%)", borderRadius: 14, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 24px 60px rgba(24,20,14,0.18)", padding: "26px 28px", textAlign: "center" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+              <span style={{ width: 44, height: 44, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", background: layoutFeedback.type === "save_success" ? "linear-gradient(135deg, rgba(46,122,90,0.08), rgba(46,122,90,0.15))" : "rgba(255,255,255,0.05)", color: layoutFeedback.type === "save_success" ? C.green : C.text }}>
+                {layoutFeedback.type === "save_success" ? <CheckCircle2 size={24} /> : <RotateCcw size={22} />}
+              </span>
+              <div>
+                <h2 id="layout-feedback-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 700, fontFamily: F.label, letterSpacing: "-0.01em" }}>
+                  {layoutFeedback.type === "save_success" ? "Layout Saved" : "Layout Restored"}
+                </h2>
+                <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.5, color: C.muted }}>
+                  {layoutFeedback.type === "save_success" 
+                    ? "Your grid reordering and visibility changes have been successfully saved." 
+                    : "Your unsaved layout changes have been discarded, and the original layout has been restored."}
+                </p>
+              </div>
+            </div>
+            <button type="button" onClick={() => setLayoutFeedback(null)} style={{ ...buttonBase(), width: "100%", marginTop: 22, background: C.soft, border: `1px solid ${C.border}`, color: C.text }}>
+              Close
+            </button>
+          </section>
+        </div>
+      )}
+
       {saveFeedback && (
         <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSuccessAndDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 8200, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
           <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="save-feedback-title" style={{ width: "min(460px, 100%)", borderRadius: 14, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 24px 60px rgba(24,20,14,0.18)", padding: "26px 28px" }}>
@@ -2513,10 +3084,17 @@ export default function FunctionRooms() {
               </span>
               <div>
                 <h2 id="save-feedback-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 700, fontFamily: F.label, letterSpacing: "-0.01em" }}>
-                  {saveFeedback.type === "create" ? "Venue Created" : "Venue Updated"}
+                  {saveFeedback.type === "create" ? "Venue Created" 
+                   : saveFeedback.type === "update" ? "Venue Updated"
+                   : saveFeedback.type === "draft_saved" ? "Draft Saved"
+                   : "Draft Deleted"}
                 </h2>
                 <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.5, color: C.muted }}>
-                  Changes have been saved successfully and are now reflected in the venue directory.
+                  {saveFeedback.type === "draft_saved" 
+                   ? "Your draft has been saved. It is hidden from the client view until you publish it."
+                   : saveFeedback.type === "draft_deleted"
+                   ? "The drafted venue has been completely deleted."
+                   : "Changes have been saved successfully and are now reflected in the venue directory."}
                 </p>
               </div>
             </div>

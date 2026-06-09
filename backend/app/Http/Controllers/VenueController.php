@@ -174,19 +174,21 @@ class VenueController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         try {
+            $isDraft = $request->input('is_draft', false);
+
             $validated = $request->validate([
                 'parent_id' => 'sometimes|nullable|exists:venues,id',
                 'name' => 'sometimes|required|string|max:255',
                 'slug' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('venues', 'slug')->ignore($id)->where('is_archived', false)],
                 'display_name' => 'sometimes|nullable|string|max:255',
-                'wing' => 'sometimes|required|string|max:255',
-                'type' => 'sometimes|required|string|max:255',
+                'wing' => $isDraft ? 'sometimes|nullable|string|max:255' : 'sometimes|required|string|max:255',
+                'type' => $isDraft ? 'sometimes|nullable|string|max:255' : 'sometimes|required|string|max:255',
                 'category' => 'sometimes|nullable|string|max:255',
                 'capacity' => 'sometimes|nullable|integer|min:0',
                 'price_per_hour' => 'sometimes|nullable|numeric|min:0',
                 'description' => 'sometimes|nullable|string',
                 'image' => 'sometimes|nullable|string',
-                'display_order' => 'sometimes|required|integer|min:0',
+                'display_order' => $isDraft ? 'sometimes|nullable|integer|min:0' : 'sometimes|required|integer|min:0',
                 'is_active' => 'sometimes|boolean',
                 'is_visible' => 'sometimes|boolean',
                 'show_on_landing' => 'sometimes|boolean',
@@ -196,6 +198,7 @@ class VenueController extends Controller
                 'reservation_route' => ['sometimes', 'nullable', 'string', 'max:255', 'regex:/^\//'],
                 'image_position' => 'sometimes|nullable|string|max:255',
                 'metadata' => 'sometimes|nullable|array',
+                'is_draft' => 'sometimes|boolean',
             ]);
             if (isset($validated['name']) && !array_key_exists('slug', $validated)) {
                 $validated['slug'] = Str::slug($validated['name']);
@@ -206,7 +209,9 @@ class VenueController extends Controller
             if (empty($validated['reservation_route']) && !empty($validated['slug'])) {
                 $validated['reservation_route'] = '/' . $validated['slug'];
             }
-            $this->guardParentConfiguration($validated, $id);
+            if (!$isDraft) {
+                $this->guardParentConfiguration($validated, $id);
+            }
 
             $venue = $this->venueService->updateVenue($id, $validated);
             

@@ -322,6 +322,7 @@ class VenueService
             'reservation_route' => $venue->reservation_route,
             'image_position' => $venue->image_position,
             'metadata' => $venue->metadata,
+            'is_draft' => $venue->is_draft ?? false,
             'parent' => $venue->relationLoaded('parent') && $venue->parent ? [
                 'id' => $venue->parent->id,
                 'name' => $venue->parent->name,
