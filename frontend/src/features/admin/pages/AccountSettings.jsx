@@ -93,12 +93,12 @@ function readStoredAvatar(user) {
 function inputStyle(extra = {}) {
   return {
     width: "100%",
-    minHeight: 38,
+    minHeight: 42,
     border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: "8px 11px",
+    borderRadius: 10,
+    padding: "10px 14px",
     fontFamily: F.body,
-    fontSize: 13,
+    fontSize: 13.5,
     color: C.text,
     background: C.surface,
     outline: "none",
@@ -109,15 +109,16 @@ function inputStyle(extra = {}) {
 
 function buttonStyle(kind = "primary", disabled = false) {
   const primary = kind === "primary";
+  const ghost = kind === "ghost";
   return {
-    minHeight: 38,
-    padding: "0 14px",
-    border: `1px solid ${primary ? "rgba(140,107,42,0.22)" : C.border}`,
-    borderRadius: 9,
-    background: disabled ? "rgba(0,0,0,0.04)" : primary ? C.gold : C.surface,
-    color: disabled ? C.faint : primary ? "#FFFFFF" : C.gold,
+    minHeight: 42,
+    padding: "0 16px",
+    border: ghost ? "1px solid transparent" : `1px solid ${primary ? "rgba(140,107,42,0.22)" : C.border}`,
+    borderRadius: 10,
+    background: disabled ? "rgba(0,0,0,0.04)" : primary ? C.gold : ghost ? "transparent" : C.surface,
+    color: disabled ? C.faint : primary ? "#FFFFFF" : ghost ? C.muted : C.gold,
     fontFamily: F.label,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 800,
     letterSpacing: "0.12em",
     textTransform: "uppercase",
@@ -127,7 +128,7 @@ function buttonStyle(kind = "primary", disabled = false) {
     justifyContent: "center",
     gap: 8,
     whiteSpace: "nowrap",
-    boxShadow: primary && !disabled ? "0 2px 8px rgba(140,107,42,0.10)" : "none",
+    boxShadow: primary && !disabled ? "0 4px 12px rgba(140,107,42,0.12)" : "none",
     transition: "background 0.16s ease, border-color 0.16s ease, transform 0.16s ease",
   };
 }
@@ -150,32 +151,32 @@ function Spinner({ color = C.gold, size = 13 }) {
 
 function Field({ label, hint, children }) {
   return (
-    <label style={{ display: "grid", gap: 7, minWidth: 0 }}>
-      <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.faint }}>
+    <label style={{ display: "grid", gap: 8, minWidth: 0, textAlign: "left" }}>
+      <span style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted }}>
         {label}
       </span>
       {children}
-      {hint && <span style={{ fontSize: 11.5, lineHeight: 1.45, color: C.muted }}>{hint}</span>}
+      {hint && <span style={{ fontSize: 12, lineHeight: 1.45, color: C.muted, display: "block" }}>{hint}</span>}
     </label>
   );
 }
 
 function Panel({ eyebrow, title, description, children, actions }) {
   return (
-    <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadowSoft, overflow: "hidden" }}>
-      <div style={{ padding: "18px 20px 15px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+    <section style={{ background: C.surface, border: `1px solid rgba(0,0,0,0.04)`, borderRadius: 16, boxShadow: "0 12px 36px rgba(24,20,14,0.02), 0 4px 12px rgba(24,20,14,0.02)", overflow: "hidden" }}>
+      <div style={{ padding: "24px 28px 20px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
         <div style={{ minWidth: 0 }}>
           {eyebrow && (
-            <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>
+            <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>
               {eyebrow}
             </div>
           )}
-          <h2 style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 700 }}>{title}</h2>
-          {description && <p style={{ margin: "5px 0 0", fontSize: 12.5, lineHeight: 1.55, color: C.muted }}>{description}</p>}
+          <h2 style={{ margin: 0, fontSize: 20, lineHeight: 1.25, color: C.text, fontWeight: 700 }}>{title}</h2>
+          {description && <p style={{ margin: "6px 0 0", fontSize: 13, lineHeight: 1.55, color: C.muted }}>{description}</p>}
         </div>
         {actions && <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>{actions}</div>}
       </div>
-      <div style={{ padding: 20 }}>{children}</div>
+      <div style={{ padding: "0 28px 28px" }}>{children}</div>
     </section>
   );
 }
@@ -186,8 +187,8 @@ function Notice({ type = "success", children }) {
   const bg = isError ? C.redFaint : C.greenFaint;
   const Icon = isError ? AlertCircle : CheckCircle2;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 13px", background: bg, color, border: `1px solid ${color}2A`, borderRadius: 9, fontSize: 12.5, lineHeight: 1.45 }}>
-      <Icon size={16} />
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", background: bg, color, border: `1px solid ${color}2A`, borderRadius: 10, fontSize: 13, lineHeight: 1.45 }}>
+      <Icon size={18} />
       <span>{children}</span>
     </div>
   );
@@ -201,24 +202,26 @@ function SettingsNavButton({ section, active, onClick }) {
       onClick={onClick}
       style={{
         width: "100%",
-        minHeight: 44,
-        border: `1px solid ${active ? "rgba(140,107,42,0.18)" : "transparent"}`,
-        borderRadius: 10,
-        background: active ? C.goldFaint : "transparent",
+        minHeight: 48,
+        border: "none",
+        borderLeft: active ? `3px solid ${C.gold}` : "3px solid transparent",
+        borderRadius: 8,
+        background: active ? C.surface : "transparent",
         color: active ? C.gold : C.muted,
         display: "grid",
         gridTemplateColumns: "20px minmax(0,1fr)",
-        gap: 10,
+        gap: 12,
         alignItems: "center",
         textAlign: "left",
-        padding: "10px 12px",
+        padding: "12px 16px",
         cursor: "pointer",
         fontFamily: F.body,
-        transition: "background 0.16s ease, border-color 0.16s ease, color 0.16s ease",
+        transition: "background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, border-left 0.16s ease",
+        boxShadow: active ? "0 4px 12px rgba(24,20,14,0.04)" : "none",
       }}
       onMouseEnter={(event) => {
         if (!active) {
-          event.currentTarget.style.background = "rgba(140,107,42,0.045)";
+          event.currentTarget.style.background = "rgba(24,20,14,0.03)";
           event.currentTarget.style.color = C.text;
         }
       }}
@@ -229,10 +232,10 @@ function SettingsNavButton({ section, active, onClick }) {
         }
       }}
     >
-      <Icon size={16} />
+      <Icon size={18} />
       <span style={{ minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: 12.5, fontWeight: active ? 720 : 560 }}>{section.label}</span>
-        <span style={{ display: "block", marginTop: 2, fontSize: 11, lineHeight: 1.3, color: active ? C.goldSoft : C.faint }}>{section.description}</span>
+        <span style={{ display: "block", fontSize: 13, fontWeight: active ? 720 : 560 }}>{section.label}</span>
+        <span style={{ display: "block", marginTop: 2, fontSize: 11.5, lineHeight: 1.3, color: active ? C.goldSoft : C.faint }}>{section.description}</span>
       </span>
     </button>
   );
@@ -249,7 +252,7 @@ function ToggleRow({ title, description, checked, onChange, disabled = false }) 
         border: `1px solid ${checked ? "rgba(46,122,90,0.18)" : C.border}`,
         borderRadius: 10,
         background: checked ? C.greenFaint : C.surfaceSoft,
-        padding: "13px 14px",
+        padding: "16px 20px",
         display: "grid",
         gridTemplateColumns: "minmax(0,1fr) auto",
         gap: 14,
@@ -516,7 +519,7 @@ export default function AccountSettings() {
   };
 
   return (
-    <div style={{ height: "100vh", overflow: "hidden", fontFamily: F.body, background: C.pageBg, color: C.text }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", fontFamily: F.body, background: C.pageBg, color: C.text }}>
       <style>{`
         @keyframes accountSettingsSpin { to { transform: rotate(360deg); } }
         .account-settings-shell input:focus,
@@ -577,7 +580,7 @@ export default function AccountSettings() {
         <main className="account-settings-shell" style={{ flex: 1, minWidth: 0, overflow: "auto", padding: "30px 32px 42px" }}>
           <div style={{ maxWidth: 1320, display: "grid", gap: 18 }}>
             <AdminPageHeader
-              eyebrow="Account"
+              eyebrow="ACCOUNT"
               title="Account Settings"
               description="Manage your profile, security, notification preferences, and account access from one consistent admin page."
               C={C}
@@ -586,49 +589,8 @@ export default function AccountSettings() {
 
             {message && <Notice type={message.type}>{message.text}</Notice>}
 
-            <section
-              className="account-profile-hero"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0,1fr) auto",
-                gap: 18,
-                alignItems: "center",
-                padding: "18px 20px",
-                border: `1px solid ${C.border}`,
-                borderRadius: 12,
-                background: `linear-gradient(180deg, ${C.surface} 0%, ${C.surfaceSoft} 100%)`,
-                boxShadow: C.shadowSoft,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-                <div style={{ width: 58, height: 58, borderRadius: "50%", background: C.gold, color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, boxShadow: "0 8px 18px rgba(140,107,42,0.16)", flexShrink: 0, overflow: "hidden" }}>
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : initials}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 18, fontWeight: 740, color: C.text, lineHeight: 1.25 }}>{displayName}</div>
-                  <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", fontSize: 12.5, color: C.muted }}>
-                    <span>{currentUser.email || "No email on file"}</span>
-                    <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.faint }} />
-                    <span>{formatRole(role, availableRoles)}</span>
-                    <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.faint }} />
-                    <span>{scopedLabel}</span>
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-                <span style={{ padding: "6px 10px", borderRadius: 999, background: C.greenFaint, color: C.green, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                  Active Session
-                </span>
-                <span style={{ padding: "6px 10px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                  {formatRole(role, availableRoles)}
-                </span>
-              </div>
-            </section>
-
             <div className="account-settings-grid">
-              <aside className="account-settings-nav" style={{ position: "sticky", top: 18, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 10, display: "grid", gap: 4, boxShadow: C.shadowSoft }}>
+              <aside className="account-settings-nav" style={{ position: "sticky", top: 18, display: "grid", gap: 4, alignSelf: "start" }}>
                 {sections.map((section) => (
                   <SettingsNavButton
                     key={section.id}
@@ -653,16 +615,16 @@ export default function AccountSettings() {
                   >
                     <form onSubmit={saveProfile} style={{ display: "grid", gap: 18 }}>
                       <div className="account-profile-form-grid">
-                        <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.surfaceSoft, padding: 15, display: "grid", gap: 12, justifyItems: "center", textAlign: "center" }}>
-                          <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>
+                        <div style={{ border: `1px solid rgba(0,0,0,0.04)`, borderRadius: 16, background: C.surfaceSoft, padding: 20, display: "grid", gap: 14, justifyItems: "center", textAlign: "center", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)" }}>
+                          <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: C.gold }}>
                             Profile Photo
                           </div>
-                          <div style={{ width: 82, height: 82, borderRadius: "50%", background: C.gold, color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 23, fontWeight: 850, overflow: "hidden", boxShadow: "0 8px 18px rgba(140,107,42,0.14)" }}>
+                          <div style={{ width: 96, height: 96, borderRadius: "50%", background: C.gold, color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 850, overflow: "hidden", boxShadow: "0 8px 24px rgba(140,107,42,0.18)" }}>
                             {avatarPreview ? (
                               <img src={avatarPreview} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             ) : initials}
                           </div>
-                          <div style={{ width: "100%", display: "grid", gap: 8 }}>
+                          <div style={{ width: "100%", display: "grid", gap: 8, marginTop: 4 }}>
                             <label style={{ ...buttonStyle("secondary"), minHeight: 34, padding: "0 11px", width: "100%" }}>
                               <Upload size={13} />
                               Upload Photo
@@ -674,23 +636,17 @@ export default function AccountSettings() {
                               </button>
                             )}
                           </div>
-                          <span style={{ maxWidth: 150, fontSize: 11, lineHeight: 1.45, color: C.muted }}>
+                          {avatarDirty && (
+                            <span style={{ padding: "5px 8px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" }}>
+                              Photo pending save
+                            </span>
+                          )}
+                          <span style={{ maxWidth: 150, fontSize: 11, lineHeight: 1.45, color: C.muted, marginTop: 12 }}>
                             JPG or PNG, up to 2 MB. Save profile to apply changes.
                           </span>
                         </div>
 
-                        <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                            <div>
-                              <div style={{ fontSize: 15, fontWeight: 760, color: C.text, lineHeight: 1.25 }}>{displayName}</div>
-                              <div style={{ marginTop: 3, fontSize: 12.2, color: C.muted }}>{formatRole(role, availableRoles)}</div>
-                            </div>
-                            {avatarDirty && (
-                              <span style={{ padding: "5px 8px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" }}>
-                                Photo pending save
-                              </span>
-                            )}
-                          </div>
+                        <div style={{ display: "grid", gap: 16, minWidth: 0, alignContent: "start" }}>
                           <div className="account-form-grid">
                             <Field label="Full Name">
                               <input value={profile.name} onChange={(event) => setProfile((prev) => ({ ...prev, name: event.target.value }))} required style={inputStyle()} />
@@ -706,23 +662,23 @@ export default function AccountSettings() {
                             </Field>
                           </div>
 
-                          <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 13, display: "grid", gap: 9 }}>
+                          <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 18, display: "grid", gap: 12 }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                              <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>
+                              <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: C.gold }}>
                                 Assigned Venues & Outlets
                               </div>
-                              <span style={{ fontSize: 11.5, color: C.muted }}>
+                              <span style={{ fontSize: 12, color: C.muted }}>
                                 {hasFullScope ? "Full access" : "Scoped access"}
                               </span>
                             </div>
-                            <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                               {hasFullScope ? (
-                                <span style={{ padding: "5px 9px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                                <span style={{ padding: "6px 12px", borderRadius: 999, background: C.surfaceSoft, border: `1px solid rgba(0,0,0,0.06)`, color: C.text, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" }}>
                                   All venues and outlets
                                 </span>
                               ) : assignedVenues.length ? (
                                 assignedVenues.map((venue) => (
-                                  <span key={venue} style={{ padding: "5px 9px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                                  <span key={venue} style={{ padding: "6px 12px", borderRadius: 999, background: C.surfaceSoft, border: `1px solid rgba(0,0,0,0.06)`, color: C.text, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" }}>
                                     {venue}
                                   </span>
                                 ))
@@ -739,7 +695,7 @@ export default function AccountSettings() {
                           type="button"
                           disabled={!profileDirty || savingProfile}
                           onClick={resetProfileDraft}
-                          style={buttonStyle("secondary", !profileDirty || savingProfile)}
+                          style={buttonStyle("ghost", !profileDirty || savingProfile)}
                         >
                           Reset
                         </button>
@@ -758,40 +714,36 @@ export default function AccountSettings() {
                     title="Password Management"
                     description="Update your password using your current password. Stronger passwords help protect operational access."
                   >
-                    <form onSubmit={saveSecurity} style={{ display: "grid", gap: 16, maxWidth: 660 }}>
-                      <div style={{ maxWidth: 430 }}>
-                        <Field label="Current Password">
-                          <PasswordInput
-                            value={security.current_password}
-                            onChange={(event) => setSecurity((prev) => ({ ...prev, current_password: event.target.value }))}
-                            required
-                            visible={showPasswords.current}
-                            onToggle={() => setShowPasswords((prev) => ({ ...prev, current: !prev.current }))}
-                          />
-                        </Field>
-                      </div>
-                      <div className="account-password-grid">
-                        <Field label="New Password" hint="Use at least 8 characters. Add uppercase letters, numbers, or symbols for a stronger password.">
-                          <PasswordInput
-                            value={security.password}
-                            onChange={(event) => setSecurity((prev) => ({ ...prev, password: event.target.value }))}
-                            required
-                            visible={showPasswords.next}
-                            onToggle={() => setShowPasswords((prev) => ({ ...prev, next: !prev.next }))}
-                          />
-                        </Field>
-                        <Field label="Confirm Password">
-                          <PasswordInput
-                            value={security.password_confirmation}
-                            onChange={(event) => setSecurity((prev) => ({ ...prev, password_confirmation: event.target.value }))}
-                            required
-                            visible={showPasswords.confirm}
-                            onToggle={() => setShowPasswords((prev) => ({ ...prev, confirm: !prev.confirm }))}
-                          />
-                        </Field>
-                      </div>
+                    <form onSubmit={saveSecurity} style={{ display: "grid", gap: 16, maxWidth: 540 }}>
+                      <Field label="Current Password">
+                        <PasswordInput
+                          value={security.current_password}
+                          onChange={(event) => setSecurity((prev) => ({ ...prev, current_password: event.target.value }))}
+                          required
+                          visible={showPasswords.current}
+                          onToggle={() => setShowPasswords((prev) => ({ ...prev, current: !prev.current }))}
+                        />
+                      </Field>
+                      <Field label="New Password" hint="Use at least 8 characters. Add uppercase letters, numbers, or symbols for a stronger password.">
+                        <PasswordInput
+                          value={security.password}
+                          onChange={(event) => setSecurity((prev) => ({ ...prev, password: event.target.value }))}
+                          required
+                          visible={showPasswords.next}
+                          onToggle={() => setShowPasswords((prev) => ({ ...prev, next: !prev.next }))}
+                        />
+                      </Field>
+                      <Field label="Confirm Password">
+                        <PasswordInput
+                          value={security.password_confirmation}
+                          onChange={(event) => setSecurity((prev) => ({ ...prev, password_confirmation: event.target.value }))}
+                          required
+                          visible={showPasswords.confirm}
+                          onToggle={() => setShowPasswords((prev) => ({ ...prev, confirm: !prev.confirm }))}
+                        />
+                      </Field>
 
-                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surfaceSoft, padding: 13, display: "grid", gap: 9, maxWidth: 620 }}>
+                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surfaceSoft, padding: 13, display: "grid", gap: 9 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 8, color: C.text, fontSize: 13, fontWeight: 700 }}>
                             <LockKeyhole size={15} color={passwordStrength.color} />
@@ -808,7 +760,7 @@ export default function AccountSettings() {
                         </div>
                       </div>
 
-                      <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 16, display: "flex", justifyContent: "flex-end" }}>
+                      <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-start" }}>
                         <button type="submit" disabled={savingSecurity} style={buttonStyle("primary", savingSecurity)}>
                           {savingSecurity ? <Spinner color="#FFFFFF" /> : <KeyRound size={14} />}
                           Change Password
@@ -823,12 +775,6 @@ export default function AccountSettings() {
                     eyebrow="Notifications"
                     title="Notification Preferences"
                     description="Choose which operational alerts should be emphasized for your current device."
-                    actions={
-                      <button type="button" onClick={savePreferences} disabled={savingPreferences} style={buttonStyle("primary", savingPreferences)}>
-                        {savingPreferences ? <Spinner color="#FFFFFF" /> : <Save size={14} />}
-                        Save Preferences
-                      </button>
-                    }
                   >
                     <div className="account-preference-grid">
                       <ToggleRow
@@ -856,6 +802,12 @@ export default function AccountSettings() {
                         onChange={(value) => setPreferences((prev) => ({ ...prev, systemUpdates: value }))}
                       />
                     </div>
+                    <div style={{ borderTop: `1px solid ${C.divider}`, marginTop: 24, paddingTop: 16, display: "flex", justifyContent: "flex-end" }}>
+                      <button type="button" onClick={savePreferences} disabled={savingPreferences} style={buttonStyle("primary", savingPreferences)}>
+                        {savingPreferences ? <Spinner color="#FFFFFF" /> : <Save size={14} />}
+                        Save Preferences
+                      </button>
+                    </div>
                   </Panel>
                 )}
 
@@ -881,9 +833,12 @@ export default function AccountSettings() {
                         </span>
                       </div>
 
-                      <Notice>
-                        Session history and logout-from-all-devices can be added once the backend exposes stored login activity.
-                      </Notice>
+                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surfaceSoft, padding: "14px 18px", display: "flex", gap: 12, alignItems: "flex-start", color: C.muted, fontSize: 13, lineHeight: 1.55 }}>
+                        <AlertCircle size={16} color={C.muted} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <span style={{ minWidth: 0 }}>
+                          Session history and logout-from-all-devices can be added once the backend exposes stored login activity.
+                        </span>
+                      </div>
                     </div>
                   </Panel>
                 )}

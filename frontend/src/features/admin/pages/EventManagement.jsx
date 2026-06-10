@@ -73,27 +73,24 @@ function formatDate(dateStr) {
 function DeleteConfirmModal({ event, loading, onCancel, onConfirm }) {
   if (!event) return null;
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(24,20,14,0.42)", backdropFilter: "blur(2px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div style={{ width: "min(400px,100%)", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 24px 80px rgba(0,0,0,0.22)", overflow: "hidden", animation: "modalIn 200ms ease" }}>
-        <div style={{ padding: "18px 20px", borderBottom: `1px solid ${C.divider}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, color: C.red, marginBottom: 8 }}>
-            <AlertTriangle size={18} />
-            <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase" }}>Delete Event</div>
-          </div>
-          <h3 style={{ margin: 0, fontSize: 18, lineHeight: 1.2, color: C.text }}>Delete {event.title}?</h3>
-        </div>
-        <div style={{ padding: 20, display: "grid", gap: 14 }}>
-          <p style={{ margin: 0, color: C.muted, fontSize: 13, lineHeight: 1.55 }}>
-            Are you sure you want to delete this event? This action cannot be undone. Associated reservations may lose their event link.
-          </p>
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 8 }}>
-            <button type="button" onClick={onCancel} disabled={loading} style={{ minWidth: 100, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, color: C.muted, fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", cursor: loading ? "not-allowed" : "pointer" }}>Cancel</button>
-            <button type="button" onClick={onConfirm} disabled={loading} style={{ minWidth: 130, padding: "10px 14px", border: "none", borderRadius: 8, background: C.red, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", cursor: loading ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              {loading ? <Spinner color="#FFFFFF" size={12} /> : <Trash2 size={14} />} Delete Event
-            </button>
+    <div className="event-confirm-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !loading) onCancel(); }} style={{ position: "fixed", inset: 0, zIndex: 10000, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)", animation: "modalFadeIn 200ms ease" }}>
+      <section className="event-confirm" role="dialog" aria-modal="true" aria-labelledby="delete-event-title" style={{ width: "min(420px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", padding: 20, animation: "modalIn 250ms cubic-bezier(0.22,1,0.36,1)" }}>
+        <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}>
+          <span style={{ width: 38, height: 38, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: C.redFaint, color: C.red }}>
+            <Trash2 size={18} />
+          </span>
+          <div>
+            <h2 id="delete-event-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 650 }}>Delete Event?</h2>
+            <p style={{ margin: "8px 0 0", fontSize: 13, lineHeight: 1.6, color: C.muted }}>Are you sure you want to delete <strong>{event.title}</strong>? This action cannot be undone.</p>
           </div>
         </div>
-      </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 18 }}>
+          <button type="button" disabled={loading} onClick={onCancel} style={{ minHeight: 34, border: `1px solid ${C.border}`, borderRadius: 9, background: C.surface, color: C.muted, padding: "0 11px", fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", cursor: "pointer" }}>Cancel</button>
+          <button type="button" disabled={loading} onClick={onConfirm} style={{ minHeight: 34, border: "none", borderRadius: 9, background: C.red, color: "#fff", padding: "0 11px", fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", cursor: "pointer", minWidth: 118 }}>
+            {loading ? "Working..." : "Delete Event"}
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
@@ -102,21 +99,53 @@ function SaveFeedbackModal({ type, item, onClose }) {
   if (!item) return null;
   const isDelete = type === "delete";
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(24,20,14,0.42)", backdropFilter: "blur(2px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, animation: "modalFadeIn 200ms ease" }}>
-      <div style={{ width: "min(340px,100%)", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 24px 80px rgba(0,0,0,0.22)", overflow: "hidden", textAlign: "center", animation: "modalIn 250ms cubic-bezier(0.22,1,0.36,1)" }}>
-        <div style={{ padding: "32px 24px" }}>
-          <div style={{ width: 48, height: 48, borderRadius: 24, background: isDelete ? C.redFaint : C.greenFaint, color: isDelete ? C.red : C.green, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+    <div className="event-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }} style={{ position: "fixed", inset: 0, zIndex: 10000, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)", animation: "modalFadeIn 200ms ease" }}>
+      <section className="event-confirm" role="dialog" aria-modal="true" aria-labelledby="save-feedback-title" style={{ width: "min(460px, 100%)", borderRadius: 14, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 24px 60px rgba(24,20,14,0.18)", padding: "26px 28px", animation: "modalIn 250ms cubic-bezier(0.22,1,0.36,1)" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 12 }}>
+          <span style={{ width: 44, height: 44, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", background: isDelete ? "linear-gradient(135deg, rgba(160,56,56,0.08), rgba(160,56,56,0.15))" : "linear-gradient(135deg, rgba(46,122,90,0.08), rgba(46,122,90,0.15))", color: isDelete ? C.red : C.green }}>
             {isDelete ? <Trash2 size={24} /> : <CheckCircle2 size={24} />}
+          </span>
+          <div>
+            <h2 id="save-feedback-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 700, fontFamily: F.label, letterSpacing: "-0.01em" }}>
+              {type === "create" ? "Event Created" 
+               : type === "update" ? "Event Updated"
+               : "Event Deleted"}
+            </h2>
+            <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.5, color: C.muted }}>
+              {isDelete
+               ? "The event has been completely removed from the system."
+               : "Changes have been saved successfully and are now reflected in the events list."}
+            </p>
           </div>
-          <h3 style={{ margin: "0 0 8px", fontSize: 18, color: C.text }}>Event {isDelete ? "Deleted" : "Saved"}</h3>
-          <p style={{ margin: 0, fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
-            {isDelete ? `"${item.title}" has been permanently removed.` : `"${item.title}" was saved successfully.`}
-          </p>
         </div>
-        <div style={{ padding: 16, borderTop: `1px solid ${C.divider}`, background: C.soft }}>
-          <button onClick={onClose} style={{ width: "100%", padding: "12px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}>Continue</button>
+
+        {!isDelete && (
+        <div style={{ marginTop: 22, display: "grid", gap: 14, padding: "16px 0", borderTop: `1px solid ${C.divider}`, borderBottom: `1px solid ${C.divider}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 20px" }}>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Event Title</span>
+              <strong style={{ display: "block", marginTop: 3, color: C.text, fontSize: 12.5, fontWeight: 650 }}>{item.title}</strong>
+            </div>
+            <div>
+              <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Status</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 4 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: item.status === "published" ? C.green : C.muted }} />
+                <span style={{ color: C.text, fontSize: 12.5, fontWeight: 600, textTransform: "capitalize" }}>{item.status}</span>
+              </span>
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Public URL Route</span>
+              <span style={{ display: "block", marginTop: 3, color: C.text, fontFamily: "monospace", fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                /{item.slug}
+              </span>
+            </div>
+          </div>
         </div>
-      </div>
+        )}
+        <button type="button" onClick={onClose} style={{ width: "100%", minHeight: 38, border: `1px solid ${C.border}`, borderRadius: 9, background: C.soft, color: C.text, marginTop: 22, padding: "0 11px", fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", cursor: "pointer" }}>
+          Close
+        </button>
+      </section>
     </div>
   );
 }
@@ -131,6 +160,8 @@ export default function EventManagement() {
   const [drawerClosing, setDrawerClosing] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(DEFAULT_FORM);
+  const [initialForm, setInitialForm] = useState(DEFAULT_FORM);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
   
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -142,6 +173,15 @@ export default function EventManagement() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!drawerOpen || saveFeedback || showDiscardConfirm) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") closeDrawer();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [drawerOpen, form, initialForm, saveFeedback, showDiscardConfirm]);
 
   const loadData = async () => {
     setLoading(true);
@@ -167,13 +207,14 @@ export default function EventManagement() {
   const handleCreate = () => {
     setEditingId(null);
     setForm(DEFAULT_FORM);
+    setInitialForm(DEFAULT_FORM);
     setDrawerClosing(false);
     setDrawerOpen(true);
   };
 
   const handleEdit = (ev) => {
     setEditingId(ev.id);
-    setForm({
+    const formData = {
       title: ev.title || "",
       slug: ev.slug || "",
       venue_id: ev.venue_id || "",
@@ -182,12 +223,20 @@ export default function EventManagement() {
       start_datetime: ev.start_datetime ? ev.start_datetime.substring(0, 16) : "",
       end_datetime: ev.end_datetime ? ev.end_datetime.substring(0, 16) : "",
       status: ev.status || "draft",
-    });
+    };
+    setForm(formData);
+    setInitialForm(formData);
     setDrawerClosing(false);
     setDrawerOpen(true);
   };
 
-  const closeDrawer = () => {
+  const closeDrawer = (forceDiscard = false) => {
+    const hasUnsavedChanges = JSON.stringify(form) !== JSON.stringify(initialForm);
+    if (hasUnsavedChanges && !forceDiscard) {
+      setShowDiscardConfirm(true);
+      return;
+    }
+    setShowDiscardConfirm(false);
     setDrawerClosing(true);
     setTimeout(() => {
       setDrawerOpen(false);
@@ -358,17 +407,11 @@ export default function EventManagement() {
 
       {drawerOpen && createPortal((
         <div className={`drawer-backdrop ${drawerClosing ? "closing" : ""}`} style={{ position: "fixed", inset: 0, background: "rgba(24,20,14,0.42)", backdropFilter: "blur(2px)", zIndex: 9999 }}>
-          <div style={{ position: "absolute", inset: 0 }} onClick={closeDrawer} />
+          <div style={{ position: "absolute", inset: 0 }} onClick={() => closeDrawer()} />
           <div className="drawer-panel" style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(480px, 100vw)", background: C.surface, boxShadow: "-8px 0 32px rgba(0,0,0,0.12)", display: "flex", flexDirection: "column" }}>
-            
-            <div style={{ padding: "16px 24px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: C.soft }}>
-              <div>
-                <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>
-                  {editingId ? "Edit Configuration" : "New Configuration"}
-                </div>
-                <h2 style={{ margin: 0, fontSize: 18, color: C.text }}>{editingId ? "Edit Event" : "Create Event"}</h2>
-              </div>
-              <button onClick={closeDrawer} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", padding: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: `1px solid ${C.divider}` }}>
+              <h2 style={{ margin: 0, fontSize: 18, color: C.text }}>{editingId ? "Edit Event" : "Create Event"}</h2>
+              <button onClick={() => closeDrawer()} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", padding: 4 }}>
                 <X size={20} />
               </button>
             </div>
@@ -426,7 +469,7 @@ export default function EventManagement() {
 
               <div style={{ borderTop: `1px solid ${C.divider}`, margin: "10px -24px", padding: "20px 24px" }}>
                 <div style={{ display: "flex", gap: 12 }}>
-                  <button type="button" onClick={closeDrawer} style={{ flex: 1, padding: "12px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, color: C.text, fontFamily: F.label, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer" }}>Cancel</button>
+                  <button type="button" onClick={() => closeDrawer()} style={{ flex: 1, padding: "12px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, color: C.text, fontFamily: F.label, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer" }}>Cancel</button>
                   <button type="submit" disabled={saving} style={{ flex: 1, padding: "12px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: saving ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                     {saving && <Spinner color="#fff" size={14} />}
                     {editingId ? "Save Changes" : "Create Event"}
@@ -439,6 +482,29 @@ export default function EventManagement() {
       ), document.body)}
 
       <DeleteConfirmModal event={deleteTarget} loading={saving} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDelete} />
+      
+      {showDiscardConfirm && (
+        <div className="event-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowDiscardConfirm(false); }} style={{ position: "fixed", inset: 0, zIndex: 10000, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)", animation: "modalFadeIn 200ms ease" }}>
+          <section className="event-confirm" role="dialog" aria-modal="true" aria-labelledby="discard-changes-title" style={{ width: "min(420px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", padding: 20, animation: "modalIn 250ms cubic-bezier(0.22,1,0.36,1)" }}>
+            <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}>
+              <span style={{ width: 38, height: 38, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: C.redFaint, color: C.red }}>
+                <AlertTriangle size={18} />
+              </span>
+              <div>
+                <h2 id="discard-changes-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 650 }}>Discard unsaved changes?</h2>
+                <p style={{ margin: "8px 0 0", fontSize: 13, lineHeight: 1.6, color: C.muted }}>You have unsaved event configuration changes. Leaving now will discard them.</p>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 18 }}>
+              <button type="button" onClick={() => setShowDiscardConfirm(false)} style={{ minHeight: 34, border: `1px solid ${C.border}`, borderRadius: 9, background: C.surface, color: C.muted, padding: "0 11px", fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", cursor: "pointer" }}>Keep Editing</button>
+              <button type="button" onClick={() => closeDrawer(true)} style={{ minHeight: 34, border: "none", borderRadius: 9, background: C.gold, color: "#fff", padding: "0 11px", fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", cursor: "pointer", minWidth: 140 }}>
+                Discard Changes
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       <SaveFeedbackModal type={saveFeedback?.type} item={saveFeedback?.item} onClose={() => setSaveFeedback(null)} />
 
     </div>
