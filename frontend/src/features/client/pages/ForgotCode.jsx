@@ -241,7 +241,7 @@ export default function ForgotCode() {
   const [focused,     setFocused]     = useState(false);
 
   // Email recovery tab state
-  const [activeTab,    setActiveTab]    = useState("combo");
+  const [activeTab,    setActiveTab]    = useState("email");
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [emailSending,  setEmailSending]  = useState(false);
   const [emailSent,     setEmailSent]     = useState(false);
@@ -467,13 +467,13 @@ export default function ForgotCode() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: "96px 24px 48px",
+          padding: "36px 24px",
           boxSizing: "border-box",
         }}>
           <div style={{
             width: "100%",
             maxWidth: results ? 540 : 462,
-            padding: results ? 0 : "clamp(24px,3vw,34px)",
+            padding: results ? 0 : "22px 28px",
             borderRadius: results ? 0 : 24,
             background: results ? "transparent" : (isDark
               ? "linear-gradient(145deg, rgba(255,250,241,0.075), rgba(255,250,241,0.025)), rgba(17,16,9,0.70)"
@@ -489,8 +489,8 @@ export default function ForgotCode() {
 
             {/* Header — hidden once results appear */}
             {!results && !emailSent && (
-              <div style={{ marginBottom: 28, animation: "fadeUp 0.32s ease" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              <div style={{ marginBottom: 16, animation: "fadeUp 0.32s ease" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                   <span style={{ display: "inline-block", width: 24, height: "1px", background: C.gold, opacity: 0.6 }} />
                   <span style={{
                     fontFamily: F.label, fontSize: 9, letterSpacing: "0.26em",
@@ -500,15 +500,15 @@ export default function ForgotCode() {
                   </span>
                 </div>
                 <h1 style={{
-                  fontFamily: F.display, fontSize: 32, fontWeight: 400,
-                  color: C.textPrimary, lineHeight: 1.2, margin: "0 0 12px",
+                  fontFamily: F.display, fontSize: 28, fontWeight: 400,
+                  color: C.textPrimary, lineHeight: 1.2, margin: "0 0 8px",
                   letterSpacing: "0.01em",
                 }}>
                   Recover Your Reference Code
                 </h1>
                 <p style={{
-                  fontFamily: F.body, fontSize: 13.5, color: C.textSecondary,
-                  margin: "0 0 22px", lineHeight: 1.72,
+                  fontFamily: F.body, fontSize: 13, color: C.textSecondary,
+                  margin: "0 0 14px", lineHeight: 1.65,
                 }}>
                   {activeTab === "combo"
                     ? "Enter your combination code to locate your booking reference."
@@ -523,14 +523,6 @@ export default function ForgotCode() {
                   border: `1px solid ${C.borderDefault}`,
                 }}>
                   {[
-                    { key: "combo", label: "Combination Code", icon: (
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" strokeWidth="2.5"
-                        strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                    )},
                     { key: "email", label: "Email Recovery", icon: (
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" strokeWidth="2.5"
@@ -539,12 +531,20 @@ export default function ForgotCode() {
                         <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                       </svg>
                     )},
+                    { key: "combo", label: "Combination Code", icon: (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2.5"
+                        strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    )},
                   ].map(({ key, label, icon }) => (
                     <button
                       key={key}
                       onClick={() => { setActiveTab(key); setError(""); setResults(null); setEmailSent(false); }}
                       style={{
-                        flex: 1, padding: "9px 14px",
+                        flex: 1, padding: "7px 12px",
                         background: activeTab === key
                           ? (isDark ? "rgba(196,163,90,0.15)" : "rgba(255,255,255,0.92)")
                           : "transparent",
@@ -576,17 +576,17 @@ export default function ForgotCode() {
 
                 {/* How-it-works hint */}
                 <div style={{
-                  padding: "12px 14px", borderRadius: 12, marginBottom: 20,
+                  padding: "8px 12px", borderRadius: 8, marginBottom: 12,
                   background: isDark ? "rgba(196,163,90,0.075)" : "rgba(140,107,42,0.065)", border: `1px solid ${C.borderAccent}`,
-                  display: "flex", gap: 12, alignItems: "flex-start",
+                  display: "flex", gap: 10, alignItems: "flex-start",
                 }}>
                   <div style={{
-                    width: 28, height: 28, borderRadius: 6,
+                    width: 24, height: 24, borderRadius: 5,
                     background: C.goldFaintest, border: `1px solid ${C.borderAccent}`,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     flexShrink: 0,
                   }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
                       stroke={C.gold} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10" />
                       <line x1="12" y1="8"  x2="12"   y2="12" />
@@ -595,15 +595,15 @@ export default function ForgotCode() {
                   </div>
                   <div>
                     <div style={{
-                      fontFamily: F.label, fontSize: 10, fontWeight: 700,
+                      fontFamily: F.label, fontSize: 9.5, fontWeight: 700,
                       letterSpacing: "0.10em", textTransform: "uppercase",
-                      color: C.gold, marginBottom: 3,
+                      color: C.gold, marginBottom: 2,
                     }}>
                       How it works
                     </div>
                     <div style={{
-                      fontFamily: F.body, fontSize: 12,
-                      color: C.textSecondary, lineHeight: 1.65,
+                      fontFamily: F.body, fontSize: 11.5,
+                      color: C.textSecondary, lineHeight: 1.55,
                     }}>
                       Combine your surname with the last 2 digits of your phone number.
                     </div>
@@ -611,12 +611,12 @@ export default function ForgotCode() {
                 </div>
 
                 {/* Input */}
-                <div style={{ marginBottom: 14 }}>
+                <div style={{ marginBottom: 10 }}>
                   <label style={{
                     display: "flex", alignItems: "center", gap: 6,
                     fontFamily: F.label, fontSize: 9, letterSpacing: "0.22em",
                     color: focused ? C.gold : C.textSecondary,
-                    fontWeight: 700, textTransform: "uppercase", marginBottom: 8,
+                    fontWeight: 700, textTransform: "uppercase", marginBottom: 6,
                     transition: "color 0.18s",
                   }}>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
@@ -638,11 +638,11 @@ export default function ForgotCode() {
                     autoComplete="off"
                     style={{
                       width: "100%", boxSizing: "border-box",
-                      padding: "14px 18px",
+                      padding: "10px 14px",
                       border: `1px solid ${focused ? C.borderAccent : C.borderDefault}`,
                       borderRadius: 12,
                       background: isDark ? "rgba(255,250,241,0.055)" : "rgba(255,255,255,0.76)",
-                      fontFamily: F.mono, fontSize: 17, fontWeight: 500,
+                      fontFamily: F.mono, fontSize: 15, fontWeight: 500,
                       letterSpacing: "0.06em", color: C.textPrimary,
                       outline: "none",
                       transition: "border-color 0.18s, box-shadow 0.18s, background 0.18s",
@@ -676,7 +676,7 @@ export default function ForgotCode() {
                   onClick={handleSearch}
                   disabled={searching}
                   style={{
-                    width: "100%", padding: "14px",
+                    width: "100%", padding: "11px",
                     background: searching
                       ? (isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)")
                       : `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`,
@@ -690,7 +690,7 @@ export default function ForgotCode() {
                     display: "flex", alignItems: "center",
                     justifyContent: "center", gap: 10,
                     marginBottom: 0,
-                    boxShadow: searching ? "none" : "0 14px 26px rgba(140,107,42,0.22)",
+                    boxShadow: searching ? "none" : "0 10px 20px rgba(140,107,42,0.16)",
                   }}
                   onMouseEnter={(e) => { if (!searching) e.currentTarget.style.background = C.goldLight; }}
                   onMouseLeave={(e) => { if (!searching) e.currentTarget.style.background = `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`; }}
@@ -721,7 +721,7 @@ export default function ForgotCode() {
 
                 {/* Footer link */}
                 <div style={{
-                  marginTop: 24, paddingTop: 22,
+                  marginTop: 18, paddingTop: 16,
                   borderTop: `1px solid ${C.divider}`,
                   display: "flex", alignItems: "center",
                   justifyContent: "space-between",
@@ -755,12 +755,12 @@ export default function ForgotCode() {
               <div style={{ animation: "fadeUp 0.36s ease" }}>
 
                 {/* Email input */}
-                <div style={{ marginBottom: 14 }}>
+                <div style={{ marginBottom: 10 }}>
                   <label style={{
                     display: "flex", alignItems: "center", gap: 6,
                     fontFamily: F.label, fontSize: 9, letterSpacing: "0.22em",
                     color: emailFocused ? C.gold : C.textSecondary,
-                    fontWeight: 700, textTransform: "uppercase", marginBottom: 8,
+                    fontWeight: 700, textTransform: "uppercase", marginBottom: 6,
                     transition: "color 0.18s",
                   }}>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
@@ -783,11 +783,11 @@ export default function ForgotCode() {
                     autoComplete="email"
                     style={{
                       width: "100%", boxSizing: "border-box",
-                      padding: "14px 18px",
+                      padding: "10px 14px",
                       border: `1px solid ${emailFocused ? C.borderAccent : C.borderDefault}`,
                       borderRadius: 12,
                       background: isDark ? "rgba(255,250,241,0.055)" : "rgba(255,255,255,0.76)",
-                      fontFamily: F.body, fontSize: 15, fontWeight: 500,
+                      fontFamily: F.body, fontSize: 14, fontWeight: 500,
                       color: C.textPrimary,
                       outline: "none",
                       transition: "border-color 0.18s, box-shadow 0.18s, background 0.18s",
@@ -799,19 +799,19 @@ export default function ForgotCode() {
 
                 {/* Info hint */}
                 <div style={{
-                  padding: "10px 14px", borderRadius: 10, marginBottom: 14,
+                  padding: "8px 12px", borderRadius: 8, marginBottom: 10,
                   background: isDark ? "rgba(196,163,90,0.06)" : "rgba(140,107,42,0.05)",
                   border: `1px solid ${C.borderAccent}`,
-                  display: "flex", gap: 10, alignItems: "flex-start",
+                  display: "flex", gap: 8, alignItems: "flex-start",
                 }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
                     stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                     style={{ flexShrink: 0, marginTop: 1 }}>
                     <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
                     <path d="M12 16v-4" />
                     <path d="M12 8h.01" />
                   </svg>
-                  <span style={{ fontFamily: F.body, fontSize: 12, color: C.textSecondary, lineHeight: 1.6 }}>
+                  <span style={{ fontFamily: F.body, fontSize: 11.5, color: C.textSecondary, lineHeight: 1.55 }}>
                     We'll send all your active reservation reference codes to this email. Check your inbox (and spam folder) after submitting.
                   </span>
                 </div>
@@ -840,7 +840,7 @@ export default function ForgotCode() {
                   onClick={handleEmailRecovery}
                   disabled={emailSending}
                   style={{
-                    width: "100%", padding: "14px",
+                    width: "100%", padding: "11px",
                     background: emailSending
                       ? (isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)")
                       : `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`,
@@ -853,7 +853,7 @@ export default function ForgotCode() {
                     transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
                     display: "flex", alignItems: "center",
                     justifyContent: "center", gap: 10,
-                    boxShadow: emailSending ? "none" : "0 14px 26px rgba(140,107,42,0.22)",
+                    boxShadow: emailSending ? "none" : "0 10px 20px rgba(140,107,42,0.16)",
                   }}
                   onMouseEnter={(e) => { if (!emailSending) e.currentTarget.style.background = C.goldLight; }}
                   onMouseLeave={(e) => { if (!emailSending) e.currentTarget.style.background = `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`; }}
@@ -884,7 +884,7 @@ export default function ForgotCode() {
 
                 {/* Footer link */}
                 <div style={{
-                  marginTop: 24, paddingTop: 22,
+                  marginTop: 18, paddingTop: 16,
                   borderTop: `1px solid ${C.divider}`,
                   display: "flex", alignItems: "center",
                   justifyContent: "space-between",
