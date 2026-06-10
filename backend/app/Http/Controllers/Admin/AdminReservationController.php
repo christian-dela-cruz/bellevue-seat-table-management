@@ -106,8 +106,8 @@ class AdminReservationController extends Controller
             'email'            => 'required|email|max:255',
             'phone'            => 'required|string|max:20',
             'venue_id'         => 'required|exists:venues,id',
-            'table_number'     => 'nullable|string|max:50',
-            'seat_number'      => 'nullable|string|max:50',
+            'table_number'     => 'nullable|string|max:255',
+            'seat_number'      => 'nullable|string|max:255',
             'guests_count'     => 'required|integer|min:1',
             'event_date'       => 'required|date',
             'event_time'       => 'required|string|max:50',
@@ -118,7 +118,7 @@ class AdminReservationController extends Controller
             'special_requests' => 'nullable|string',
             'type'             => 'required|in:whole,individual,standalone',
             'is_standalone'    => 'nullable|boolean',
-            'seat_id'          => 'nullable|string|max:50',
+            'seat_id'          => 'nullable|string|max:255',
         ]);
 
         $validated['reference_code'] = date('Y') . '-' . str_pad(mt_rand(1, 9999), 4, '0', STR_PAD_LEFT);
@@ -202,9 +202,9 @@ class AdminReservationController extends Controller
             'phone'            => 'sometimes|required|string|max:20',
             'venue_id'         => 'sometimes|required|exists:venues,id',
             'room'             => 'sometimes|nullable|string|max:255',
-            'table_number'     => 'sometimes|nullable|string|max:50',
-            'seat_number'      => 'sometimes|nullable|string|max:50',
-            'seat_id'          => 'sometimes|nullable|string|max:50',
+            'table_number'     => 'sometimes|nullable|string|max:255',
+            'seat_number'      => 'sometimes|nullable|string|max:255',
+            'seat_id'          => 'sometimes|nullable|string|max:255',
             'guests_count'     => 'sometimes|required|integer|min:1',
             'event_date'       => 'sometimes|required|date',
             'event_time'       => 'sometimes|required|string|max:50',

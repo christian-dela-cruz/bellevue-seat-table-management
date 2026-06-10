@@ -81,30 +81,28 @@ function SidebarCollapseBtn({ onClick, isOpen }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title={isOpen ? "Collapse sidebar" : "Expand sidebar"}
-      style={{
-        position: "absolute",
-        top: 64, // Align exactly on the header divider border line
-        right: -12, // Float exactly over the border (half of button width)
-        transform: "translateY(-50%)",
-        width: 24,
-        height: 24,
-        borderRadius: "50%",
-        background: "#FFFFFF",
-        border: "1px solid rgba(140,107,42,0.18)",
-        padding: 0,
-        boxSizing: "border-box",
-        flexShrink: 0,
-        boxShadow: hovered
-          ? "0 4px 10px rgba(140,107,42,0.16)"
-          : "0 2px 6px rgba(0,0,0,0.05)",
-        cursor: "pointer",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 50,
-        transition: "background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s",
-        outline: "none",
-      }}
+        style={{
+          position: "absolute",
+          top: 64, // Align exactly on the header divider border line
+          right: -13, // Float exactly over the border (half of button width)
+          transform: "translateY(-50%)",
+          width: 26,
+          height: 26,
+          borderRadius: "50%",
+          background: "#FFFFFF",
+          border: "1px solid rgba(140,107,42,0.35)",
+          padding: 0,
+          boxShadow: hovered
+            ? "0 4px 12px rgba(140,107,42,0.25)"
+            : "0 2px 8px rgba(0,0,0,0.15)",
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 50,
+          transition: "background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s",
+          outline: "none",
+        }}
     >
       <Icon
         size={12}

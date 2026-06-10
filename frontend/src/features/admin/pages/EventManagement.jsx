@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+
 import {
   CalendarDays,
   CheckCircle2,
@@ -144,12 +146,17 @@ export default function EventManagement() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [eventsRes, venuesRes] = await Promise.all([
+      const [eventsRes, venuesRes] = await Promise.allSettled([
         eventAPI.getAll(),
         venueAPI.getAll()
       ]);
-      setEvents(eventsRes.data || []);
-      setVenues(Array.isArray(venuesRes) ? venuesRes : (venuesRes.data || []));
+      setEvents(eventsRes.status === 'fulfilled' ? (eventsRes.value.data || []) : []);
+      if (venuesRes.status === 'fulfilled') {
+        const vData = venuesRes.value;
+        setVenues(Array.isArray(vData) ? vData : (vData && vData.data ? vData.data : []));
+      } else {
+        setVenues([]);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -348,8 +355,8 @@ export default function EventManagement() {
         </main>
       </div>
 
-      {drawerOpen && (
-        <div className={`drawer-backdrop ${drawerClosing ? "closing" : ""}`} style={{ position: "fixed", inset: 0, background: "rgba(24,20,14,0.42)", backdropFilter: "blur(2px)", zIndex: 1000 }}>
+      {drawerOpen && createPortal((
+        <div className={`drawer-backdrop ${drawerClosing ? "closing" : ""}`} style={{ position: "fixed", inset: 0, background: "rgba(24,20,14,0.42)", backdropFilter: "blur(2px)", zIndex: 9999 }}>
           <div style={{ position: "absolute", inset: 0 }} onClick={closeDrawer} />
           <div className="drawer-panel" style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(480px, 100vw)", background: C.surface, boxShadow: "-8px 0 32px rgba(0,0,0,0.12)", display: "flex", flexDirection: "column" }}>
             
@@ -425,11 +432,10 @@ export default function EventManagement() {
                   </button>
                 </div>
               </div>
-
             </form>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       <DeleteConfirmModal event={deleteTarget} loading={saving} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDelete} />
       <SaveFeedbackModal type={saveFeedback?.type} item={saveFeedback?.item} onClose={() => setSaveFeedback(null)} />

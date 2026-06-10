@@ -1573,13 +1573,16 @@ function LeftSidebarPanel({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ 
-            transform: isOpen ? "rotate(90deg)" : "rotate(0deg)", 
-            transition: "transform 0.15s", 
-            display: "inline-block", 
-            fontSize: 7,
-            color: C.gold
-          }}>▶</span>
+          <svg 
+            width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.gold} 
+            strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+            style={{ 
+              transform: isOpen ? "rotate(90deg)" : "rotate(0deg)", 
+              transition: "transform 0.15s", 
+            }}
+          >
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
           <span style={{
             fontSize: 10,
             fontWeight: 700,
@@ -1598,43 +1601,56 @@ function LeftSidebarPanel({
     );
   };
 
-  const SubSectionHeader = ({ title, isOpen, onClick }) => (
-    <div 
-      onClick={onClick}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        marginTop: 8,
-        marginBottom: 6,
-        padding: "4px 2px",
-        cursor: "pointer",
-        userSelect: "none"
-      }}
-    >
-      <span style={{ 
-        transform: isOpen ? "rotate(90deg)" : "rotate(0deg)", 
-        transition: "transform 0.15s", 
-        display: "inline-block", 
-        fontSize: 7,
-        color: C.gold
-      }}>▶</span>
-      <div style={{
-        fontSize: 8,
-        fontWeight: 700,
-        letterSpacing: "0.08em",
-        color: C.gold,
-        textTransform: "uppercase",
-        fontFamily: F
-      }}>{title}</div>
-    </div>
-  );
+  const SubSectionHeader = ({ title, isOpen, onClick }) => {
+    const [hovered, setHovered] = useState(false);
+    return (
+      <div 
+        onClick={onClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginTop: 6,
+          marginBottom: 6,
+          padding: "8px 10px",
+          background: hovered ? "rgba(140, 107, 42, 0.08)" : "rgba(0,0,0,0.02)",
+          border: `1px solid ${hovered ? C.goldFaint : C.borderDefault}`,
+          borderRadius: 6,
+          cursor: "pointer",
+          userSelect: "none",
+          transition: "all 0.15s ease"
+        }}
+      >
+        <div style={{
+          fontSize: 9,
+          fontWeight: 750,
+          letterSpacing: "0.06em",
+          color: hovered ? C.gold : C.textSecondary,
+          textTransform: "uppercase",
+          fontFamily: F,
+          transition: "color 0.15s"
+        }}>{title}</div>
+        <svg 
+          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={hovered ? C.gold : C.textTertiary} 
+          strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          style={{ 
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", 
+            transition: "all 0.2s ease" 
+          }}
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </div>
+    );
+  };
 
   return (
-    <div className="sm-scroll" style={{ width: 240, flexShrink: 0, alignSelf: "stretch", background: C.sidebarBg, borderRight: `1px solid ${C.sidebarBorder}`, display: "flex", flexDirection: "column", overflowY: "auto", overflowX: "hidden", userSelect: "none" }}>
+    <div className="sm-scroll" style={{ width: 240, flexShrink: 0, alignSelf: "stretch", background: C.sidebarBg, borderRight: `1px solid ${C.sidebarBorder}`, display: "flex", flexDirection: "column", overflow: "hidden", userSelect: "none" }}>
       
       {/* SEGMENTED TAB CONTROL */}
-      <div style={{ position: "sticky", top: 0, zIndex: 10, padding: "12px 14px 10px", background: C.surfaceRaised, borderBottom: `1px solid ${C.divider}` }}>
+      <div style={{ padding: "12px 14px 10px", background: C.surfaceRaised, borderBottom: `1px solid ${C.divider}`, zIndex: 10, flexShrink: 0 }}>
         <div style={{ display: "flex", background: "rgba(0,0,0,0.04)", borderRadius: 8, padding: 3, border: `1px solid ${C.borderDefault}` }}>
           <button 
             onClick={() => setActiveTab("rooms")}
@@ -1665,7 +1681,9 @@ function LeftSidebarPanel({
         </div>
       </div>
 
-      {/* 1. ROOM NAVIGATOR */}
+      <div className="sm-scroll" style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+
+        {/* 1. ROOM NAVIGATOR */}
       {activeTab === "rooms" && (
         <div style={{ display: "flex", flexDirection: "column", paddingBottom: 10 }}>
           {/* Current Context Badge */}
@@ -2080,6 +2098,7 @@ function LeftSidebarPanel({
       </div>
       )}
 
+      </div>
     </div>
   );
 }
@@ -3081,7 +3100,7 @@ function InspectorPanel({
 
       {/* ── Label selected ── */}
       {selected?.type === "label" && selectedLabelObj && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", flex: 1 }}>
           <div>
             {iLabel("Label Text")}
             {iInput({

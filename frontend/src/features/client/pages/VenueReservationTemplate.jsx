@@ -232,9 +232,21 @@ const getWholeSeatLabel = (guests, tableData = null) => {
   if (!guests || guests < 1) return "Seat 1";
   if (tableData?.seats?.length) {
     const bookable = tableData.seats.filter(s => s.status === "available").slice(0, guests).map(s => s.num ?? s.id);
-    if (bookable.length > 0) return `Seat ${bookable.join(", ")}`;
+    if (bookable.length > 0) {
+      const first = String(bookable[0]);
+      if (first.toLowerCase().startsWith("seat")) {
+        return bookable.join(", ");
+      }
+      return `Seat ${bookable.join(", ")}`;
+    }
   }
   return `Seat ${Array.from({ length: guests }, (_, i) => i + 1).join(", ")}`;
+};
+
+const formatSeatLabel = (seat) => {
+  if (!seat) return "";
+  const num = String(seat.num ?? seat.id ?? "");
+  return num.toLowerCase().startsWith("seat") ? num : `Seat ${num}`;
 };
 
 const getSeatRatio = (table) => {
@@ -289,8 +301,8 @@ function ModalShell({ children, onClose, disabled, C, maxWidth = 720 }) {
       style={{ position: "fixed", inset: 0, background: C.modalOverlay, zIndex: 20000, display: "flex", alignItems: "center", justifyContent: "center", padding: "28px 20px", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
       onClick={e => { if (e.target === e.currentTarget && !disabled) onClose(); }}
     >
-      <div style={{ background: C.surfaceBase, borderRadius: 16, width: "100%", maxWidth, maxHeight: "calc(100vh - 40px)", overflowY: "auto", boxShadow: "0 30px 90px rgba(0,0,0,0.50)", border: `1px solid ${C.borderAccent}`, fontFamily: F.body, position: "relative", animation: "modalIn 0.22s cubic-bezier(0.16,1,0.3,1)", overflow: "hidden" }}>
-        <div style={{ height: "4px", background: `linear-gradient(90deg, transparent 0%, ${C.gold} 30%, ${C.gold} 70%, transparent 100%)` }} />
+      <div style={{ display: "flex", flexDirection: "column", background: C.surfaceBase, borderRadius: 16, width: "100%", maxWidth, maxHeight: "calc(100vh - 40px)", boxShadow: "0 30px 90px rgba(0,0,0,0.50)", border: `1px solid ${C.borderAccent}`, fontFamily: F.body, position: "relative", animation: "modalIn 0.22s cubic-bezier(0.16,1,0.3,1)", overflow: "hidden" }}>
+        <div style={{ flexShrink: 0, height: "4px", background: `linear-gradient(90deg, transparent 0%, ${C.gold} 30%, ${C.gold} 70%, transparent 100%)` }} />
         {children}
       </div>
     </div>
@@ -299,7 +311,7 @@ function ModalShell({ children, onClose, disabled, C, maxWidth = 720 }) {
 
 function ModalHeader({ eyebrow, title, onClose, disabled, C, meta }) {
   return (
-    <div style={{ background: C.headerGradient, padding: "24px 28px 20px", position: "sticky", top: 0, zIndex: 2, borderBottom: `1px solid ${C.divider}` }}>
+    <div style={{ flexShrink: 0, background: C.headerGradient, padding: "24px 28px 20px", position: "sticky", top: 0, zIndex: 2, borderBottom: `1px solid ${C.divider}` }}>
       <div style={{ position: "absolute", top: 20, right: 20, zIndex: 20 }}>
         <CloseBtn onClick={onClose} disabled={disabled} C={C} />
       </div>
@@ -511,7 +523,7 @@ function ModalGuestCount({ seatData, tableData, mode, isStandalone, onContinue, 
     return (
       <ModalShell onClose={onCancel} C={C}>
         <ModalHeader eyebrow="Seat Reservation" title="Reserve This Seat" onClose={onCancel} C={C} meta={<StepIndicator step={1} C={C} />} />
-        <div style={{ padding: "22px 24px 26px" }}>
+        <div style={{ padding: "22px 24px 26px", flex: 1, minHeight: 0, overflowY: "auto" }}>
           <div style={{ background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 10, overflow: "hidden", marginBottom: 22 }}>
             {[
               ["Room", ROOM, null],
@@ -540,7 +552,7 @@ function ModalGuestCount({ seatData, tableData, mode, isStandalone, onContinue, 
         onClose={onCancel} C={C}
         meta={<StepIndicator step={1} C={C} />}
       />
-      <div style={{ padding: "22px 24px 26px" }}>
+      <div style={{ padding: "22px 24px 26px", flex: 1, minHeight: 0, overflowY: "auto" }}>
         {mode === "individual" && (
           <div style={{ background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 10, overflow: "hidden", marginBottom: 22 }}>
             {infoRows.map(([key, val, color], i) => (
@@ -674,7 +686,7 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
 
   const allFilled = Object.keys(errors).length === 0;
 
-  const seatDisplay = mode === "whole" ? getWholeSeatLabel(guests, tableData) : seatData ? `Seat ${seatData.num ?? seatData.id}` : "-";
+  const seatDisplay = mode === "whole" ? getWholeSeatLabel(guests, tableData) : seatData ? formatSeatLabel(seatData) : "-";
   const summaryRows = [
     ["Venue", "The Bellevue Manila"],
     ["Outlet", ROOM],
@@ -696,8 +708,8 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
   return (
     <ModalShell onClose={onCancel} C={C} maxWidth={920}>
       <ModalHeader eyebrow={isStandalone ? "Standalone Seat Reservation" : mode === "individual" ? "Seat Reservation" : "Table Reservation"} title="Your Information" onClose={onCancel} C={C} meta={<StepIndicator step={2} C={C} />} />
-      <div style={{ display: "grid", gridTemplateColumns: window.innerWidth < 820 ? "1fr" : "minmax(0,1fr) 300px", gap: 0, maxHeight: window.innerWidth < 820 ? "calc(100vh - 180px)" : "calc(100vh - 214px)", overflow: "hidden" }}>
-        <div style={{ padding: "24px 28px 28px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: window.innerWidth < 820 ? "1fr" : "minmax(0,1fr) 300px", gap: 0, overflow: "hidden" }}>
+        <div style={{ padding: "24px 28px 28px", overflowY: "auto", WebkitOverflowScrolling: "touch", minHeight: 0 }}>
 
           <SectionLabel C={C}>1. Guest Information</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
@@ -719,8 +731,8 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
           <Field label="Special Requests (Optional)" value={form.specialRequests} onChange={set("specialRequests")} type="textarea" rows={3} C={C} isDark={isDark} placeholder="Optional requests, preferences, dietary restrictions, or notes for the reservation." />
         </div>
 
-        <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "20px 20px 20px", overflowY: "auto" }}>
-          <div style={{ display: "grid", gap: 12 }}>
+        <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "20px 20px 20px", overflowY: "auto", minHeight: 0 }}>
+          <div style={{ display: "grid", gap: 12, paddingBottom: 16 }}>
 
             {/* Elegant Seat Hold Timer Card */}
             <div style={{
@@ -778,7 +790,7 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
 function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, onSubmit, onEdit, submitting, isRebook, rebookFrom, C, ROOM, WING }) {
   const [consentAccepted, setConsentAccepted] = useState(false);
   const fmt = t => { if (!t) return null; const [h, m] = t.split(":"); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr >= 12 ? "PM" : "AM"}`; };
-  const seatDisplay = mode === "whole" ? getWholeSeatLabel(guests, tableData) : `Seat ${seatData?.num ?? seatData?.id ?? "-"}`;
+  const seatDisplay = mode === "whole" ? getWholeSeatLabel(guests, tableData) : (seatData ? formatSeatLabel(seatData) : "-");
   const canSubmit = consentAccepted && !submitting;
 
   const reservationRows = [
@@ -807,8 +819,8 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
   return (
     <ModalShell onClose={onEdit} disabled={submitting} C={C} maxWidth={920}>
       <ModalHeader eyebrow={isRebook ? "Rebook / Move Seat" : isStandalone ? "Standalone Seat Reservation" : mode === "individual" ? "Seat Reservation" : "Table Reservation"} title="Review Your Booking" onClose={onEdit} disabled={submitting} C={C} meta={<StepIndicator step={3} C={C} />} />
-      <div style={{ display: "grid", gridTemplateColumns: window.innerWidth < 820 ? "1fr" : "minmax(0,1fr) 300px", gap: 0, maxHeight: window.innerWidth < 820 ? "calc(100vh - 180px)" : "calc(100vh - 214px)", overflow: "hidden" }}>
-        <div style={{ padding: "24px 28px 28px", overflowY: "auto", display: "grid", gap: 20 }}>
+      <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: window.innerWidth < 820 ? "1fr" : "minmax(0,1fr) 300px", gap: 0, overflow: "hidden" }}>
+        <div style={{ padding: "24px 28px 28px", overflowY: "auto", display: "grid", gap: 20, minHeight: 0 }}>
           {isRebook && rebookFrom && (
             <div style={{ padding: "12px 14px", borderRadius: 8, background: C.statusNote?.pending || C.goldFaintest, border: `1px solid ${C.statusNoteBorder?.pending || C.borderAccent}`, fontSize: 12, color: C.gold, lineHeight: 1.65 }}>
               <strong style={{ color: C.gold }}>Rebooking Notice:</strong> Previous reservation <strong>{rebookFrom.reference_code || rebookFrom.id}</strong> will be cancelled automatically on submission.
@@ -834,8 +846,8 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
           </div>
         </div>
 
-        <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "20px 20px 20px", overflowY: "auto" }}>
-          <div style={{ display: "grid", gap: 12 }}>
+        <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "20px 20px 20px", overflowY: "auto", minHeight: 0 }}>
+          <div style={{ display: "grid", gap: 12, paddingBottom: 16 }}>
             <div style={{ padding: "10px 14px", borderRadius: 12, background: C.surfaceInput, border: `1px solid ${C.borderAccent}`, boxShadow: `0 0 10px ${C.gold}08` }}>
               <div style={{ fontFamily: F.label, fontSize: 8.5, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, fontWeight: 800, marginBottom: 8 }}>Final Review</div>
               <div style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.6 }}>Your booking will be reviewed by our team after submission. You will receive updates through your contact details.</div>
@@ -942,7 +954,7 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
           <CloseBtn onClick={onBack} C={C} />
         </div>
 
-        <div style={{ padding: "40px 32px 34px", textAlign: "center", display: "grid", gap: 24 }}>
+        <div style={{ padding: "40px 32px 34px", textAlign: "center", display: "grid", gap: 24, flex: 1, minHeight: 0, overflowY: "auto" }}>
           <div>
             <div style={{
               width: 56,
@@ -1729,7 +1741,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   const displaySeat = !hasSeatLayout
     ? "Whole Area"
     : mode === "individual"
-      ? (selectedSeat ? `Seat ${selectedSeat.num ?? selectedSeat.id}` : "Select a seat")
+      ? (selectedSeat ? formatSeatLabel(selectedSeat) : "Select a seat")
       : getWholeSeatLabel(guests, activeTable);
   const venueImage = imageUrl(venue?.image);
 

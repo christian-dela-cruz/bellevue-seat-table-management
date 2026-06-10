@@ -48,8 +48,13 @@ class ReservationValidationTest extends TestCase
             'reservations_enabled' => true,
         ]);
 
-        $venue->seatmap_payload = json_encode($payload);
-        $venue->save();
+        \App\Models\SeatMap::create([
+            'venue_id' => $venue->id,
+            'status' => 'published',
+            'payload' => $payload,
+            'version_number' => 1,
+            'published_at' => now(),
+        ]);
 
         return $venue;
     }

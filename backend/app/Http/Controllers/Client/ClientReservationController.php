@@ -99,8 +99,8 @@ class ClientReservationController extends Controller
             'phone'            => 'required|string|max:20',
             'venue_id'         => 'required|exists:venues,id',
             'room'             => 'nullable|string|max:255',
-            'table_number'     => 'nullable|string|max:50',
-            'seat_number'      => 'nullable|string|max:50',
+            'table_number'     => 'nullable|string|max:255',
+            'seat_number'      => 'nullable|string|max:255',
             'guests_count'     => 'required|integer|min:1',
             'event_date'       => 'required|date',
             'event_time'       => 'required|string|max:50',
@@ -111,7 +111,7 @@ class ClientReservationController extends Controller
             'special_requests' => 'nullable|string',
             'type'             => 'required|in:whole,individual,standalone',
             'is_standalone'    => 'nullable|boolean',
-            'seat_id'          => 'nullable|string|max:50',
+            'seat_id'          => 'nullable|string|max:255',
             'consent_accepted' => 'nullable|boolean',
         ]);
 
@@ -176,9 +176,13 @@ class ClientReservationController extends Controller
                 
                 $slotTime = substr((string) $validated['event_time'], 0, 5);
                 $isAvailable = false;
+                $reason = "The selected time is invalid or not available for reservations.";
                 foreach ($slots['slots'] as $slot) {
                     if (substr($slot['time'], 0, 5) === $slotTime) {
                         $isAvailable = (bool) $slot['available'];
+                        if (!$isAvailable && !empty($slot['reason'])) {
+                            $reason = $slot['reason'];
+                        }
                         break;
                     }
                 }
@@ -186,7 +190,7 @@ class ClientReservationController extends Controller
                 if (!$isAvailable) {
                     return response()->json([
                         'success' => false,
-                        'message' => "{$parentVenue->display_name} is fully booked for the selected schedule. Please choose another date or time.",
+                        'message' => $reason,
                     ], 422);
                 }
 
