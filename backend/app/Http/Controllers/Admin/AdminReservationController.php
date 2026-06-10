@@ -401,6 +401,77 @@ class AdminReservationController extends Controller
         ]);
     }
 
+    public function updatePricing(Request $request, int $id): JsonResponse
+    {
+        $reservation = Reservation::findOrFail($id);
+        $admin = $this->currentAdmin($request);
+
+        if (!$this->reservationService->canAccessReservation($admin, $reservation)) {
+            return $this->scopeDeniedResponse();
+        }
+
+        $validated = $request->validate([
+            'pricing_mode' => 'nullable|string|in:fixed,per_person,per_seat,package,custom',
+            'base_price' => 'nullable|numeric|min:0',
+            'price_per_person' => 'nullable|numeric|min:0',
+            'price_per_seat' => 'nullable|numeric|min:0',
+            'package_name' => 'nullable|string',
+            'package_price' => 'nullable|numeric|min:0',
+            'calculated_price' => 'nullable|numeric|min:0',
+            'manual_price_override' => 'nullable|numeric|min:0',
+            'final_price' => 'nullable|numeric|min:0',
+            'price_notes' => 'nullable|string',
+            'show_price_to_guest' => 'boolean',
+        ]);
+
+        $original = $reservation->getOriginal();
+
+        $reservation->fill($validated);
+        $reservation->pricing_updated_by = $admin['id'] ?? null;
+        $reservation->pricing_updated_at = now();
+        $reservation->save();
+
+        $changes = [];
+        foreach ($validated as $field => $value) {
+            $before = $original[$field] ?? null;
+            $after = $reservation->{$field};
+
+            if ((string) $before !== (string) $after) {
+                $changes[$field] = [
+                    'from' => $before,
+                    'to' => $after,
+                ];
+            }
+        }
+
+        if (!empty($changes)) {
+            $this->reservationService->recordTransaction(
+                $reservation,
+                'pricing_updated',
+                $reservation->status,
+                $reservation->status,
+                'Internal pricing updated by admin.',
+                [
+                    'changes' => $changes,
+                    'updated_by' => $admin['username'] ?? $admin['email'] ?? null,
+                ],
+                $admin
+            );
+        }
+
+        broadcast(new ReservationUpdated($reservation))->toOthers();
+        WebsocketBroadcaster::broadcast('reservations', 'ReservationUpdated', [
+            'reservation' => $reservation
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pricing details updated successfully',
+            'reservation' => $reservation,
+            'transaction_history' => $reservation->transactions()->latest()->limit(8)->get(),
+        ]);
+    }
+
     public function destroy(string $id): JsonResponse
     {
         try {

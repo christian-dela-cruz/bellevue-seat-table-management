@@ -130,6 +130,8 @@ const normalizeBooking = (b) => ({
   guests:           b.guests_count ?? b.guests ?? b.guest_count ?? 1,
   type:             b.type ?? "whole",
   special_requests: b.special_requests ?? b.specialRequests ?? "",
+  show_price_to_guest: b.show_price_to_guest ?? false,
+  final_price:      b.manual_price_override ?? b.calculated_price ?? b.final_price ?? 0,
 });
 
 // ─── Shared UI Primitives ─────────────────────────────────────────────────────
@@ -1033,6 +1035,7 @@ export default function ManageBooking() {
                             ["Time",         fmtTime(booking.event_time)],
                             ["Guests",       booking.guests ? `${booking.guests} pax` : "—"],
                             ["Table / Seat", [booking.table, booking.seat].filter(Boolean).join(" / ") || "—"],
+                            ...(booking.show_price_to_guest ? [["Estimated Price", `PHP ${Number(booking.final_price || 0).toLocaleString('en-US', {minimumFractionDigits:2})}`]] : []),
                           ].map(([label, val]) => (
                             <div key={label}>
                               <div style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary, fontWeight: 700, marginBottom: 3 }}>{label}</div>

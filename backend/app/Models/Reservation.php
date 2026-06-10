@@ -53,6 +53,19 @@ class Reservation extends Model
         'internal_room_name',
         'assignment_status',
         'consent_accepted',
+        'pricing_mode',
+        'base_price',
+        'price_per_person',
+        'price_per_seat',
+        'package_name',
+        'package_price',
+        'calculated_price',
+        'manual_price_override',
+        'final_price',
+        'price_notes',
+        'show_price_to_guest',
+        'pricing_updated_by',
+        'pricing_updated_at',
     ];
 
     protected $casts = [
@@ -65,6 +78,15 @@ class Reservation extends Model
         'is_standalone' => 'boolean',
         'seen_by' => 'array',
         'last_operational_at' => 'datetime',
+        'show_price_to_guest' => 'boolean',
+        'pricing_updated_at' => 'datetime',
+        'base_price' => 'decimal:2',
+        'price_per_person' => 'decimal:2',
+        'price_per_seat' => 'decimal:2',
+        'package_price' => 'decimal:2',
+        'calculated_price' => 'decimal:2',
+        'manual_price_override' => 'decimal:2',
+        'final_price' => 'decimal:2',
     ];
 
     protected static function booted(): void

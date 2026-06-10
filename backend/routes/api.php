@@ -129,6 +129,7 @@ Route::prefix('admin/reservations')->group(function () {
     Route::post('/', [AdminReservationController::class, 'store'])->middleware(AdminAccess::class . ':manage_reservations');
     Route::get('/{reservation}', [AdminReservationController::class, 'show'])->middleware(AdminAccess::class . ':view_admin');
     Route::put('/{reservation}', [AdminReservationController::class, 'update'])->middleware(AdminAccess::class . ':adjust_reservation_details');
+    Route::patch('/{reservation}/pricing', [AdminReservationController::class, 'updatePricing'])->middleware(AdminAccess::class . ':manage_reservations');
     Route::patch('/{reservation}/coordination', [AdminReservationController::class, 'updateCoordination'])->middleware(AdminAccess::class . ':adjust_reservation_details');
     Route::post('/{reservation}/seen', [AdminReservationController::class, 'markSeen'])->middleware(AdminAccess::class . ':view_admin');
     Route::patch('/{id}/approve', [AdminReservationController::class, 'approve'])->middleware(AdminAccess::class . ':manage_reservations');
