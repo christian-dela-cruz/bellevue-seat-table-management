@@ -236,7 +236,7 @@ export default function EventManagement() {
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: C.page, fontFamily: F.body }}>
+    <div style={{ display: "flex", height: "100vh", background: C.page, fontFamily: F.body }}>
       <style>{`
         @keyframes eventSpin { to { transform: rotate(360deg); } }
         @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -255,11 +255,12 @@ export default function EventManagement() {
         .form-label { display: block; font-family: ${F.label}; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: ${C.muted}; margin-bottom: 6px; }
       `}</style>
 
-      <AdminNavbar />
-      <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0, overflow: "hidden" }}>
-        <Sidebar activeNav="events" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <Sidebar activeNav="events" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      
+      <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
+        <AdminNavbar />
         
-        <main style={{ flex: 1, padding: "30px 32px 42px", overflow: "auto", height: "calc(100vh - 60px)" }}>
+        <main style={{ flex: 1, padding: "30px 32px 42px", overflow: "auto" }}>
           <div style={{ maxWidth: 1440, margin: "0 auto", display: "grid", gap: 18 }}>
             <AdminPageHeader 
               eyebrow="Event Engine"

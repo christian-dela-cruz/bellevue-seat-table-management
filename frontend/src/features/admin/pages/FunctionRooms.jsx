@@ -2052,10 +2052,11 @@ export default function FunctionRooms() {
           .venue-preview-panel { position: relative !important; top: auto !important; }
         }
       `}</style>
-      <AdminNavbar />
-      <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0, overflow: "hidden", background: C.page }}>
+      <div style={{ display: "flex", height: "100vh", minHeight: 0, overflow: "hidden", background: C.page }}>
         <Sidebar activeNav="function-rooms" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
-        <main style={{ flex: 1, height: "calc(100vh - 60px)", overflow: "auto", padding: "30px 32px 42px" }}>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, height: "100vh", overflow: "hidden" }}>
+          <AdminNavbar />
+          <main style={{ flex: 1, overflow: "auto", padding: "30px 32px 42px" }}>
           <AdminPageHeader
             eyebrow="Venue Configuration"
             title="Venue Management"
@@ -3338,6 +3339,7 @@ export default function FunctionRooms() {
           </section>
         </div>
       )}
+      </div>
     </>
   );
 }

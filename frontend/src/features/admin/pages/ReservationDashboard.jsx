@@ -3097,17 +3097,17 @@ export default function ReservationDashboard() {
         ::-webkit-scrollbar-thumb { background:rgba(0,0,0,0.12); border-radius:4px; }
       `}</style>
 
-      <div style={{height:"100vh",overflow:"hidden",fontFamily:F.body,background:C.pageBg,color:C.textPrimary}}>
-        <AdminNavbar onLogout={handleLogout}/>
+      <div style={{display:"flex",height:"100vh",overflow:"hidden",fontFamily:F.body,background:C.pageBg,color:C.textPrimary}}>
+        <Sidebar
+          isOpen={sidebarOpen}
+          onToggle={()=>setSidebarOpen(!sidebarOpen)}
+          activeNav="reservations"
+        />
 
-        <div style={{display:"flex",height:"calc(100vh - 60px)",minHeight:0}}>
-          <Sidebar
-            isOpen={sidebarOpen}
-            onToggle={()=>setSidebarOpen(!sidebarOpen)}
-            activeNav="reservations"
-          />
+        <div style={{display:"flex",flexDirection:"column",height:"100vh",flex:1,minWidth:0,background:C.pageBg,overflow:"hidden"}}>
+          <AdminNavbar onLogout={handleLogout}/>
 
-          <div style={{flex:1,minWidth:0,height:"calc(100vh - 60px)",background:C.pageBg,overflow:"auto"}}>
+          <div style={{flex:1,minWidth:0,overflow:"auto"}}>
 
             {/* ── Top navbar bar ── */}
             <div style={{

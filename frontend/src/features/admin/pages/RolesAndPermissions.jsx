@@ -451,7 +451,7 @@ export default function RolesAndPermissions() {
   const roleAccountsCount = selectedRole ? accounts.filter(a => a.role === selectedRole.slug && a.is_active !== false).length : 0;
 
   return (
-    <div style={{ minHeight: "100vh", background: C.pageBg, fontFamily: F.body }}>
+    <div style={{ display: "flex", height: "100vh", background: C.pageBg, fontFamily: F.body }}>
       <style>{`
         @keyframes rolesSpin { to { transform: rotate(360deg); } }
         @keyframes rolesSlideIn { from { opacity: 0; transform: translate3d(34px,0,0); } to { opacity: 1; transform: translate3d(0,0,0); } }
@@ -460,12 +460,12 @@ export default function RolesAndPermissions() {
         .perm-row:hover { background: rgba(140,107,42,0.024) !important; }
       `}</style>
 
-      <AdminNavbar />
+      <Sidebar activeNav="roles" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
-      <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0, overflow: "hidden" }}>
-        <Sidebar activeNav="roles" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
+        <AdminNavbar />
 
-        <main style={{ flex: 1, padding: "30px 32px 42px", overflow: "auto", height: "calc(100vh - 60px)" }}>
+        <main style={{ flex: 1, padding: "30px 32px 42px", overflow: "auto" }}>
           <div style={{ maxWidth: 1440, display: "grid", gap: 18 }}>
             <AdminPageHeader
               eyebrow="Administration"

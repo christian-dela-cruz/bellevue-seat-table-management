@@ -191,7 +191,7 @@ export default function UnifiedSeatMapEditor() {
   }, []);
 
   return (
-    <div style={{ height: "100vh", overflow: "hidden", fontFamily: F.body, background: C.pageBg, color: C.textPrimary }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", fontFamily: F.body, background: C.pageBg, color: C.textPrimary }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700;800&display=swap');
@@ -199,14 +199,14 @@ export default function UnifiedSeatMapEditor() {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
       `}</style>
 
-      <AdminNavbar onLogout={handleLogout} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        activeNav="seat-map"
+      />
 
-      <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0 }}>
-        <Sidebar
-          isOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
-          activeNav="seat-map"
-        />
+      <div style={{ display: "flex", flexDirection: "column", height: "100vh", minHeight: 0, flex: 1, minWidth: 0 }}>
+        <AdminNavbar onLogout={handleLogout} />
 
         {/* Main content area */}
         <div style={{
@@ -214,7 +214,7 @@ export default function UnifiedSeatMapEditor() {
           minWidth: 0,
           // Subtract the AdminNavbar height (60px) so the editor fills the rest
           // of the viewport without a scrollbar appearing on the outer page.
-          height: "calc(100vh - 60px)",
+          height: "100vh",
           background: C.pageBg,
           overflow: "hidden",
           display: "flex",

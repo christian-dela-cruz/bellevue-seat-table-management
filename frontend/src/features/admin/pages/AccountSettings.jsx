@@ -569,12 +569,12 @@ export default function AccountSettings() {
         }
       `}</style>
 
-      <AdminNavbar />
+      <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} activeNav="settings" />
 
-      <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0, overflow: "hidden" }}>
-        <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} activeNav="settings" />
+      <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
+        <AdminNavbar />
 
-        <main className="account-settings-shell" style={{ flex: 1, minWidth: 0, height: "calc(100vh - 60px)", overflow: "auto", padding: "30px 32px 42px" }}>
+        <main className="account-settings-shell" style={{ flex: 1, minWidth: 0, overflow: "auto", padding: "30px 32px 42px" }}>
           <div style={{ maxWidth: 1320, display: "grid", gap: 18 }}>
             <AdminPageHeader
               eyebrow="Account"

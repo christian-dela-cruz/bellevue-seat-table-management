@@ -1175,7 +1175,7 @@ function OutletDashboard() {
   const quickStats = reports.summary || {};
 
   return (
-    <div style={{ minHeight: "100vh", background: C.page, fontFamily: F.body }}>
+    <div style={{ display: "flex", height: "100vh", background: C.page, fontFamily: F.body }}>
       <style>{`
         @keyframes odFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes odDraw { from { stroke-dashoffset: 650; } to { stroke-dashoffset: 0; } }
@@ -1208,18 +1208,18 @@ function OutletDashboard() {
           .od-row { grid-template-columns: 1fr !important; }
         }
       `}</style>
-      <AdminNavbar />
-      <div style={{ display: "flex", height: "calc(100vh - 60px)", minHeight: 0, overflow: "hidden" }}>
-        <Sidebar
-          activeNav="outlets"
-          isOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
-          pending={quickStats.pending || 0}
-          approved={quickStats.reserved || quickStats.approved || 0}
-          rejected={quickStats.rejected || 0}
-          cancelled={quickStats.cancelled || 0}
-        />
-        <main style={{ flex: 1, height: "calc(100vh - 60px)", overflow: "auto", padding: "30px 32px 42px" }}>
+      <Sidebar
+        activeNav="outlets"
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        pending={quickStats.pending || 0}
+        approved={quickStats.reserved || quickStats.approved || 0}
+        rejected={quickStats.rejected || 0}
+        cancelled={quickStats.cancelled || 0}
+      />
+      <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
+        <AdminNavbar />
+        <main style={{ flex: 1, overflow: "auto", padding: "30px 32px 42px" }}>
           <AdminPageHeader
             eyebrow="Outlet Operations"
             title={selectedOutlet?.name || "Outlet Dashboard"}

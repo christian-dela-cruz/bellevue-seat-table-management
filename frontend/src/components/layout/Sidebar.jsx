@@ -479,7 +479,7 @@ export default function Sidebar({
       }}
       style={{
         width: effectiveOpen ? 228 : 58,
-        height: "calc(100vh - 60px)",
+        height: "100vh",
         background: "linear-gradient(180deg, #FFFCF8 0%, #F7F1E8 100%)",
         borderRight: "1px solid rgba(140,107,42,0.12)",
         display: "flex",
@@ -489,7 +489,7 @@ export default function Sidebar({
         overflow: "visible",
         boxShadow: "4px 0 18px rgba(55,39,17,0.026)",
         position: "relative",
-        zIndex: 100,
+        zIndex: 3100,
       }}
     >
       <style>{`
