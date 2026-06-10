@@ -97,7 +97,7 @@
         }
 
         .ref-code {
-            font-family: 'Didot', 'Bodoni MT', 'Times New Roman', serif;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 26px;
             font-weight: 700;
             color: #1A1A1A;

@@ -97,7 +97,7 @@
         }
 
         .ref-code {
-            font-family: 'Didot', 'Bodoni MT', 'Times New Roman', serif;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             color: #1A1A1A;
             font-weight: 700;
             font-size: 24px;
@@ -247,10 +247,24 @@
                 @endif
             </p>
 
-            @if(in_array($status, ['pending', 'approved', 'reserved', 'cancelled']))
+            @if(in_array($status, ['pending', 'approved', 'reserved', 'cancelled', 'rejected']))
             <div class="ref-code-box">
                 <div class="ref-code-label">Reference Code</div>
-                <div class="ref-code">{{ $reservation->reference_code ?? 'N/A' }}</div>
+                <div class="ref-code" style="margin-bottom: 12px;">{{ $reservation->reference_code ?? 'N/A' }}</div>
+                <div class="status-badge status-{{ $status }}">
+                    STATUS: 
+                    @if($status === 'pending')
+                        PENDING
+                    @elseif($status === 'approved' || $status === 'reserved')
+                        CONFIRMED
+                    @elseif($status === 'rejected')
+                        REJECTED
+                    @elseif($status === 'cancelled')
+                        CANCELLED
+                    @else
+                        {{ strtoupper($status) }}
+                    @endif
+                </div>
             </div>
             @endif
 
@@ -310,23 +324,7 @@
                 @endif
             </div>
 
-            {{-- Status badge --}}
-            <div class="status-wrap">
-                <div class="status-badge status-{{ $status }}">
-                    STATUS: 
-                    @if($status === 'pending')
-                        PENDING
-                    @elseif($status === 'approved' || $status === 'reserved')
-                        CONFIRMED
-                    @elseif($status === 'rejected')
-                        REJECTED
-                    @elseif($status === 'cancelled')
-                        CANCELLED
-                    @else
-                        {{ strtoupper($status) }}
-                    @endif
-                </div>
-            </div>
+
 
         </div>
 
