@@ -6,24 +6,7 @@ import Sidebar from "../../../components/layout/Sidebar";
 import { roleAPI } from "../../../services/roleAPI";
 import { authAPI } from "../../../services/authAPI";
 
-const C = {
-  pageBg: "#F7F4EE",
-  surface: "#FFFFFF",
-  surfaceSoft: "#FAF8F4",
-  border: "rgba(0,0,0,0.08)",
-  divider: "rgba(0,0,0,0.05)",
-  gold: "#8C6B2A",
-  goldFaint: "rgba(140,107,42,0.08)",
-  green: "#2E7A5A",
-  greenFaint: "rgba(46,122,90,0.08)",
-  red: "#A03838",
-  redFaint: "rgba(160,56,56,0.08)",
-  text: "#18140E",
-  muted: "#7A7060",
-  faint: "rgba(24,20,14,0.42)",
-  shadow: "0 2px 8px rgba(44,36,24,0.035)",
-  shadowSoft: "0 1px 5px rgba(44,36,24,0.025)",
-};
+import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
 // Custom Switch Component
 function Switch({ checked, indeterminate, onChange, disabled }) {
@@ -148,10 +131,7 @@ function PermissionTooltip({ perm }) {
   );
 }
 
-const F = {
-  body: "'Inter','Helvetica Neue',Arial,sans-serif",
-  label: "'Inter','Helvetica Neue',Arial,sans-serif",
-};
+// Local F is replaced by context-imported F
 
 const DEFAULT_FORM = {
   name: "",
@@ -201,6 +181,7 @@ function inputStyle() {
 }
 
 export default function RolesAndPermissions() {
+  const { isDark } = useAdminTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [roles, setRoles] = useState([]);
   const [allPermissions, setAllPermissions] = useState([]);

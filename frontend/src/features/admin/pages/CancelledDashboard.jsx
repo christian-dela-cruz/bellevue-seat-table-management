@@ -6,57 +6,12 @@ import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 import { venueAPI } from "../../../services/venueAPI";
 import { buildOutletGroupsFromVenues, buildDynamicOutletTree, resolveOutletChildren } from "../../../constants/outletCatalog";
+import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
 import RoomFilterDropdown from "../components/RoomFilterDropdown";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
-// ─── Design Tokens ────────────────────────────────────────────────────────────
-const C = {
-  gold: "#8C6B2A",
-  goldLight: "#A07D38",
-  goldFaint: "rgba(140,107,42,0.07)",
-  goldFaintest: "rgba(140,107,42,0.04)",
-  pageBg: "#F7F4EE",
-  surfaceBase: "#FFFFFF",
-  surfaceInput: "#FFFFFF",
-  borderDefault: "rgba(0,0,0,0.08)",
-  borderStrong: "rgba(0,0,0,0.13)",
-  borderAccent: "rgba(140,107,42,0.28)",
-  textPrimary: "#18140E",
-  textSecondary: "#7A7060",
-  textTertiary: "rgba(24,20,14,0.35)",
-  textOnAccent: "#FFFFFF",
 
-  // ── Cancelled accent: muted slate/taupe instead of red ──
-  accent: "#6B7280",           // slate-500
-  accentLight: "#9CA3AF",      // slate-400
-  accentFaint: "rgba(107,114,128,0.08)",
-  accentFaintest: "rgba(107,114,128,0.04)",
-  accentBorder: "rgba(107,114,128,0.22)",
-  accentBorderStrong: "rgba(107,114,128,0.35)",
-
-  green: "#2E7A5A",
-  greenFaint: "rgba(46,122,90,0.07)",
-  greenBorder: "rgba(46,122,90,0.18)",
-  badgeCancelled: { bg: "rgba(107,114,128,0.10)", color: "#6B7280", dot: "#6B7280" },
-  navBg: "rgba(247,244,238,0.97)",
-  navBorder: "rgba(140,107,42,0.14)",
-  divider: "rgba(0,0,0,0.05)",
-  inputFocusShadow: "0 0 0 3px rgba(107,114,128,0.12)",
-  modalOverlay: "rgba(0,0,0,0.42)",
-  headerGradient: "linear-gradient(160deg,#FAF8F4 0%,#F2EFE8 100%)",
-  spinnerBorder: "rgba(0,0,0,0.12)",
-  spinnerTop: "#8C6B2A",
-  cardBg: "#FFFFFF",
-  cardBorder: "rgba(0,0,0,0.07)",
-};
-
-const F = {
-  display: "'Inter','Helvetica Neue',Arial,sans-serif",
-  body:    "'Inter','Helvetica Neue',Arial,sans-serif",
-  label:   "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono:    "'Inter','Helvetica Neue',Arial,sans-serif",
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function Spinner({ size = 13 }) {
@@ -676,6 +631,7 @@ function Toast({ message, type, onClose }) {
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function CancelledDashboard() {
+  const { isDark } = useAdminTheme();
   const navigate = useNavigate();
   const [reservations, setReservations] = useState([]);
   const [filteredReservations, setFilteredReservations] = useState([]);
@@ -1219,7 +1175,7 @@ export default function CancelledDashboard() {
                     </label>
                     <label style={{ display: "grid", gap: 5 }}>
                       <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Sort</span>
-                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ padding: "9px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: C.surfaceInput, color: C.textPrimary, fontSize: 12 }}>
+                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ padding: "8px 10px", height: 36, boxSizing: "border-box", border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: C.surfaceInput, color: C.textPrimary, fontSize: 12 }}>
                         <option value="cancelled_desc">Latest cancelled</option>
                         <option value="cancelled_asc">Oldest cancelled</option>
                         <option value="event_asc">Event soonest</option>
@@ -1230,7 +1186,7 @@ export default function CancelledDashboard() {
                     <button
                       type="button"
                       onClick={() => { setReasonFilter("ALL"); setSearch(""); setSortBy("cancelled_desc"); setRoomFilter("ALL"); }}
-                      style={{ minHeight: 37, border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: C.surfaceBase, color: C.textSecondary, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+                      style={{ height: 36, boxSizing: "border-box", border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: C.surfaceBase, color: C.textSecondary, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                     >
                       Reset Review
                     </button>

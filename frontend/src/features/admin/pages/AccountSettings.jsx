@@ -20,31 +20,9 @@ import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { roleAPI } from "../../../services/roleAPI";
 import { useEffect } from "react";
+import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
-const C = {
-  pageBg: "#F7F4EE",
-  surface: "#FFFFFF",
-  surfaceSoft: "#FAF8F4",
-  border: "rgba(0,0,0,0.08)",
-  divider: "rgba(0,0,0,0.05)",
-  gold: "#8C6B2A",
-  goldSoft: "#A07D38",
-  goldFaint: "rgba(140,107,42,0.08)",
-  green: "#2E7A5A",
-  greenFaint: "rgba(46,122,90,0.08)",
-  red: "#A03838",
-  redFaint: "rgba(160,56,56,0.08)",
-  text: "#18140E",
-  muted: "#7A7060",
-  faint: "rgba(24,20,14,0.42)",
-  shadowSoft: "0 1px 5px rgba(44,36,24,0.025)",
-};
 
-const F = {
-  body: "'Inter','Helvetica Neue',Arial,sans-serif",
-  label: "'Inter','Helvetica Neue',Arial,sans-serif",
-  display: "'Inter','Helvetica Neue',Arial,sans-serif",
-};
 
 const DEFAULT_PREFERENCES = {
   reservationAlerts: true,
@@ -322,6 +300,7 @@ function PasswordInput({ value, onChange, placeholder, visible, onToggle, requir
 }
 
 export default function AccountSettings() {
+  const { isDark } = useAdminTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentUser, setCurrentUser] = useState(() => authAPI.getCurrentUser() || {});
   const [activeSection, setActiveSection] = useState("profile");

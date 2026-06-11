@@ -18,6 +18,7 @@ import ForgotCode from "../features/client/pages/ForgotCode";
 import LoginPage from "../features/auth/pages/LoginPage";
 import { authAPI } from "../services/authAPI";
 import SharedNavbar from "../components/SharedNavbar";
+import { AdminThemeProvider } from "../context/AdminThemeContext";
 
 function RequireAdminAuth({ children, permission }) {
   if (!authAPI.isAuthenticated()) {
@@ -37,8 +38,9 @@ function AdminEntry() {
 
 export default function AppRoutes() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <AdminThemeProvider>
+      <BrowserRouter>
+        <Routes>
         <Route path="/" element={<ReservationLanding />} />
         <Route path="/venues" element={<ReservationLanding />} />
         <Route path="/manage-booking" element={<ManageBooking />} />
@@ -179,5 +181,6 @@ export default function AppRoutes() {
 
       </Routes>
     </BrowserRouter>
+    </AdminThemeProvider>
   );
 }

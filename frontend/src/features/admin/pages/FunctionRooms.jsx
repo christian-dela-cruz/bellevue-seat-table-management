@@ -36,27 +36,7 @@ import { CSS } from '@dnd-kit/utilities';
 import clientDisplayAPI from "../../../services/clientDisplayAPI";
 import { buildDiningOutletsFromConfig, buildEventVenuesFromConfig, VenueCard } from "../../client/pages/ReservationLanding";
 
-const C = {
-  page: "#F7F4EE",
-  surface: "#FFFFFF",
-  soft: "#FAF8F4",
-  border: "rgba(0,0,0,0.08)",
-  divider: "rgba(0,0,0,0.055)",
-  gold: "#8C6B2A",
-  goldFaint: "rgba(140,107,42,0.075)",
-  green: "#2E7A5A",
-  greenFaint: "rgba(46,122,90,0.075)",
-  red: "#A03838",
-  redFaint: "rgba(160,56,56,0.075)",
-  text: "#18140E",
-  muted: "#746B5E",
-  faint: "rgba(24,20,14,0.42)",
-};
-
-const F = {
-  body: "'Inter','Helvetica Neue',Arial,sans-serif",
-  label: "'Inter','Helvetica Neue',Arial,sans-serif",
-};
+import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
 function SortableRow({ id, disabled, level, className, style, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -987,6 +967,7 @@ function VenueLandingPreview({ form, preview, childRooms = [], rooms = [], editi
 }
 
 export default function FunctionRooms() {
+  const { isDark } = useAdminTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);

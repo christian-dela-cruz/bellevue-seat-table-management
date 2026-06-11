@@ -18,6 +18,7 @@ import {
   LayoutTemplate,
 } from "lucide-react";
 import { authAPI } from "../../services/authAPI";
+import { useAdminTheme } from "../../context/AdminThemeContext";
 
 const F = { body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" };
 
@@ -72,6 +73,7 @@ const NAV_ROUTES = {
 };
 
 function SidebarCollapseBtn({ onClick, isOpen }) {
+  const { isDark } = useAdminTheme();
   const [hovered, setHovered] = useState(false);
   const Icon = isOpen ? ChevronLeft : ChevronRight;
   return (
@@ -89,8 +91,8 @@ function SidebarCollapseBtn({ onClick, isOpen }) {
           width: 26,
           height: 26,
           borderRadius: "50%",
-          background: "#FFFFFF",
-          border: "1px solid rgba(140,107,42,0.35)",
+          background: isDark ? "#111009" : "#FFFFFF",
+          border: isDark ? "1px solid rgba(196,163,90,0.35)" : "1px solid rgba(140,107,42,0.35)",
           padding: 0,
           boxShadow: hovered
             ? "0 4px 12px rgba(140,107,42,0.25)"
@@ -106,7 +108,7 @@ function SidebarCollapseBtn({ onClick, isOpen }) {
     >
       <Icon
         size={12}
-        color="#8C6B2A"
+        color={isDark ? "#C4A35A" : "#8C6B2A"}
         strokeWidth={2.5}
         style={{
           transition: "transform 0.2s ease",
@@ -118,12 +120,13 @@ function SidebarCollapseBtn({ onClick, isOpen }) {
 }
 
 function NavItem({ item, isActive, isOpen, onClick, nested = false }) {
+  const { isDark } = useAdminTheme();
   const [hovered, setHovered] = useState(false);
   const navigate = useNavigate();
-  const activeColor = "#7E5E25";
-  const hoverColor = "#8C6B2A";
-  const activeBg = "rgba(140,107,42,0.10)";
-  const hoverBg = "rgba(140,107,42,0.04)";
+  const activeColor = isDark ? "#D9BC7A" : "#7E5E25";
+  const hoverColor = isDark ? "#C4A35A" : "#8C6B2A";
+  const activeBg = isDark ? "rgba(196,163,90,0.15)" : "rgba(140,107,42,0.10)";
+  const hoverBg = isDark ? "rgba(196,163,90,0.06)" : "rgba(140,107,42,0.04)";
 
   const handleClick = () => {
     navigate(NAV_ROUTES[item.id] || "/admin/dashboard");
@@ -146,7 +149,7 @@ function NavItem({ item, isActive, isOpen, onClick, nested = false }) {
     >
       <Icon
         size={nested ? 13.25 : 14}
-        color={isActive ? activeColor : hovered ? hoverColor : "#8F8679"}
+        color={isActive ? activeColor : hovered ? hoverColor : (isDark ? "#8A8278" : "#8F8679")}
         strokeWidth={isActive ? 2.45 : 2.1}
         style={{ flexShrink: 0, transition: "color 0.15s, stroke-width 0.15s" }}
       />
@@ -171,11 +174,11 @@ function NavItem({ item, isActive, isOpen, onClick, nested = false }) {
           justifyContent: isOpen ? "flex-start" : "center",
           fontFamily: F.body,
           fontSize: nested ? 12 : 12.35,
-          color: isActive ? activeColor : hovered ? hoverColor : "#5E5548",
+          color: isActive ? activeColor : hovered ? hoverColor : (isDark ? "#C7BEAF" : "#5E5548"),
           background: isActive
             ? activeBg
             : hovered ? hoverBg : "transparent",
-          border: `1px solid ${isActive ? "rgba(140,107,42,0.18)" : "transparent"}`,
+          border: `1px solid ${isActive ? (isDark ? "rgba(196,163,90,0.25)" : "rgba(140,107,42,0.18)") : "transparent"}`,
           cursor: "pointer",
           fontWeight: isActive ? 680 : nested ? 490 : 540,
           transition: "background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease",
@@ -216,6 +219,7 @@ function NavItem({ item, isActive, isOpen, onClick, nested = false }) {
 }
 
 function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
+  const { isDark } = useAdminTheme();
   const storageKey = `bellevue_sidebar_group_${group.id}_expanded`;
   const [expanded, setExpanded] = useState(() => {
     try {
@@ -229,10 +233,10 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
   const hasActiveItem = group.items.some((item) => item.id === activeNav);
   const isSingleDestination = group.items.length === 1;
   const GroupIcon = group.icon || ClipboardList;
-  const activeColor = "#7E5E25";
-  const hoverColor = "#8C6B2A";
-  const activeBg = "rgba(140,107,42,0.10)";
-  const hoverBg = "rgba(140,107,42,0.04)";
+  const activeColor = isDark ? "#D9BC7A" : "#7E5E25";
+  const hoverColor = isDark ? "#C4A35A" : "#8C6B2A";
+  const activeBg = isDark ? "rgba(196,163,90,0.15)" : "rgba(140,107,42,0.10)";
+  const hoverBg = isDark ? "rgba(196,163,90,0.06)" : "rgba(140,107,42,0.04)";
 
   useEffect(() => {
     if (!hasActiveItem) return;
@@ -300,11 +304,11 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
           padding: "8px 10px 8px 11px",
           minHeight: 38,
           borderRadius: 11,
-          border: `1px solid ${hasActiveItem ? "rgba(140,107,42,0.18)" : "transparent"}`,
+          border: `1px solid ${hasActiveItem ? (isDark ? "rgba(196,163,90,0.25)" : "rgba(140,107,42,0.18)") : "transparent"}`,
           background: hasActiveItem
             ? activeBg
             : hovered ? hoverBg : "transparent",
-          color: hasActiveItem ? activeColor : hovered ? hoverColor : "#5E5548",
+          color: hasActiveItem ? activeColor : hovered ? hoverColor : (isDark ? "#C7BEAF" : "#5E5548"),
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
@@ -348,7 +352,7 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
         >
           <GroupIcon
             size={14}
-            color={hasActiveItem ? activeColor : hovered ? hoverColor : "#8F8679"}
+            color={hasActiveItem ? activeColor : hovered ? hoverColor : (isDark ? "#8A8278" : "#8F8679")}
             strokeWidth={hasActiveItem ? 2.45 : 2.1}
             style={{ flexShrink: 0, transition: "color 0.15s, stroke-width 0.15s" }}
           />
@@ -361,7 +365,7 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
           strokeWidth={2.35}
           style={{
             flexShrink: 0,
-            color: hasActiveItem ? "#8C6B2A" : hovered ? "#8C6B2A" : "#9B9285",
+            color: hasActiveItem ? (isDark ? "#C4A35A" : "#8C6B2A") : hovered ? (isDark ? "#C4A35A" : "#8C6B2A") : (isDark ? "#8A8278" : "#9B9285"),
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform 0.22s cubic-bezier(.2,.8,.2,1), color 0.18s ease",
           }}
@@ -372,7 +376,7 @@ function NavGroup({ group, activeNav, isOpen, onNavChange, defaultOpen }) {
         style={{
           marginLeft: 17,
           paddingLeft: 7,
-          borderLeft: expanded ? "1px solid rgba(140,107,42,0.10)" : "1px solid transparent",
+          borderLeft: expanded ? (isDark ? "1px solid rgba(196,163,90,0.18)" : "1px solid rgba(140,107,42,0.10)") : "1px solid transparent",
           display: "grid",
           gridTemplateRows: expanded ? "1fr" : "0fr",
           transition: "grid-template-rows 0.24s cubic-bezier(.2,.8,.2,1), opacity 0.18s ease, border-color 0.18s ease",
@@ -402,6 +406,7 @@ export default function Sidebar({
   isOpen = true,
   onToggle = () => { },
 }) {
+  const { isDark } = useAdminTheme();
   const navigate = useNavigate();
   const [pinnedOpen, setPinnedOpen] = useState(() => {
     try {
@@ -480,14 +485,14 @@ export default function Sidebar({
       style={{
         width: effectiveOpen ? 228 : 58,
         height: "100vh",
-        background: "linear-gradient(180deg, #FFFCF8 0%, #F7F1E8 100%)",
-        borderRight: "1px solid rgba(140,107,42,0.12)",
+        background: isDark ? "linear-gradient(180deg, #111009 0%, #0A0908 100%)" : "linear-gradient(180deg, #FFFCF8 0%, #F7F1E8 100%)",
+        borderRight: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(140,107,42,0.12)",
         display: "flex",
         flexDirection: "column",
         flexShrink: 0,
         transition: "width 0.26s cubic-bezier(.2,.8,.2,1)",
         overflow: "visible",
-        boxShadow: "4px 0 18px rgba(55,39,17,0.026)",
+        boxShadow: isDark ? "4px 0 18px rgba(0,0,0,0.4)" : "4px 0 18px rgba(55,39,17,0.026)",
         position: "relative",
         zIndex: 3100,
       }}
@@ -521,7 +526,7 @@ export default function Sidebar({
           alignItems: "center",
           justifyContent: effectiveOpen ? "space-between" : "center",
           padding: effectiveOpen ? "0 12px 0 18px" : "0",
-          borderBottom: "1px solid rgba(140,107,42,0.09)",
+          borderBottom: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(140,107,42,0.09)",
           flexShrink: 0,
           overflow: "hidden",
         }}
@@ -537,7 +542,7 @@ export default function Sidebar({
           >
             <span
               style={{
-                color: "#18140E",
+                color: isDark ? "#EDE8DF" : "#18140E",
                 fontSize: 14.5,
                 fontWeight: 600,
                 letterSpacing: 0.2,
@@ -548,7 +553,7 @@ export default function Sidebar({
             </span>
             <span
               style={{
-                color: "#7A7060",
+                color: isDark ? "#8A8278" : "#7A7060",
                 fontSize: 11.5,
                 fontWeight: 500,
                 letterSpacing: 0.1,
@@ -559,7 +564,7 @@ export default function Sidebar({
             </span>
           </div>
         ) : (
-          <span style={{ color: "#8C6B2A", fontSize: 12, fontWeight: 800, fontFamily: F.body, letterSpacing: 0.5 }}>
+          <span style={{ color: isDark ? "#C4A35A" : "#8C6B2A", fontSize: 12, fontWeight: 800, fontFamily: F.body, letterSpacing: 0.5 }}>
             S&T
           </span>
         )}
@@ -594,7 +599,7 @@ export default function Sidebar({
         style={{
           margin: effectiveOpen ? "0 12px 13px" : "0 7px 13px",
           paddingTop: 11,
-          borderTop: "1px solid rgba(140,107,42,0.10)",
+          borderTop: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(140,107,42,0.10)",
           position: "relative",
         }}
       >
@@ -608,9 +613,9 @@ export default function Sidebar({
               width: effectiveOpen ? "auto" : 204,
               padding: 7,
               borderRadius: 14,
-              background: "rgba(255,252,247,0.98)",
-              border: "1px solid rgba(140,107,42,0.14)",
-              boxShadow: "0 16px 36px rgba(55,39,17,0.12)",
+              background: isDark ? "rgba(22,20,16,0.98)" : "rgba(255,252,247,0.98)",
+              border: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(140,107,42,0.14)",
+              boxShadow: isDark ? "0 16px 36px rgba(0,0,0,0.5)" : "0 16px 36px rgba(55,39,17,0.12)",
               zIndex: 20,
               display: "grid",
               gap: 3,
@@ -709,20 +714,20 @@ export default function Sidebar({
                 height: 7,
                 borderRadius: "50%",
                 background: "#4CAF79",
-                border: "2px solid #F7F0E5",
+                border: `2px solid ${isDark ? "#111009" : "#F7F0E5"}`,
               }}
             />
           </span>
           {effectiveOpen && (
             <span style={{ minWidth: 0, display: "grid", gap: 2, flex: 1 }}>
-              <span style={{ color: "#18140E", fontSize: 12.25, fontWeight: 670, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</span>
-              <span style={{ color: "#7A7060", fontSize: 9.5, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{roleLabel}</span>
+              <span style={{ color: isDark ? "#EDE8DF" : "#18140E", fontSize: 12.25, fontWeight: 670, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</span>
+              <span style={{ color: isDark ? "#8A8278" : "#7A7060", fontSize: 9.5, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{roleLabel}</span>
             </span>
           )}
           {effectiveOpen && (
             <ChevronUp
               size={14}
-              color="#8C6B2A"
+              color={isDark ? "#C4A35A" : "#8C6B2A"}
               strokeWidth={2.4}
               style={{ flexShrink: 0, transition: "transform 0.18s ease", transform: accountMenuOpen ? "rotate(180deg)" : "none" }}
             />

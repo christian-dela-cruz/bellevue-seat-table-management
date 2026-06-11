@@ -12,59 +12,11 @@ import { reservationAPI } from "../../../services/reservationAPI";
 import { authAPI } from "../../../services/authAPI";
 import { ADMIN_OUTLET_GROUPS, ADMIN_OUTLET_ROOMS, canonicalOutletName, getScopedOutletRooms } from "../../../constants/outletCatalog";
 
-function getTokens() {
-  return {
-    gold: "#8C6B2A",
-    goldLight: "#A07D38",
-    goldFaint: "rgba(140,107,42,0.07)",
-    goldFaintest: "rgba(140,107,42,0.04)",
-    pageBg: "#F7F4EE",
-    surfaceBase: "#FFFFFF",
-    surfaceRaised: "#FFFFFF",
-    surfaceInput: "rgba(0,0,0,0.03)",
-    borderDefault: "rgba(0,0,0,0.08)",
-    borderStrong: "rgba(0,0,0,0.13)",
-    borderAccent: "rgba(140,107,42,0.28)",
-    textPrimary: "#18140E",
-    textSecondary: "#7A7060",
-    textTertiary: "rgba(24,20,14,0.35)",
-    textOnAccent: "#FFFFFF",
-    red: "#A03838",
-    redFaint: "rgba(160,56,56,0.07)",
-    redBorder: "rgba(160,56,56,0.18)",
-    green: "#2E7A5A",
-    greenFaint: "rgba(46,122,90,0.07)",
-    greenBorder: "rgba(46,122,90,0.18)",
-    blue: "#5B8FD4",
-    blueFaint: "rgba(91,143,212,0.08)",
-    blueBorder: "rgba(91,143,212,0.20)",
-    badgePending:  { bg: "rgba(140,107,42,0.09)",  color: "#8C6B2A",  dot: "#8C6B2A"  },
-    badgeApproved: { bg: "rgba(46,122,90,0.09)",   color: "#2E7A5A",  dot: "#2E7A5A"  },
-    badgeRejected: { bg: "rgba(160,56,56,0.09)",   color: "#A03838",  dot: "#A03838"  },
-    navBg: "rgba(247,244,238,0.97)",
-    navBorder: "rgba(140,107,42,0.14)",
-    divider: "rgba(0,0,0,0.05)",
-    inputFocusShadow: "0 0 0 3px rgba(140,107,42,0.10)",
-    modalOverlay: "rgba(0,0,0,0.42)",
-    statusNote: { pending: "rgba(140,107,42,0.05)", approved: "rgba(46,122,90,0.05)" },
-    statusNoteBorder: { pending: "rgba(140,107,42,0.15)", approved: "rgba(46,122,90,0.15)" },
-    // FIX: headerGradient uses a light background — modal titles need dark text
-    headerGradient: "linear-gradient(160deg,#FAF8F4 0%,#F2EFE8 100%)",
-    spinnerBorder: "rgba(0,0,0,0.12)",
-    spinnerTop: "#8C6B2A",
-    cardBg: "#FFFFFF",
-    cardBorder: "rgba(0,0,0,0.07)",
-    bgFilter: "blur(6px) brightness(0.45) saturate(0.4)",
-    bgOverlay: "rgba(237,233,224,0.65)",
-  };
-}
+import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
-const F = {
-  display: "'Inter','Helvetica Neue',Arial,sans-serif",
-  body:    "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono:    "'Inter','Helvetica Neue',Arial,sans-serif",
-  label:   "'Inter','Helvetica Neue',Arial,sans-serif",
-};
+function getTokens() {
+  return C;
+}
 
 const POLL_INTERVAL_MS = 1000;
 const RECONNECT_WINDOW_MS = 60000;
@@ -1071,6 +1023,7 @@ function AcknowledgmentMonitor({ activeAlerts, acknowledgedAlerts, onAcknowledge
 }
 
 function NotificationDashboard() {
+  const { isDark } = useAdminTheme();
   const C=getTokens();
   const navigate = useNavigate();
   const currentUser = useMemo(()=>authAPI.getCurrentUser(),[]);

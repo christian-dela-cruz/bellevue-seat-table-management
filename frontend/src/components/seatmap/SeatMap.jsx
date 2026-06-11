@@ -4,6 +4,7 @@ import { fetchAdminSeatmap, saveDraftSeatmap, publishSeatmap } from "../../utils
 import { cleanupReservationsForDeletedTable, cleanupReservationsForDeletedSeat, cleanupReservationsForDeletedStandaloneSeat } from "../../utils/reservationCleanup.js";
 import { authAPI } from "../../services/authAPI.js";
 import { getScopedOutletGroups } from "../../constants/outletCatalog.js";
+import { useAdminTheme, C as adminC, F as adminF } from "../../context/AdminThemeContext.jsx";
 import { 
   Undo2, Redo2, Lock, Unlock, Copy, Plus, Trash2, Grid, RotateCw, ZoomIn, ZoomOut, Check, Square, Circle 
 } from "lucide-react";
@@ -81,14 +82,15 @@ function getClientTokens(isDark) {
   return isDark
     ? {
         gold: "#C4A35A", goldFaint: "rgba(196,163,90,0.10)", goldFaintest: "rgba(196,163,90,0.05)",
-        canvasBg: "#1A1712", canvasBorder: "rgba(196,163,90,0.20)",
-        tableBg: "#1F1C15", tableSelected: "#2A2518", tableBgHov: "#252118",
+        // Canvas & Table elements remain light-styled for layout design readability
+        canvasBg: "#EDEAE2", canvasBorder: "rgba(140,107,42,0.18)",
+        tableBg: "#FFFFFF", tableSelected: "#FFFBF2", tableBgHov: "#FAF8F2",
         borderDefault: "rgba(255,255,255,0.08)", borderStrong: "rgba(255,255,255,0.14)",
         borderAccent: "rgba(196,163,90,0.35)",
         textPrimary: "#EDE8DF", textSecondary: "#8A8278", textTertiary: "rgba(237,232,223,0.32)",
         divider: "rgba(255,255,255,0.06)", cardShadow: "0 1px 4px rgba(0,0,0,0.30)",
-        labelScreen: { bg: "#C4A35A", color: "#0A0908" },
-        labelOther: { color: "#8A8278", border: "rgba(255,255,255,0.10)" },
+        labelScreen: { bg: "#8C6B2A", color: "#FFFFFF" },
+        labelOther: { color: "#7A7060", border: "rgba(0,0,0,0.10)" },
       }
     : {
         gold: "#8C6B2A", goldFaint: "rgba(140,107,42,0.08)", goldFaintest: "rgba(140,107,42,0.04)",
@@ -104,18 +106,45 @@ function getClientTokens(isDark) {
 }
 
 const C = {
-  gold: "#8C6B2A", goldLight: "#A07D38",
-  goldFaint: "rgba(140,107,42,0.08)", goldFaintest: "rgba(140,107,42,0.04)",
-  pageBg: "#F7F4EE", surfaceBase: "#FFFFFF", surfaceRaised: "#FAF8F4", surfaceInput: "#FFFFFF",
-  borderDefault: "rgba(0,0,0,0.08)", borderStrong: "rgba(0,0,0,0.13)", borderAccent: "rgba(140,107,42,0.28)",
-  textPrimary: "#18140E", textSecondary: "#7A7060", textTertiary: "rgba(24,20,14,0.35)", textOnAccent: "#FFFFFF",
-  red: "#A03838", redFaint: "rgba(160,56,56,0.07)", redBorder: "rgba(160,56,56,0.18)",
-  green: "#2E7A5A", greenFaint: "rgba(46,122,90,0.07)", greenBorder: "rgba(46,122,90,0.18)",
-  navBg: "rgba(247,244,238,0.98)", navBorder: "rgba(140,107,42,0.14)",
-  divider: "rgba(0,0,0,0.06)", canvasBg: "#EDEAE2", canvasBorder: "rgba(140,107,42,0.18)",
-  tableBg: "#FFFFFF", tableSelected: "#FFFBF2",
-  sidebarBg: "#FAF8F4", sidebarBorder: "rgba(0,0,0,0.06)",
-  inputFocus: "0 0 0 3px rgba(140,107,42,0.10)", cardShadow: "0 1px 4px rgba(0,0,0,0.06)",
+  get gold() { return adminC.gold; },
+  get goldLight() { return adminC.goldLight; },
+  get goldSoft() { return adminC.goldSoft; },
+  get goldFaint() { return adminC.goldFaint; },
+  get goldFaintest() { return adminC.goldFaintest; },
+  get pageBg() { return adminC.pageBg; },
+  get surfaceBase() { return adminC.surfaceBase; },
+  get surfaceRaised() { return adminC.surfaceRaised; },
+  get surfaceInput() { return adminC.surfaceInput; },
+  get borderDefault() { return adminC.borderDefault; },
+  get borderStrong() { return adminC.borderStrong; },
+  get borderAccent() { return adminC.borderAccent; },
+  get textPrimary() { return adminC.textPrimary; },
+  get textSecondary() { return adminC.textSecondary; },
+  get textTertiary() { return adminC.textTertiary; },
+  get textOnAccent() { return adminC.textOnAccent; },
+  get red() { return adminC.red; },
+  get redFaint() { return adminC.redFaint; },
+  get redBorder() { return adminC.redBorder; },
+  get green() { return adminC.green; },
+  get greenFaint() { return adminC.greenFaint; },
+  get greenBorder() { return adminC.greenBorder; },
+  get navBg() { return adminC.navBg; },
+  get navBorder() { return adminC.navBorder; },
+  get divider() { return adminC.divider; },
+
+  // Canvas elements must stay light-themed (white/cream)
+  get canvasBg() { return "#EDEAE2"; },
+  get canvasBorder() { return "rgba(140,107,42,0.18)"; },
+  get tableBg() { return "#FFFFFF"; },
+  get tableSelected() { return "#FFFBF2"; },
+
+  // Sidebar colors dynamic
+  get sidebarBg() { return adminC.surfaceSoft; },
+  get sidebarBorder() { return adminC.divider; },
+
+  // Shadows / focus
+  get inputFocus() { return adminC.inputFocusShadow || "0 0 0 3px rgba(140,107,42,0.10)"; },
+  get cardShadow() { return adminC.shadowSoft || "0 1px 4px rgba(0,0,0,0.06)"; },
 };
 
 // FIX: Use let so these can be reset when a room is loaded
@@ -457,17 +486,23 @@ function StaticLabel({ item, T }) {
   );
 }
 
-function DraggableLabel({ item, onDragStart, isDragging }) {
+function DraggableLabel({ item, onDragStart, isDragging, T }) {
   const [hov, setHov] = useState(false);
   const isScreen = item.type === "screen";
+  const tokens = T || {
+    gold: C.gold, borderDefault: C.borderDefault, borderAccent: C.borderAccent,
+    textSecondary: C.textSecondary,
+    labelScreen: { bg: C.gold, color: "#fff" },
+    labelOther: { color: C.textSecondary, border: C.borderDefault }
+  };
   return (
     <div
       title={`Drag ${item.label}`}
       style={{
         position: "absolute", left: (item.x || 0), top: (item.y || 0),
-        background: isScreen ? C.gold : "transparent",
-        color: isScreen ? "#fff" : C.textSecondary,
-        border: isScreen ? "none" : `1px solid ${hov || isDragging ? C.borderAccent : C.borderDefault}`,
+        background: isScreen ? tokens.labelScreen.bg : "transparent",
+        color: isScreen ? tokens.labelScreen.color : tokens.labelOther.color,
+        border: isScreen ? "none" : `1px solid ${hov || isDragging ? tokens.borderAccent : tokens.labelOther.border}`,
         borderRadius: isScreen ? 6 : 18, padding: isScreen ? "6px 16px" : "5px 12px",
         fontFamily: F, fontWeight: 700, fontSize: isScreen ? 14 : 12,
         letterSpacing: "0.18em", textTransform: "uppercase",
@@ -482,8 +517,8 @@ function DraggableLabel({ item, onDragStart, isDragging }) {
       <span style={{ display: "flex", flexDirection: "column", gap: 3, flexShrink: 0 }}>
       {[0,1,2].map(i => (
         <span key={i} style={{ display: "flex", gap: 3 }}>
-          <span style={{ width:4, height:4, borderRadius:"50%", background: isScreen ? "#fff" : C.gold, display:"block", flexShrink: 0, opacity: 1 }} />
-          <span style={{ width:4, height:4, borderRadius:"50%", background: isScreen ? "#fff" : C.gold, display:"block", flexShrink: 0, opacity: 1 }} />
+          <span style={{ width:4, height:4, borderRadius:"50%", background: isScreen ? "#fff" : tokens.gold, display:"block", flexShrink: 0, opacity: 1 }} />
+          <span style={{ width:4, height:4, borderRadius:"50%", background: isScreen ? "#fff" : tokens.gold, display:"block", flexShrink: 0, opacity: 1 }} />
         </span>
       ))}
     </span>
@@ -3141,6 +3176,7 @@ export default function SeatMap({
   onSeatClick, onTableClick, windowWidth, virtualWidth, virtualHeight,
   wing, room, mode = "whole", isDark = false, onBack, sidebarWidth = 0,
 }) {
+  const adminTheme = useAdminTheme();
   const normalize = useCallback(td => {
     if (!td) return [];
     if (Array.isArray(td)) return td.map(t => ({ shape: "rect", width: 110, height: 70, ...t }));
@@ -4725,7 +4761,8 @@ export default function SeatMap({
                 {labels.map((l, index) => (
                   <DraggableLabel key={`label-${l.id}-${index}`} item={l}
                     onDragStart={(e, id) => startLabelDrag(e, id)}
-                    isDragging={activeDragId === l.id} />
+                    isDragging={activeDragId === l.id}
+                    T={T} />
                 ))}
 
                 {/* Draggable Fixtures */}

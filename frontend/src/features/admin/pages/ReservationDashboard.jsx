@@ -10,6 +10,7 @@ import { authAPI } from "../../../services/authAPI";
 import { venueAPI } from "../../../services/venueAPI";
 import { ADMIN_OUTLET_GROUPS, buildOutletGroupsFromVenues, canonicalOutletName, getScopedOutletGroups, getScopedOutletRooms, buildDynamicOutletTree, resolveOutletChildren } from "../../../constants/outletCatalog";
 import RoomFilterDropdown from "../components/RoomFilterDropdown";
+import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -25,52 +26,6 @@ function normaliseApiStatus(raw) {
   if (s === "pending")  return "pending";
   return "available";
 }
-
-// ─── Design Tokens (light only) ───────────────────────────────────────────────
-const C = {
-  gold: "#8C6B2A",
-  goldLight: "#A07D38",
-  goldFaint: "rgba(140,107,42,0.07)",
-  goldFaintest: "rgba(140,107,42,0.04)",
-  pageBg: "#F7F4EE",
-  surfaceBase: "#FFFFFF",
-  surfaceInput: "#FFFFFF",
-  borderDefault: "rgba(0,0,0,0.08)",
-  borderStrong: "rgba(0,0,0,0.13)",
-  borderAccent: "rgba(140,107,42,0.28)",
-  textPrimary: "#18140E",
-  textSecondary: "#7A7060",
-  textTertiary: "rgba(24,20,14,0.35)",
-  textOnAccent: "#FFFFFF",
-  red: "#A03838",
-  redFaint: "rgba(160,56,56,0.07)",
-  redBorder: "rgba(160,56,56,0.18)",
-  green: "#2E7A5A",
-  greenFaint: "rgba(46,122,90,0.07)",
-  greenBorder: "rgba(46,122,90,0.18)",
-  badgePending:  { bg: "rgba(140,107,42,0.09)",  color: "#8C6B2A",  dot: "#8C6B2A"  },
-  badgeApproved: { bg: "rgba(46,122,90,0.09)",   color: "#2E7A5A",  dot: "#2E7A5A"  },
-  badgeRejected: { bg: "rgba(160,56,56,0.09)",   color: "#A03838",  dot: "#A03838"  },
-  navBg: "rgba(247,244,238,0.97)",
-  navBorder: "rgba(140,107,42,0.14)",
-  divider: "rgba(0,0,0,0.05)",
-  inputFocusShadow: "0 0 0 3px rgba(140,107,42,0.10)",
-  modalOverlay: "rgba(0,0,0,0.42)",
-  statusNote:       { pending: "rgba(140,107,42,0.05)", approved: "rgba(46,122,90,0.05)", rejected: "rgba(160,56,56,0.05)", cancelled: "rgba(160,56,56,0.05)" },
-  statusNoteBorder: { pending: "rgba(140,107,42,0.18)", approved: "rgba(46,122,90,0.18)", rejected: "rgba(160,56,56,0.18)", cancelled: "rgba(160,56,56,0.18)" },
-  headerGradient: "linear-gradient(160deg,#FAF8F4 0%,#F2EFE8 100%)",
-  spinnerBorder: "rgba(0,0,0,0.12)",
-  spinnerTop: "#8C6B2A",
-  cardBg: "#FFFFFF",
-  cardBorder: "rgba(0,0,0,0.07)",
-};
-
-const F = {
-  display: "'Inter','Helvetica Neue',Arial,sans-serif",
-  body:    "'Inter','Helvetica Neue',Arial,sans-serif",
-  label:   "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono:    "'Inter','Helvetica Neue',Arial,sans-serif",
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatTableNumber(tableNumber) {
@@ -2599,6 +2554,7 @@ function PaginationControls({ pagination, onPageChange, onRowsChange, filteredCo
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function ReservationDashboard() {
+  const { isDark } = useAdminTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -3570,7 +3526,7 @@ export default function ReservationDashboard() {
                     </label>
                     <label style={{display:"grid",gap:5}}>
                       <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Status</span>
-                      <select value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)} style={{padding:"9px 10px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
+                      <select value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)} style={{padding:"8px 10px",height:36,boxSizing:"border-box",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
                         <option value="ALL">All statuses</option>
                         <option value="PENDING">Pending</option>
                         <option value="APPROVED">Reserved</option>
@@ -3581,7 +3537,7 @@ export default function ReservationDashboard() {
                     </label>
                     <label style={{display:"grid",gap:5}}>
                       <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Priority</span>
-                      <select value={filterPriority} onChange={(e)=>setFilterPriority(e.target.value)} style={{padding:"9px 10px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
+                      <select value={filterPriority} onChange={(e)=>setFilterPriority(e.target.value)} style={{padding:"8px 10px",height:36,boxSizing:"border-box",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
                         <option value="ALL">All priorities</option>
                         <option value="overdue">Overdue response</option>
                         <option value="urgent">Urgent</option>
@@ -3594,7 +3550,7 @@ export default function ReservationDashboard() {
                     </label>
                     <label style={{display:"grid",gap:5}}>
                       <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Type</span>
-                      <select value={filterType} onChange={(e)=>setFilterType(e.target.value)} style={{padding:"9px 10px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
+                      <select value={filterType} onChange={(e)=>setFilterType(e.target.value)} style={{padding:"8px 10px",height:36,boxSizing:"border-box",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
                         <option value="ALL">All types</option>
                         <option value="whole">Whole table</option>
                         <option value="individual">Individual seat</option>
@@ -3603,7 +3559,7 @@ export default function ReservationDashboard() {
                     </label>
                     <label style={{display:"grid",gap:5}}>
                       <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Queue Sort</span>
-                      <select value={sortBy} onChange={(e)=>setSortBy(e.target.value)} style={{padding:"9px 10px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
+                      <select value={sortBy} onChange={(e)=>setSortBy(e.target.value)} style={{padding:"8px 10px",height:36,boxSizing:"border-box",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
                         <option value="smart">Smart priority</option>
                         <option value="event_asc">Event soonest</option>
                         <option value="oldest_waiting">Oldest request</option>

@@ -1,32 +1,10 @@
-﻿import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Search, ChevronDown } from "lucide-react";
 import { buildDynamicOutletTree, canonicalOutletName } from "../../../constants/outletCatalog";
-
-const C = {
-  pageBg: "#F7F4EE",
-  surface: "#FFFFFF",
-  surfaceBase: "#FFFFFF",
-  soft: "#FAF8F4",
-  borderDefault: "rgba(0,0,0,0.08)",
-  borderAccent: "rgba(140,107,42,0.28)",
-  border: "rgba(0,0,0,0.08)",
-  divider: "rgba(0,0,0,0.05)",
-  gold: "#8C6B2A",
-  goldFaint: "rgba(140,107,42,0.08)",
-  text: "#18140E",
-  textPrimary: "#18140E",
-  textSecondary: "#7A7060",
-  textTertiary: "rgba(24,20,14,0.35)",
-  faint: "rgba(24,20,14,0.42)",
-  inputFocusShadow: "0 0 0 3px rgba(140,107,42,0.10)",
-};
-
-const F = {
-  body: "'Inter','Helvetica Neue',Arial,sans-serif",
-  label: "'Inter','Helvetica Neue',Arial,sans-serif",
-};
+import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
 export default function RoomFilterDropdown({ rooms = [], venues = [], selectedRoom, onSelect, isMobile }) {
+  const { isDark } = useAdminTheme();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
@@ -76,22 +54,23 @@ export default function RoomFilterDropdown({ rooms = [], venues = [], selectedRo
           width: "100%",
           alignItems: "center",
           gap: 6,
-          padding: "7px 11px",
-          background: hasFilter ? C.goldFaint : C.surfaceBase,
-          border: `1.5px solid ${open || focused ? C.borderAccent : hasFilter ? C.gold + "55" : C.borderDefault}`,
+          padding: "8px 10px",
+          background: hasFilter ? C.goldFaint : C.surfaceInput,
+          border: `1px solid ${open || focused ? C.borderAccent : hasFilter ? C.gold + "55" : C.borderDefault}`,
           borderRadius: 8,
           fontFamily: F.label,
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: 700,
           letterSpacing: "0.10em",
           textTransform: "uppercase",
-          color: hasFilter ? C.gold : C.textSecondary,
+          color: hasFilter ? C.gold : C.textPrimary,
           cursor: "pointer",
           transition: "all 0.18s",
           whiteSpace: "nowrap",
           boxShadow: open ? C.inputFocusShadow : "none",
           minWidth: isMobile ? 120 : 148,
-          height: 38,
+          height: 36,
+          boxSizing: "border-box",
         }}
         onMouseEnter={(e) => {
           if (!open) {
@@ -102,7 +81,7 @@ export default function RoomFilterDropdown({ rooms = [], venues = [], selectedRo
         onMouseLeave={(e) => {
           if (!open && !focused) {
             e.currentTarget.style.borderColor = hasFilter ? C.gold + "55" : C.borderDefault;
-            e.currentTarget.style.color = hasFilter ? C.gold : C.textSecondary;
+            e.currentTarget.style.color = hasFilter ? C.gold : C.textPrimary;
           }
         }}
       >
@@ -115,12 +94,12 @@ export default function RoomFilterDropdown({ rooms = [], venues = [], selectedRo
         </span>
         <ChevronDown size={14} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.18s", flexShrink:0 }} />
       </button>
-
+      
       {open && (
-         <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 1000, background: C.surfaceBase, border: `1px solid ${C.borderDefault}`, borderRadius: 12, boxShadow: "0 8px 18px rgba(40,32,18,0.08)", overflow: "hidden", minWidth: 260, width: "max-content", maxWidth: 320 }}>
+         <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 1000, background: C.surfaceBase, border: `1px solid ${C.borderDefault}`, borderRadius: 12, boxShadow: C.shadow, overflow: "hidden", minWidth: 260, width: "max-content", maxWidth: 320 }}>
           <div style={{ padding: 10, borderBottom: `1px solid ${C.divider}` }}>
             <div style={{ height: 36, border: `1px solid ${C.borderDefault}`, borderRadius: 9, background: C.soft, display: "flex", alignItems: "center", gap: 8, padding: "0 10px" }}>
-              <Search size={14} color={C.faint} />
+              <Search size={14} color={C.textSecondary} />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search outlet or sub-room" style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontSize: 12, color: C.textPrimary }} autoFocus />
             </div>
           </div>

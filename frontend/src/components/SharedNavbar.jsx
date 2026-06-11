@@ -73,8 +73,8 @@ function ThemeToggle({ isDark, toggle, C }) {
         }}
       >
         <span style={{ width:14, height:14, color:isDark ? "rgba(255,250,241,0.72)" : "rgba(74,60,39,0.34)", display:"inline-flex", alignItems:"center", justifyContent:"center", transition:"color 0.25s ease" }}>
-          <svg viewBox="0 0 24 24" role="presentation" style={{ width:"100%", height:"100%", fill:"currentColor", stroke:"none" }}>
-            <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
+          <svg viewBox="0 0 24 24" role="presentation" style={{ width:"100%", height:"100%", fill:"none", stroke:"currentColor", strokeWidth:2.2, strokeLinecap:"round", strokeLinejoin:"round" }}>
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </svg>
         </span>
         <span style={{ width:14, height:14, color:isDark ? "rgba(255,250,241,0.42)" : "rgba(74,60,39,0.70)", display:"inline-flex", alignItems:"center", justifyContent:"center", transition:"color 0.25s ease" }}>
@@ -104,8 +104,8 @@ function ThemeToggle({ isDark, toggle, C }) {
           }}
         >
           {isDark ? (
-            <svg viewBox="0 0 24 24" role="presentation" style={{ width:"100%", height:"100%", fill:"currentColor", stroke:"none" }}>
-              <path d="M20.3 15.4A7.8 7.8 0 0 1 8.6 3.7a8.2 8.2 0 1 0 11.7 11.7Z" />
+            <svg viewBox="0 0 24 24" role="presentation" style={{ width:"100%", height:"100%", fill:"none", stroke:"currentColor", strokeWidth:2.2, strokeLinecap:"round", strokeLinejoin:"round" }}>
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
             </svg>
           ) : (
             <svg viewBox="0 0 24 24" role="presentation" style={{ width:"100%", height:"100%", fill:"none", stroke:"currentColor", strokeWidth:1.9, strokeLinecap:"round", strokeLinejoin:"round" }}>

@@ -32,31 +32,7 @@ import { venueAPI } from "../../../services/venueAPI";
 import { fetchReservations } from "../../../utils/api";
 import { buildOutletRowsFromVenues, canonicalOutletName, outletGroupLabel, buildDynamicOutletTree } from "../../../constants/outletCatalog";
 
-const C = {
-  page: "#F7F4EE",
-  surface: "#FFFFFF",
-  soft: "#FAF8F4",
-  border: "rgba(0,0,0,0.08)",
-  divider: "rgba(0,0,0,0.05)",
-  gold: "#8C6B2A",
-  goldFaint: "rgba(140,107,42,0.08)",
-  green: "#2E7A5A",
-  greenFaint: "rgba(46,122,90,0.08)",
-  red: "#A03838",
-  redFaint: "rgba(160,56,56,0.08)",
-  blue: "#3B6FA8",
-  blueFaint: "rgba(59,111,168,0.08)",
-  slate: "#5E6470",
-  slateFaint: "rgba(94,100,112,0.08)",
-  text: "#18140E",
-  muted: "#7A7060",
-  faint: "rgba(24,20,14,0.42)",
-};
-
-const F = {
-  body: "'Inter','Helvetica Neue',Arial,sans-serif",
-  label: "'Inter','Helvetica Neue',Arial,sans-serif",
-};
+import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
 const POLL_INTERVAL_MS = 5000;
 const RECONNECT_WINDOW_MS = 60000;
@@ -818,6 +794,7 @@ function ReservationRow({ reservation, showPriority = false }) {
 }
 
 function OutletDashboard() {
+  const { isDark } = useAdminTheme();
   const navigate = useNavigate();
   const params = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(true);

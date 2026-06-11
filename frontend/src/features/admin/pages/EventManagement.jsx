@@ -22,28 +22,9 @@ import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import { eventAPI } from "../../../services/eventAPI";
 import { venueAPI } from "../../../services/venueAPI";
 import { authAPI } from "../../../services/authAPI";
+import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
-const C = {
-  page: "#F7F4EE",
-  surface: "#FFFFFF",
-  soft: "#FAF8F4",
-  border: "rgba(0,0,0,0.08)",
-  divider: "rgba(0,0,0,0.055)",
-  gold: "#8C6B2A",
-  goldFaint: "rgba(140,107,42,0.075)",
-  green: "#2E7A5A",
-  greenFaint: "rgba(46,122,90,0.075)",
-  red: "#A03838",
-  redFaint: "rgba(160,56,56,0.075)",
-  text: "#18140E",
-  muted: "#746B5E",
-  faint: "rgba(24,20,14,0.42)",
-};
 
-const F = {
-  body: "'Inter','Helvetica Neue',Arial,sans-serif",
-  label: "'Inter','Helvetica Neue',Arial,sans-serif",
-};
 
 const DEFAULT_FORM = {
   title: "",
@@ -151,6 +132,7 @@ function SaveFeedbackModal({ type, item, onClose }) {
 }
 
 export default function EventManagement() {
+  const { isDark } = useAdminTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [events, setEvents] = useState([]);
   const [venues, setVenues] = useState([]);

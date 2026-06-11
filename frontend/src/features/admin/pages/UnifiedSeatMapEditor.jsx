@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
 import SeatMap from "../../../components/seatmap/SeatMap";
+import { useAdminTheme, C as themeC, F as themeF } from "../../../context/AdminThemeContext";
 
 /**
  * Venue configurations keyed by URL slug.
@@ -121,6 +122,7 @@ function getVenueTypeFromPath(pathname) {
 }
 
 export default function UnifiedSeatMapEditor() {
+  const { isDark } = useAdminTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -133,8 +135,8 @@ export default function UnifiedSeatMapEditor() {
   // Derive venue type reactively from the URL so deep-links work correctly.
   const venueType = getVenueTypeFromPath(location.pathname);
   const config    = VENUE_CONFIGS[venueType] ?? VENUE_CONFIGS["business-center"];
-  const C         = config.colors;
-  const F         = FONTS[config.theme];
+  const venueColors = config.colors;
+  const venueFonts  = FONTS[config.theme];
 
   // Migration script for scooping up local storage seatmaps
   useEffect(() => {
@@ -191,7 +193,7 @@ export default function UnifiedSeatMapEditor() {
   }, []);
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", fontFamily: F.body, background: C.pageBg, color: C.textPrimary }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", fontFamily: themeF.body, background: themeC.pageBg, color: themeC.textPrimary }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700;800&display=swap');
@@ -215,7 +217,7 @@ export default function UnifiedSeatMapEditor() {
           // Subtract the AdminNavbar height (60px) so the editor fills the rest
           // of the viewport without a scrollbar appearing on the outer page.
           height: "100vh",
-          background: C.pageBg,
+          background: themeC.pageBg,
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
@@ -235,6 +237,7 @@ export default function UnifiedSeatMapEditor() {
               room={config.room}
               virtualWidth={1200}
               virtualHeight={800}
+              isDark={isDark}
             />
           </div>
         </div>
