@@ -157,23 +157,23 @@ const diningLogoMap = {
 function resolveRoomImage(image) {
   if (!image) return businessCenterImg;
   if (/^(https?:|data:|blob:)/i.test(image)) return image;
-  
+
   const key = String(image).split("/").pop();
   const isCustomPath = String(image).includes("/");
   if (!isCustomPath && roomImageMap[key]) return roomImageMap[key];
-  
+
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "");
-  
+
   let cleanPath = String(image).replace(/\\/g, "/").replace(/^\/+/, "");
-  
+
   if (!cleanPath.includes("/")) {
     return `${apiRoot}/images/${cleanPath}`;
   }
-  
+
   if (cleanPath.startsWith("function-rooms/") && !cleanPath.startsWith("images/")) {
     cleanPath = "images/" + cleanPath;
   }
-  
+
   return `${apiRoot}/${cleanPath}`;
 }
 
@@ -198,7 +198,7 @@ function resolveDiningLogo(room) {
 
   // Fallback to custom upload if no static logo exists
   const isCustomUploaded = room?.image && (
-    /^(https?:|data:|blob:)/i.test(String(room.image)) || 
+    /^(https?:|data:|blob:)/i.test(String(room.image)) ||
     String(room.image).includes("/")
   );
   if (isCustomUploaded) {
@@ -522,7 +522,7 @@ export default function ReservationLanding() {
     try {
       const s = localStorage.getItem("bellevue-theme");
       if (s !== null) return s;
-    } catch {}
+    } catch { }
     return (window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true) ? "dark" : "light";
   });
   const [diningOutlets, setDiningOutlets] = useState(fallbackDiningOutlets);
@@ -535,7 +535,7 @@ export default function ReservationLanding() {
     setTheme(nextTheme);
     try {
       localStorage.setItem("bellevue-theme", nextTheme);
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -545,19 +545,19 @@ export default function ReservationLanding() {
         venueAPI.getAll({ _t: Date.now() }).catch(() => []),
         clientDisplayAPI.getAll().catch(() => [])
       ]).then(([rooms, settings]) => {
-          if (!mounted) return;
-          const venueRows = Array.isArray(rooms) ? rooms : [];
-          const settingsMap = { dining: {}, events: {} };
-          if (Array.isArray(settings)) {
-            settings.forEach(s => settingsMap[s.section] = s);
-          }
-          setDisplaySettings(settingsMap);
+        if (!mounted) return;
+        const venueRows = Array.isArray(rooms) ? rooms : [];
+        const settingsMap = { dining: {}, events: {} };
+        if (Array.isArray(settings)) {
+          settings.forEach(s => settingsMap[s.section] = s);
+        }
+        setDisplaySettings(settingsMap);
 
-          let dining = buildDiningOutletsFromConfig(venueRows);
-          let events = buildEventVenuesFromConfig(venueRows);
+        let dining = buildDiningOutletsFromConfig(venueRows);
+        let events = buildEventVenuesFromConfig(venueRows);
 
-          setDiningOutlets(dining);
-          setEventVenues(events);
+        setDiningOutlets(dining);
+        setEventVenues(events);
       });
     };
 
@@ -636,25 +636,25 @@ export default function ReservationLanding() {
                 aria-label={isLight ? "Switch to dark mode" : "Switch to light mode"}
               >
                 {isLight ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#a47821", pointerEvents: "none", display: "block" }}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#a47821", pointerEvents: "none", display: "block" }}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
                 ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#e2c96a", pointerEvents: "none", display: "block" }}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#e2c96a", pointerEvents: "none", display: "block" }}><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
                 )}
               </button>
             </div>
 
-            <div 
+            <div
               className={`reservation-grid reservation-grid--dining ${displaySettings.dining?.layout_engine === 'flex' ? 'reservation-grid--flex' : ''}`}
               style={
                 displaySettings.dining?.layout_engine === 'flex'
-                ? {
+                  ? {
                     display: "flex",
                     flexWrap: "wrap",
                     justifyContent: displaySettings.dining.flex_alignment || "center",
                     "--card-width": `${displaySettings.dining.card_width || 240}px`,
                     "--card-stretch": displaySettings.dining.stretch_to_fill ? "1" : "0"
                   }
-                : (displaySettings.dining?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.dining.desktop_columns}, minmax(0, 1fr))` } : undefined)
+                  : (displaySettings.dining?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.dining.desktop_columns}, minmax(0, 1fr))` } : undefined)
               }
             >
               {diningOutlets.map((outlet) => (
@@ -671,18 +671,18 @@ export default function ReservationLanding() {
               </div>
             </div>
 
-            <div 
+            <div
               className={`reservation-grid reservation-grid--events ${displaySettings.events?.layout_engine === 'flex' ? 'reservation-grid--flex' : ''}`}
               style={
                 displaySettings.events?.layout_engine === 'flex'
-                ? {
+                  ? {
                     display: "flex",
                     flexWrap: "wrap",
                     justifyContent: displaySettings.events.flex_alignment || "center",
                     "--card-width": `${displaySettings.events.card_width || 240}px`,
                     "--card-stretch": displaySettings.events.stretch_to_fill ? "1" : "0"
                   }
-                : (displaySettings.events?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.events.desktop_columns}, minmax(0, 1fr))` } : undefined)
+                  : (displaySettings.events?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.events.desktop_columns}, minmax(0, 1fr))` } : undefined)
               }
             >
               {eventVenues === null ? (

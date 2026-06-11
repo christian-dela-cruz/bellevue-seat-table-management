@@ -6,8 +6,10 @@ import { authAPI } from "../../services/authAPI.js";
 import { getScopedOutletGroups } from "../../constants/outletCatalog.js";
 import { useAdminTheme, C as adminC, F as adminF } from "../../context/AdminThemeContext.jsx";
 import { 
-  Undo2, Redo2, Lock, Unlock, Copy, Plus, Trash2, Grid, RotateCw, ZoomIn, ZoomOut, Check, Square, Circle 
+  Undo2, Redo2, Lock, Unlock, Copy, Plus, Trash2, Grid, RotateCw, ZoomIn, ZoomOut, Check, Square, Circle,
+  Download, Upload, RotateCcw, Eye, EyeOff, X
 } from "lucide-react";
+
 
 // Status Colors
 export const STATUS_COLORS = {
@@ -28,6 +30,43 @@ export const STATUS_LABELS = {
 const SEAT_STATUS_CYCLE = ["available", "pending", "reserved"];
 
 const F = "'Inter', 'Helvetica Neue', Arial, sans-serif";
+
+const hexToRgba = (hex, opacity) => {
+  if (!hex) return "rgba(250, 249, 245, 1)";
+  hex = hex.replace(/^#/, "");
+  if (hex.length === 3) {
+    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+  }
+  if (hex.length !== 6) return `rgba(250, 249, 245, ${opacity / 100})`;
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity / 100})`;
+};
+
+const isDarkColor = (color) => {
+  if (!color) return false;
+  const c = color.toLowerCase();
+  if (c.includes("gradient")) {
+    return c.includes("#1e1b18") || c.includes("#0d0a09") || c.includes("dark") || c.includes("#2a251d");
+  }
+  if (c.startsWith("#")) {
+    const hex = c.substring(1);
+    let r = 255, g = 255, b = 255;
+    if (hex.length === 3) {
+      r = parseInt(hex[0] + hex[0], 16);
+      g = parseInt(hex[1] + hex[1], 16);
+      b = parseInt(hex[2] + hex[2], 16);
+    } else if (hex.length === 6) {
+      r = parseInt(hex.substring(0, 2), 16);
+      g = parseInt(hex.substring(2, 4), 16);
+      b = parseInt(hex.substring(4, 6), 16);
+    }
+    return (r * 0.299 + g * 0.587 + b * 0.114) < 128;
+  }
+  if (c === "black" || c === "charcoal" || c === "darkgray") return true;
+  return false;
+};
 
 // ─── VENUE STRUCTURE STORAGE KEY ─────────────────────────────────────────────
 const VENUE_STRUCTURE_KEY = "bellevue_venue_structure";
@@ -2463,7 +2502,7 @@ function WingRoomSidebar({ activeWing, activeRoom, onSelect, venueStructure, onO
 function InspectorPanel({ 
   selected, selectedTable, selectedSeatObj, selectedStandaloneSeatObj, 
   selectedLabelObj, selectedFixtureObj,
-  tables, setTables, labels, setLabels, fixtures, setFixtures,
+  tables, setTables, labels, setLabels, fixtures, setFixtures, standaloneSeats,
   addSeat, deleteSeat, deleteTable, deleteStandaloneSeat, deleteFixture,
   updateTable, updateLabel, updateFixture, handleSeatLabelEdit, handleSeatStatus,
   handleStandaloneSeatStatus, onRequestDelete, 
@@ -2474,8 +2513,232 @@ function InspectorPanel({
   showGrid, setShowGrid,
   gridVisibility, setGridVisibility,
   smartGuidesEnabled, setSmartGuidesEnabled,
-  showRulers, setShowRulers
+  showRulers, setShowRulers,
+  canvasBgColor, setCanvasBgColor,
+  canvasBgOpacity, setCanvasBgOpacity,
+  canvasBgVisible, setCanvasBgVisible,
+  discardChanges
 }) {
+  const svRef = useRef(null);
+  const hueRef = useRef(null);
+  const alphaRef = useRef(null);
+  const colorRowRef = useRef(null);
+  const popoverRef = useRef(null);
+
+  const [isDraggingSV, setIsDraggingSV] = useState(false);
+  const [isDraggingHue, setIsDraggingHue] = useState(false);
+  const [isDraggingAlpha, setIsDraggingAlpha] = useState(false);
+  const [showColorPickerPopover, setShowColorPickerPopover] = useState(false);
+  const [popoverCoords, setPopoverCoords] = useState({ top: 300 });
+
+  const [h, setH] = useState(0);
+  const [s, setS] = useState(0);
+  const [v, setV] = useState(100);
+  const prevColorRef = useRef(canvasBgColor);
+  const prevOpacityRef = useRef(canvasBgOpacity);
+  const prevVisibleRef = useRef(canvasBgVisible);
+
+  const handleColorFocus = () => {
+    prevColorRef.current = canvasBgColor;
+    prevOpacityRef.current = canvasBgOpacity;
+    prevVisibleRef.current = canvasBgVisible;
+  };
+
+  // Helper to convert HSV to Hex
+  const hsvToHex = (h, s, v) => {
+    s /= 100;
+    v /= 100;
+    const k = (n) => (n + h / 60) % 6;
+    const f = (n) => v * (1 - s * Math.max(0, Math.min(k(n), 4 - k(n), 1)));
+    const r = Math.round(255 * f(5)).toString(16).padStart(2, "0");
+    const g = Math.round(255 * f(3)).toString(16).padStart(2, "0");
+    const b = Math.round(255 * f(1)).toString(16).padStart(2, "0");
+    return `#${r}${g}${b}`;
+  };
+
+  // Helper to convert Hex to HSV
+  const hexToHsv = (hex) => {
+    if (!hex) return { h: 0, s: 0, v: 100 };
+    hex = hex.replace(/^#/, "");
+    if (hex.length === 3) {
+      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    if (hex.length !== 6) return { h: 0, s: 0, v: 100 };
+    let r = parseInt(hex.substring(0, 2), 16) / 255;
+    let g = parseInt(hex.substring(2, 4), 16) / 255;
+    let b = parseInt(hex.substring(4, 6), 16) / 255;
+    let max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, v = max;
+    let d = max - min;
+    s = max === 0 ? 0 : d / max;
+    if (max === min) {
+      h = 0;
+    } else {
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    return {
+      h: Math.round(h * 360),
+      s: Math.round(s * 100),
+      v: Math.round(v * 100)
+    };
+  };
+
+  // Sync canvas background hex to SV/Hue states
+  useEffect(() => {
+    if (canvasBgColor.startsWith("#")) {
+      const hsv = hexToHsv(canvasBgColor);
+      setH(hsv.h);
+      setS(hsv.s);
+      setV(hsv.v);
+    }
+  }, [canvasBgColor]);
+
+  const handleSVInteractionWithY = useCallback((clientX, clientY, rect) => {
+    const w = rect.width;
+    const hBox = rect.height;
+    const x = Math.max(0, Math.min(w, clientX - rect.left));
+    const y = Math.max(0, Math.min(hBox, clientY - rect.top));
+    
+    const newS = Math.round((x / w) * 100);
+    const newV = Math.round((1 - y / hBox) * 100);
+    
+    setS(newS);
+    setV(newV);
+    const newHex = hsvToHex(h, newS, newV);
+    setCanvasBgColor(newHex);
+  }, [h, setCanvasBgColor]);
+
+  const handleHueInteraction = useCallback((clientX, rect) => {
+    const w = rect.width;
+    const x = Math.max(0, Math.min(w, clientX - rect.left));
+    const newH = Math.round((x / w) * 360);
+    
+    setH(newH);
+    const newHex = hsvToHex(newH, s, v);
+    setCanvasBgColor(newHex);
+  }, [s, v, setCanvasBgColor]);
+
+  const handleSVMouseDown = (e) => {
+    e.preventDefault();
+    setIsDraggingSV(true);
+    pushHistory(tables, standaloneSeats, labels, fixtures, canvasBgColor, canvasBgOpacity, canvasBgVisible);
+    const rect = e.currentTarget.getBoundingClientRect();
+    handleSVInteractionWithY(e.clientX, e.clientY, rect);
+  };
+
+  const handleHueMouseDown = (e) => {
+    e.preventDefault();
+    setIsDraggingHue(true);
+    pushHistory(tables, standaloneSeats, labels, fixtures, canvasBgColor, canvasBgOpacity, canvasBgVisible);
+    const rect = e.currentTarget.getBoundingClientRect();
+    handleHueInteraction(e.clientX, rect);
+  };
+
+  const handleAlphaInteraction = useCallback((clientX, rect) => {
+    const w = rect.width;
+    const x = Math.max(0, Math.min(w, clientX - rect.left));
+    const newOpacity = Math.round((x / w) * 100);
+    setCanvasBgOpacity(newOpacity);
+  }, [setCanvasBgOpacity]);
+
+  const handleAlphaMouseDown = (e) => {
+    e.preventDefault();
+    setIsDraggingAlpha(true);
+    pushHistory(tables, standaloneSeats, labels, fixtures, canvasBgColor, canvasBgOpacity, canvasBgVisible);
+    const rect = e.currentTarget.getBoundingClientRect();
+    handleAlphaInteraction(e.clientX, rect);
+  };
+
+  useEffect(() => {
+    if (!isDraggingSV) return;
+    const handleMouseMove = (e) => {
+      if (svRef.current) {
+        const rect = svRef.current.getBoundingClientRect();
+        handleSVInteractionWithY(e.clientX, e.clientY, rect);
+      }
+    };
+    const handleMouseUp = () => {
+      setIsDraggingSV(false);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDraggingSV, handleSVInteractionWithY]);
+
+  useEffect(() => {
+    if (!isDraggingHue) return;
+    const handleMouseMove = (e) => {
+      if (hueRef.current) {
+        const rect = hueRef.current.getBoundingClientRect();
+        handleHueInteraction(e.clientX, rect);
+      }
+    };
+    const handleMouseUp = () => {
+      setIsDraggingHue(false);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDraggingHue, handleHueInteraction]);
+
+  useEffect(() => {
+    if (!isDraggingAlpha) return;
+    const handleMouseMove = (e) => {
+      if (alphaRef.current) {
+        const rect = alphaRef.current.getBoundingClientRect();
+        handleAlphaInteraction(e.clientX, rect);
+      }
+    };
+    const handleMouseUp = () => {
+      setIsDraggingAlpha(false);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDraggingAlpha, handleAlphaInteraction]);
+
+  // Click outside to dismiss color popover
+  useEffect(() => {
+    if (!showColorPickerPopover) return;
+    const handleOutsideClick = (e) => {
+      if (colorRowRef.current && colorRowRef.current.contains(e.target)) return;
+      if (popoverRef.current && popoverRef.current.contains(e.target)) return;
+      setShowColorPickerPopover(false);
+    };
+    window.addEventListener("mousedown", handleOutsideClick);
+    return () => window.removeEventListener("mousedown", handleOutsideClick);
+  }, [showColorPickerPopover]);
+
+  const toggleVisibility = () => {
+    pushHistory(tables, standaloneSeats, labels, fixtures, canvasBgColor, canvasBgOpacity, canvasBgVisible);
+    setCanvasBgVisible(prev => !prev);
+  };
+
+  const togglePopover = () => {
+    if (!showColorPickerPopover) {
+      if (colorRowRef.current) {
+        const rect = colorRowRef.current.getBoundingClientRect();
+        setPopoverCoords({
+          top: Math.max(80, Math.min(window.innerHeight - 280, rect.top - 100))
+        });
+      }
+    }
+    setShowColorPickerPopover(prev => !prev);
+  };
   const iLabel = t => (
     <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", color: C.gold, textTransform: "uppercase", marginBottom: 5, marginTop: 12, fontFamily: F }}>{t}</div>
   );
@@ -2702,24 +2965,460 @@ function InspectorPanel({
             </div>
           </div>
 
-          <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 12, marginTop: 4 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: C.textSecondary, marginBottom: 8 }}>Layout Configuration</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <button onClick={exportLayout} style={{ width: "100%", padding: "8px", background: "transparent", border: `1px solid ${C.borderAccent}`, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, cursor: "pointer", transition: "all 0.15s" }}
-                onMouseEnter={e => e.currentTarget.style.background = C.goldFaint}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                Export JSON Layout
+          <div id="canvas-bg-inspector" style={{ transition: "outline 0.2s ease", borderRadius: 8, padding: "2px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.textSecondary, marginBottom: 8, fontFamily: F }}>Page</div>
+            
+            {/* Figma-Style properties row */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div 
+                ref={colorRowRef} 
+                onClick={togglePopover}
+                style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  background: C.surfaceInput, 
+                  border: `1px solid ${C.borderDefault}`, 
+                  borderRadius: 6, 
+                  padding: "4px 8px", 
+                  cursor: "pointer",
+                  flex: 1,
+                  userSelect: "none"
+                }}
+              >
+                {/* Color preview tile with checkerboard */}
+                <div 
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 4,
+                    position: "relative",
+                    border: `1.5px solid ${C.borderDefault}`,
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                    backgroundImage: "linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)",
+                    backgroundSize: "8px 8px",
+                    backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0",
+                    flexShrink: 0
+                  }}
+                >
+                  <div style={{
+                    position: "absolute",
+                    inset: 0,
+                    borderRadius: 3,
+                    background: canvasBgVisible ? hexToRgba(canvasBgColor, canvasBgOpacity) : "transparent"
+                  }} />
+                </div>
+
+                {/* Hex Display */}
+                <div 
+                  style={{
+                    flex: 1,
+                    fontSize: 11,
+                    fontFamily: "monospace",
+                    color: C.textPrimary,
+                    fontWeight: 600,
+                    textTransform: "uppercase"
+                  }}
+                >
+                  {canvasBgColor.replace(/^#/, "")}
+                </div>
+
+                {/* Separator | */}
+                <div style={{ width: 1, height: 16, background: C.borderDefault }} />
+
+                {/* Opacity Value */}
+                <div 
+                  style={{
+                    fontSize: 11,
+                    color: C.textSecondary,
+                    textAlign: "right",
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                    paddingRight: 2
+                  }}
+                >
+                  {canvasBgOpacity} %
+                </div>
+              </div>
+
+              {/* Eye visibility toggle (outside the pill) */}
+              <button
+                onClick={toggleVisibility}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: canvasBgVisible ? C.textPrimary : C.textTertiary,
+                  cursor: "pointer",
+                  display: "flex",
+                  padding: 4,
+                  alignItems: "center",
+                  opacity: canvasBgVisible ? 1 : 0.6,
+                  transition: "opacity 0.15s ease"
+                }}
+                title={canvasBgVisible ? "Hide Canvas Background" : "Show Canvas Background"}
+              >
+                {canvasBgVisible ? <Eye size={14} /> : <EyeOff size={14} />}
               </button>
-              <label style={{ width: "100%", padding: "8px", background: "transparent", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: C.textSecondary, cursor: "pointer", display: "block", textAlign: "center", transition: "all 0.15s" }}
+            </div>
+
+            {/* Floating popover/modal positioned next to the sidebar */}
+            {showColorPickerPopover && (
+              <div 
+                ref={popoverRef}
+                style={{
+                  position: "fixed",
+                  zIndex: 99999,
+                  right: 260, // Float to the left of the 252px sidebar
+                  top: popoverCoords.top,
+                  width: 220,
+                  background: C.surfaceRaised,
+                  border: `1px solid ${C.borderDefault}`,
+                  borderRadius: 12,
+                  boxShadow: "0 10px 32px rgba(0,0,0,0.18)",
+                  padding: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  boxSizing: "border-box"
+                }}
+              >
+                {/* Popover Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${C.divider}`, paddingBottom: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.textPrimary }}>Custom Color</span>
+                  <button 
+                    onClick={() => setShowColorPickerPopover(false)} 
+                    style={{ background: "transparent", border: "none", color: C.textSecondary, cursor: "pointer", display: "flex", padding: 2 }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {/* Figma-Style SV Box */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <div 
+                    ref={svRef}
+                    onMouseDown={handleSVMouseDown}
+                    style={{
+                      width: "100%",
+                      height: 120,
+                      borderRadius: 6,
+                      position: "relative",
+                      backgroundColor: `hsl(${h}, 100%, 50%)`,
+                      backgroundImage: "linear-gradient(to top, #000000, transparent), linear-gradient(to right, #ffffff, transparent)",
+                      cursor: "crosshair",
+                      boxShadow: "inset 0 1px 4px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.1)",
+                      border: `1px solid ${C.borderDefault}`,
+                      overflow: "hidden"
+                    }}
+                  >
+                    {/* SV pointer */}
+                    <div 
+                      style={{
+                        position: "absolute",
+                        left: `${s}%`,
+                        top: `${100 - v}%`,
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        border: "2px solid #ffffff",
+                        boxShadow: "0 1px 4px rgba(0,0,0,0.5)",
+                        transform: "translate(-6px, -6px)",
+                        pointerEvents: "none",
+                        background: canvasBgColor.startsWith("#") ? canvasBgColor : "#fff"
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Figma-Style Hue Slider */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <div style={{ fontSize: 8, color: C.textTertiary }}>Hue</div>
+                  <div 
+                    ref={hueRef}
+                    onMouseDown={handleHueMouseDown}
+                    style={{
+                      width: "100%",
+                      height: 12,
+                      borderRadius: 6,
+                      position: "relative",
+                      background: "linear-gradient(to right, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%)",
+                      cursor: "ew-resize",
+                      boxShadow: "inset 0 1px 3px rgba(0,0,0,0.15)",
+                      border: `1px solid ${C.borderDefault}`
+                    }}
+                  >
+                    {/* Hue pointer */}
+                    <div 
+                      style={{
+                        position: "absolute",
+                        left: `${(h / 360) * 100}%`,
+                        top: "50%",
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        border: "2px solid #ffffff",
+                        boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
+                        transform: "translate(-6px, -50%)",
+                        pointerEvents: "none",
+                        background: `hsl(${h}, 100%, 50%)`
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Opacity/Alpha Slider */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <div style={{ fontSize: 8, color: C.textTertiary }}>Opacity</div>
+                  <div 
+                    ref={alphaRef}
+                    onMouseDown={handleAlphaMouseDown}
+                    style={{
+                      width: "100%",
+                      height: 12,
+                      borderRadius: 6,
+                      position: "relative",
+                      cursor: "ew-resize",
+                      boxShadow: "inset 0 1px 3px rgba(0,0,0,0.15)",
+                      border: `1px solid ${C.borderDefault}`,
+                      overflow: "hidden",
+                      backgroundImage: "linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)",
+                      backgroundSize: "8px 8px",
+                      backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0"
+                    }}
+                  >
+                    <div style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: `linear-gradient(to right, transparent, ${hsvToHex(h, s, v)})`
+                    }} />
+                    {/* Alpha slider pointer */}
+                    <div 
+                      style={{
+                        position: "absolute",
+                        left: `${canvasBgOpacity}%`,
+                        top: "50%",
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        border: "2px solid #ffffff",
+                        boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
+                        transform: "translate(-6px, -50%)",
+                        pointerEvents: "none",
+                        background: "#fff"
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Input Fields Row */}
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+                  {/* Hex Dropdown Pill */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 10, 
+                    fontWeight: 600, 
+                    color: C.textPrimary,
+                    background: C.surfaceInput,
+                    border: `1px solid ${C.borderDefault}`,
+                    borderRadius: 4,
+                    padding: "4px 6px",
+                    userSelect: "none",
+                    cursor: "pointer"
+                  }}>
+                    Hex
+                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={canvasBgColor.replace(/^#/, "").toUpperCase()}
+                    onFocus={handleColorFocus}
+                    onMouseDown={handleColorFocus}
+                    onChange={e => {
+                      let val = e.target.value.replace(/[^0-9A-Fa-f]/g, "");
+                      if (val.length > 6) val = val.substring(0, 6);
+                      setCanvasBgColor("#" + val);
+                    }}
+                    onBlur={e => {
+                      let val = e.target.value.replace(/[^0-9A-Fa-f]/g, "");
+                      if (val.length === 3) {
+                        val = val[0] + val[0] + val[1] + val[1] + val[2] + val[2];
+                      }
+                      while (val.length < 6) val += "F";
+                      const finalHex = "#" + val.toUpperCase();
+                      setCanvasBgColor(finalHex);
+                      if (finalHex !== prevColorRef.current) {
+                        pushHistory(tables, standaloneSeats, labels, fixtures, prevColorRef.current, canvasBgOpacity, canvasBgVisible);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      fontSize: 10,
+                      padding: "4px 6px",
+                      background: C.surfaceInput,
+                      color: C.textPrimary,
+                      border: `1px solid ${C.borderDefault}`,
+                      borderRadius: 4,
+                      fontFamily: "monospace",
+                      textAlign: "center",
+                      outline: "none"
+                    }}
+                  />
+
+                  {/* Opacity Value Input */}
+                  <div style={{ display: "flex", alignItems: "center", background: C.surfaceInput, border: `1px solid ${C.borderDefault}`, borderRadius: 4, padding: "2px 4px", width: 48 }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={canvasBgOpacity}
+                      onFocus={handleColorFocus}
+                      onMouseDown={handleColorFocus}
+                      onChange={e => {
+                        const val = Math.max(0, Math.min(100, Number(e.target.value)));
+                        setCanvasBgOpacity(val);
+                      }}
+                      onBlur={() => {
+                        if (canvasBgOpacity !== prevOpacityRef.current) {
+                          pushHistory(tables, standaloneSeats, labels, fixtures, canvasBgColor, prevOpacityRef.current, canvasBgVisible);
+                        }
+                      }}
+                      style={{
+                        width: "100%",
+                        fontSize: 10,
+                        background: "transparent",
+                        border: "none",
+                        color: C.textPrimary,
+                        textAlign: "right",
+                        padding: 0,
+                        outline: "none"
+                      }}
+                    />
+                    <span style={{ fontSize: 9, color: C.textTertiary, marginLeft: 2 }}>%</span>
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </div>
+
+          {/* Import / Export Section */}
+          <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 12, marginTop: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: C.textSecondary, marginBottom: 8, letterSpacing: "0.05em" }}>Import / Export</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <button 
+                onClick={exportLayout} 
+                style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  gap: 4, 
+                  padding: "8px 4px", 
+                  background: "transparent", 
+                  border: `1px solid ${C.borderAccent}`, 
+                  borderRadius: 6, 
+                  fontFamily: F, 
+                  fontWeight: 700, 
+                  fontSize: 9, 
+                  letterSpacing: "0.05em", 
+                  textTransform: "uppercase", 
+                  color: C.gold, 
+                  cursor: "pointer", 
+                  transition: "all 0.15s" 
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = C.goldFaint}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <Download size={10} />
+                Export JSON
+              </button>
+              <label 
+                style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  gap: 4, 
+                  padding: "8px 4px", 
+                  background: "transparent", 
+                  border: `1px solid ${C.borderDefault}`, 
+                  borderRadius: 6, 
+                  fontFamily: F, 
+                  fontWeight: 700, 
+                  fontSize: 9, 
+                  letterSpacing: "0.05em", 
+                  textTransform: "uppercase", 
+                  color: C.textSecondary, 
+                  cursor: "pointer", 
+                  textAlign: "center", 
+                  transition: "all 0.15s" 
+                }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = C.borderAccent}
-                onMouseLeave={e => e.currentTarget.style.borderColor = C.borderDefault}>
-                Import JSON Layout
+                onMouseLeave={e => e.currentTarget.style.borderColor = C.borderDefault}
+              >
+                <Upload size={10} />
+                Import JSON
                 <input type="file" accept=".json" onChange={importLayout} style={{ display: "none" }} />
               </label>
-              <button onClick={resetLayout} style={{ width: "100%", padding: "8px", background: "transparent", border: `1px solid ${C.redBorder}`, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: C.red, cursor: "pointer", transition: "all 0.15s" }}
+            </div>
+          </div>
+
+          {/* Draft & Reset Operations Section */}
+          <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 12, marginTop: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: C.textSecondary, marginBottom: 8, letterSpacing: "0.05em" }}>Draft & Reset Options</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <button 
+                onClick={discardChanges} 
+                style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  gap: 4, 
+                  padding: "8px 4px", 
+                  background: "transparent", 
+                  border: `1px solid ${C.borderDefault}`, 
+                  borderRadius: 6, 
+                  fontFamily: F, 
+                  fontWeight: 700, 
+                  fontSize: 9, 
+                  letterSpacing: "0.05em", 
+                  textTransform: "uppercase", 
+                  color: C.textSecondary, 
+                  cursor: "pointer", 
+                  transition: "all 0.15s" 
+                }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = C.gold}
+                onMouseLeave={e => e.currentTarget.style.borderColor = C.borderDefault}
+              >
+                <RotateCcw size={10} />
+                Discard Draft
+              </button>
+              <button 
+                onClick={resetLayout} 
+                style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  gap: 4, 
+                  padding: "8px 4px", 
+                  background: "transparent", 
+                  border: `1px solid ${C.redBorder}`, 
+                  borderRadius: 6, 
+                  fontFamily: F, 
+                  fontWeight: 700, 
+                  fontSize: 9, 
+                  letterSpacing: "0.05em", 
+                  textTransform: "uppercase", 
+                  color: C.red, 
+                  cursor: "pointer", 
+                  transition: "all 0.15s" 
+                }}
                 onMouseEnter={e => e.currentTarget.style.background = C.redFaint}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                Reset Room Layout
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <Trash2 size={10} />
+                Reset Room
               </button>
             </div>
           </div>
@@ -3205,11 +3904,23 @@ export default function SeatMap({
 
   // ── Panning & Zooming & Blueprint Guides ────────────────────────────────────
   const [pan, setPan]                   = useState({ x: 0, y: 0 });
-  const [zoom, setZoom]                 = useState(1);
+  const [zoom, setZoom]                 = useState(0.7);
   const [snapToGrid, setSnapToGrid]     = useState(true);
   const [gridSize, setGridSize]         = useState(25);
   const [roomWidth, setRoomWidth]       = useState(1200);
   const [roomHeight, setRoomHeight]     = useState(800);
+  const [canvasBgColor, setCanvasBgColor] = useState(() => {
+    if (!editMode && tableData?.editor?.canvas_bg_color) return tableData.editor.canvas_bg_color;
+    return "#FAF9F5";
+  });
+  const [canvasBgOpacity, setCanvasBgOpacity] = useState(() => {
+    if (!editMode && tableData?.editor?.canvas_bg_opacity !== undefined) return tableData.editor.canvas_bg_opacity;
+    return 100;
+  });
+  const [canvasBgVisible, setCanvasBgVisible] = useState(() => {
+    if (!editMode && tableData?.editor?.canvas_bg_visible !== undefined) return tableData.editor.canvas_bg_visible;
+    return true;
+  });
   const [alignGuides, setAlignGuides]   = useState(null);
   const [isPanning, setIsPanning]       = useState(false);
   const [spacePressed, setSpacePressed] = useState(false);
@@ -3221,18 +3932,21 @@ export default function SeatMap({
   // ── History States for Undo / Redo ──────────────────────────────────────────
   const [history, setHistory]           = useState({ past: [], future: [] });
 
-  const pushHistory = useCallback((currentTables = tables, currentSeats = standaloneSeats, currentLabels = labels, currentFixtures = fixtures) => {
+  const pushHistory = useCallback((currentTables = tables, currentSeats = standaloneSeats, currentLabels = labels, currentFixtures = fixtures, currentCanvasBgColor = canvasBgColor, currentCanvasBgOpacity = canvasBgOpacity, currentCanvasBgVisible = canvasBgVisible) => {
     userEditedRef.current = true;  // Mark that user has made a real edit
     setHistory(prev => ({
       past: [...prev.past, { 
         tables: JSON.parse(JSON.stringify(currentTables)), 
         standaloneSeats: JSON.parse(JSON.stringify(currentSeats)), 
         labels: JSON.parse(JSON.stringify(currentLabels)),
-        fixtures: JSON.parse(JSON.stringify(currentFixtures))
+        fixtures: JSON.parse(JSON.stringify(currentFixtures)),
+        canvasBgColor: currentCanvasBgColor,
+        canvasBgOpacity: currentCanvasBgOpacity,
+        canvasBgVisible: currentCanvasBgVisible
       }].slice(-50),
       future: []
     }));
-  }, [tables, standaloneSeats, labels, fixtures]);
+  }, [tables, standaloneSeats, labels, fixtures, canvasBgColor, canvasBgOpacity, canvasBgVisible]);
 
   const undo = useCallback(() => {
     setHistory(prev => {
@@ -3243,17 +3957,23 @@ export default function SeatMap({
         tables: JSON.parse(JSON.stringify(tables)),
         standaloneSeats: JSON.parse(JSON.stringify(standaloneSeats)),
         labels: JSON.parse(JSON.stringify(labels)),
-        fixtures: JSON.parse(JSON.stringify(fixtures))
+        fixtures: JSON.parse(JSON.stringify(fixtures)),
+        canvasBgColor: canvasBgColor,
+        canvasBgOpacity: canvasBgOpacity,
+        canvasBgVisible: canvasBgVisible
       }, ...prev.future];
 
       setTables(previous.tables);
       setStandaloneSeats(previous.standaloneSeats);
       setLabels(previous.labels);
       setFixtures(previous.fixtures || []);
+      if (previous.canvasBgColor) setCanvasBgColor(previous.canvasBgColor);
+      if (previous.canvasBgOpacity !== undefined) setCanvasBgOpacity(previous.canvasBgOpacity);
+      if (previous.canvasBgVisible !== undefined) setCanvasBgVisible(previous.canvasBgVisible);
       setSelected(null);
       return { past: newPast, future: newFuture };
     });
-  }, [tables, standaloneSeats, labels, fixtures]);
+  }, [tables, standaloneSeats, labels, fixtures, canvasBgColor, canvasBgOpacity, canvasBgVisible]);
 
   const redo = useCallback(() => {
     setHistory(prev => {
@@ -3264,17 +3984,23 @@ export default function SeatMap({
         tables: JSON.parse(JSON.stringify(tables)),
         standaloneSeats: JSON.parse(JSON.stringify(standaloneSeats)),
         labels: JSON.parse(JSON.stringify(labels)),
-        fixtures: JSON.parse(JSON.stringify(fixtures))
+        fixtures: JSON.parse(JSON.stringify(fixtures)),
+        canvasBgColor: canvasBgColor,
+        canvasBgOpacity: canvasBgOpacity,
+        canvasBgVisible: canvasBgVisible
       }];
 
       setTables(next.tables);
       setStandaloneSeats(next.standaloneSeats);
       setLabels(next.labels);
       setFixtures(next.fixtures || []);
+      if (next.canvasBgColor) setCanvasBgColor(next.canvasBgColor);
+      if (next.canvasBgOpacity !== undefined) setCanvasBgOpacity(next.canvasBgOpacity);
+      if (next.canvasBgVisible !== undefined) setCanvasBgVisible(next.canvasBgVisible);
       setSelected(null);
       return { past: newPast, future: newFuture };
     });
-  }, [tables, standaloneSeats, labels, fixtures]);
+  }, [tables, standaloneSeats, labels, fixtures, canvasBgColor, canvasBgOpacity, canvasBgVisible]);
 
   const [venueStructure, setVenueStructure] = useState(() => loadVenueStructure());
   const [venuesList, setVenuesList] = useState([]);
@@ -3296,6 +4022,8 @@ export default function SeatMap({
   const canvasViewportRef = useRef(null);
   const panStart      = useRef({ x: 0, y: 0 });
   const adminScaleRef = useRef(1);
+  const pendingCenterRef = useRef(false);
+  const viewportClickStartRef = useRef({ x: 0, y: 0 });
   const T = getClientTokens(isDark);
 
   useEffect(() => {
@@ -3328,6 +4056,19 @@ export default function SeatMap({
       if (observer) observer.disconnect();
     };
   }, [canvasViewportRef.current]);
+
+  // Centering hook that triggers once viewport size is measured and valid
+  useEffect(() => {
+    if (!pendingCenterRef.current) return;
+    if (viewportSize.width > 50 && viewportSize.height > 50) {
+      const zoomLevel = 0.7;
+      const px = Math.round((viewportSize.width - roomWidth * zoomLevel) / 2);
+      const py = Math.round((viewportSize.height - roomHeight * zoomLevel) / 2);
+      setZoom(zoomLevel);
+      setPan({ x: px, y: py });
+      pendingCenterRef.current = false;
+    }
+  }, [viewportSize, activeRoom, activeWing, tableData, roomWidth, roomHeight]);
 
   useEffect(() => {
     let mounted = true;
@@ -3473,28 +4214,48 @@ export default function SeatMap({
         });
 
         // Load Editor Configurations
+        let loadedWidth = 1200;
+        let loadedHeight = 800;
         if (stored.editor) {
-          if (stored.editor.room_width_cm) setRoomWidth(stored.editor.room_width_cm);
-          if (stored.editor.room_height_cm) setRoomHeight(stored.editor.room_height_cm);
+          if (stored.editor.room_width_cm) {
+            loadedWidth = stored.editor.room_width_cm;
+            setRoomWidth(loadedWidth);
+          }
+          if (stored.editor.room_height_cm) {
+            loadedHeight = stored.editor.room_height_cm;
+            setRoomHeight(loadedHeight);
+          }
           if (stored.editor.grid_cm) setGridSize(stored.editor.grid_cm);
           if (stored.editor.snap_enabled !== undefined) setSnapToGrid(stored.editor.snap_enabled);
-          if (stored.editor.zoom) setZoom(stored.editor.zoom);
-          if (stored.editor.pan) setPan(stored.editor.pan);
           if (stored.editor.show_grid !== undefined) setShowGrid(stored.editor.show_grid);
           if (stored.editor.grid_visibility !== undefined) setGridVisibility(stored.editor.grid_visibility);
           if (stored.editor.smart_guides_enabled !== undefined) setSmartGuidesEnabled(stored.editor.smart_guides_enabled);
           if (stored.editor.show_rulers !== undefined) setShowRulers(stored.editor.show_rulers);
+          if (stored.editor.canvas_bg_color) setCanvasBgColor(stored.editor.canvas_bg_color);
+          setCanvasBgOpacity(stored.editor.canvas_bg_opacity !== undefined ? stored.editor.canvas_bg_opacity : 100);
+          setCanvasBgVisible(stored.editor.canvas_bg_visible !== undefined ? stored.editor.canvas_bg_visible : true);
         } else {
-          setRoomWidth(1200); setRoomHeight(800); setGridSize(25); setSnapToGrid(true);
-          setZoom(1); setPan({ x: 0, y: 0 }); setShowGrid(true); setGridVisibility(30);
-          setSmartGuidesEnabled(true); setShowRulers(true);
+          setRoomWidth(loadedWidth); setRoomHeight(loadedHeight); setGridSize(25); setSnapToGrid(true);
+          setShowGrid(true); setGridVisibility(30);
+          setSmartGuidesEnabled(true); setShowRulers(true); 
+          setCanvasBgColor("#FAF9F5");
+          setCanvasBgOpacity(100);
+          setCanvasBgVisible(true);
         }
+
+        // Mark centering as pending
+        pendingCenterRef.current = true;
       } else {
         setIsDraft(false); setLayoutVersion(1);
         setTables([]); setLabels(DEFAULT_LABELS); setStandaloneSeats([]); setFixtures([]);
         setRoomWidth(1200); setRoomHeight(800); setGridSize(25); setSnapToGrid(true);
-        setZoom(1); setPan({ x: 0, y: 0 });
         setShowGrid(true); setGridVisibility(30); setSmartGuidesEnabled(true); setShowRulers(true);
+        setCanvasBgColor("#FAF9F5");
+        setCanvasBgOpacity(100);
+        setCanvasBgVisible(true);
+
+        // Mark centering as pending
+        pendingCenterRef.current = true;
       }
       setHistory({ past: [], future: [] });
       setSelected(null);
@@ -3518,7 +4279,10 @@ export default function SeatMap({
         editor: {
           room_width_cm: roomWidth, room_height_cm: roomHeight, grid_cm: gridSize,
           snap_enabled: snapToGrid, zoom, pan, show_grid: showGrid, grid_visibility: gridVisibility,
-          smart_guides_enabled: smartGuidesEnabled, show_rulers: showRulers
+          smart_guides_enabled: smartGuidesEnabled, show_rulers: showRulers,
+          canvas_bg_color: canvasBgColor,
+          canvas_bg_opacity: canvasBgOpacity,
+          canvas_bg_visible: canvasBgVisible
         }
       };
       const matchedVenue = venuesList.find(v => v.name === activeRoom);
@@ -3531,30 +4295,60 @@ export default function SeatMap({
     }, 600);
 
     return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
-  }, [tables, labels, standaloneSeats, fixtures, editMode, activeWing, activeRoom, roomWidth, roomHeight, gridSize, snapToGrid, zoom, pan, showGrid, gridVisibility, smartGuidesEnabled, showRulers]);
+  }, [tables, labels, standaloneSeats, fixtures, editMode, activeWing, activeRoom, roomWidth, roomHeight, gridSize, snapToGrid, zoom, pan, showGrid, gridVisibility, smartGuidesEnabled, showRulers, canvasBgColor, canvasBgOpacity, canvasBgVisible]);
 
   // ── Client: sync from prop ───────────────────────────────────────────────────
   useEffect(() => {
     if (editMode) return;
     if (!tableData) return;
+    let loadedWidth = 1200;
+    let loadedHeight = 800;
     if (tableData.v === 2) {
       setTables(normalize(tableData.tables || []).filter(t => t.seats?.length > 0));
       setLabels(tableData.labels?.length ? tableData.labels : DEFAULT_LABELS);
       setStandaloneSeats(tableData.standaloneSeats || []);
       setFixtures(tableData.fixtures || []);
       if (tableData.editor) {
-        if (tableData.editor.room_width_cm) setRoomWidth(tableData.editor.room_width_cm);
-        if (tableData.editor.room_height_cm) setRoomHeight(tableData.editor.room_height_cm);
+        if (tableData.editor.room_width_cm) {
+          loadedWidth = tableData.editor.room_width_cm;
+          setRoomWidth(loadedWidth);
+        }
+        if (tableData.editor.room_height_cm) {
+          loadedHeight = tableData.editor.room_height_cm;
+          setRoomHeight(loadedHeight);
+        }
+        if (tableData.editor.canvas_bg_color) setCanvasBgColor(tableData.editor.canvas_bg_color);
+        setCanvasBgOpacity(tableData.editor.canvas_bg_opacity !== undefined ? tableData.editor.canvas_bg_opacity : 100);
+        setCanvasBgVisible(tableData.editor.canvas_bg_visible !== undefined ? tableData.editor.canvas_bg_visible : true);
       }
     } else if (tableData.tables) {
       setTables(normalize(tableData.tables).filter(t => t.seats?.length > 0));
       setLabels(tableData.labels?.length ? tableData.labels : DEFAULT_LABELS);
       setStandaloneSeats(tableData.standaloneSeats || []);
       setFixtures(tableData.fixtures || []);
+      if (tableData.editor) {
+        if (tableData.editor.room_width_cm) {
+          loadedWidth = tableData.editor.room_width_cm;
+          setRoomWidth(loadedWidth);
+        }
+        if (tableData.editor.room_height_cm) {
+          loadedHeight = tableData.editor.room_height_cm;
+          setRoomHeight(loadedHeight);
+        }
+        if (tableData.editor.canvas_bg_color) setCanvasBgColor(tableData.editor.canvas_bg_color);
+        setCanvasBgOpacity(tableData.editor.canvas_bg_opacity !== undefined ? tableData.editor.canvas_bg_opacity : 100);
+        setCanvasBgVisible(tableData.editor.canvas_bg_visible !== undefined ? tableData.editor.canvas_bg_visible : true);
+      }
     } else if (Array.isArray(tableData)) {
       setTables(normalize(tableData).filter(t => t.seats?.length > 0));
       setLabels(DEFAULT_LABELS); setStandaloneSeats([]);
+      setCanvasBgColor("#FAF9F5");
+      setCanvasBgOpacity(100);
+      setCanvasBgVisible(true);
     }
+
+    // Mark centering as pending
+    pendingCenterRef.current = true;
   }, [tableData, normalize, editMode]);
 
   const selectedTable             = selected?.type === "table"          ? tables.find(t => t.id === selected.tableId) : null;
@@ -4240,7 +5034,8 @@ export default function SeatMap({
         show_grid: showGrid,
         grid_visibility: gridVisibility,
         smart_guides_enabled: smartGuidesEnabled,
-        show_rulers: showRulers
+        show_rulers: showRulers,
+        canvas_bg_color: canvasBgColor
       }
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -4250,7 +5045,7 @@ export default function SeatMap({
     a.download = `layout-${activeRoom.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [tables, labels, standaloneSeats, roomWidth, roomHeight, gridSize, snapToGrid, activeRoom, showGrid, gridVisibility, smartGuidesEnabled, showRulers]);
+  }, [tables, labels, standaloneSeats, roomWidth, roomHeight, gridSize, snapToGrid, activeRoom, showGrid, gridVisibility, smartGuidesEnabled, showRulers, canvasBgColor]);
 
   const importLayout = useCallback((e) => {
     const file = e.target.files?.[0];
@@ -4273,6 +5068,7 @@ export default function SeatMap({
             if (data.editor.grid_visibility !== undefined) setGridVisibility(data.editor.grid_visibility);
             if (data.editor.smart_guides_enabled !== undefined) setSmartGuidesEnabled(data.editor.smart_guides_enabled);
             if (data.editor.show_rulers !== undefined) setShowRulers(data.editor.show_rulers);
+            if (data.editor.canvas_bg_color) setCanvasBgColor(data.editor.canvas_bg_color);
           }
           alert("Layout imported successfully!");
         } else {
@@ -4300,8 +5096,55 @@ export default function SeatMap({
     setGridVisibility(30);
     setSmartGuidesEnabled(true);
     setShowRulers(true);
+    setCanvasBgColor("#FAF9F5");
     setSelected(null);
   }, [pushHistory]);
+
+  const discardChanges = useCallback(() => {
+    const confirm = window.confirm("Are you sure you want to discard all unsaved changes and restore the layout from the server?");
+    if (!confirm) return;
+    
+    if (!tableData) return;
+    pushHistory();
+    if (tableData.v === 2) {
+      setTables(normalize(tableData.tables || []).filter(t => t.seats?.length > 0));
+      setLabels(tableData.labels?.length ? tableData.labels : DEFAULT_LABELS);
+      setStandaloneSeats(tableData.standaloneSeats || []);
+      setFixtures(tableData.fixtures || []);
+      if (tableData.editor) {
+        if (tableData.editor.room_width_cm) setRoomWidth(tableData.editor.room_width_cm);
+        if (tableData.editor.room_height_cm) setRoomHeight(tableData.editor.room_height_cm);
+        setCanvasBgColor(tableData.editor.canvas_bg_color || "#FAF9F5");
+        setCanvasBgOpacity(tableData.editor.canvas_bg_opacity !== undefined ? tableData.editor.canvas_bg_opacity : 100);
+        setCanvasBgVisible(tableData.editor.canvas_bg_visible !== undefined ? tableData.editor.canvas_bg_visible : true);
+      } else {
+        setCanvasBgColor("#FAF9F5");
+        setCanvasBgOpacity(100);
+        setCanvasBgVisible(true);
+      }
+    } else if (tableData.tables) {
+      setTables(normalize(tableData.tables).filter(t => t.seats?.length > 0));
+      setLabels(tableData.labels?.length ? tableData.labels : DEFAULT_LABELS);
+      setStandaloneSeats(tableData.standaloneSeats || []);
+      setFixtures(tableData.fixtures || []);
+      if (tableData.editor) {
+        if (tableData.editor.canvas_bg_color) setCanvasBgColor(tableData.editor.canvas_bg_color);
+        setCanvasBgOpacity(tableData.editor.canvas_bg_opacity !== undefined ? tableData.editor.canvas_bg_opacity : 100);
+        setCanvasBgVisible(tableData.editor.canvas_bg_visible !== undefined ? tableData.editor.canvas_bg_visible : true);
+      } else {
+        setCanvasBgColor("#FAF9F5");
+        setCanvasBgOpacity(100);
+        setCanvasBgVisible(true);
+      }
+    } else if (Array.isArray(tableData)) {
+      setTables(normalize(tableData).filter(t => t.seats?.length > 0));
+      setLabels(DEFAULT_LABELS); setStandaloneSeats([]); setFixtures([]);
+      setCanvasBgColor("#FAF9F5");
+      setCanvasBgOpacity(100);
+      setCanvasBgVisible(true);
+    }
+    setSelected(null);
+  }, [tableData, normalize, pushHistory]);
 
   const updateTable           = (k, v)    => { 
     if (!selected?.tableId) return; 
@@ -4357,9 +5200,19 @@ export default function SeatMap({
     const VIRTUAL_W = virtualWidth || roomWidth || 1200;
     const VIRTUAL_H = virtualHeight || roomHeight || 800;
     return (
-      <div style={{ width: "100%", height: "100%", background: T.canvasBg, transition: "background 0.30s" }}>
+      <div style={{ width: "100%", height: "100%", background: canvasBgVisible ? hexToRgba(canvasBgColor, canvasBgOpacity) : "transparent", transition: "background 0.30s" }}>
         <ScaledCanvas virtualW={VIRTUAL_W} virtualH={VIRTUAL_H} fitMode="contain" remountKey={0}>
-          <div style={{ position: "absolute", top: 0, left: 0, width: VIRTUAL_W, height: VIRTUAL_H }}>
+          <div style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: VIRTUAL_W,
+            height: VIRTUAL_H,
+            background: "#FFFFFF",
+            boxShadow: "0 12px 48px rgba(0,0,0,0.12)",
+            border: "1px dashed rgba(140, 107, 42, 0.25)",
+            overflow: "hidden"
+          }}>
             {labels.map(l => <StaticLabel key={`${wing}-${room}-label-${l.id}`} item={l} T={T} />)}
             {fixtures.map((f, index) => (
               <FixtureNode key={`${wing}-${room}-fixture-${f.id}-${index}`} fixture={f}
@@ -4439,6 +5292,7 @@ export default function SeatMap({
 
   // Mouse Drag Panning handling
   const handleViewportMouseDown = (e) => {
+    viewportClickStartRef.current = { x: e.clientX, y: e.clientY };
     const isMiddleClick = e.button === 1;
     const isSpaceDrag = spacePressed || tool === "pan";
     if (isMiddleClick || isSpaceDrag) {
@@ -4470,12 +5324,16 @@ export default function SeatMap({
   // Dot Grid pattern drawing
   const renderDotGrid = () => {
     if (showGrid === false) return null;
-    const opacityValue = (gridVisibility !== undefined ? gridVisibility : 30) / 100;
+    const isDarkBg = canvasBgVisible && isDarkColor(canvasBgColor) && canvasBgOpacity > 40;
+    const baseOpacity = isDarkBg 
+      ? Math.min(1.0, ((gridVisibility !== undefined ? gridVisibility : 30) * 1.35) / 100) 
+      : ((gridVisibility !== undefined ? gridVisibility : 30) / 100);
+    const gridColor = isDarkBg ? "#FAF3E0" : C.gold;
     return (
-      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", opacity: opacityValue }}>
+      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", opacity: baseOpacity }}>
         <defs>
           <pattern id="dotGrid" width={gridSize} height={gridSize} patternUnits="userSpaceOnUse">
-            <circle cx={2} cy={2} r={1.5} fill={C.gold} />
+            <circle cx={2} cy={2} r={1.5} fill={gridColor} />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#dotGrid)" />
@@ -4567,6 +5425,8 @@ export default function SeatMap({
           <ToolBtn active={tool === "pan"}         onClick={() => setTool("pan")}         label="Grab Workspace" />
           <ToolBtn active={tool === "multiSelect"} onClick={() => { setTool("multiSelect"); setSelectedStandaloneSeats(new Set()); }} label="Multi-Select" />
         </div>
+
+
 
         {(isAddMode || isDeleteMode || isMultiSelectMode) && toolHint && (
           <div style={{ padding: "4px 10px", background: isDeleteMode ? C.redFaint : C.goldFaintest, color: isDeleteMode ? C.red : C.gold, fontFamily: F, fontWeight: 600, fontSize: 9, border: `1px solid ${isDeleteMode ? C.redBorder : C.borderAccent}`, borderRadius: 5, whiteSpace: "nowrap", animation: "sm-fadeIn 0.16s ease" }}>
@@ -4697,10 +5557,20 @@ export default function SeatMap({
                 right: 0,
                 bottom: 0,
                 overflow: "hidden",
+                background: canvasBgVisible ? hexToRgba(canvasBgColor, canvasBgOpacity) : "transparent", // Dynamic workspace/viewport background
                 cursor: isPanning ? "grabbing" : (spacePressed || tool === "pan") ? "grab" : isAddMode ? "crosshair" : "default",
                 userSelect: "none"
               }}
               onMouseDown={handleViewportMouseDown}
+              onClick={e => {
+                if (e.target === canvasViewportRef.current) {
+                  const dx = Math.abs(e.clientX - viewportClickStartRef.current.x);
+                  const dy = Math.abs(e.clientY - viewportClickStartRef.current.y);
+                  if (dx < 6 && dy < 6) {
+                    setSelected(null);
+                  }
+                }
+              }}
             >
               {/* Inner zoomable/panable sheet canvas of roomWidth x roomHeight */}
               <div 
@@ -4713,7 +5583,7 @@ export default function SeatMap({
                   height: roomHeight,
                   transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                   transformOrigin: "top left",
-                  background: "#FAF9F5", // Premium warm luxury paper workspace
+                  background: "#FFFFFF", // Canvas sheet stays clean white
                   boxShadow: "0 12px 48px rgba(0,0,0,0.12)",
                   transition: isPanning ? "none" : "transform 0.08s ease-out",
                   border: "1px dashed rgba(140, 107, 42, 0.25)"
@@ -5087,6 +5957,7 @@ export default function SeatMap({
             tables={tables} setTables={setTables}
             labels={labels} setLabels={setLabels}
             fixtures={fixtures} setFixtures={setFixtures}
+            standaloneSeats={standaloneSeats}
             addSeat={addSeat} deleteSeat={deleteSeat} deleteTable={deleteTable}
             deleteStandaloneSeat={deleteStandaloneSeat} deleteFixture={deleteFixture}
             updateTable={updateTable} updateLabel={updateLabel} updateFixture={updateFixture}
@@ -5107,6 +5978,10 @@ export default function SeatMap({
             gridVisibility={gridVisibility} setGridVisibility={setGridVisibility}
             smartGuidesEnabled={smartGuidesEnabled} setSmartGuidesEnabled={setSmartGuidesEnabled}
             showRulers={showRulers} setShowRulers={setShowRulers}
+            canvasBgColor={canvasBgColor} setCanvasBgColor={setCanvasBgColor}
+            canvasBgOpacity={canvasBgOpacity} setCanvasBgOpacity={setCanvasBgOpacity}
+            canvasBgVisible={canvasBgVisible} setCanvasBgVisible={setCanvasBgVisible}
+            discardChanges={discardChanges}
           />
         </div>
       </div>
