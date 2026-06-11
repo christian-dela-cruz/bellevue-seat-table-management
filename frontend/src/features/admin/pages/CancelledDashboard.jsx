@@ -231,7 +231,8 @@ function DetailModal({ reservation, onClose }) {
   };
 
   const cancelTx = Array.isArray(reservation.transactions)
-    ? reservation.transactions.find(t => ["cancelled_by_admin", "cancelled_by_guest"].includes(t.action) || t.to_status === "cancelled")
+    ? (reservation.transactions.find(t => ["cancelled_by_admin", "cancelled_by_guest"].includes(t.action))
+      || reservation.transactions.find(t => t.to_status === "cancelled" && !["notification_sent", "notification_failed"].includes(t.action)))
     : null;
   const isCancelledByGuest = cancelTx ? cancelTx.action === "cancelled_by_guest" : true;
   const cancelledBy = cancelTx ? getActorLabel(cancelTx) : (reservation.cancelled_by || "Guest");

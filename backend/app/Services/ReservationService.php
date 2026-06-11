@@ -1517,7 +1517,8 @@ class ReservationService
 
         $approvedTx = $transactions->first(fn ($t) => $t->action === 'approved' || ($t->action === 'status_changed' && $t->to_status === 'reserved'));
         $rejectedTx = $transactions->first(fn ($t) => $t->action === 'rejected' || ($t->action === 'status_changed' && $t->to_status === 'rejected'));
-        $cancelledTx = $transactions->first(fn ($t) => in_array($t->action, ['cancelled_by_admin', 'cancelled_by_guest'], true) || $t->to_status === 'cancelled');
+        $cancelledTx = $transactions->first(fn ($t) => in_array($t->action, ['cancelled_by_admin', 'cancelled_by_guest'], true))
+            ?? $transactions->first(fn ($t) => $t->to_status === 'cancelled' && !in_array($t->action, ['notification_sent', 'notification_failed'], true));
         $lastTx = $transactions->first();
 
         $formatActor = function ($tx) {

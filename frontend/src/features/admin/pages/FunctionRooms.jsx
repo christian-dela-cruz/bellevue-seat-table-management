@@ -39,6 +39,7 @@ import { buildDiningOutletsFromConfig, buildEventVenuesFromConfig, VenueCard } f
 import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
 function SortableRow({ id, disabled, level, className, style, children }) {
+  const { isDark } = useAdminTheme();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
     disabled
@@ -48,7 +49,7 @@ function SortableRow({ id, disabled, level, className, style, children }) {
     ...style,
     transform: CSS.Transform.toString(transform),
     transition,
-    ...(isDragging ? { position: 'relative', zIndex: 99, boxShadow: '0 5px 15px rgba(0,0,0,0.15)', opacity: 0.9, background: level ? "rgba(250,248,244,0.92)" : C.surface } : {}),
+    ...(isDragging ? { position: 'relative', zIndex: 99, boxShadow: '0 5px 15px rgba(0,0,0,0.15)', opacity: 0.9, background: level ? (isDark ? "rgba(255,255,255,0.08)" : "rgba(250,248,244,0.92)") : C.surface } : {}),
   };
 
   return (
@@ -2188,7 +2189,7 @@ export default function FunctionRooms() {
                           disabled={sortBy !== "display_order" || search.length > 0}
                           level={level}
                           className="function-room-row"
-                          style={{ background: level ? "rgba(250,248,244,0.52)" : C.surface }}
+                          style={{ background: level ? (isDark ? "rgba(255,255,255,0.03)" : "rgba(250,248,244,0.52)") : C.surface }}
                         >
                           {(attributes, listeners, isDragging) => (
                             <>
