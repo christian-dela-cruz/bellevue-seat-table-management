@@ -1,5 +1,5 @@
 // src/features/booking/pages/ForgotCode.jsx
-import { useState, createContext, useContext } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import bellevueLogo from "../../../assets/bellevue-logo.png";
 import SharedNavbar from "../../../components/SharedNavbar.jsx";
@@ -241,11 +241,29 @@ export default function ForgotCode() {
   const [focused,     setFocused]     = useState(false);
 
   // Email recovery tab state
-  const [activeTab,    setActiveTab]    = useState("email");
+  const [activeTab,     setActiveTab]     = useState("combo");
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [emailSending,  setEmailSending]  = useState(false);
   const [emailSent,     setEmailSent]     = useState(false);
   const [emailFocused,  setEmailFocused]  = useState(false);
+
+  // UX additions: copy state and email resend cooldown
+  const [copiedCode,    setCopiedCode]    = useState(null);
+  const [emailCooldown, setEmailCooldown] = useState(0);
+
+  useEffect(() => {
+    if (emailCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setEmailCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [emailCooldown]);
+
+  const handleCopy = (code) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
 
   // ── Date / time formatters ──────────────────────────────────────────────────
   // Parse without UTC shift: "2025-04-20" → local midnight, not UTC midnight
@@ -353,6 +371,7 @@ export default function ForgotCode() {
         setError(data.message || "Something went wrong. Please try again.");
       } else {
         setEmailSent(true);
+        setEmailCooldown(60); // start 60s cooldown
       }
     } catch {
       setError("Network error. Please check your connection and try again.");
@@ -467,18 +486,18 @@ export default function ForgotCode() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: "36px 24px",
+          padding: "96px 24px 48px",
           boxSizing: "border-box",
         }}>
           <div style={{
             width: "100%",
             maxWidth: results ? 540 : 462,
-            padding: results ? 0 : "22px 28px",
+            padding: results ? 0 : "clamp(24px,3vw,34px)",
             borderRadius: results ? 0 : 24,
             background: results ? "transparent" : (isDark
               ? "linear-gradient(145deg, rgba(255,250,241,0.075), rgba(255,250,241,0.025)), rgba(17,16,9,0.70)"
               : "linear-gradient(145deg, rgba(255,255,255,0.88), rgba(255,250,241,0.66)), rgba(255,255,255,0.62)"),
-            border: results ? "none" : `1px solid ${isDark ? "rgba(255,250,241,0.13)" : "rgba(140,107,42,0.17)"}`,
+            border: results ? "none" : `1px solid ${isDark ? "rgba(255,255,255,0.13)" : "rgba(140,107,42,0.17)"}`,
             boxShadow: results ? "none" : (isDark
               ? "0 16px 40px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.08)"
               : "0 16px 40px rgba(78,60,32,0.08), inset 0 1px 0 rgba(255,255,255,0.72)"),
@@ -489,8 +508,8 @@ export default function ForgotCode() {
 
             {/* Header — hidden once results appear */}
             {!results && !emailSent && (
-              <div style={{ marginBottom: 16, animation: "fadeUp 0.32s ease" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <div style={{ marginBottom: 28, animation: "fadeUp 0.32s ease" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                   <span style={{ display: "inline-block", width: 24, height: "1px", background: C.gold, opacity: 0.6 }} />
                   <span style={{
                     fontFamily: F.label, fontSize: 9, letterSpacing: "0.26em",
@@ -500,21 +519,12 @@ export default function ForgotCode() {
                   </span>
                 </div>
                 <h1 style={{
-                  fontFamily: F.display, fontSize: 28, fontWeight: 400,
-                  color: C.textPrimary, lineHeight: 1.2, margin: "0 0 8px",
+                  fontFamily: F.display, fontSize: 32, fontWeight: 400,
+                  color: C.textPrimary, lineHeight: 1.2, margin: "0 0 12px",
                   letterSpacing: "0.01em",
                 }}>
                   Recover Your Reference Code
                 </h1>
-                <p style={{
-                  fontFamily: F.body, fontSize: 13, color: C.textSecondary,
-                  margin: "0 0 14px", lineHeight: 1.65,
-                }}>
-                  {activeTab === "combo"
-                    ? "Enter your combination code to locate your booking reference."
-                    : "We'll send your reference code(s) to your email address."}
-                </p>
-
                 {/* ── Tab Switcher ── */}
                 <div style={{
                   display: "flex", gap: 0,
@@ -523,20 +533,20 @@ export default function ForgotCode() {
                   border: `1px solid ${C.borderDefault}`,
                 }}>
                   {[
-                    { key: "email", label: "Email Recovery", icon: (
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" strokeWidth="2.5"
-                        strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="4" width="20" height="16" rx="2" />
-                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                      </svg>
-                    )},
                     { key: "combo", label: "Combination Code", icon: (
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" strokeWidth="2.5"
                         strokeLinecap="round" strokeLinejoin="round">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                         <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    )},
+                    { key: "email", label: "Email Recovery", icon: (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2.5"
+                        strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                       </svg>
                     )},
                   ].map(({ key, label, icon }) => (
@@ -573,6 +583,12 @@ export default function ForgotCode() {
             {/* ── Combination code search form ── */}
             {!results && !emailSent && activeTab === "combo" && (
               <div style={{ animation: "fadeUp 0.36s ease" }}>
+                <p style={{
+                  fontFamily: F.body, fontSize: 13.5, color: C.textSecondary,
+                  margin: "0 0 16px", lineHeight: 1.72,
+                }}>
+                  Enter your combination code to locate your booking reference.
+                </p>
 
                 {/* How-it-works hint */}
                 <div style={{
@@ -630,7 +646,7 @@ export default function ForgotCode() {
                   </label>
                   <input
                     value={combination}
-                    onChange={(e) => { setCombination(e.target.value); setError(""); }}
+                    onChange={(e) => { setCombination(e.target.value.toLowerCase().replace(/\s+/g, "")); setError(""); }}
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                     onFocus={() => setFocused(true)}
                     onBlur={() => setFocused(false)}
@@ -753,9 +769,34 @@ export default function ForgotCode() {
             {/* ── Email recovery form ── */}
             {!results && !emailSent && activeTab === "email" && (
               <div style={{ animation: "fadeUp 0.36s ease" }}>
+                <p style={{
+                  fontFamily: F.body, fontSize: 13.5, color: C.textSecondary,
+                  margin: "0 0 16px", lineHeight: 1.72,
+                }}>
+                  We'll send your reference code(s) to your email address.
+                </p>
+
+                {/* Info hint */}
+                <div style={{
+                  padding: "8px 12px", borderRadius: 8, marginBottom: 16,
+                  background: isDark ? "rgba(196,163,90,0.06)" : "rgba(140,107,42,0.05)",
+                  border: `1px solid ${C.borderAccent}`,
+                  display: "flex", gap: 8, alignItems: "flex-start",
+                }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                    stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                    style={{ flexShrink: 0, marginTop: 1 }}>
+                    <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                    <path d="M12 16v-4" />
+                    <path d="M12 8h.01" />
+                  </svg>
+                  <span style={{ fontFamily: F.body, fontSize: 11.5, color: C.textSecondary, lineHeight: 1.55 }}>
+                    We'll send all your active reservation reference codes to this email. Check your inbox (and spam folder) after submitting.
+                  </span>
+                </div>
 
                 {/* Email input */}
-                <div style={{ marginBottom: 10 }}>
+                <div style={{ marginBottom: 14 }}>
                   <label style={{
                     display: "flex", alignItems: "center", gap: 6,
                     fontFamily: F.label, fontSize: 9, letterSpacing: "0.22em",
@@ -797,25 +838,6 @@ export default function ForgotCode() {
                   />
                 </div>
 
-                {/* Info hint */}
-                <div style={{
-                  padding: "8px 12px", borderRadius: 8, marginBottom: 10,
-                  background: isDark ? "rgba(196,163,90,0.06)" : "rgba(140,107,42,0.05)",
-                  border: `1px solid ${C.borderAccent}`,
-                  display: "flex", gap: 8, alignItems: "flex-start",
-                }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-                    stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                    style={{ flexShrink: 0, marginTop: 1 }}>
-                    <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
-                    <path d="M12 16v-4" />
-                    <path d="M12 8h.01" />
-                  </svg>
-                  <span style={{ fontFamily: F.body, fontSize: 11.5, color: C.textSecondary, lineHeight: 1.55 }}>
-                    We'll send all your active reservation reference codes to this email. Check your inbox (and spam folder) after submitting.
-                  </span>
-                </div>
-
                 {/* Error */}
                 {error && (
                   <div style={{
@@ -838,25 +860,25 @@ export default function ForgotCode() {
                 {/* Submit button */}
                 <button
                   onClick={handleEmailRecovery}
-                  disabled={emailSending}
+                  disabled={emailSending || emailCooldown > 0}
                   style={{
                     width: "100%", padding: "11px",
-                    background: emailSending
+                    background: (emailSending || emailCooldown > 0)
                       ? (isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)")
                       : `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`,
-                    border: `1px solid ${emailSending ? C.borderDefault : "transparent"}`,
+                    border: `1px solid ${(emailSending || emailCooldown > 0) ? C.borderDefault : "transparent"}`,
                     borderRadius: 12,
                     fontFamily: F.label, fontSize: 10, fontWeight: 700,
                     letterSpacing: "0.18em", textTransform: "uppercase",
-                    color: emailSending ? C.textSecondary : C.textOnAccent,
-                    cursor: emailSending ? "not-allowed" : "pointer",
+                    color: (emailSending || emailCooldown > 0) ? C.textSecondary : C.textOnAccent,
+                    cursor: (emailSending || emailCooldown > 0) ? "not-allowed" : "pointer",
                     transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
                     display: "flex", alignItems: "center",
                     justifyContent: "center", gap: 10,
-                    boxShadow: emailSending ? "none" : "0 10px 20px rgba(140,107,42,0.16)",
+                    boxShadow: (emailSending || emailCooldown > 0) ? "none" : "0 10px 20px rgba(140,107,42,0.16)",
                   }}
-                  onMouseEnter={(e) => { if (!emailSending) e.currentTarget.style.background = C.goldLight; }}
-                  onMouseLeave={(e) => { if (!emailSending) e.currentTarget.style.background = `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`; }}
+                  onMouseEnter={(e) => { if (!emailSending && emailCooldown === 0) e.currentTarget.style.background = C.goldLight; }}
+                  onMouseLeave={(e) => { if (!emailSending && emailCooldown === 0) e.currentTarget.style.background = `linear-gradient(135deg, ${C.goldLight}, ${C.gold})`; }}
                 >
                   {emailSending ? (
                     <>
@@ -869,6 +891,8 @@ export default function ForgotCode() {
                       }} />
                       Sending…
                     </>
+                  ) : emailCooldown > 0 ? (
+                    `Resend in ${emailCooldown}s`
                   ) : (
                     <>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
@@ -1068,10 +1092,59 @@ export default function ForgotCode() {
                               Reference Code
                             </div>
                             <div style={{
-                              fontFamily: F.mono, fontSize: 28, fontWeight: 500,
-                              color: C.textPrimary, letterSpacing: "0.06em", lineHeight: 1,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
                             }}>
-                              {refCode}
+                              <div style={{
+                                fontFamily: F.mono, fontSize: 28, fontWeight: 500,
+                                color: C.textPrimary, letterSpacing: "0.06em", lineHeight: 1,
+                              }}>
+                                {refCode}
+                              </div>
+                              <button
+                                onClick={() => handleCopy(refCode)}
+                                title="Copy Reference Code"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  width: 26,
+                                  height: 26,
+                                  borderRadius: 6,
+                                  background: copiedCode === refCode ? C.greenFaint : "transparent",
+                                  border: `1px solid ${copiedCode === refCode ? C.greenBorder : C.borderDefault}`,
+                                  color: copiedCode === refCode ? C.green : C.textSecondary,
+                                  cursor: "pointer",
+                                  transition: "all 0.2s ease-in-out",
+                                  padding: 0,
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (copiedCode !== refCode) {
+                                    e.currentTarget.style.borderColor = C.borderAccent;
+                                    e.currentTarget.style.color = C.gold;
+                                    e.currentTarget.style.background = C.goldFaint;
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (copiedCode !== refCode) {
+                                    e.currentTarget.style.borderColor = C.borderDefault;
+                                    e.currentTarget.style.color = C.textSecondary;
+                                    e.currentTarget.style.background = "transparent";
+                                  }
+                                }}
+                              >
+                                {copiedCode === refCode ? (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                ) : (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                  </svg>
+                                )}
+                              </button>
                             </div>
                           </div>
                           <StatusBadge status={r.status} C={C} />
