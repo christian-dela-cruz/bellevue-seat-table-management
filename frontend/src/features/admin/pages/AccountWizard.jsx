@@ -473,7 +473,7 @@ export default function AccountWizard({
   };
 
   const isNextDisabled = () => {
-    if (step === 1) return !form.name || !form.email || !form.username || (!editingAccount && !form.password) || !form.role;
+    if (step === 1) return !form.name || !form.email || !form.username || !form.role;
     if (step === 2) return form.scope_type === "assigned" && (!form.outlet_scope || form.outlet_scope.length === 0);
     return false;
   };
@@ -549,18 +549,36 @@ export default function AccountWizard({
                     <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={inputStyle(!form.email)} />
                   </Field>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
-                  <Field label="Username">
-                    <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} style={inputStyle(!form.username)} />
-                  </Field>
-                  <Field label={editingAccount ? "New Password" : "Password"}>
-                    <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editingAccount ? "Leave blank to keep current" : ""} style={inputStyle(!editingAccount && !form.password)} />
-                  </Field>
-                </div>
-                {editingAccount && (
-                  <div style={{ fontSize: 11, color: C.muted, marginTop: -6, paddingLeft: 2 }}>
-                    Leave blank if the password should not change.
-                  </div>
+                {editingAccount ? (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+                      <Field label="Username">
+                        <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} style={inputStyle(!form.username)} />
+                      </Field>
+                      <Field label="New Password">
+                        <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Leave blank to keep current" style={inputStyle(false)} />
+                      </Field>
+                    </div>
+                    <div style={{ fontSize: 11, color: C.muted, marginTop: -6, paddingLeft: 2 }}>
+                      Leave blank if the password should not change.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14, alignItems: "start" }}>
+                      <Field label="Username">
+                        <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} style={inputStyle(!form.username)} />
+                      </Field>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, background: C.goldFaint, border: `1px solid rgba(140,107,42,0.18)`, padding: "12px 14px", borderRadius: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: C.gold, display: "flex", alignItems: "center", gap: 6 }}>
+                        <Info size={14} /> Password Auto-Setup
+                      </span>
+                      <span style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.4 }}>
+                        No password is required. An invitation email with a secure link will be sent to the user's email to set their password.
+                      </span>
+                    </div>
+                  </>
                 )}
               </div>
 

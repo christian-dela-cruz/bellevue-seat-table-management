@@ -118,6 +118,9 @@ function LoginScreen({ onLogin }) {
   const [loading, setLoading] = useState(false);
   
   // Light mode by default as requested
+  const [formMode, setFormMode] = useState("login"); // 'login' | 'forgot' | 'forgot_success'
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
   const [isDark, setIsDark] = useState(false);
   const [focusedField, setFocusedField] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -189,6 +192,28 @@ function LoginScreen({ onLogin }) {
     } catch (err) {
       console.error("Login error:", err);
       setError("Unable to connect to the authentication server. Please check your credentials.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (event) => {
+    if (event) event.preventDefault();
+    if (loading) return;
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await authAPI.requestPasswordReset(resetEmail);
+
+      if (response.success) {
+        setFormMode("forgot_success");
+      } else {
+        setError(response.message || "Failed to request password reset. Please try again.");
+      }
+    } catch (err) {
+      console.error("Forgot password error:", err);
+      setError("Unable to connect to the authentication server. Please check your network.");
     } finally {
       setLoading(false);
     }
@@ -341,40 +366,7 @@ function LoginScreen({ onLogin }) {
             }} 
           />
 
-          <div style={{ position: "relative", zIndex: 2, maxWidth: 480 }}>
-            <span style={{ 
-              fontFamily: F.label, 
-              fontSize: 9, 
-              fontWeight: 800, 
-              letterSpacing: "0.26em", 
-              color: "#C4A35A", 
-              textTransform: "uppercase", 
-              display: "block", 
-              marginBottom: 8 
-            }}>
-              The Bellevue Manila
-            </span>
-            
-            <h2 style={{ 
-              fontFamily: F.display, 
-              fontSize: "clamp(26px, 3vw, 38px)", 
-              color: "#FFFFFF", 
-              fontWeight: 600, 
-              lineHeight: 1.15, 
-              margin: "0 0 12px" 
-            }}>
-              Reservation Operations Portal
-            </h2>
-            
-            <p className="login-visual-desc" style={{ 
-              color: "rgba(255,255,255,0.75)", 
-              fontSize: 13.5, 
-              lineHeight: 1.6, 
-              margin: 0 
-            }}>
-              Manage reservations, venues, seating, and daily service flow.
-            </p>
-          </div>
+
         </aside>
 
         {/* Right Side: 30% Clean minimal sign-in form panel */}
@@ -426,7 +418,7 @@ function LoginScreen({ onLogin }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                   <span style={{ width: 18, height: 1, background: C.gold, opacity: 0.7 }} />
                   <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: "0.22em", color: C.gold, textTransform: "uppercase", fontFamily: F.label }}>
-                    Admin Portal
+                    {formMode === "login" ? "Admin Portal" : "Account Recovery"}
                   </span>
                 </div>
                 <h1 style={{ 
@@ -438,10 +430,15 @@ function LoginScreen({ onLogin }) {
                   color: C.textPrimary,
                   letterSpacing: "0.01em"
                 }}>
-                  Seat & Table Management
+                  {formMode === "login" ? "Sign In" : formMode === "forgot" ? "Reset Password" : "Check Your Email"}
                 </h1>
                 <p style={{ margin: 0, color: C.textSecondary, fontSize: 13, lineHeight: 1.62 }}>
-                  Sign in to manage reservations, outlets, venues, reports, and daily operations.
+                  {formMode === "login" 
+                    ? "Enter your administrative credentials to access the system." 
+                    : formMode === "forgot" 
+                      ? "Enter your registered email address below, and we will send you a secure link to reset your password." 
+                      : `A password reset link has been dispatched to ${resetEmail}. Please check your inbox and follow the instructions.`
+                  }
                 </p>
               </div>
 
@@ -471,144 +468,328 @@ function LoginScreen({ onLogin }) {
                 </div>
               )}
 
-              <form onSubmit={handle}>
-                <div style={{ display: "grid", gap: 16, marginBottom: 24 }}>
-                  <label style={{ display: "block" }}>
-                    <span style={{ 
-                      display: "block", 
-                      marginBottom: 7, 
-                      fontSize: 9.5, 
-                      fontWeight: 700, 
-                      letterSpacing: "0.14em", 
-                      textTransform: "uppercase", 
-                      color: error ? C.errorText : focusedField === "user" ? C.gold : C.textMuted 
-                    }}>
-                      Username or Email
-                    </span>
-                    <input
-                      style={inputStyle("user")}
-                      type="text"
-                      disabled={loading}
-                      value={user}
-                      onFocus={() => setFocusedField("user")}
-                      onBlur={() => setFocusedField("")}
-                      onChange={(event) => { setUser(event.target.value); setError(""); }}
-                      placeholder="Enter username"
-                      autoComplete="username"
-                      required
-                    />
-                  </label>
-
-                  <label style={{ display: "block" }}>
-                    <span style={{ 
-                      display: "block", 
-                      marginBottom: 7, 
-                      fontSize: 9.5, 
-                      fontWeight: 700, 
-                      letterSpacing: "0.14em", 
-                      textTransform: "uppercase", 
-                      color: error ? C.errorText : focusedField === "pass" ? C.gold : C.textMuted 
-                    }}>
-                      Password
-                    </span>
-                    
-                    {/* Password with visibility eye toggle */}
-                    <div style={{ position: "relative" }}>
+              {formMode === "login" && (
+                <form onSubmit={handle}>
+                  <div style={{ display: "grid", gap: 16, marginBottom: 24 }}>
+                    <label style={{ display: "block" }}>
+                      <span style={{ 
+                        display: "block", 
+                        marginBottom: 7, 
+                        fontSize: 9.5, 
+                        fontWeight: 700, 
+                        letterSpacing: "0.14em", 
+                        textTransform: "uppercase", 
+                        color: error ? C.errorText : focusedField === "user" ? C.gold : C.textMuted 
+                      }}>
+                        Username or Email
+                      </span>
                       <input
-                        style={inputStyle("pass")}
-                        type={showPassword ? "text" : "password"}
+                        style={inputStyle("user")}
+                        type="text"
                         disabled={loading}
-                        value={pass}
-                        onFocus={() => setFocusedField("pass")}
+                        value={user}
+                        onFocus={() => setFocusedField("user")}
                         onBlur={() => setFocusedField("")}
-                        onChange={(event) => { setPass(event.target.value); setError(""); }}
-                        placeholder="Enter password"
-                        autoComplete="current-password"
+                        onChange={(event) => { setUser(event.target.value); setError(""); }}
+                        placeholder="Enter username"
+                        autoComplete="username"
                         required
                       />
-                      
-                      <button
-                        type="button"
-                        disabled={loading}
-                        onClick={() => setShowPassword(!showPassword)}
-                        style={{
-                          position: "absolute",
-                          right: 14,
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          background: "transparent",
-                          border: "none",
-                          cursor: loading ? "not-allowed" : "pointer",
-                          color: C.textSecondary,
-                          opacity: 0.6,
-                          padding: 4,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          outline: "none",
-                          transition: "opacity 0.2s ease"
-                        }}
-                        onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = 1; }}
-                        onMouseLeave={e => { if (!loading) e.currentTarget.style.opacity = 0.6; }}
-                      >
-                        {showPassword ? (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                            <line x1="1" y1="1" x2="23" y2="23" />
-                          </svg>
-                        ) : (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  </label>
-                </div>
+                    </label>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  style={{
-                    width: "100%",
-                    padding: "13px 16px",
-                    border: "none",
-                    borderRadius: 8,
-                    background: loading ? C.goldDeep : C.gold,
-                    color: C.buttonText,
-                    fontSize: 10.5,
-                    fontWeight: 800,
-                    letterSpacing: "0.18em",
-                    textTransform: "uppercase",
-                    cursor: loading ? "not-allowed" : "pointer",
-                    transition: "all 0.20s ease",
-                    boxShadow: loading ? "none" : C.buttonShadow,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 10,
-                    outline: "none"
-                  }}
-                  onMouseEnter={(event) => { if (!loading) event.currentTarget.style.background = C.goldLight; }}
-                  onMouseLeave={(event) => { if (!loading) event.currentTarget.style.background = C.gold; }}
-                >
-                  {loading && (
-                    <span
-                      style={{
-                        width: 13,
-                        height: 13,
-                        borderRadius: "50%",
-                        border: "1.5px solid rgba(255,255,255,0.2)",
-                        borderTopColor: C.buttonText,
-                        display: "inline-block",
-                        animation: "loginSpin 0.75s linear infinite",
-                      }}
-                    />
-                  )}
-                  {loading ? "Signing in..." : "Sign In"}
-                </button>
-              </form>
+                    <label style={{ display: "block" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
+                        <span style={{ 
+                          fontSize: 9.5, 
+                          fontWeight: 700, 
+                          letterSpacing: "0.14em", 
+                          textTransform: "uppercase", 
+                          color: error ? C.errorText : focusedField === "pass" ? C.gold : C.textMuted 
+                        }}>
+                          Password
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormMode("forgot");
+                            setError("");
+                          }}
+                          tabIndex={-1}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: 0,
+                            color: C.gold,
+                            fontSize: 11,
+                            fontWeight: 500,
+                            cursor: "pointer",
+                            fontFamily: F.body,
+                            transition: "color 0.2s ease",
+                            outline: "none"
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = C.goldLight}
+                          onMouseLeave={(e) => e.currentTarget.style.color = C.gold}
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
+                      
+                      {/* Password with visibility eye toggle */}
+                      <div style={{ position: "relative" }}>
+                        <input
+                          style={inputStyle("pass")}
+                          type={showPassword ? "text" : "password"}
+                          disabled={loading}
+                          value={pass}
+                          onFocus={() => setFocusedField("pass")}
+                          onBlur={() => setFocusedField("")}
+                          onChange={(event) => { setPass(event.target.value); setError(""); }}
+                          placeholder="Enter password"
+                          autoComplete="current-password"
+                          required
+                        />
+                        
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() => setShowPassword(!showPassword)}
+                          style={{
+                            position: "absolute",
+                            right: 14,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            background: "transparent",
+                            border: "none",
+                            cursor: loading ? "not-allowed" : "pointer",
+                            color: C.textSecondary,
+                            opacity: 0.6,
+                            padding: 4,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            outline: "none",
+                            transition: "opacity 0.2s ease"
+                          }}
+                          onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = 1; }}
+                          onMouseLeave={e => { if (!loading) e.currentTarget.style.opacity = 0.6; }}
+                        >
+                          {showPassword ? (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                              <line x1="1" y1="1" x2="23" y2="23" />
+                            </svg>
+                          ) : (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    style={{
+                      width: "100%",
+                      padding: "13px 16px",
+                      border: "none",
+                      borderRadius: 8,
+                      background: loading ? C.goldDeep : C.gold,
+                      color: C.buttonText,
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      letterSpacing: "0.18em",
+                      textTransform: "uppercase",
+                      cursor: loading ? "not-allowed" : "pointer",
+                      transition: "all 0.20s ease",
+                      boxShadow: loading ? "none" : C.buttonShadow,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 10,
+                      outline: "none"
+                    }}
+                    onMouseEnter={(event) => { if (!loading) event.currentTarget.style.background = C.goldLight; }}
+                    onMouseLeave={(event) => { if (!loading) event.currentTarget.style.background = C.gold; }}
+                  >
+                    {loading && (
+                      <span
+                        style={{
+                          width: 13,
+                          height: 13,
+                          borderRadius: "50%",
+                          border: "1.5px solid rgba(255,255,255,0.2)",
+                          borderTopColor: C.buttonText,
+                          display: "inline-block",
+                          animation: "loginSpin 0.75s linear infinite",
+                        }}
+                      />
+                    )}
+                    {loading ? "Signing in..." : "Sign In"}
+                  </button>
+                </form>
+              )}
+
+              {formMode === "forgot" && (
+                <form onSubmit={handleForgotPassword}>
+                  <div style={{ display: "grid", gap: 16, marginBottom: 24 }}>
+                    <label style={{ display: "block" }}>
+                      <span style={{ 
+                        display: "block", 
+                        marginBottom: 7, 
+                        fontSize: 9.5, 
+                        fontWeight: 700, 
+                        letterSpacing: "0.14em", 
+                        textTransform: "uppercase", 
+                        color: error ? C.errorText : focusedField === "resetEmail" ? C.gold : C.textMuted 
+                      }}>
+                        Email Address
+                      </span>
+                      <input
+                        style={inputStyle("resetEmail")}
+                        type="email"
+                        disabled={loading}
+                        value={resetEmail}
+                        onFocus={() => setFocusedField("resetEmail")}
+                        onBlur={() => setFocusedField("")}
+                        onChange={(event) => { setResetEmail(event.target.value); setError(""); }}
+                        placeholder="Enter registered email"
+                        autoComplete="email"
+                        required
+                      />
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    style={{
+                      width: "100%",
+                      padding: "13px 16px",
+                      border: "none",
+                      borderRadius: 8,
+                      background: loading ? C.goldDeep : C.gold,
+                      color: C.buttonText,
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      letterSpacing: "0.18em",
+                      textTransform: "uppercase",
+                      cursor: loading ? "not-allowed" : "pointer",
+                      transition: "all 0.20s ease",
+                      boxShadow: loading ? "none" : C.buttonShadow,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 10,
+                      outline: "none",
+                      marginBottom: 16
+                    }}
+                    onMouseEnter={(event) => { if (!loading) event.currentTarget.style.background = C.goldLight; }}
+                    onMouseLeave={(event) => { if (!loading) event.currentTarget.style.background = C.gold; }}
+                  >
+                    {loading && (
+                      <span
+                        style={{
+                          width: 13,
+                          height: 13,
+                          borderRadius: "50%",
+                          border: "1.5px solid rgba(255,255,255,0.2)",
+                          borderTopColor: C.buttonText,
+                          display: "inline-block",
+                          animation: "loginSpin 0.75s linear infinite",
+                        }}
+                      />
+                    )}
+                    {loading ? "Sending..." : "Send Reset Link"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormMode("login");
+                      setError("");
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "13px 16px",
+                      border: `1.5px solid ${C.goldBorder}`,
+                      borderRadius: 8,
+                      background: "transparent",
+                      color: C.gold,
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      letterSpacing: "0.18em",
+                      textTransform: "uppercase",
+                      cursor: "pointer",
+                      transition: "all 0.20s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      outline: "none"
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(140, 107, 42, 0.05)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    Back to Sign In
+                  </button>
+                </form>
+              )}
+
+              {formMode === "forgot_success" && (
+                <div style={{ animation: "fadeUp 0.3s ease" }}>
+                  <div style={{ 
+                    width: 56, 
+                    height: 56, 
+                    borderRadius: "50%", 
+                    background: "rgba(46,122,90,0.08)", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center", 
+                    margin: "0 auto 24px", 
+                    color: "#2E7A5A", 
+                    border: "1.5px solid rgba(46,122,90,0.18)" 
+                  }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                      <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormMode("login");
+                      setResetEmail("");
+                      setError("");
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "13px 16px",
+                      border: `1.5px solid ${C.goldBorder}`,
+                      borderRadius: 8,
+                      background: "transparent",
+                      color: C.gold,
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      letterSpacing: "0.18em",
+                      textTransform: "uppercase",
+                      cursor: "pointer",
+                      transition: "all 0.20s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      outline: "none"
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(140, 107, 42, 0.05)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    Back to Sign In
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Footer Row aligned to form column */}

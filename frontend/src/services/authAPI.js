@@ -89,6 +89,12 @@ export const authAPI = {
 
   reactivateAccount: (id) => api.patch(`/admin/accounts/${id}/reactivate`),
 
+  getActivationDetails: (token) => api.get(`/auth/activate/${token}`),
+
+  activateAccount: (token, passwordData) => api.post(`/auth/activate/${token}`, passwordData),
+
+  requestPasswordReset: (email) => api.post('/auth/forgot-password', { email }),
+
   updateProfile: async (profileData) => {
     const response = await api.put('/admin/accounts/me', profileData);
 

@@ -28,6 +28,9 @@ Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+    Route::get('/activate/{token}', [AuthController::class, 'showActivationDetails']);
+    Route::post('/activate/{token}', [AuthController::class, 'activate']);
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 });
 
 // Admin authentication routes

@@ -10,6 +10,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\AdminActivationInviteMail;
 
 class AdminAccountController extends Controller
 {
@@ -54,7 +56,7 @@ class AdminAccountController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:admins,email'],
             'username' => ['required', 'string', 'max:255', 'unique:admins,username'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['nullable', 'string', 'min:8'],
             'role' => ['required', Rule::in($allowedRoles)],
             'scope_type' => ['required', Rule::in(['all', 'assigned'])],
             'outlet_scope' => ['nullable', 'array'],
@@ -72,17 +74,27 @@ class AdminAccountController extends Controller
             ], 422);
         }
 
-        $admin = Admin::create([
+        // Generate activation token and expires
+        $activationToken = \Illuminate\Support\Str::random(60);
+        $activationExpires = now()->addDays(2);
+        $dummyPassword = \Illuminate\Support\Str::random(32);
+
+        $admin = new Admin([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'username' => $validated['username'],
-            'password' => $validated['password'],
+            'password' => $dummyPassword,
             'role' => AdminAccess::normalizeRole($validated['role']),
             'scope_type' => $scopeType,
             'outlet_scope' => $scopeType === 'assigned'
                 ? array_values($validated['outlet_scope'] ?? [])
                 : [],
+            'is_active' => false,
         ]);
+        
+        $admin->activation_token = $activationToken;
+        $admin->activation_expires_at = $activationExpires;
+        $admin->save();
 
         if (!empty($validated['overrides'])) {
             foreach ($validated['overrides'] as $override) {
@@ -102,9 +114,21 @@ class AdminAccountController extends Controller
             'new_values' => $admin->toArray(),
         ]);
 
+        // Send welcome activation email
+        try {
+            Mail::to($admin->email)->send(new AdminActivationInviteMail($admin));
+        } catch (\Exception $e) {
+            \Log::error('Failed to send admin activation invite email: ' . $e->getMessage());
+        }
+
+        // Log the activation link for easy local testing/verification
+        $frontendUrl = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+        $activationLink = $frontendUrl . '/activate/' . $activationToken;
+        \Log::info("Admin activation invite generated for {$admin->email}: {$activationLink}");
+
         return response()->json([
             'success' => true,
-            'message' => 'Admin account created successfully.',
+            'message' => 'Admin account created successfully. Invitation email sent.',
             'data' => $this->formatAdmin($admin),
         ], 201);
     }

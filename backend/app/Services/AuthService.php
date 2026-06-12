@@ -38,7 +38,9 @@ class AuthService
             ];
         }
 
-        $admin = Admin::where('username', $username)->first();
+        $admin = Admin::where('username', $username)
+            ->orWhere('email', $username)
+            ->first();
 
         if (!$admin) {
             \Log::error('Admin not found: ' . $username);
@@ -110,7 +112,9 @@ class AuthService
      */
     public function validateCredentials(string $username, string $password): bool
     {
-        $admin = Admin::where('username', $username)->first();
+        $admin = Admin::where('username', $username)
+            ->orWhere('email', $username)
+            ->first();
         
         if (!$admin) {
             return false;

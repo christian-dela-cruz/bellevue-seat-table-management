@@ -17,6 +17,7 @@ import EventManagement from "../features/admin/pages/EventManagement";
 import EventBooking from "../features/client/pages/EventBooking";
 import ForgotCode from "../features/client/pages/ForgotCode";
 import LoginPage from "../features/auth/pages/LoginPage";
+import ActivateAccount from "../features/auth/pages/ActivateAccount";
 import { authAPI } from "../services/authAPI";
 import SharedNavbar from "../components/SharedNavbar";
 import { AdminThemeProvider } from "../context/AdminThemeContext";
@@ -189,6 +190,7 @@ export default function AppRoutes() {
           }
         />
         <Route path="/forgot-code" element={<ForgotCode />} />  
+        <Route path="/activate/:token" element={<ActivateAccount />} />
         <Route path="/login" element={<LoginPage />} />  
         <Route path="/events/:slug" element={<EventBooking />} />
         <Route path="/:venueSlug" element={<DynamicVenueReservation />} />
