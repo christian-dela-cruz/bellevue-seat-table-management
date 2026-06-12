@@ -1193,6 +1193,8 @@ function OutletDashboard() {
           transform: translateY(-2px);
           box-shadow: 0 4px 12px rgba(140, 107, 42, 0.06);
         }
+        @keyframes odPulseSync { 0% { opacity: 0.35; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.05); } 100% { opacity: 0.35; transform: scale(0.95); } }
+        .od-pulse-sync { animation: odPulseSync 1.2s infinite ease-in-out; }
         @media (max-width: 980px) {
           .od-top, .od-two, .od-filters { grid-template-columns: 1fr !important; }
           .od-row { grid-template-columns: 1fr !important; }
@@ -1219,6 +1221,56 @@ function OutletDashboard() {
                 : selectedOutlet
                   ? `${outletGroupLabel(selectedOutlet.name)} dashboard - isolated operational tracking from ${readableDate(startDate)} to ${readableDate(endDate)}`
                   : "Dedicated monitoring view for assigned outlet operations."
+            }
+            actions={
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px", borderRadius: 8, background: C.soft, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: F.label, color: C.muted, fontWeight: 600 }}>
+                {syncing ? (
+                  <>
+                    <span className="od-pulse-sync" style={{ 
+                      width: 7, 
+                      height: 7, 
+                      borderRadius: "50%", 
+                      background: C.gold, 
+                      display: "inline-block"
+                    }} />
+                    <span>Syncing...</span>
+                  </>
+                ) : wsStatus === "connected" ? (
+                  <>
+                    <span style={{ 
+                      width: 7, 
+                      height: 7, 
+                      borderRadius: "50%", 
+                      background: C.green, 
+                      display: "inline-block",
+                      boxShadow: `0 0 8px ${C.green}` 
+                    }} />
+                    <span>Live Connection</span>
+                  </>
+                ) : wsStatus === "polling" ? (
+                  <>
+                    <span style={{ 
+                      width: 7, 
+                      height: 7, 
+                      borderRadius: "50%", 
+                      background: C.gold, 
+                      display: "inline-block" 
+                    }} />
+                    <span>Live (Polling)</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ 
+                      width: 7, 
+                      height: 7, 
+                      borderRadius: "50%", 
+                      background: C.slate, 
+                      display: "inline-block" 
+                    }} />
+                    <span>Disconnected</span>
+                  </>
+                )}
+              </div>
             }
             C={C}
             F={F}
@@ -1275,8 +1327,26 @@ function OutletDashboard() {
                       <option value="status">Status A-Z</option>
                     </select>
                   </Field>
-                  <button onClick={() => loadDashboard(false)} disabled={loading || syncing} style={{ height: 38, border: "none", borderRadius: 9, background: C.gold, color: "#fff", padding: "0 14px", fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", cursor: loading || syncing ? "not-allowed" : "pointer" }}>
-                    {syncing ? "Syncing" : "Apply"}
+                  <button 
+                    onClick={() => loadDashboard(false)} 
+                    disabled={loading} 
+                    style={{ 
+                      height: 38, 
+                      border: "none", 
+                      borderRadius: 9, 
+                      background: C.gold, 
+                      color: "#fff", 
+                      padding: "0 14px", 
+                      fontFamily: F.label, 
+                      fontSize: 10, 
+                      fontWeight: 800, 
+                      letterSpacing: "0.14em", 
+                      textTransform: "uppercase", 
+                      cursor: loading ? "not-allowed" : "pointer",
+                      transition: "opacity 0.16s ease, background 0.16s ease"
+                    }}
+                  >
+                    {loading ? "Applying..." : "Apply"}
                   </button>
                 </div>
               </Panel>

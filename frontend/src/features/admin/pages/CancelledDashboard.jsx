@@ -661,8 +661,8 @@ export default function CancelledDashboard() {
   const isTablet = windowWidth < 960;
 
   // ── Load cancelled reservations ───────────────────────────────────────────
-  const loadReservations = async () => {
-    setLoading(true);
+  const loadReservations = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/reservations?status=cancelled&per_page=500`, {
         headers: { Accept: "application/json" },
@@ -699,7 +699,7 @@ export default function CancelledDashboard() {
     } catch (e) {
       console.error("[CancelledDashboard] Failed to load:", e);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -722,29 +722,20 @@ export default function CancelledDashboard() {
 
     let ws = null;
     let retryCount = 0;
-    const maxRetries = 3;
-    const retryDelay = 5000;
+    const maxRetries = 5;
+    const retryDelay = 2000;
     let pollingInterval = null;
     let isPolling = false;
+    let reconnectTimer = null;
+    let recoveryTimer = null;
+    let isMounted = true;
 
     const startPolling = () => {
       if (isPolling) return;
       isPolling = true;
       pollingInterval = setInterval(async () => {
         try {
-          const resp = await fetch(`${API_BASE_URL}/admin/reservations/cancelled`);
-          if (resp.ok) {
-            const data = await resp.json();
-            if (Array.isArray(data)) {
-              data.forEach(updated => {
-                setReservations(prev => {
-                  const idx = prev.findIndex(r => r.id === updated.id);
-                  if (idx >= 0) { const arr = [...prev]; arr[idx] = updated; return arr; }
-                  return [...prev, updated];
-                });
-              });
-            }
-          }
+          await loadReservations(true);
         } catch (err) { console.error("[CancelledDashboard] Polling error:", err); }
       }, 5000);
     };
@@ -753,16 +744,48 @@ export default function CancelledDashboard() {
       if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; isPolling = false; }
     };
 
+    const stopRecovery = () => {
+      if (recoveryTimer) { clearInterval(recoveryTimer); recoveryTimer = null; }
+    };
+
     const connect = () => {
+      if (!isMounted) return;
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+
       try {
         ws = new WebSocket(wsUrl);
-        ws.onopen = () => { retryCount = 0; stopPolling(); };
+        ws.onopen = () => {
+          retryCount = 0;
+          stopPolling();
+          stopRecovery();
+          console.log("[CancelledDashboard] WebSocket connected successfully");
+        };
         ws.onclose = () => {
-          if (retryCount < maxRetries) { retryCount++; setTimeout(connect, retryDelay * Math.pow(2, retryCount - 1)); }
-          else startPolling();
+          ws = null;
+          if (!isMounted) return;
+
+          if (retryCount >= maxRetries) {
+            startPolling();
+            if (!recoveryTimer) {
+              recoveryTimer = setInterval(() => {
+                if (!ws && isMounted) {
+                  console.log("[CancelledDashboard] Attempting to recover WebSocket connection...");
+                  connect();
+                }
+              }, 45000);
+            }
+            return;
+          }
+
+          retryCount++;
+          const delay = Math.min(retryDelay * Math.pow(2, retryCount - 1), 30000);
+          console.log(`[CancelledDashboard] WebSocket disconnected. Retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+          reconnectTimer = setTimeout(connect, delay);
         };
         ws.onerror = () => {
-          if (retryCount >= maxRetries) startPolling();
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.close();
+          }
         };
         ws.onmessage = (event) => {
           try {
@@ -780,7 +803,13 @@ export default function CancelledDashboard() {
     };
 
     connect();
-    return () => { stopPolling(); if (ws) { ws.close(); ws = null; } };
+    return () => {
+      isMounted = false;
+      stopPolling();
+      stopRecovery();
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+      if (ws) { ws.close(); ws = null; }
+    };
   }, []);
 
   // Filter

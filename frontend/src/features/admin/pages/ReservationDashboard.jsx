@@ -2674,9 +2674,12 @@ export default function ReservationDashboard() {
 
     let ws           = null;
     let retryCount   = 0;
-    const maxRetries = 3;
-    const retryDelay = 5000;
+    const maxRetries = 5;
+    const retryDelay = 2000;
     let wsLive       = false;
+    let reconnectTimer = null;
+    let recoveryTimer = null;
+    let isMounted    = true;
 
     const startPolling = () => {
       if (pollingRef.current) return;
@@ -2688,7 +2691,14 @@ export default function ReservationDashboard() {
       if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
     };
 
+    const stopRecovery = () => {
+      if (recoveryTimer) { clearInterval(recoveryTimer); recoveryTimer = null; }
+    };
+
     const connect = () => {
+      if (!isMounted) return;
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+
       try {
         ws = new WebSocket(wsUrl);
 
@@ -2696,20 +2706,38 @@ export default function ReservationDashboard() {
           wsLive = true;
           retryCount = 0;
           stopPolling();
+          stopRecovery();
+          console.log("[Dashboard] WebSocket connected successfully");
         };
 
         ws.onclose = () => {
           wsLive = false;
-          if (retryCount < maxRetries) {
-            retryCount++;
-            setTimeout(connect, retryDelay * Math.pow(2, retryCount - 1));
-          } else {
+          ws = null;
+          if (!isMounted) return;
+
+          if (retryCount >= maxRetries) {
             startPolling();
+            if (!recoveryTimer) {
+              recoveryTimer = setInterval(() => {
+                if (!ws && isMounted) {
+                  console.log("[Dashboard] Attempting to recover WebSocket connection...");
+                  connect();
+                }
+              }, 45000);
+            }
+            return;
           }
+
+          retryCount++;
+          const delay = Math.min(retryDelay * Math.pow(2, retryCount - 1), 30000);
+          console.log(`[Dashboard] WebSocket disconnected. Retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+          reconnectTimer = setTimeout(connect, delay);
         };
 
         ws.onerror = () => {
-          if (retryCount >= maxRetries) startPolling();
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.close();
+          }
         };
 
         ws.onmessage = event => {
@@ -2740,6 +2768,9 @@ export default function ReservationDashboard() {
     }, 8_000);
 
     return () => {
+      isMounted = false;
+      stopRecovery();
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
       clearTimeout(fallbackTimer);
       stopPolling();
       if (ws) { ws.close(); ws = null; }

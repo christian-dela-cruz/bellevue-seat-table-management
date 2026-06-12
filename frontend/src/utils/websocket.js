@@ -6,7 +6,7 @@ class LocalWebSocket {
     this.connected = false;
     this.connection = null;
     this.retryCount = 0;
-    this.maxRetries = 3;
+    this.maxRetries = Infinity;
     this.retryDelay = 5000;
     
     this.connect();
@@ -45,7 +45,7 @@ class LocalWebSocket {
         // Attempt to reconnect with backoff, but limit retries
         if (this.retryCount < this.maxRetries) {
           this.retryCount++;
-          const delay = this.retryDelay * Math.pow(2, this.retryCount - 1);
+          const delay = Math.min(this.retryDelay * Math.pow(2, this.retryCount - 1), 30000);
           setTimeout(() => this.connect(), delay);
         }
       };
@@ -55,13 +55,6 @@ class LocalWebSocket {
           console.error('[WebSocket] Connection error:', error);
         }
         this.emit('error', error);
-        
-        // Attempt to reconnect with backoff, but limit retries
-        if (this.retryCount < this.maxRetries) {
-          this.retryCount++;
-          const delay = this.retryDelay * Math.pow(2, this.retryCount - 1);
-          setTimeout(() => this.connect(), delay);
-        }
       };
     } catch (error) {
       console.error('[WebSocket] Failed to create connection:', error);

@@ -200,32 +200,46 @@ function MiniStat({ label, value }) {
   );
 }
 
-function ProgressRow({ label, value, total, tone = "gold" }) {
+function ProgressRow({ label, value, total, tone = "gold", printMode = false }) {
   const [color] = toneColor(tone);
   const pct = total > 0 ? Math.round((value / total) * 100) : 0;
 
+  const textColor = printMode ? "#7A7060" : C.muted;
+  const pctColor = printMode ? "#9E9485" : C.faint;
+  const trackBg = printMode ? "rgba(0,0,0,0.06)" : "rgba(0,0,0,0.04)";
+
   return (
     <div style={{ display: "grid", gap: 4 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11.5, color: C.muted }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11.5, color: textColor }}>
         <span>{label}</span>
-        <span>{value} <span style={{ color: C.faint, fontSize: 10.5 }}>({pct}%)</span></span>
+        <span>{value} <span style={{ color: pctColor, fontSize: 10.5 }}>({pct}%)</span></span>
       </div>
-      <div style={{ height: 4, borderRadius: 999, background: "rgba(0,0,0,0.04)", overflow: "hidden" }}>
+      <div style={{ height: 4, borderRadius: 999, background: trackBg, overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 999 }} />
       </div>
     </div>
   );
 }
 
-function StatusPill({ value }) {
+function StatusPill({ value, printMode = false }) {
   const status = String(value || "-");
+  
+  const greenColor = printMode ? "#2E7A5A" : C.green;
+  const greenBg = printMode ? "rgba(46,122,90,0.07)" : C.greenFaint;
+  const goldColor = printMode ? "#8C6B2A" : C.gold;
+  const goldBg = printMode ? "rgba(140,107,42,0.08)" : C.goldFaint;
+  const redColor = printMode ? "#A03838" : C.red;
+  const redBg = printMode ? "rgba(160,56,56,0.07)" : C.redFaint;
+  const slateColor = printMode ? "#6B7280" : C.slate;
+  const slateBg = printMode ? "rgba(107,114,128,0.08)" : C.slateFaint;
+
   const tone = {
-    reserved: [C.green, C.greenFaint],
-    approved: [C.green, C.greenFaint],
-    pending: [C.gold, C.goldFaint],
-    rejected: [C.red, C.redFaint],
-    cancelled: [C.slate, C.slateFaint],
-  }[status.toLowerCase()] || [C.slate, C.slateFaint];
+    reserved: [greenColor, greenBg],
+    approved: [greenColor, greenBg],
+    pending: [goldColor, goldBg],
+    rejected: [redColor, redBg],
+    cancelled: [slateColor, slateBg],
+  }[status.toLowerCase()] || [slateColor, slateBg];
 
   return (
     <span style={{ display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 8px", background: tone[1], color: tone[0], fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
@@ -1089,6 +1103,26 @@ function ReportTabs({ groups, activeTab, onChange }) {
 
 export default function Reports() {
   const { isDark } = useAdminTheme();
+
+  const paperColors = {
+    background: "#FFFFFF",
+    text: "#18140E",
+    muted: "#7A7060",
+    faint: "rgba(24,20,14,0.42)",
+    border: "rgba(0,0,0,0.08)",
+    divider: "rgba(0,0,0,0.05)",
+    soft: "#FAF8F4",
+    gold: "#8C6B2A",
+    green: "#2E7A5A",
+    greenFaint: "rgba(46,122,90,0.07)",
+    goldFaint: "rgba(140,107,42,0.08)",
+    red: "#A03838",
+    redFaint: "rgba(160,56,56,0.07)",
+    slate: "#6B7280",
+    slateFaint: "rgba(107,114,128,0.08)",
+    blue: "#5B8FD4",
+    blueFaint: "rgba(91,143,212,0.08)",
+  };
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("summary");
   const [startDate, setStartDate] = useState(monthStart());
@@ -2448,8 +2482,9 @@ export default function Reports() {
                 {/* Paper sheet container */}
                 <div
                   style={{
-                    background: C.surface,
-                    border: `1px solid ${C.border}`,
+                    background: paperColors.background,
+                    color: paperColors.text,
+                    border: `1px solid ${paperColors.border}`,
                     borderRadius: 8,
                     boxShadow: "0 8px 30px rgba(24,20,14,0.06)",
                     padding: "30px 24px",
@@ -2466,22 +2501,22 @@ export default function Reports() {
                   }}
                 >
                   {/* Preview Paper Header */}
-                  <div style={{ borderBottom: `2px solid ${C.gold}`, paddingBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexShrink: 0 }}>
+                  <div style={{ borderBottom: `2px solid ${paperColors.gold}`, paddingBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexShrink: 0 }}>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: C.text, letterSpacing: "0.06em", textTransform: "uppercase" }}>The Bellevue Manila</div>
-                      <div style={{ fontSize: 9.5, color: C.muted, marginTop: 2 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: paperColors.text, letterSpacing: "0.06em", textTransform: "uppercase" }}>The Bellevue Manila</div>
+                      <div style={{ fontSize: 9.5, color: paperColors.muted, marginTop: 2 }}>
                         Performance & Operational Report summary{selectedOutlet !== "ALL" && ` · Filtered by: ${selectedOutlet}`}
                       </div>
                     </div>
-                    <div style={{ fontSize: 9.5, color: C.gold, fontWeight: 700 }}>{dateRangeLabel}</div>
+                    <div style={{ fontSize: 9.5, color: paperColors.gold, fontWeight: 700 }}>{dateRangeLabel}</div>
                   </div>
 
                   {/* Preview Paper Content Blocks */}
                   <div style={{ display: "grid", gap: 14, flex: 1, overflowY: "auto", paddingRight: 4 }}>
                     {/* Mock Overview */}
                     {printSections.overview && (
-                      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, padding: 10, background: C.soft }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>Overview Metrics</div>
+                      <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10, background: paperColors.soft }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 6 }}>Overview Metrics</div>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
                           {[
                             ["Reservations", filteredSummary.reservations || 0],
@@ -2489,9 +2524,9 @@ export default function Reports() {
                             ["Outlets", selectedOutlet === "ALL" ? (summary.outlets || 0) : filteredOutlets.length],
                             ["Transactions", transactionSummary.transactions || 0],
                           ].map(([lbl, val]) => (
-                            <div key={lbl} style={{ background: C.surface, padding: 6, borderRadius: 6, border: `1px solid ${C.divider}` }}>
-                              <div style={{ fontSize: 8, color: C.faint, textTransform: "uppercase" }}>{lbl}</div>
-                              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2, color: C.text }}>{val}</div>
+                            <div key={lbl} style={{ background: paperColors.background, padding: 6, borderRadius: 6, border: `1px solid ${paperColors.divider}` }}>
+                              <div style={{ fontSize: 8, color: paperColors.faint, textTransform: "uppercase" }}>{lbl}</div>
+                              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2, color: paperColors.text }}>{val}</div>
                             </div>
                           ))}
                         </div>
@@ -2500,16 +2535,16 @@ export default function Reports() {
 
                     {/* Mock Status Breakdown */}
                     {printSections.mix && (
-                      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, padding: 10 }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Reservation status distribution</div>
+                      <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 8 }}>Reservation status distribution</div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                           <div style={{ display: "grid", gap: 4 }}>
-                            <ProgressRow label="Reserved" value={filteredSummary.reserved} total={filteredSummary.reservations} tone="green" />
-                            <ProgressRow label="Pending" value={filteredSummary.pending} total={filteredSummary.reservations} tone="gold" />
+                            <ProgressRow label="Reserved" value={filteredSummary.reserved} total={filteredSummary.reservations} tone="green" printMode={true} />
+                            <ProgressRow label="Pending" value={filteredSummary.pending} total={filteredSummary.reservations} tone="gold" printMode={true} />
                           </div>
                           <div style={{ display: "grid", gap: 4 }}>
-                            <ProgressRow label="Rejected" value={filteredSummary.rejected} total={filteredSummary.reservations} tone="red" />
-                            <ProgressRow label="Cancelled" value={filteredSummary.cancelled} total={filteredSummary.reservations} tone="slate" />
+                            <ProgressRow label="Rejected" value={filteredSummary.rejected} total={filteredSummary.reservations} tone="red" printMode={true} />
+                            <ProgressRow label="Cancelled" value={filteredSummary.cancelled} total={filteredSummary.reservations} tone="slate" printMode={true} />
                           </div>
                         </div>
                       </div>
@@ -2517,13 +2552,13 @@ export default function Reports() {
 
                     {/* Mock Outlets */}
                     {printSections.outlets && (
-                      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, padding: 10 }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>Venue Performance Deck</div>
+                      <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 6 }}>Venue Performance Deck</div>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
                           {filteredOutlets.slice(0, 3).map((out) => (
-                            <div key={out.name} style={{ background: C.soft, border: `1px solid ${C.divider}`, borderRadius: 6, padding: 6 }}>
-                              <div style={{ fontSize: 9.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{out.name}</div>
-                              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 8.5, color: C.muted }}>
+                            <div key={out.name} style={{ background: paperColors.soft, border: `1px solid ${paperColors.divider}`, borderRadius: 6, padding: 6 }}>
+                              <div style={{ fontSize: 9.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: paperColors.text }}>{out.name}</div>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 8.5, color: paperColors.muted }}>
                                 <span>Bookings: {out.total_reservations || 0}</span>
                                 <span>{out.acceptance_rate}% approved</span>
                               </div>
@@ -2531,18 +2566,18 @@ export default function Reports() {
                           ))}
                         </div>
                         {filteredOutlets.length > 3 && (
-                          <div style={{ fontSize: 8.5, color: C.faint, marginTop: 4, textAlign: "right" }}>+ {filteredOutlets.length - 3} more outlets will print in full document page...</div>
+                          <div style={{ fontSize: 8.5, color: paperColors.faint, marginTop: 4, textAlign: "right" }}>+ {filteredOutlets.length - 3} more outlets will print in full document page...</div>
                         )}
                       </div>
                     )}
 
                     {/* Mock Rooms */}
                     {printSections.rooms && (
-                      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, padding: 10 }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>Room totals performance listing</div>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 9.5 }}>
+                      <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 6 }}>Room totals performance listing</div>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 9.5, color: paperColors.text }}>
                           <thead>
-                            <tr style={{ background: C.soft, color: C.faint, textTransform: "uppercase", fontSize: 8 }}>
+                            <tr style={{ background: paperColors.soft, color: paperColors.faint, textTransform: "uppercase", fontSize: 8 }}>
                               <th style={{ textAlign: "left", padding: "4px" }}>Room</th>
                               <th style={{ textAlign: "left", padding: "4px" }}>Bookings</th>
                               <th style={{ textAlign: "left", padding: "4px" }}>Guests</th>
@@ -2551,7 +2586,7 @@ export default function Reports() {
                           </thead>
                           <tbody>
                             {roomDetails.slice(0, 3).map((r) => (
-                              <tr key={r.room} style={{ borderBottom: `1px solid ${C.divider}` }}>
+                              <tr key={r.room} style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
                                 <td style={{ padding: "4px", fontWeight: 650 }}>{r.room}</td>
                                 <td style={{ padding: "4px" }}>{r.reservations}</td>
                                 <td style={{ padding: "4px" }}>{r.guests}</td>
@@ -2561,16 +2596,16 @@ export default function Reports() {
                           </tbody>
                         </table>
                         {roomDetails.length > 3 && (
-                          <div style={{ fontSize: 8.5, color: C.faint, marginTop: 4, textAlign: "right" }}>+ {roomDetails.length - 3} more rooms will print in full document list...</div>
+                          <div style={{ fontSize: 8.5, color: paperColors.faint, marginTop: 4, textAlign: "right" }}>+ {roomDetails.length - 3} more rooms will print in full document list...</div>
                         )}
                       </div>
                     )}
 
                     {/* Mock Trend Chart */}
                     {printSections.trends && (
-                      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, padding: 10 }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>Reservation density trends</div>
-                        <div style={{ height: 40, border: `1px dashed ${C.border}`, borderRadius: 6, display: "grid", placeItems: "center", background: C.soft, color: C.muted, fontSize: 10 }}>
+                      <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 4 }}>Reservation density trends</div>
+                        <div style={{ height: 40, border: `1px dashed ${paperColors.border}`, borderRadius: 6, display: "grid", placeItems: "center", background: paperColors.soft, color: paperColors.muted, fontSize: 10 }}>
                           📊 Composed trend line visualization will render in full high-resolution printout
                         </div>
                       </div>
@@ -2578,15 +2613,15 @@ export default function Reports() {
 
                     {/* Mock Audit */}
                     {printSections.audit && (
-                      <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, padding: 10 }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>Audit trail transaction monitor logs</div>
-                        <div style={{ fontSize: 9, color: C.muted }}>Transaction record logs (Time, Reference code, Coordinator action) will print as structured list pages at the end of the report document.</div>
+                      <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 4 }}>Audit trail transaction monitor logs</div>
+                        <div style={{ fontSize: 9, color: paperColors.muted }}>Transaction record logs (Time, Reference code, Coordinator action) will print as structured list pages at the end of the report document.</div>
                       </div>
                     )}
                   </div>
 
                   {/* Preview Footer */}
-                  <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 6, display: "flex", justifyContent: "space-between", fontSize: 8.5, color: C.faint, flexShrink: 0 }}>
+                  <div style={{ borderTop: `1px solid ${paperColors.divider}`, paddingTop: 6, display: "flex", justifyContent: "space-between", fontSize: 8.5, color: paperColors.faint, flexShrink: 0 }}>
                     <span>Report size standard: {printPageSize.toUpperCase()} · {printOrientation.toUpperCase()}</span>
                     <span>Document Page 1 of 1 (Preview)</span>
                   </div>
@@ -2761,8 +2796,8 @@ export default function Reports() {
                 {/* Paper sheet spreadsheet preview container */}
                 <div
                   style={{
-                    background: C.surface,
-                    border: `1px solid ${C.border}`,
+                    background: paperColors.background,
+                    border: `1px solid ${paperColors.border}`,
                     borderRadius: 12,
                     boxShadow: "0 8px 30px rgba(24,20,14,0.04)",
                     padding: 20,
@@ -2775,9 +2810,9 @@ export default function Reports() {
                     overflowX: "auto"
                   }}
                 >
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5, minWidth: 600 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5, minWidth: 600, color: paperColors.text }}>
                     <thead>
-                      <tr style={{ background: C.soft, color: C.faint, borderBottom: `2px solid ${C.gold}` }}>
+                      <tr style={{ background: paperColors.soft, color: paperColors.faint, borderBottom: `2px solid ${paperColors.gold}` }}>
                         {csvExportType === "raw" ? (
                           <>
                             <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Ref Code</th>
@@ -2797,44 +2832,44 @@ export default function Reports() {
                     <tbody>
                       {csvExportType === "raw" ? (
                         <>
-                          <tr style={{ borderBottom: `1px solid ${C.divider}` }}>
-                            <td style={{ padding: "8px 6px", fontWeight: 700, color: C.text }}>Bellevue-5812</td>
+                          <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
+                            <td style={{ padding: "8px 6px", fontWeight: 700, color: paperColors.text }}>Bellevue-5812</td>
                             <td style={{ padding: "8px 6px" }}>Christian Dela Cruz</td>
                             <td style={{ padding: "8px 6px" }}>christian@example.com</td>
                             <td style={{ padding: "8px 6px" }}>20/20 Function Room</td>
-                            <td style={{ padding: "8px 6px", color: C.green, fontWeight: 650 }}>20/20 Function Room A</td>
+                            <td style={{ padding: "8px 6px", color: paperColors.green, fontWeight: 650 }}>20/20 Function Room A</td>
                           </tr>
-                          <tr style={{ borderBottom: `1px solid ${C.divider}` }}>
-                            <td style={{ padding: "8px 6px", fontWeight: 700, color: C.text }}>Bellevue-3421</td>
+                          <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
+                            <td style={{ padding: "8px 6px", fontWeight: 700, color: paperColors.text }}>Bellevue-3421</td>
                             <td style={{ padding: "8px 6px" }}>John Doe</td>
                             <td style={{ padding: "8px 6px" }}>john.doe@example.com</td>
                             <td style={{ padding: "8px 6px" }}>Grand Ballroom</td>
-                            <td style={{ padding: "8px 6px", color: C.green, fontWeight: 650 }}>Grand Ballroom B</td>
+                            <td style={{ padding: "8px 6px", color: paperColors.green, fontWeight: 650 }}>Grand Ballroom B</td>
                           </tr>
-                          <tr style={{ borderBottom: `1px solid ${C.divider}` }}>
-                            <td style={{ padding: "8px 6px", fontWeight: 700, color: C.text }}>Bellevue-9856</td>
+                          <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
+                            <td style={{ padding: "8px 6px", fontWeight: 700, color: paperColors.text }}>Bellevue-9856</td>
                             <td style={{ padding: "8px 6px" }}>Jane Smith</td>
                             <td style={{ padding: "8px 6px" }}>jane.smith@example.com</td>
                             <td style={{ padding: "8px 6px" }}>Laguna Ballroom</td>
-                            <td style={{ padding: "8px 6px", color: C.green, fontWeight: 650 }}>Laguna Ballroom 2</td>
+                            <td style={{ padding: "8px 6px", color: paperColors.green, fontWeight: 650 }}>Laguna Ballroom 2</td>
                           </tr>
                         </>
                       ) : (
                         <>
                           {csvIncludeHeaders && (
-                            <tr style={{ borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
-                              <td style={{ padding: "8px 6px", fontWeight: 700, color: C.gold }}>[HEADER]</td>
-                              <td style={{ padding: "8px 6px", fontStyle: "italic", color: C.muted }}>BELLEVUE OUTLET & ROOM PERFORMANCE REPORT · Date: {dateRangeLabel}</td>
+                            <tr style={{ borderBottom: `1px solid ${paperColors.divider}`, background: paperColors.soft }}>
+                              <td style={{ padding: "8px 6px", fontWeight: 700, color: paperColors.gold }}>[HEADER]</td>
+                              <td style={{ padding: "8px 6px", fontStyle: "italic", color: paperColors.muted }}>BELLEVUE OUTLET & ROOM PERFORMANCE REPORT · Date: {dateRangeLabel}</td>
                             </tr>
                           )}
                           {csvSections.summary && (
-                            <tr style={{ borderBottom: `1px solid ${C.divider}` }}>
+                            <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
                               <td style={{ padding: "8px 6px", fontWeight: 700 }}>OVERVIEW SUMMARY</td>
                               <td style={{ padding: "8px 6px" }}>Reservations Total: {summary.reservations || 0} · Guests Total: {summary.guests || 0}</td>
                             </tr>
                           )}
                           {csvSections.status && (
-                            <tr style={{ borderBottom: `1px solid ${C.divider}` }}>
+                            <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
                               <td style={{ padding: "8px 6px", fontWeight: 700 }}>STATUS BREAKDOWN</td>
                               <td style={{ padding: "8px 6px" }}>Approved: {reservedCount} · Pending: {statuses.pending || 0} · Rejected: {statuses.rejected || 0}</td>
                             </tr>
@@ -2842,7 +2877,7 @@ export default function Reports() {
                         </>
                       )}
                       <tr>
-                        <td colSpan={csvExportType === "raw" ? 5 : 2} style={{ padding: "10px 6px", textTransform: "uppercase", fontSize: 9, color: C.faint, fontWeight: 800, textAlign: "center" }}>
+                        <td colSpan={csvExportType === "raw" ? 5 : 2} style={{ padding: "10px 6px", textTransform: "uppercase", fontSize: 9, color: paperColors.faint, fontWeight: 800, textAlign: "center" }}>
                           + {Math.max(0, compileCsvData().length - 3)} additional rows will export into spreadsheet document
                         </td>
                       </tr>
