@@ -5,7 +5,7 @@ import { cleanupReservationsForDeletedTable, cleanupReservationsForDeletedSeat, 
 import { authAPI } from "../../services/authAPI.js";
 import { getScopedOutletGroups } from "../../constants/outletCatalog.js";
 import { useAdminTheme, C as adminC, F as adminF } from "../../context/AdminThemeContext.jsx";
-import { 
+import {
   Undo2, Redo2, Lock, Unlock, Copy, Plus, Trash2, Grid, RotateCw, ZoomIn, ZoomOut, Check, Square, Circle,
   Download, Upload, RotateCcw, Eye, EyeOff, X
 } from "lucide-react";
@@ -15,17 +15,17 @@ import {
 export const STATUS_COLORS = {
   available: "#4A9E7E",
   unavailable: "#B85C5C",
-  pending:   "#C4A35A",
-  reserved:  "#B85C5C",
-  rejected:  "#4A9E7E",
+  pending: "#C4A35A",
+  reserved: "#B85C5C",
+  rejected: "#4A9E7E",
 };
 export const STATUS_LABELS = {
   available: "AVAILABLE",
   unavailable: "UNAVAILABLE",
-  pending:   "PENDING",
-  reserved:  "RESERVED",
-  approved:  "APPROVED",
-  rejected:  "REJECTED",
+  pending: "PENDING",
+  reserved: "RESERVED",
+  approved: "APPROVED",
+  rejected: "REJECTED",
 };
 const SEAT_STATUS_CYCLE = ["available", "pending", "reserved"];
 
@@ -113,35 +113,35 @@ function saveVenueStructure(structure) {
   try {
     localStorage.setItem(VENUE_STRUCTURE_KEY, JSON.stringify(structure));
     window.dispatchEvent(new CustomEvent("venue:structure:changed", { detail: { structure } }));
-  } catch {}
+  } catch { }
 }
 
 // ─── Theme tokens ─────────────────────────────────────────────────────────────
 function getClientTokens(isDark) {
   return isDark
     ? {
-        gold: "#C4A35A", goldFaint: "rgba(196,163,90,0.10)", goldFaintest: "rgba(196,163,90,0.05)",
-        // Canvas & Table elements remain light-styled for layout design readability
-        canvasBg: "#EDEAE2", canvasBorder: "rgba(140,107,42,0.18)",
-        tableBg: "#FFFFFF", tableSelected: "#FFFBF2", tableBgHov: "#FAF8F2",
-        borderDefault: "rgba(255,255,255,0.08)", borderStrong: "rgba(255,255,255,0.14)",
-        borderAccent: "rgba(196,163,90,0.35)",
-        textPrimary: "#EDE8DF", textSecondary: "#8A8278", textTertiary: "rgba(237,232,223,0.32)",
-        divider: "rgba(255,255,255,0.06)", cardShadow: "0 1px 4px rgba(0,0,0,0.30)",
-        labelScreen: { bg: "#8C6B2A", color: "#FFFFFF" },
-        labelOther: { color: "#7A7060", border: "rgba(0,0,0,0.10)" },
-      }
+      gold: "#C4A35A", goldFaint: "rgba(196,163,90,0.10)", goldFaintest: "rgba(196,163,90,0.05)",
+      // Canvas & Table elements remain light-styled for layout design readability
+      canvasBg: "#EDEAE2", canvasBorder: "rgba(140,107,42,0.18)",
+      tableBg: "#FFFFFF", tableSelected: "#FFFBF2", tableBgHov: "#FAF8F2",
+      borderDefault: "rgba(255,255,255,0.08)", borderStrong: "rgba(255,255,255,0.14)",
+      borderAccent: "rgba(196,163,90,0.35)",
+      textPrimary: "#EDE8DF", textSecondary: "#8A8278", textTertiary: "rgba(237,232,223,0.32)",
+      divider: "rgba(255,255,255,0.06)", cardShadow: "0 1px 4px rgba(0,0,0,0.30)",
+      labelScreen: { bg: "#8C6B2A", color: "#FFFFFF" },
+      labelOther: { color: "#7A7060", border: "rgba(0,0,0,0.10)" },
+    }
     : {
-        gold: "#8C6B2A", goldFaint: "rgba(140,107,42,0.08)", goldFaintest: "rgba(140,107,42,0.04)",
-        canvasBg: "#EDEAE2", canvasBorder: "rgba(140,107,42,0.18)",
-        tableBg: "#FFFFFF", tableSelected: "#FFFBF2", tableBgHov: "#FAF8F2",
-        borderDefault: "rgba(0,0,0,0.08)", borderStrong: "rgba(0,0,0,0.13)",
-        borderAccent: "rgba(140,107,42,0.28)",
-        textPrimary: "#18140E", textSecondary: "#7A7060", textTertiary: "rgba(24,20,14,0.35)",
-        divider: "rgba(0,0,0,0.06)", cardShadow: "0 1px 4px rgba(0,0,0,0.06)",
-        labelScreen: { bg: "#8C6B2A", color: "#FFFFFF" },
-        labelOther: { color: "#7A7060", border: "rgba(0,0,0,0.10)" },
-      };
+      gold: "#8C6B2A", goldFaint: "rgba(140,107,42,0.08)", goldFaintest: "rgba(140,107,42,0.04)",
+      canvasBg: "#EDEAE2", canvasBorder: "rgba(140,107,42,0.18)",
+      tableBg: "#FFFFFF", tableSelected: "#FFFBF2", tableBgHov: "#FAF8F2",
+      borderDefault: "rgba(0,0,0,0.08)", borderStrong: "rgba(0,0,0,0.13)",
+      borderAccent: "rgba(140,107,42,0.28)",
+      textPrimary: "#18140E", textSecondary: "#7A7060", textTertiary: "rgba(24,20,14,0.35)",
+      divider: "rgba(0,0,0,0.06)", cardShadow: "0 1px 4px rgba(0,0,0,0.06)",
+      labelScreen: { bg: "#8C6B2A", color: "#FFFFFF" },
+      labelOther: { color: "#7A7060", border: "rgba(0,0,0,0.10)" },
+    };
 }
 
 const C = {
@@ -244,7 +244,7 @@ export function getSeatsCoordinates(table) {
   }
 
   let nLeft = 0, nRight = 0, nTop = 0, nBottom = 0;
-  
+
   if (shape === "square" || w === h) {
     const base = Math.floor(N / 4);
     const rem = N % 4;
@@ -299,9 +299,9 @@ export function getSeatsCoordinates(table) {
       if (seatIdx >= N) break;
       const seat = seats[seatIdx++];
       let sx, sy, rot;
-      
-      const pos = count === 1 
-        ? length / 2 
+
+      const pos = count === 1
+        ? length / 2
         : startPos + i * chairSpacing;
 
       const chairDist = Math.max(22, chairH / 2 + 4);
@@ -401,7 +401,7 @@ function getActualWingForRoom(room, venueStructure) {
       if (raw) {
         structure = JSON.parse(raw);
       }
-    } catch {}
+    } catch { }
   }
   if (structure && Array.isArray(structure)) {
     for (const wing of structure) {
@@ -554,13 +554,13 @@ function DraggableLabel({ item, onDragStart, isDragging, T }) {
       onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
     >
       <span style={{ display: "flex", flexDirection: "column", gap: 3, flexShrink: 0 }}>
-      {[0,1,2].map(i => (
-        <span key={i} style={{ display: "flex", gap: 3 }}>
-          <span style={{ width:4, height:4, borderRadius:"50%", background: isScreen ? "#fff" : tokens.gold, display:"block", flexShrink: 0, opacity: 1 }} />
-          <span style={{ width:4, height:4, borderRadius:"50%", background: isScreen ? "#fff" : tokens.gold, display:"block", flexShrink: 0, opacity: 1 }} />
-        </span>
-      ))}
-    </span>
+        {[0, 1, 2].map(i => (
+          <span key={i} style={{ display: "flex", gap: 3 }}>
+            <span style={{ width: 4, height: 4, borderRadius: "50%", background: isScreen ? "#fff" : tokens.gold, display: "block", flexShrink: 0, opacity: 1 }} />
+            <span style={{ width: 4, height: 4, borderRadius: "50%", background: isScreen ? "#fff" : tokens.gold, display: "block", flexShrink: 0, opacity: 1 }} />
+          </span>
+        ))}
+      </span>
       {item.label}
     </div>
   );
@@ -570,18 +570,18 @@ function StandaloneSeat({ seat, editMode, isSelected, isDragging, onDragStart, o
   const [hov, setHov] = useState(false);
   const blocked = !editMode && seat.status !== "available";
   const color = STATUS_COLORS[seat.status] || STATUS_COLORS.available;
-  
+
   const rotation = seat.editor?.rotation || 0;
   const chairStyle = seat.editor?.chair_style || "standard-standalone";
   const width = seat.editor?.width || 38;
   const height = seat.editor?.height || 38;
   const isReservable = seat.editor?.reservable !== false;
-  
+
   const tokens = T || { gold: C.gold, cardShadow: C.cardShadow };
 
   // Calculate distinct colors based on status/reservability
   const baseColor = isReservable ? color : "#8A8278"; // neutral grey if non-reservable
-  
+
   return (
     <div
       style={{
@@ -632,7 +632,7 @@ function StandaloneSeat({ seat, editMode, isSelected, isDragging, onDragStart, o
         <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" }}>
           {/* VIP Chair Gold ring */}
           {chairStyle === "vip-chair" && (
-            <circle cx="50%" cy="50%" r={width/2 - 4} fill="none" stroke={tokens.gold} strokeWidth={1.5} opacity={0.6} />
+            <circle cx="50%" cy="50%" r={width / 2 - 4} fill="none" stroke={tokens.gold} strokeWidth={1.5} opacity={0.6} />
           )}
           {/* Backrest overlay for standard/premium chairs */}
           {["standard-standalone", "premium-standalone", "arm-chair", "vip-chair"].includes(chairStyle) && (
@@ -647,7 +647,7 @@ function StandaloneSeat({ seat, editMode, isSelected, isDragging, onDragStart, o
           )}
           {/* Bar stool circle seat cushion ring */}
           {chairStyle === "bar-stool" && (
-            <circle cx="50%" cy="50%" r={width/2 - 5} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} />
+            <circle cx="50%" cy="50%" r={width / 2 - 5} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} />
           )}
           {/* Sofa details */}
           {chairStyle === "sofa-seat" && (
@@ -680,7 +680,7 @@ function StandaloneSeat({ seat, editMode, isSelected, isDragging, onDragStart, o
         }}>
           {seat.num}
         </span>
-        
+
         {(isSelected || isMultiSelected) && (
           <div style={{
             position: "absolute",
@@ -709,7 +709,7 @@ function SeatNode({ seat, isSelected, editMode, isDragging, onSeatClick, onSeatD
   const [hov, setHov] = useState(false);
   const blocked = !editMode && seat.status !== "available";
   const color = STATUS_COLORS[seat.status] || STATUS_COLORS.available;
-  
+
   const sizeMap = {
     "standard-dining": 38,
     "premium-dining": 42,
@@ -770,7 +770,7 @@ function SeatNode({ seat, isSelected, editMode, isDragging, onSeatClick, onSeatD
       <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" }}>
         {/* VIP Chair Gold ring */}
         {chairStyle === "vip-chair" && (
-          <circle cx="50%" cy="50%" r={SIZE/2 - 4} fill="none" stroke={tokens.gold} strokeWidth={1.5} opacity={0.6} />
+          <circle cx="50%" cy="50%" r={SIZE / 2 - 4} fill="none" stroke={tokens.gold} strokeWidth={1.5} opacity={0.6} />
         )}
         {/* Backrest overlay */}
         {["standard-dining", "premium-dining", "arm-chair", "vip-chair", "banquet-chair", "child-chair", "lounge-chair"].includes(chairStyle) && (
@@ -785,7 +785,7 @@ function SeatNode({ seat, isSelected, editMode, isDragging, onSeatClick, onSeatD
         )}
         {/* Bar stool seat ring */}
         {chairStyle === "bar-stool" && (
-          <circle cx="50%" cy="50%" r={SIZE/2 - 5} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} />
+          <circle cx="50%" cy="50%" r={SIZE / 2 - 5} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} />
         )}
         {/* Sofa details */}
         {chairStyle === "sofa-chair" && (
@@ -804,12 +804,12 @@ function SeatNode({ seat, isSelected, editMode, isDragging, onSeatClick, onSeatD
         )}
       </svg>
 
-      <span style={{ 
-        color: (isSelected || isBench) ? tokens.gold : "#fff", 
-        fontSize: SIZE > 40 ? 11 : 9, 
-        fontWeight: 800, 
-        fontFamily: F, 
-        lineHeight: 1, 
+      <span style={{
+        color: (isSelected || isBench) ? tokens.gold : "#fff",
+        fontSize: SIZE > 40 ? 11 : 9,
+        fontWeight: 800,
+        fontFamily: F,
+        lineHeight: 1,
         pointerEvents: "none",
         zIndex: 1,
         transform: `rotate(${-totalRot}deg)`,
@@ -833,7 +833,7 @@ function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectT
     borderDefault: C.borderDefault, borderAccent: C.borderAccent,
     textPrimary: C.textPrimary, textTertiary: C.textTertiary, divider: C.divider,
   };
-  
+
   const seats = table.seats || [];
   const totalSeats = seats.length;
   const unavailableSeats = seats.filter(s => s.status === "unavailable" || s.status === "reserved").length;
@@ -859,7 +859,7 @@ function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectT
   );
 
   useEffect(() => setLabelVal(table.label || table.id), [table.label, table.id]);
-  
+
   const tableW = Math.max(table.width || 110, 80);
   const tableH = Math.max(table.height || 70, 50);
   const rotation = table.editor?.rotation || 0;
@@ -876,19 +876,19 @@ function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectT
 
   return (
     <div
-      style={{ 
-         position: "absolute", 
-         left: (table.x || 0), 
-         top: (table.y || 0), 
-         width: tableW, 
-         height: tableH, 
-         overflow: "visible", 
-         zIndex: isTableSelected ? 10 : 4,
-         transform: `rotate(${rotation}deg)`,
-         transformOrigin: "center center",
-         transition: isDragging ? "none" : "transform 0.15s ease",
+      style={{
+        position: "absolute",
+        left: (table.x || 0),
+        top: (table.y || 0),
+        width: tableW,
+        height: tableH,
+        overflow: "visible",
+        zIndex: isTableSelected ? 10 : 4,
+        transform: `rotate(${rotation}deg)`,
+        transformOrigin: "center center",
+        transition: isDragging ? "none" : "transform 0.15s ease",
       }}
-      onMouseEnter={() => setHov(true)} 
+      onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       onClick={e => e.stopPropagation()}
     >
@@ -954,29 +954,29 @@ function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectT
           })(),
           borderRadius: table.shape === "round" ? "50%" : table.shape === "oval" ? "50%" : 8,
           display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
-          border: isTableSelected 
-            ? `2px solid ${tokens.gold}` 
-            : isColliding 
-              ? `2.5px solid ${C.red}` 
+          border: isTableSelected
+            ? `2px solid ${tokens.gold}`
+            : isColliding
+              ? `2.5px solid ${C.red}`
               : !editMode && tableStatus === "unavailable"
                 ? `1.5px solid ${STATUS_COLORS.unavailable}`
                 : !editMode && tableStatus === "pending"
                   ? `1.5px solid ${STATUS_COLORS.pending}`
-                  : hov 
-                    ? `1.5px solid ${tokens.borderAccent}` 
+                  : hov
+                    ? `1.5px solid ${tokens.borderAccent}`
                     : `1px solid ${tokens.borderDefault}`,
-          boxShadow: isTableSelected 
-            ? `0 0 0 3px ${tokens.gold}10, 0 4px 16px rgba(0,0,0,0.12)` 
+          boxShadow: isTableSelected
+            ? `0 0 0 3px ${tokens.gold}10, 0 4px 16px rgba(0,0,0,0.12)`
             : isColliding
               ? `0 0 12px ${C.red}50, 0 4px 16px rgba(160,56,56,0.15)`
               : !editMode && (tableStatus === "unavailable" || tableStatus === "pending")
                 ? "none"
-                : hov 
-                  ? "0 4px 12px rgba(0,0,0,0.12)" 
+                : hov
+                  ? "0 4px 12px rgba(0,0,0,0.12)"
                   : tokens.cardShadow,
           transition: "border 0.15s, box-shadow 0.15s, background 0.18s",
-          cursor: editMode ? (isDragging ? "grabbing" : isLocked ? "not-allowed" : "grab") : isTableBlockedForSelection ? "not-allowed" : "pointer", 
-          zIndex: 2, 
+          cursor: editMode ? (isDragging ? "grabbing" : isLocked ? "not-allowed" : "grab") : isTableBlockedForSelection ? "not-allowed" : "pointer",
+          zIndex: 2,
           overflow: "visible",
           opacity: isTableBlockedForSelection ? 0.6 : 1,
         }}
@@ -993,41 +993,41 @@ function TableNode({ table, editMode, isTableSelected, selectedSeatId, onSelectT
       >
         {editingLabel
           ? <div style={{ transform: `rotate(${-rotation}deg)`, transformOrigin: "center center", width: "100%", display: "flex", justifyContent: "center" }}>
-              <input autoFocus value={labelVal} onChange={e => setLabelVal(e.target.value)}
-                onBlur={() => { setEditingLabel(false); onLabelEdit?.(table.id, labelVal); }}
-                onKeyDown={e => { if (e.key === "Enter") { setEditingLabel(false); onLabelEdit?.(table.id, labelVal); } e.stopPropagation(); }}
-                onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
-                style={{ background: "transparent", border: "none", outline: "none", color: tokens.textPrimary, fontFamily: F, fontWeight: 700, fontSize: 10, letterSpacing: "0.10em", textAlign: "center", width: "85%", textTransform: "uppercase" }}
-              />
-            </div>
+            <input autoFocus value={labelVal} onChange={e => setLabelVal(e.target.value)}
+              onBlur={() => { setEditingLabel(false); onLabelEdit?.(table.id, labelVal); }}
+              onKeyDown={e => { if (e.key === "Enter") { setEditingLabel(false); onLabelEdit?.(table.id, labelVal); } e.stopPropagation(); }}
+              onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
+              style={{ background: "transparent", border: "none", outline: "none", color: tokens.textPrimary, fontFamily: F, fontWeight: 700, fontSize: 10, letterSpacing: "0.10em", textAlign: "center", width: "85%", textTransform: "uppercase" }}
+            />
+          </div>
           : <>
-              <div style={{ 
-                transform: `rotate(${-rotation}deg)`, 
-                transformOrigin: "center center", 
-                display: "flex", 
-                flexDirection: "column", 
-                alignItems: "center", 
-                justifyContent: "center",
-                transition: isDragging ? "none" : "transform 0.15s ease"
-              }}>
-                <div style={{ color: tokens.textPrimary, fontFamily: F, fontWeight: 700, fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", lineHeight: 1.3, textAlign: "center", padding: "0 8px" }}>
-                  {table.label || table.id}
-                </div>
-                {(table.seats?.length || 0) > 0 && (
-                  <div style={{ color: tokens.textTertiary, fontFamily: F, fontSize: 9, marginTop: 2 }}>
-                    {table.seats.length} seats
-                  </div>
-                )}
+            <div style={{
+              transform: `rotate(${-rotation}deg)`,
+              transformOrigin: "center center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: isDragging ? "none" : "transform 0.15s ease"
+            }}>
+              <div style={{ color: tokens.textPrimary, fontFamily: F, fontWeight: 700, fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", lineHeight: 1.3, textAlign: "center", padding: "0 8px" }}>
+                {table.label || table.id}
               </div>
-              {isLocked && (
-                <div style={{ position: "absolute", top: 4, right: 6, opacity: 0.5, color: tokens.gold }}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              {(table.seats?.length || 0) > 0 && (
+                <div style={{ color: tokens.textTertiary, fontFamily: F, fontSize: 9, marginTop: 2 }}>
+                  {table.seats.length} seats
                 </div>
               )}
-            </>
+            </div>
+            {isLocked && (
+              <div style={{ position: "absolute", top: 4, right: 6, opacity: 0.5, color: tokens.gold }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+              </div>
+            )}
+          </>
         }
       </div>
-      
+
       {/* Dimensions tooltip on hover */}
       {editMode && hov && !isDragging && (
         <div style={{ position: "absolute", bottom: -20, left: "50%", transform: "translateX(-50%)", background: "#18140E", color: "#fff", padding: "2px 6px", borderRadius: 4, fontSize: 8, fontWeight: 700, fontFamily: "monospace", pointerEvents: "none", whiteSpace: "nowrap", zIndex: 100, boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}>
@@ -1231,7 +1231,7 @@ function FixtureNode({ fixture, editMode, isSelected, onSelect, onDragStart, isD
   };
 
   const isWall = [
-    "straight-wall", "curved-wall", "partition-wall", "glass-divider", 
+    "straight-wall", "curved-wall", "partition-wall", "glass-divider",
     "movable-divider", "half-wall", "room-boundary-segment"
   ].includes(fixture.fixture_type);
 
@@ -1250,7 +1250,7 @@ function FixtureNode({ fixture, editMode, isSelected, onSelect, onDragStart, isD
   if (isWall) {
     if (fixture.fixture_type === "curved-wall") {
       const curveStrength = fixture.editor?.curve_strength || 40;
-      const pathD = `M ${thickness/2},${h - thickness/2} Q ${w/2},${h - curveStrength - thickness/2} ${w - thickness/2},${h - thickness/2}`;
+      const pathD = `M ${thickness / 2},${h - thickness / 2} Q ${w / 2},${h - curveStrength - thickness / 2} ${w - thickness / 2},${h - thickness / 2}`;
       return (
         <div
           style={{
@@ -1433,10 +1433,10 @@ function FixtureNode({ fixture, editMode, isSelected, onSelect, onDragStart, isD
         <div style={{
           width: w, height: h,
           background: isSelected ? "rgba(196,163,90,0.06)" : "#FAF8F4",
-          border: isSelected 
-            ? `2px solid ${tokens.gold}` 
-            : hov 
-              ? `1.5px solid ${tokens.borderAccent}` 
+          border: isSelected
+            ? `2px solid ${tokens.gold}`
+            : hov
+              ? `1.5px solid ${tokens.borderAccent}`
               : `1px solid ${tokens.borderDefault}`,
           borderRadius: isFan ? "50%" : 4,
           boxShadow: tokens.cardShadow,
@@ -1493,10 +1493,10 @@ function FixtureNode({ fixture, editMode, isSelected, onSelect, onDragStart, isD
           width: "100%",
           height: "100%",
           background: isSelected ? "rgba(140,107,42,0.06)" : "#F2EFE9",
-          border: isSelected 
-            ? `2px solid ${tokens.gold}` 
-            : hov 
-              ? `1.5px solid ${tokens.borderAccent}` 
+          border: isSelected
+            ? `2px solid ${tokens.gold}`
+            : hov
+              ? `1.5px solid ${tokens.borderAccent}`
               : `1px solid ${tokens.borderDefault}`,
           borderRadius: fixture.fixture_type === "pillar-column" ? "50%" : 4,
           boxShadow: isSelected ? "0 4px 16px rgba(0,0,0,0.10)" : tokens.cardShadow,
@@ -1522,13 +1522,13 @@ function FixtureNode({ fixture, editMode, isSelected, onSelect, onDragStart, isD
       </div>
       {isLocked && (
         <div style={{ position: "absolute", top: 4, right: 6, opacity: 0.5, color: tokens.gold }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         </div>
       )}
     </div>
   );
 }
-function LeftSidebarPanel({ 
+function LeftSidebarPanel({
   activeWing, activeRoom, onSelect, venueStructure, onOpenVenueManager,
   addTablePreset, addFixturePreset, addLabelPreset, addStandaloneSeatPreset
 }) {
@@ -1539,7 +1539,7 @@ function LeftSidebarPanel({
   const [fixturesExpanded, setFixturesExpanded] = useState(false);
   const [annotationsExpanded, setAnnotationsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState("rooms"); // "rooms" or "library"
-  
+
   const [subsExpanded, setSubsExpanded] = useState({
     tables: true,
     chairs: true,
@@ -1552,7 +1552,7 @@ function LeftSidebarPanel({
   });
   const toggleSub = (key) => setSubsExpanded(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const [wingsExpanded, setWingsExpanded] = useState(() => 
+  const [wingsExpanded, setWingsExpanded] = useState(() =>
     Object.fromEntries(venueStructure.map(w => [w.id, true]))
   );
 
@@ -1582,10 +1582,10 @@ function LeftSidebarPanel({
   };
 
   const rowStyle = (active) => ({
-    display: "flex", 
-    alignItems: "center", 
+    display: "flex",
+    alignItems: "center",
     justifyContent: "space-between",
-    padding: "6px 14px 6px 24px", 
+    padding: "6px 14px 6px 24px",
     cursor: "pointer",
     background: active ? C.goldFaint : "transparent",
     borderLeft: `3px solid ${active ? C.gold : "transparent"}`,
@@ -1601,8 +1601,8 @@ function LeftSidebarPanel({
   const filterPresets = (presets) => {
     if (!searchQuery) return presets;
     const q = searchQuery.toLowerCase().trim();
-    return presets.filter(p => 
-      (p.label && p.label.toLowerCase().includes(q)) || 
+    return presets.filter(p =>
+      (p.label && p.label.toLowerCase().includes(q)) ||
       (p.id && p.id.toLowerCase().includes(q)) ||
       (p.fixture_type && p.fixture_type.toLowerCase().includes(q))
     );
@@ -1617,10 +1617,10 @@ function LeftSidebarPanel({
   const filteredFixtures = filterPresets(FIXTURE_PRESETS);
   const filteredLabels = filterPresets(LABEL_PRESETS);
 
-  const hasAnyMatches = filteredTables.length > 0 || filteredChairs.length > 0 || 
-                        filteredWalls.length > 0 || filteredDoors.length > 0 || 
-                        filteredDisplays.length > 0 || filteredAirflow.length > 0 || 
-                        filteredFixtures.length > 0 || filteredLabels.length > 0;
+  const hasAnyMatches = filteredTables.length > 0 || filteredChairs.length > 0 ||
+    filteredWalls.length > 0 || filteredDoors.length > 0 ||
+    filteredDisplays.length > 0 || filteredAirflow.length > 0 ||
+    filteredFixtures.length > 0 || filteredLabels.length > 0;
 
   const isDiningOpen = searchQuery ? true : diningExpanded;
   const isArchitectureOpen = searchQuery ? true : architectureExpanded;
@@ -1630,7 +1630,7 @@ function LeftSidebarPanel({
   const CategoryHeader = ({ title, isOpen, onClick, count }) => {
     const [hov, setHov] = useState(false);
     return (
-      <div 
+      <div
         onClick={onClick}
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
@@ -1647,12 +1647,12 @@ function LeftSidebarPanel({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <svg 
-            width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.gold} 
+          <svg
+            width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.gold}
             strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
-            style={{ 
-              transform: isOpen ? "rotate(90deg)" : "rotate(0deg)", 
-              transition: "transform 0.15s", 
+            style={{
+              transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
+              transition: "transform 0.15s",
             }}
           >
             <polyline points="9 18 15 12 9 6"></polyline>
@@ -1678,7 +1678,7 @@ function LeftSidebarPanel({
   const SubSectionHeader = ({ title, isOpen, onClick }) => {
     const [hovered, setHovered] = useState(false);
     return (
-      <div 
+      <div
         onClick={onClick}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -1706,12 +1706,12 @@ function LeftSidebarPanel({
           fontFamily: F,
           transition: "color 0.15s"
         }}>{title}</div>
-        <svg 
-          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={hovered ? C.gold : C.textTertiary} 
+        <svg
+          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={hovered ? C.gold : C.textTertiary}
           strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-          style={{ 
-            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", 
-            transition: "all 0.2s ease" 
+          style={{
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "all 0.2s ease"
           }}
         >
           <polyline points="6 9 12 15 18 9"></polyline>
@@ -1722,13 +1722,13 @@ function LeftSidebarPanel({
 
   return (
     <div className="sm-scroll" style={{ width: 240, flexShrink: 0, alignSelf: "stretch", background: C.sidebarBg, borderRight: `1px solid ${C.sidebarBorder}`, display: "flex", flexDirection: "column", overflow: "hidden", userSelect: "none" }}>
-      
+
       {/* SEGMENTED TAB CONTROL */}
       <div style={{ padding: "12px 14px 10px", background: C.surfaceRaised, borderBottom: `1px solid ${C.divider}`, zIndex: 10, flexShrink: 0 }}>
         <div style={{ display: "flex", background: "rgba(0,0,0,0.04)", borderRadius: 8, padding: 3, border: `1px solid ${C.borderDefault}` }}>
-          <button 
+          <button
             onClick={() => setActiveTab("rooms")}
-            style={{ 
+            style={{
               flex: 1, padding: "6px 0", border: "none", borderRadius: 6, cursor: "pointer",
               fontFamily: F, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
               transition: "all 0.15s",
@@ -1739,9 +1739,9 @@ function LeftSidebarPanel({
           >
             Rooms
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab("library")}
-            style={{ 
+            style={{
               flex: 1, padding: "6px 0", border: "none", borderRadius: 6, cursor: "pointer",
               fontFamily: F, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
               transition: "all 0.15s",
@@ -1758,10 +1758,10 @@ function LeftSidebarPanel({
       <div className="sm-scroll" style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
 
         {/* 1. ROOM NAVIGATOR */}
-      {activeTab === "rooms" && (
-        <div style={{ display: "flex", flexDirection: "column", paddingBottom: 10 }}>
-          {/* Current Context Badge */}
-          <div style={{ padding: "14px 14px 10px" }}>
+        {activeTab === "rooms" && (
+          <div style={{ display: "flex", flexDirection: "column", paddingBottom: 10 }}>
+            {/* Current Context Badge */}
+            <div style={{ padding: "14px 14px 10px" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "8px 10px", background: "rgba(140, 107, 42, 0.05)", borderRadius: 6, border: `1px solid ${C.borderAccent}` }}>
                 <div style={{ fontSize: 7, color: C.textTertiary, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Active Venue Context</div>
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: F }}>
@@ -1794,9 +1794,9 @@ function LeftSidebarPanel({
                       {wing.rooms.map((room, roomIndex) => {
                         const active = activeWing === wing.label && activeRoom === room;
                         return (
-                          <div 
-                            key={`${wing.id}-${roomIndex}-${room}`} 
-                            onClick={() => onSelect(wing.label, room)} 
+                          <div
+                            key={`${wing.id}-${roomIndex}-${room}`}
+                            onClick={() => onSelect(wing.label, room)}
                             style={rowStyle(active)}
                             onMouseEnter={e => { if (!active) e.currentTarget.style.background = C.goldFaintest; }}
                             onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
@@ -1820,357 +1820,357 @@ function LeftSidebarPanel({
                   style={{ width: "100%", padding: "7px 0", background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 6, fontFamily: F, fontSize: 8, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}
                   onMouseEnter={e => { e.currentTarget.style.background = C.goldFaint; }}
                   onMouseLeave={e => { e.currentTarget.style.background = C.goldFaintest; }}>
-                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
                   Manage Venue
                 </button>
               </div>
             )}
-        </div>
-      )}
-
-      {/* 2. STUDIO LIBRARY */}
-      {activeTab === "library" && (
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "14px 14px 10px" }}>
-          
-          {/* Search input bar */}
-          <div style={{ position: "relative" }}>
-            <input 
-              type="text" 
-              placeholder="Search objects..." 
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "6px 10px 6px 26px",
-                border: `1px solid ${C.borderDefault}`,
-                borderRadius: 6,
-                fontSize: 10,
-                color: C.textPrimary,
-                background: C.surfaceInput,
-                fontFamily: F,
-                outline: "none",
-                boxSizing: "border-box",
-                transition: "all 0.15s"
-              }}
-              onFocus={e => { e.target.style.borderColor = C.borderAccent; e.target.style.boxShadow = C.inputFocus; }}
-              onBlur={e => { e.target.style.borderColor = C.borderDefault; e.target.style.boxShadow = "none"; }}
-            />
-            <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 10, pointerEvents: "none", opacity: 0.6 }}>🔍</span>
           </div>
-        </div>
+        )}
 
-        {/* Categories accordion */}
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          
-          {/* A. Dining */}
-          {(filteredTables.length > 0 || filteredChairs.length > 0) && (
-            <div>
-              <CategoryHeader 
-                title="Dining" 
-                isOpen={isDiningOpen} 
-                onClick={() => setDiningExpanded(!diningExpanded)}
-                count={filteredTables.length + filteredChairs.length}
-              />
-              {isDiningOpen && (
-                <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.divider}` }}>
-                  {filteredTables.length > 0 && (
-                    <div>
-                      <SubSectionHeader title="Table Presets" isOpen={searchQuery || subsExpanded.tables} onClick={() => toggleSub("tables")} />
-                      {(searchQuery || subsExpanded.tables) && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        {filteredTables.map(preset => (
-                          <button 
-                            key={preset.id}
-                            onClick={() => addTablePreset(preset)}
-                            draggable={true}
-                            onDragStart={e => {
-                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "table" }));
-                              e.dataTransfer.effectAllowed = "copy";
-                            }}
-                            style={presetButtonStyle}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
-                          >
-                            <div style={{ width: 12, height: 12, borderRadius: preset.shape === "round" ? "50%" : 2, border: `1.5px solid ${C.gold}`, background: "transparent", flexShrink: 0 }} />
-                            <div>
-                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
-                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.defaultSeatCount} seats · {preset.width}x{preset.height}cm</div>
+        {/* 2. STUDIO LIBRARY */}
+        {activeTab === "library" && (
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "14px 14px 10px" }}>
+
+              {/* Search input bar */}
+              <div style={{ position: "relative" }}>
+                <input
+                  type="text"
+                  placeholder="Search objects..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "6px 10px 6px 26px",
+                    border: `1px solid ${C.borderDefault}`,
+                    borderRadius: 6,
+                    fontSize: 10,
+                    color: C.textPrimary,
+                    background: C.surfaceInput,
+                    fontFamily: F,
+                    outline: "none",
+                    boxSizing: "border-box",
+                    transition: "all 0.15s"
+                  }}
+                  onFocus={e => { e.target.style.borderColor = C.borderAccent; e.target.style.boxShadow = C.inputFocus; }}
+                  onBlur={e => { e.target.style.borderColor = C.borderDefault; e.target.style.boxShadow = "none"; }}
+                />
+                <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 10, pointerEvents: "none", opacity: 0.6 }}>🔍</span>
+              </div>
+            </div>
+
+            {/* Categories accordion */}
+            <div style={{ display: "flex", flexDirection: "column" }}>
+
+              {/* A. Dining */}
+              {(filteredTables.length > 0 || filteredChairs.length > 0) && (
+                <div>
+                  <CategoryHeader
+                    title="Dining"
+                    isOpen={isDiningOpen}
+                    onClick={() => setDiningExpanded(!diningExpanded)}
+                    count={filteredTables.length + filteredChairs.length}
+                  />
+                  {isDiningOpen && (
+                    <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.divider}` }}>
+                      {filteredTables.length > 0 && (
+                        <div>
+                          <SubSectionHeader title="Table Presets" isOpen={searchQuery || subsExpanded.tables} onClick={() => toggleSub("tables")} />
+                          {(searchQuery || subsExpanded.tables) && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                              {filteredTables.map(preset => (
+                                <button
+                                  key={preset.id}
+                                  onClick={() => addTablePreset(preset)}
+                                  draggable={true}
+                                  onDragStart={e => {
+                                    e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "table" }));
+                                    e.dataTransfer.effectAllowed = "copy";
+                                  }}
+                                  style={presetButtonStyle}
+                                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                                >
+                                  <div style={{ width: 12, height: 12, borderRadius: preset.shape === "round" ? "50%" : 2, border: `1.5px solid ${C.gold}`, background: "transparent", flexShrink: 0 }} />
+                                  <div>
+                                    <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                                    <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.defaultSeatCount} seats · {preset.width}x{preset.height}cm</div>
+                                  </div>
+                                </button>
+                              ))}
                             </div>
-                          </button>
-                        ))}
-                      </div>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
 
-                  {filteredChairs.length > 0 && (
-                    <div style={{ marginTop: filteredTables.length > 0 ? 6 : 0 }}>
-                      <SubSectionHeader title="Standalone Chairs" isOpen={searchQuery || subsExpanded.chairs} onClick={() => toggleSub("chairs")} />
-                      {(searchQuery || subsExpanded.chairs) && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        {filteredChairs.map(preset => (
-                          <button 
-                            key={preset.id}
-                            onClick={() => addStandaloneSeatPreset(preset)}
-                            draggable={true}
-                            onDragStart={e => {
-                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "standaloneSeat" }));
-                              e.dataTransfer.effectAllowed = "copy";
-                            }}
-                            style={presetButtonStyle}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
-                          >
-                            <div style={{ width: 12, height: 12, borderRadius: "50%", border: `1.5px solid ${C.gold}`, background: C.goldFaint, flexShrink: 0 }} />
-                            <div>
-                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
-                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                      {filteredChairs.length > 0 && (
+                        <div style={{ marginTop: filteredTables.length > 0 ? 6 : 0 }}>
+                          <SubSectionHeader title="Standalone Chairs" isOpen={searchQuery || subsExpanded.chairs} onClick={() => toggleSub("chairs")} />
+                          {(searchQuery || subsExpanded.chairs) && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                              {filteredChairs.map(preset => (
+                                <button
+                                  key={preset.id}
+                                  onClick={() => addStandaloneSeatPreset(preset)}
+                                  draggable={true}
+                                  onDragStart={e => {
+                                    e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "standaloneSeat" }));
+                                    e.dataTransfer.effectAllowed = "copy";
+                                  }}
+                                  style={presetButtonStyle}
+                                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                                >
+                                  <div style={{ width: 12, height: 12, borderRadius: "50%", border: `1.5px solid ${C.gold}`, background: C.goldFaint, flexShrink: 0 }} />
+                                  <div>
+                                    <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                                    <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                                  </div>
+                                </button>
+                              ))}
                             </div>
-                          </button>
-                        ))}
-                      </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* B. Architecture */}
-          {(filteredWalls.length > 0 || filteredDoors.length > 0) && (
-            <div>
-              <CategoryHeader 
-                title="Architecture" 
-                isOpen={isArchitectureOpen} 
-                onClick={() => setArchitectureExpanded(!architectureExpanded)}
-                count={filteredWalls.length + filteredDoors.length}
-              />
-              {isArchitectureOpen && (
-                <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.divider}` }}>
-                  {filteredWalls.length > 0 && (
-                    <div>
-                      <SubSectionHeader title="Walls &amp; Dividers" isOpen={searchQuery || subsExpanded.walls} onClick={() => toggleSub("walls")} />
-                      {(searchQuery || subsExpanded.walls) && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        {filteredWalls.map(preset => (
-                          <button 
-                            key={preset.id}
-                            onClick={() => addFixturePreset(preset)}
-                            draggable={true}
-                            onDragStart={e => {
-                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
-                              e.dataTransfer.effectAllowed = "copy";
-                            }}
-                            style={presetButtonStyle}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
-                          >
-                            <div style={{ width: 14, height: 4, background: "#8A8278", borderRadius: 1, flexShrink: 0 }} />
-                            <div>
-                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
-                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+              {/* B. Architecture */}
+              {(filteredWalls.length > 0 || filteredDoors.length > 0) && (
+                <div>
+                  <CategoryHeader
+                    title="Architecture"
+                    isOpen={isArchitectureOpen}
+                    onClick={() => setArchitectureExpanded(!architectureExpanded)}
+                    count={filteredWalls.length + filteredDoors.length}
+                  />
+                  {isArchitectureOpen && (
+                    <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.divider}` }}>
+                      {filteredWalls.length > 0 && (
+                        <div>
+                          <SubSectionHeader title="Walls &amp; Dividers" isOpen={searchQuery || subsExpanded.walls} onClick={() => toggleSub("walls")} />
+                          {(searchQuery || subsExpanded.walls) && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                              {filteredWalls.map(preset => (
+                                <button
+                                  key={preset.id}
+                                  onClick={() => addFixturePreset(preset)}
+                                  draggable={true}
+                                  onDragStart={e => {
+                                    e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
+                                    e.dataTransfer.effectAllowed = "copy";
+                                  }}
+                                  style={presetButtonStyle}
+                                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                                >
+                                  <div style={{ width: 14, height: 4, background: "#8A8278", borderRadius: 1, flexShrink: 0 }} />
+                                  <div>
+                                    <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                                    <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                                  </div>
+                                </button>
+                              ))}
                             </div>
-                          </button>
-                        ))}
-                      </div>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
 
-                  {filteredDoors.length > 0 && (
-                    <div style={{ marginTop: filteredWalls.length > 0 ? 6 : 0 }}>
-                      <SubSectionHeader title="Doors &amp; Openings" isOpen={searchQuery || subsExpanded.doors} onClick={() => toggleSub("doors")} />
-                      {(searchQuery || subsExpanded.doors) && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        {filteredDoors.map(preset => (
-                          <button 
-                            key={preset.id}
-                            onClick={() => addFixturePreset(preset)}
-                            draggable={true}
-                            onDragStart={e => {
-                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
-                              e.dataTransfer.effectAllowed = "copy";
-                            }}
-                            style={presetButtonStyle}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
-                          >
-                            <div style={{ width: 14, height: 10, borderLeft: `2px solid ${C.gold}`, borderBottom: "1px dashed rgba(0,0,0,0.2)", flexShrink: 0 }} />
-                            <div>
-                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
-                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                      {filteredDoors.length > 0 && (
+                        <div style={{ marginTop: filteredWalls.length > 0 ? 6 : 0 }}>
+                          <SubSectionHeader title="Doors &amp; Openings" isOpen={searchQuery || subsExpanded.doors} onClick={() => toggleSub("doors")} />
+                          {(searchQuery || subsExpanded.doors) && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                              {filteredDoors.map(preset => (
+                                <button
+                                  key={preset.id}
+                                  onClick={() => addFixturePreset(preset)}
+                                  draggable={true}
+                                  onDragStart={e => {
+                                    e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
+                                    e.dataTransfer.effectAllowed = "copy";
+                                  }}
+                                  style={presetButtonStyle}
+                                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                                >
+                                  <div style={{ width: 14, height: 10, borderLeft: `2px solid ${C.gold}`, borderBottom: "1px dashed rgba(0,0,0,0.2)", flexShrink: 0 }} />
+                                  <div>
+                                    <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                                    <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                                  </div>
+                                </button>
+                              ))}
                             </div>
-                          </button>
-                        ))}
-                      </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* C. Fixtures */}
-          {(filteredDisplays.length > 0 || filteredAirflow.length > 0 || filteredFixtures.length > 0) && (
-            <div>
-              <CategoryHeader 
-                title="Fixtures" 
-                isOpen={isFixturesOpen} 
-                onClick={() => setFixturesExpanded(!fixturesExpanded)}
-                count={filteredDisplays.length + filteredAirflow.length + filteredFixtures.length}
-              />
-              {isFixturesOpen && (
-                <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.divider}` }}>
-                  {filteredDisplays.length > 0 && (
-                    <div>
-                      <SubSectionHeader title="Displays &amp; TVs" isOpen={searchQuery || subsExpanded.displays} onClick={() => toggleSub("displays")} />
-                      {(searchQuery || subsExpanded.displays) && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        {filteredDisplays.map(preset => (
-                          <button 
-                            key={preset.id}
-                            onClick={() => addFixturePreset(preset)}
-                            draggable={true}
-                            onDragStart={e => {
-                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
-                              e.dataTransfer.effectAllowed = "copy";
-                            }}
-                            style={presetButtonStyle}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
-                          >
-                            <div style={{ width: 14, height: 10, background: "#18140E", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1, flexShrink: 0 }} />
-                            <div>
-                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
-                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                      )}
-                    </div>
-                  )}
-
-                  {filteredAirflow.length > 0 && (
-                    <div style={{ marginTop: filteredDisplays.length > 0 ? 6 : 0 }}>
-                      <SubSectionHeader title="Airflow &amp; Cooling" isOpen={searchQuery || subsExpanded.airflow} onClick={() => toggleSub("airflow")} />
-                      {(searchQuery || subsExpanded.airflow) && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        {filteredAirflow.map(preset => (
-                          <button 
-                            key={preset.id}
-                            onClick={() => addFixturePreset(preset)}
-                            draggable={true}
-                            onDragStart={e => {
-                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
-                              e.dataTransfer.effectAllowed = "copy";
-                            }}
-                            style={presetButtonStyle}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
-                          >
-                            <div style={{ width: 12, height: 12, borderRadius: preset.fixture_type.includes("fan") ? "50%" : 2, border: `1.5px solid ${C.textSecondary}`, background: "#FAF8F4", flexShrink: 0 }} />
-                            <div>
-                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
-                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                      )}
-                    </div>
-                  )}
-
-                  {filteredFixtures.length > 0 && (
-                    <div style={{ marginTop: (filteredDisplays.length > 0 || filteredAirflow.length > 0) ? 6 : 0 }}>
-                      <SubSectionHeader title="General Fixtures" isOpen={searchQuery || subsExpanded.fixtures} onClick={() => toggleSub("fixtures")} />
-                      {(searchQuery || subsExpanded.fixtures) && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 180, overflowY: "auto" }} className="sm-scroll">
-                        {filteredFixtures.map(preset => (
-                          <button 
-                            key={preset.id}
-                            onClick={() => addFixturePreset(preset)}
-                            draggable={true}
-                            onDragStart={e => {
-                              e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
-                              e.dataTransfer.effectAllowed = "copy";
-                            }}
-                            style={presetButtonStyle}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
-                          >
-                            <div style={{ width: 12, height: 12, border: `1.5px dashed ${C.textSecondary}`, background: "rgba(0,0,0,0.03)", flexShrink: 0 }} />
-                            <div>
-                              <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
-                              <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* D. Annotations */}
-          {filteredLabels.length > 0 && (
-            <div>
-              <CategoryHeader 
-                title="Annotations" 
-                isOpen={isAnnotationsOpen} 
-                onClick={() => setAnnotationsExpanded(!annotationsExpanded)}
-                count={filteredLabels.length}
-              />
-              {isAnnotationsOpen && (
-                <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div>
-                    <SubSectionHeader title="Labels &amp; Markers" isOpen={searchQuery || subsExpanded.labels} onClick={() => toggleSub("labels")} />
-                    {(searchQuery || subsExpanded.labels) && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      {filteredLabels.map(preset => (
-                        <button 
-                          key={preset.id}
-                          onClick={() => addLabelPreset(preset)}
-                          draggable={true}
-                          onDragStart={e => {
-                            e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "label" }));
-                            e.dataTransfer.effectAllowed = "copy";
-                          }}
-                          style={presetButtonStyle}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
-                        >
-                          <div style={{ fontSize: 11, fontWeight: "bold", color: C.gold, fontFamily: F }}>A</div>
-                          <div>
-                            <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
-                            <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>Adds movable {preset.label.toLowerCase()}</div>
+              {/* C. Fixtures */}
+              {(filteredDisplays.length > 0 || filteredAirflow.length > 0 || filteredFixtures.length > 0) && (
+                <div>
+                  <CategoryHeader
+                    title="Fixtures"
+                    isOpen={isFixturesOpen}
+                    onClick={() => setFixturesExpanded(!fixturesExpanded)}
+                    count={filteredDisplays.length + filteredAirflow.length + filteredFixtures.length}
+                  />
+                  {isFixturesOpen && (
+                    <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.divider}` }}>
+                      {filteredDisplays.length > 0 && (
+                        <div>
+                          <SubSectionHeader title="Displays &amp; TVs" isOpen={searchQuery || subsExpanded.displays} onClick={() => toggleSub("displays")} />
+                          {(searchQuery || subsExpanded.displays) && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                              {filteredDisplays.map(preset => (
+                                <button
+                                  key={preset.id}
+                                  onClick={() => addFixturePreset(preset)}
+                                  draggable={true}
+                                  onDragStart={e => {
+                                    e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
+                                    e.dataTransfer.effectAllowed = "copy";
+                                  }}
+                                  style={presetButtonStyle}
+                                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                                >
+                                  <div style={{ width: 14, height: 10, background: "#18140E", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1, flexShrink: 0 }} />
+                                  <div>
+                                    <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                                    <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {filteredAirflow.length > 0 && (
+                        <div style={{ marginTop: filteredDisplays.length > 0 ? 6 : 0 }}>
+                          <SubSectionHeader title="Airflow &amp; Cooling" isOpen={searchQuery || subsExpanded.airflow} onClick={() => toggleSub("airflow")} />
+                          {(searchQuery || subsExpanded.airflow) && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                              {filteredAirflow.map(preset => (
+                                <button
+                                  key={preset.id}
+                                  onClick={() => addFixturePreset(preset)}
+                                  draggable={true}
+                                  onDragStart={e => {
+                                    e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
+                                    e.dataTransfer.effectAllowed = "copy";
+                                  }}
+                                  style={presetButtonStyle}
+                                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                                >
+                                  <div style={{ width: 12, height: 12, borderRadius: preset.fixture_type.includes("fan") ? "50%" : 2, border: `1.5px solid ${C.textSecondary}`, background: "#FAF8F4", flexShrink: 0 }} />
+                                  <div>
+                                    <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                                    <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {filteredFixtures.length > 0 && (
+                        <div style={{ marginTop: (filteredDisplays.length > 0 || filteredAirflow.length > 0) ? 6 : 0 }}>
+                          <SubSectionHeader title="General Fixtures" isOpen={searchQuery || subsExpanded.fixtures} onClick={() => toggleSub("fixtures")} />
+                          {(searchQuery || subsExpanded.fixtures) && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 180, overflowY: "auto" }} className="sm-scroll">
+                              {filteredFixtures.map(preset => (
+                                <button
+                                  key={preset.id}
+                                  onClick={() => addFixturePreset(preset)}
+                                  draggable={true}
+                                  onDragStart={e => {
+                                    e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "fixture" }));
+                                    e.dataTransfer.effectAllowed = "copy";
+                                  }}
+                                  style={presetButtonStyle}
+                                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                                >
+                                  <div style={{ width: 12, height: 12, border: `1.5px dashed ${C.textSecondary}`, background: "rgba(0,0,0,0.03)", flexShrink: 0 }} />
+                                  <div>
+                                    <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                                    <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>{preset.width} × {preset.height} cm</div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* D. Annotations */}
+              {filteredLabels.length > 0 && (
+                <div>
+                  <CategoryHeader
+                    title="Annotations"
+                    isOpen={isAnnotationsOpen}
+                    onClick={() => setAnnotationsExpanded(!annotationsExpanded)}
+                    count={filteredLabels.length}
+                  />
+                  {isAnnotationsOpen && (
+                    <div style={{ padding: "6px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div>
+                        <SubSectionHeader title="Labels &amp; Markers" isOpen={searchQuery || subsExpanded.labels} onClick={() => toggleSub("labels")} />
+                        {(searchQuery || subsExpanded.labels) && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                            {filteredLabels.map(preset => (
+                              <button
+                                key={preset.id}
+                                onClick={() => addLabelPreset(preset)}
+                                draggable={true}
+                                onDragStart={e => {
+                                  e.dataTransfer.setData("application/react-preset", JSON.stringify({ preset, presetType: "label" }));
+                                  e.dataTransfer.effectAllowed = "copy";
+                                }}
+                                style={presetButtonStyle}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaintest; }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}
+                              >
+                                <div style={{ fontSize: 11, fontWeight: "bold", color: C.gold, fontFamily: F }}>A</div>
+                                <div>
+                                  <div style={{ fontSize: 10, fontWeight: 600, color: C.textPrimary, fontFamily: F }}>{preset.label}</div>
+                                  <div style={{ fontSize: 8, color: C.textTertiary, fontFamily: F }}>Adds movable {preset.label.toLowerCase()}</div>
+                                </div>
+                              </button>
+                            ))}
                           </div>
-                        </button>
-                      ))}
+                        )}
+                      </div>
                     </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* No search matches state */}
-          {searchQuery && !hasAnyMatches && (
-            <div style={{ padding: "20px 14px", textAlign: "center", color: C.textSecondary, fontSize: 10, fontFamily: F }}>
-              No objects match "{searchQuery}"
-            </div>
-          )}
+              {/* No search matches state */}
+              {searchQuery && !hasAnyMatches && (
+                <div style={{ padding: "20px 14px", textAlign: "center", color: C.textSecondary, fontSize: 10, fontFamily: F }}>
+                  No objects match "{searchQuery}"
+                </div>
+              )}
 
-        </div>
-      </div>
-      )}
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
@@ -2280,7 +2280,7 @@ function VenueManagerModal({ venueStructure, onSave, onClose }) {
             <div style={{ fontFamily: F, fontSize: 16, fontWeight: 700, color: C.textPrimary }}>Manage Wings &amp; Rooms</div>
           </div>
           <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: "transparent", border: `1px solid ${C.borderDefault}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.textSecondary} strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.textSecondary} strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
 
@@ -2307,12 +2307,12 @@ function VenueManagerModal({ venueStructure, onSave, onClose }) {
           {structure.map((wing) => (
             <div key={wing.id} style={{ marginBottom: 16, border: `1px solid ${C.borderDefault}`, borderRadius: 10, overflow: "hidden" }}>
               <div style={{ padding: "10px 14px", background: C.surfaceRaised, borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", gap: 8 }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
                 {editingWingId === wing.id
                   ? <input autoFocus value={editingWingVal} onChange={e => setEditingWingVal(e.target.value)}
-                      onBlur={() => saveWingEdit(wing.id)} onKeyDown={e => { if (e.key === "Enter") saveWingEdit(wing.id); if (e.key === "Escape") setEditingWingId(null); }}
-                      style={{ flex: 1, padding: "3px 7px", border: `1px solid ${C.borderAccent}`, borderRadius: 5, fontFamily: F, fontWeight: 700, fontSize: 11, color: C.textPrimary, background: C.surfaceInput, outline: "none" }}
-                    />
+                    onBlur={() => saveWingEdit(wing.id)} onKeyDown={e => { if (e.key === "Enter") saveWingEdit(wing.id); if (e.key === "Escape") setEditingWingId(null); }}
+                    style={{ flex: 1, padding: "3px 7px", border: `1px solid ${C.borderAccent}`, borderRadius: 5, fontFamily: F, fontWeight: 700, fontSize: 11, color: C.textPrimary, background: C.surfaceInput, outline: "none" }}
+                  />
                   : <span style={{ flex: 1, fontFamily: F, fontWeight: 700, fontSize: 11, color: C.textPrimary, letterSpacing: "0.08em", textTransform: "uppercase" }}>{wing.label}</span>
                 }
                 <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
@@ -2342,9 +2342,9 @@ function VenueManagerModal({ venueStructure, onSave, onClose }) {
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.gold, opacity: 0.5, flexShrink: 0 }} />
                       {editingRoomKey === rKey
                         ? <input autoFocus value={editingRoomVal} onChange={e => setEditingRoomVal(e.target.value)}
-                            onBlur={() => saveRoomEdit(wing.id, rIdx)} onKeyDown={e => { if (e.key === "Enter") saveRoomEdit(wing.id, rIdx); if (e.key === "Escape") setEditingRoomKey(null); }}
-                            style={{ flex: 1, padding: "3px 7px", border: `1px solid ${C.borderAccent}`, borderRadius: 5, fontFamily: F, fontSize: 12, color: C.textPrimary, background: C.surfaceInput, outline: "none" }}
-                          />
+                          onBlur={() => saveRoomEdit(wing.id, rIdx)} onKeyDown={e => { if (e.key === "Enter") saveRoomEdit(wing.id, rIdx); if (e.key === "Escape") setEditingRoomKey(null); }}
+                          style={{ flex: 1, padding: "3px 7px", border: `1px solid ${C.borderAccent}`, borderRadius: 5, fontFamily: F, fontSize: 12, color: C.textPrimary, background: C.surfaceInput, outline: "none" }}
+                        />
                         : <span style={{ flex: 1, fontFamily: F, fontSize: 12, color: C.textSecondary }}>{room}</span>
                       }
                       <button onClick={() => { setEditingRoomKey(rKey); setEditingRoomVal(room); }}
@@ -2489,7 +2489,7 @@ function WingRoomSidebar({ activeWing, activeRoom, onSelect, venueStructure, onO
             style={{ width: "100%", padding: "8px 0", background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 7, fontFamily: F, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}
             onMouseEnter={e => { e.currentTarget.style.background = C.goldFaint; }}
             onMouseLeave={e => { e.currentTarget.style.background = C.goldFaintest; }}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
             Manage Venue
           </button>
         </div>
@@ -2499,16 +2499,16 @@ function WingRoomSidebar({ activeWing, activeRoom, onSelect, venueStructure, onO
 }
 
 // ─── INSPECTOR PANEL ──────────────────────────────────────────────────────────
-function InspectorPanel({ 
-  selected, selectedTable, selectedSeatObj, selectedStandaloneSeatObj, 
+function InspectorPanel({
+  selected, selectedTable, selectedSeatObj, selectedStandaloneSeatObj,
   selectedLabelObj, selectedFixtureObj,
   tables, setTables, labels, setLabels, fixtures, setFixtures, standaloneSeats,
   addSeat, deleteSeat, deleteTable, deleteStandaloneSeat, deleteFixture,
   updateTable, updateLabel, updateFixture, handleSeatLabelEdit, handleSeatStatus,
-  handleStandaloneSeatStatus, onRequestDelete, 
+  handleStandaloneSeatStatus, onRequestDelete,
   duplicateTable, duplicateStandaloneSeat, duplicateFixture,
-  snapToGrid, setSnapToGrid, gridSize, setGridSize, roomWidth, setRoomWidth, 
-  roomHeight, setRoomHeight, undo, redo, canUndo, canRedo, exportLayout, 
+  snapToGrid, setSnapToGrid, gridSize, setGridSize, roomWidth, setRoomWidth,
+  roomHeight, setRoomHeight, undo, redo, canUndo, canRedo, exportLayout,
   importLayout, resetLayout, handleSeatCountChange, pushHistory,
   showGrid, setShowGrid,
   gridVisibility, setGridVisibility,
@@ -2603,10 +2603,10 @@ function InspectorPanel({
     const hBox = rect.height;
     const x = Math.max(0, Math.min(w, clientX - rect.left));
     const y = Math.max(0, Math.min(hBox, clientY - rect.top));
-    
+
     const newS = Math.round((x / w) * 100);
     const newV = Math.round((1 - y / hBox) * 100);
-    
+
     setS(newS);
     setV(newV);
     const newHex = hsvToHex(h, newS, newV);
@@ -2617,7 +2617,7 @@ function InspectorPanel({
     const w = rect.width;
     const x = Math.max(0, Math.min(w, clientX - rect.left));
     const newH = Math.round((x / w) * 360);
-    
+
     setH(newH);
     const newHex = hsvToHex(newH, s, v);
     setCanvasBgColor(newHex);
@@ -2742,7 +2742,7 @@ function InspectorPanel({
   const iLabel = t => (
     <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", color: C.gold, textTransform: "uppercase", marginBottom: 5, marginTop: 12, fontFamily: F }}>{t}</div>
   );
-  
+
   const iInput = props => (
     <input
       style={{ width: "100%", padding: "7px 10px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, fontFamily: F, fontSize: 11, color: C.textPrimary, background: C.surfaceInput, boxSizing: "border-box", outline: "none", transition: "border-color 0.15s, box-shadow 0.15s" }}
@@ -2805,7 +2805,7 @@ function InspectorPanel({
         if (!confirm) return;
       }
       for (const seat of truncated) {
-        try { await cleanupReservationsForDeletedSeat(seat, table, activeWing, activeRoom, "admin"); } catch {}
+        try { await cleanupReservationsForDeletedSeat(seat, table, activeWing, activeRoom, "admin"); } catch { }
       }
     }
 
@@ -2902,22 +2902,22 @@ function InspectorPanel({
               <div style={{ marginBottom: 6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
                   <span style={{ fontSize: 8, color: C.textTertiary }}>Grid Visibility (%)</span>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    max="100" 
-                    value={gridVisibility ?? 30} 
-                    onChange={e => setGridVisibility(Math.min(100, Math.max(0, Number(e.target.value))))} 
-                    style={{ width: "42px", background: "transparent", border: `1px solid ${C.borderDefault}`, borderRadius: 4, textAlign: "center", fontSize: 10, fontFamily: "monospace" }} 
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={gridVisibility ?? 30}
+                    onChange={e => setGridVisibility(Math.min(100, Math.max(0, Number(e.target.value))))}
+                    style={{ width: "42px", background: "transparent", border: `1px solid ${C.borderDefault}`, borderRadius: 4, textAlign: "center", fontSize: 10, fontFamily: "monospace" }}
                   />
                 </div>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="100" 
-                  value={gridVisibility ?? 30} 
-                  onChange={e => setGridVisibility(Number(e.target.value))} 
-                  style={{ width: "100%", accentColor: C.gold, cursor: "pointer" }} 
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={gridVisibility ?? 30}
+                  onChange={e => setGridVisibility(Number(e.target.value))}
+                  style={{ width: "100%", accentColor: C.gold, cursor: "pointer" }}
                 />
               </div>
             )}
@@ -2938,13 +2938,13 @@ function InspectorPanel({
                     <option value={25}>25 cm (Bellevue standard)</option>
                     <option value={50}>50 cm</option>
                   </select>
-                  <input 
-                    type="number" 
-                    min="5" 
-                    max="100" 
-                    value={gridSize} 
-                    onChange={e => setGridSize(Math.max(5, Math.min(100, Number(e.target.value))))} 
-                    style={{ width: "45px", padding: "6px 4px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, textAlign: "center", fontSize: 11, outline: "none" }} 
+                  <input
+                    type="number"
+                    min="5"
+                    max="100"
+                    value={gridSize}
+                    onChange={e => setGridSize(Math.max(5, Math.min(100, Number(e.target.value))))}
+                    style={{ width: "45px", padding: "6px 4px", border: `1px solid ${C.borderDefault}`, borderRadius: 6, textAlign: "center", fontSize: 11, outline: "none" }}
                   />
                 </div>
               </div>
@@ -2967,27 +2967,27 @@ function InspectorPanel({
 
           <div id="canvas-bg-inspector" style={{ transition: "outline 0.2s ease", borderRadius: 8, padding: "2px" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.textSecondary, marginBottom: 8, fontFamily: F }}>Page</div>
-            
+
             {/* Figma-Style properties row */}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div 
-                ref={colorRowRef} 
+              <div
+                ref={colorRowRef}
                 onClick={togglePopover}
-                style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
-                  gap: 8, 
-                  background: C.surfaceInput, 
-                  border: `1px solid ${C.borderDefault}`, 
-                  borderRadius: 6, 
-                  padding: "4px 8px", 
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: C.surfaceInput,
+                  border: `1px solid ${C.borderDefault}`,
+                  borderRadius: 6,
+                  padding: "4px 8px",
                   cursor: "pointer",
                   flex: 1,
                   userSelect: "none"
                 }}
               >
                 {/* Color preview tile with checkerboard */}
-                <div 
+                <div
                   style={{
                     width: 20,
                     height: 20,
@@ -3010,7 +3010,7 @@ function InspectorPanel({
                 </div>
 
                 {/* Hex Display */}
-                <div 
+                <div
                   style={{
                     flex: 1,
                     fontSize: 11,
@@ -3027,7 +3027,7 @@ function InspectorPanel({
                 <div style={{ width: 1, height: 16, background: C.borderDefault }} />
 
                 {/* Opacity Value */}
-                <div 
+                <div
                   style={{
                     fontSize: 11,
                     color: C.textSecondary,
@@ -3063,7 +3063,7 @@ function InspectorPanel({
 
             {/* Floating popover/modal positioned next to the sidebar */}
             {showColorPickerPopover && (
-              <div 
+              <div
                 ref={popoverRef}
                 style={{
                   position: "fixed",
@@ -3085,8 +3085,8 @@ function InspectorPanel({
                 {/* Popover Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${C.divider}`, paddingBottom: 6 }}>
                   <span style={{ fontSize: 10, fontWeight: 700, color: C.textPrimary }}>Custom Color</span>
-                  <button 
-                    onClick={() => setShowColorPickerPopover(false)} 
+                  <button
+                    onClick={() => setShowColorPickerPopover(false)}
                     style={{ background: "transparent", border: "none", color: C.textSecondary, cursor: "pointer", display: "flex", padding: 2 }}
                   >
                     <X size={14} />
@@ -3095,7 +3095,7 @@ function InspectorPanel({
 
                 {/* Figma-Style SV Box */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <div 
+                  <div
                     ref={svRef}
                     onMouseDown={handleSVMouseDown}
                     style={{
@@ -3112,7 +3112,7 @@ function InspectorPanel({
                     }}
                   >
                     {/* SV pointer */}
-                    <div 
+                    <div
                       style={{
                         position: "absolute",
                         left: `${s}%`,
@@ -3133,7 +3133,7 @@ function InspectorPanel({
                 {/* Figma-Style Hue Slider */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   <div style={{ fontSize: 8, color: C.textTertiary }}>Hue</div>
-                  <div 
+                  <div
                     ref={hueRef}
                     onMouseDown={handleHueMouseDown}
                     style={{
@@ -3148,7 +3148,7 @@ function InspectorPanel({
                     }}
                   >
                     {/* Hue pointer */}
-                    <div 
+                    <div
                       style={{
                         position: "absolute",
                         left: `${(h / 360) * 100}%`,
@@ -3169,7 +3169,7 @@ function InspectorPanel({
                 {/* Opacity/Alpha Slider */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   <div style={{ fontSize: 8, color: C.textTertiary }}>Opacity</div>
-                  <div 
+                  <div
                     ref={alphaRef}
                     onMouseDown={handleAlphaMouseDown}
                     style={{
@@ -3192,7 +3192,7 @@ function InspectorPanel({
                       background: `linear-gradient(to right, transparent, ${hsvToHex(h, s, v)})`
                     }} />
                     {/* Alpha slider pointer */}
-                    <div 
+                    <div
                       style={{
                         position: "absolute",
                         left: `${canvasBgOpacity}%`,
@@ -3217,8 +3217,8 @@ function InspectorPanel({
                     display: "flex",
                     alignItems: "center",
                     gap: 4,
-                    fontSize: 10, 
-                    fontWeight: 600, 
+                    fontSize: 10,
+                    fontWeight: 600,
                     color: C.textPrimary,
                     background: C.surfaceInput,
                     border: `1px solid ${C.borderDefault}`,
@@ -3308,25 +3308,25 @@ function InspectorPanel({
           <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 12, marginTop: 8 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: C.textSecondary, marginBottom: 8, letterSpacing: "0.05em" }}>Import / Export</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              <button 
-                onClick={exportLayout} 
-                style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
-                  justifyContent: "center", 
-                  gap: 4, 
-                  padding: "8px 4px", 
-                  background: "transparent", 
-                  border: `1px solid ${C.borderAccent}`, 
-                  borderRadius: 6, 
-                  fontFamily: F, 
-                  fontWeight: 700, 
-                  fontSize: 9, 
-                  letterSpacing: "0.05em", 
-                  textTransform: "uppercase", 
-                  color: C.gold, 
-                  cursor: "pointer", 
-                  transition: "all 0.15s" 
+              <button
+                onClick={exportLayout}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  padding: "8px 4px",
+                  background: "transparent",
+                  border: `1px solid ${C.borderAccent}`,
+                  borderRadius: 6,
+                  fontFamily: F,
+                  fontWeight: 700,
+                  fontSize: 9,
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                  color: C.gold,
+                  cursor: "pointer",
+                  transition: "all 0.15s"
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = C.goldFaint}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
@@ -3334,25 +3334,25 @@ function InspectorPanel({
                 <Download size={10} />
                 Export JSON
               </button>
-              <label 
-                style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
-                  justifyContent: "center", 
-                  gap: 4, 
-                  padding: "8px 4px", 
-                  background: "transparent", 
-                  border: `1px solid ${C.borderDefault}`, 
-                  borderRadius: 6, 
-                  fontFamily: F, 
-                  fontWeight: 700, 
-                  fontSize: 9, 
-                  letterSpacing: "0.05em", 
-                  textTransform: "uppercase", 
-                  color: C.textSecondary, 
-                  cursor: "pointer", 
-                  textAlign: "center", 
-                  transition: "all 0.15s" 
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  padding: "8px 4px",
+                  background: "transparent",
+                  border: `1px solid ${C.borderDefault}`,
+                  borderRadius: 6,
+                  fontFamily: F,
+                  fontWeight: 700,
+                  fontSize: 9,
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                  color: C.textSecondary,
+                  cursor: "pointer",
+                  textAlign: "center",
+                  transition: "all 0.15s"
                 }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = C.borderAccent}
                 onMouseLeave={e => e.currentTarget.style.borderColor = C.borderDefault}
@@ -3368,25 +3368,25 @@ function InspectorPanel({
           <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 12, marginTop: 8 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: C.textSecondary, marginBottom: 8, letterSpacing: "0.05em" }}>Draft & Reset Options</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              <button 
-                onClick={discardChanges} 
-                style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
-                  justifyContent: "center", 
-                  gap: 4, 
-                  padding: "8px 4px", 
-                  background: "transparent", 
-                  border: `1px solid ${C.borderDefault}`, 
-                  borderRadius: 6, 
-                  fontFamily: F, 
-                  fontWeight: 700, 
-                  fontSize: 9, 
-                  letterSpacing: "0.05em", 
-                  textTransform: "uppercase", 
-                  color: C.textSecondary, 
-                  cursor: "pointer", 
-                  transition: "all 0.15s" 
+              <button
+                onClick={discardChanges}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  padding: "8px 4px",
+                  background: "transparent",
+                  border: `1px solid ${C.borderDefault}`,
+                  borderRadius: 6,
+                  fontFamily: F,
+                  fontWeight: 700,
+                  fontSize: 9,
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                  color: C.textSecondary,
+                  cursor: "pointer",
+                  transition: "all 0.15s"
                 }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = C.gold}
                 onMouseLeave={e => e.currentTarget.style.borderColor = C.borderDefault}
@@ -3394,25 +3394,25 @@ function InspectorPanel({
                 <RotateCcw size={10} />
                 Discard Draft
               </button>
-              <button 
-                onClick={resetLayout} 
-                style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
-                  justifyContent: "center", 
-                  gap: 4, 
-                  padding: "8px 4px", 
-                  background: "transparent", 
-                  border: `1px solid ${C.redBorder}`, 
-                  borderRadius: 6, 
-                  fontFamily: F, 
-                  fontWeight: 700, 
-                  fontSize: 9, 
-                  letterSpacing: "0.05em", 
-                  textTransform: "uppercase", 
-                  color: C.red, 
-                  cursor: "pointer", 
-                  transition: "all 0.15s" 
+              <button
+                onClick={resetLayout}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  padding: "8px 4px",
+                  background: "transparent",
+                  border: `1px solid ${C.redBorder}`,
+                  borderRadius: 6,
+                  fontFamily: F,
+                  fontWeight: 700,
+                  fontSize: 9,
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                  color: C.red,
+                  cursor: "pointer",
+                  transition: "all 0.15s"
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = C.redFaint}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
@@ -3506,24 +3506,24 @@ function InspectorPanel({
 
             <div>
               <span style={{ fontSize: 8, color: C.textTertiary }}>Notes / Internal Label</span>
-              <textarea 
-                value={selectedTable.editor?.notes || ""} 
-                onChange={e => updateTable("editor", { ...(selectedTable.editor || {}), notes: e.target.value })} 
+              <textarea
+                value={selectedTable.editor?.notes || ""}
+                onChange={e => updateTable("editor", { ...(selectedTable.editor || {}), notes: e.target.value })}
                 placeholder="Internal notes or category tags..."
-                style={{ 
-                  width: "100%", 
-                  height: "50px", 
-                  padding: "8px 10px", 
-                  border: `1px solid ${C.borderDefault}`, 
-                  borderRadius: 6, 
-                  fontFamily: F, 
-                  fontSize: 11, 
-                  color: C.textPrimary, 
-                  background: C.surfaceInput, 
-                  boxSizing: "border-box", 
-                  outline: "none", 
+                style={{
+                  width: "100%",
+                  height: "50px",
+                  padding: "8px 10px",
+                  border: `1px solid ${C.borderDefault}`,
+                  borderRadius: 6,
+                  fontFamily: F,
+                  fontSize: 11,
+                  color: C.textPrimary,
+                  background: C.surfaceInput,
+                  boxSizing: "border-box",
+                  outline: "none",
                   resize: "none",
-                  transition: "border-color 0.15s, box-shadow 0.15s" 
+                  transition: "border-color 0.15s, box-shadow 0.15s"
                 }}
                 onFocus={e => { e.target.style.borderColor = C.borderAccent; e.target.style.boxShadow = C.inputFocus; }}
                 onBlur={e => { e.target.style.borderColor = C.borderDefault; e.target.style.boxShadow = "none"; }}
@@ -3536,7 +3536,7 @@ function InspectorPanel({
                 <input type="range" min={minChairs} max={maxChairs} value={seatCount} onChange={e => handleSeatCountChange(selectedTable.id, Number(e.target.value))} style={{ flex: 1, accentColor: C.gold }} />
                 <input type="number" min={minChairs} max={maxChairs} value={seatCount} onChange={e => handleSeatCountChange(selectedTable.id, Math.min(maxChairs, Math.max(minChairs, Number(e.target.value))))} style={{ width: 44, padding: "4px", border: `1px solid ${C.borderDefault}`, borderRadius: 4, textAlign: "center", fontFamily: F, fontSize: 11 }} />
               </div>
-              
+
               <div style={{ marginTop: 8 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Chair Spacing (cm)</span>
                 <input type="range" min="4" max="16" value={selectedTable.editor?.seat_spacing_cm || 8} onChange={e => updateTable("editor", { ...(selectedTable.editor || {}), seat_spacing_cm: Number(e.target.value) })} style={{ width: "100%", accentColor: C.gold }} />
@@ -3797,7 +3797,7 @@ function InspectorPanel({
                   <span style={{ fontSize: 8, color: C.textTertiary }}>Wall Thickness: {selectedFixtureObj.editor?.thickness || 8} cm</span>
                   <input type="range" min="2" max="40" value={selectedFixtureObj.editor?.thickness || 8} onChange={e => updateFixture("editor", { thickness: Number(e.target.value) })} style={{ width: "100%", accentColor: C.gold, cursor: "pointer" }} />
                 </div>
-                
+
                 {selectedFixtureObj.fixture_type === "curved-wall" && (
                   <div>
                     <span style={{ fontSize: 8, color: C.textTertiary }}>Curvature Strength: {selectedFixtureObj.editor?.curve_strength || 50} cm</span>
@@ -3882,33 +3882,33 @@ export default function SeatMap({
     return [{ shape: "rect", width: 110, height: 70, ...td }];
   }, []);
 
-  const [tables, setTables]             = useState(() => editMode ? [] : normalize(tableData));
-  const [labels, setLabels]             = useState(() => {
+  const [tables, setTables] = useState(() => editMode ? [] : normalize(tableData));
+  const [labels, setLabels] = useState(() => {
     if (!editMode && tableData && tableData.labels) return tableData.labels;
     return DEFAULT_LABELS;
   });
   const [standaloneSeats, setStandaloneSeats] = useState([]);
-  const [fixtures, setFixtures]               = useState([]);
-  const [selected, setSelected]         = useState(null);
+  const [fixtures, setFixtures] = useState([]);
+  const [selected, setSelected] = useState(null);
   const [selectedStandaloneSeats, setSelectedStandaloneSeats] = useState(new Set());
   const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
-  const [saved, setSaved]               = useState(false);
-  const [isDraft, setIsDraft]           = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [isDraft, setIsDraft] = useState(false);
   const [layoutVersion, setLayoutVersion] = useState(1);
-  const [tool, setTool]                 = useState("select");
+  const [tool, setTool] = useState("select");
   const [activeDragId, setActiveDragId] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showVenueManager, setShowVenueManager] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
-  const [publishError, setPublishError]         = useState("");
+  const [publishError, setPublishError] = useState("");
 
   // ── Panning & Zooming & Blueprint Guides ────────────────────────────────────
-  const [pan, setPan]                   = useState({ x: 0, y: 0 });
-  const [zoom, setZoom]                 = useState(0.7);
-  const [snapToGrid, setSnapToGrid]     = useState(true);
-  const [gridSize, setGridSize]         = useState(25);
-  const [roomWidth, setRoomWidth]       = useState(1200);
-  const [roomHeight, setRoomHeight]     = useState(800);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(0.7);
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [gridSize, setGridSize] = useState(25);
+  const [roomWidth, setRoomWidth] = useState(1200);
+  const [roomHeight, setRoomHeight] = useState(800);
   const [canvasBgColor, setCanvasBgColor] = useState(() => {
     if (!editMode && tableData?.editor?.canvas_bg_color) return tableData.editor.canvas_bg_color;
     return "#FAF9F5";
@@ -3921,23 +3921,23 @@ export default function SeatMap({
     if (!editMode && tableData?.editor?.canvas_bg_visible !== undefined) return tableData.editor.canvas_bg_visible;
     return true;
   });
-  const [alignGuides, setAlignGuides]   = useState(null);
-  const [isPanning, setIsPanning]       = useState(false);
+  const [alignGuides, setAlignGuides] = useState(null);
+  const [isPanning, setIsPanning] = useState(false);
   const [spacePressed, setSpacePressed] = useState(false);
-  const [showGrid, setShowGrid]                     = useState(true);
-  const [gridVisibility, setGridVisibility]         = useState(30);
+  const [showGrid, setShowGrid] = useState(true);
+  const [gridVisibility, setGridVisibility] = useState(30);
   const [smartGuidesEnabled, setSmartGuidesEnabled] = useState(true);
-  const [showRulers, setShowRulers]                 = useState(true);
+  const [showRulers, setShowRulers] = useState(true);
 
   // ── History States for Undo / Redo ──────────────────────────────────────────
-  const [history, setHistory]           = useState({ past: [], future: [] });
+  const [history, setHistory] = useState({ past: [], future: [] });
 
   const pushHistory = useCallback((currentTables = tables, currentSeats = standaloneSeats, currentLabels = labels, currentFixtures = fixtures, currentCanvasBgColor = canvasBgColor, currentCanvasBgOpacity = canvasBgOpacity, currentCanvasBgVisible = canvasBgVisible) => {
     userEditedRef.current = true;  // Mark that user has made a real edit
     setHistory(prev => ({
-      past: [...prev.past, { 
-        tables: JSON.parse(JSON.stringify(currentTables)), 
-        standaloneSeats: JSON.parse(JSON.stringify(currentSeats)), 
+      past: [...prev.past, {
+        tables: JSON.parse(JSON.stringify(currentTables)),
+        standaloneSeats: JSON.parse(JSON.stringify(currentSeats)),
         labels: JSON.parse(JSON.stringify(currentLabels)),
         fixtures: JSON.parse(JSON.stringify(currentFixtures)),
         canvasBgColor: currentCanvasBgColor,
@@ -4014,13 +4014,13 @@ export default function SeatMap({
   const [activeWing, setActiveWing] = useState(wing || "Main Wing");
   const [activeRoom, setActiveRoom] = useState(room || "Alabang Function Room");
 
-  const loadedRef     = useRef(false);
+  const loadedRef = useRef(false);
   const userEditedRef = useRef(false);  // Only true after a real user edit, prevents auto-save race
   const autoSaveTimerRef = useRef(null);
-  const dragging      = useRef(null);
-  const canvasRef     = useRef(null);
+  const dragging = useRef(null);
+  const canvasRef = useRef(null);
   const canvasViewportRef = useRef(null);
-  const panStart      = useRef({ x: 0, y: 0 });
+  const panStart = useRef({ x: 0, y: 0 });
   const adminScaleRef = useRef(1);
   const pendingCenterRef = useRef(false);
   const viewportClickStartRef = useRef({ x: 0, y: 0 });
@@ -4061,7 +4061,7 @@ export default function SeatMap({
   useEffect(() => {
     if (!pendingCenterRef.current) return;
     if (viewportSize.width > 50 && viewportSize.height > 50) {
-      const zoomLevel = 0.7;
+      const zoomLevel = 0.60;
       const px = Math.round((viewportSize.width - roomWidth * zoomLevel) / 2);
       const py = Math.round((viewportSize.height - roomHeight * zoomLevel) / 2);
       setZoom(zoomLevel);
@@ -4182,7 +4182,7 @@ export default function SeatMap({
 
     const matchedVenue = venuesList.find(v => v.name === activeRoom);
     const venueId = matchedVenue ? matchedVenue.id : null;
-    
+
     if (!venueId) {
       // Venue list not loaded yet — don't show empty canvas, just wait
       return;
@@ -4237,7 +4237,7 @@ export default function SeatMap({
         } else {
           setRoomWidth(loadedWidth); setRoomHeight(loadedHeight); setGridSize(25); setSnapToGrid(true);
           setShowGrid(true); setGridVisibility(30);
-          setSmartGuidesEnabled(true); setShowRulers(true); 
+          setSmartGuidesEnabled(true); setShowRulers(true);
           setCanvasBgColor("#FAF9F5");
           setCanvasBgOpacity(100);
           setCanvasBgVisible(true);
@@ -4274,7 +4274,7 @@ export default function SeatMap({
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
     autoSaveTimerRef.current = setTimeout(() => {
-      const completeData = { 
+      const completeData = {
         tables, labels, standaloneSeats, fixtures,
         editor: {
           room_width_cm: roomWidth, room_height_cm: roomHeight, grid_cm: gridSize,
@@ -4351,11 +4351,11 @@ export default function SeatMap({
     pendingCenterRef.current = true;
   }, [tableData, normalize, editMode]);
 
-  const selectedTable             = selected?.type === "table"          ? tables.find(t => t.id === selected.tableId) : null;
-  const selectedSeatObj           = selected?.type === "seat"           ? tables.find(t => t.id === selected.tableId)?.seats.find(s => s.id === selected.seatId) : null;
+  const selectedTable = selected?.type === "table" ? tables.find(t => t.id === selected.tableId) : null;
+  const selectedSeatObj = selected?.type === "seat" ? tables.find(t => t.id === selected.tableId)?.seats.find(s => s.id === selected.seatId) : null;
   const selectedStandaloneSeatObj = selected?.type === "standaloneSeat" ? standaloneSeats.find(s => s.id === selected.standaloneSeatId) : null;
-  const selectedLabelObj           = selected?.type === "label"          ? labels.find(l => l.id === selected.labelId) : null;
-  const selectedFixtureObj         = selected?.type === "fixture"        ? fixtures.find(f => f.id === selected.fixtureId) : null;
+  const selectedLabelObj = selected?.type === "label" ? labels.find(l => l.id === selected.labelId) : null;
+  const selectedFixtureObj = selected?.type === "fixture" ? fixtures.find(f => f.id === selected.fixtureId) : null;
 
   const quickInspectorPosition = useMemo(() => {
     if (selected?.type !== "table" || !selectedTable || !canvasViewportRef.current) {
@@ -4366,22 +4366,22 @@ export default function SeatMap({
     const ty = selectedTable.y;
     const tw = selectedTable.width || 110;
     const th = selectedTable.height || 70;
-    
+
     const tableLeft = tx * zoom + pan.x;
     const tableTop = ty * zoom + pan.y;
     const tableWidthScaled = tw * zoom;
     const tableHeightScaled = th * zoom;
     const tableCenterX = tableLeft + tableWidthScaled / 2;
     const tableCenterY = tableTop + tableHeightScaled / 2;
-    
+
     const W = 280;
     const H = 250; // Estimated height for compact inspector
     const margin = 12;
-    
+
     let left = 0;
     let top = 0;
     let placement = "right";
-    
+
     // Priority 1: Right
     const rightLeft = tableLeft + tableWidthScaled + margin;
     const rightTop = tableCenterY - H / 2;
@@ -4426,11 +4426,11 @@ export default function SeatMap({
         }
       }
     }
-    
+
     // Clamp inside viewport margins
     left = Math.max(16, Math.min(viewportWidth - W - 16, left));
     top = Math.max(16, Math.min(viewportHeight - H - 16, top));
-    
+
     return { left, top, placement };
   }, [selected, selectedTable, zoom, pan, viewportSize]);
 
@@ -4443,11 +4443,11 @@ export default function SeatMap({
       const rawDx = e.clientX - d.startX, rawDy = e.clientY - d.startY;
       if (!d.active) {
         if (Math.abs(rawDx) < THRESHOLD && Math.abs(rawDy) < THRESHOLD) return;
-        d.active = true; 
+        d.active = true;
         setActiveDragId(d.id);
         pushHistory();
       }
-      
+
       let dx = rawDx / zoom;
       let dy = rawDy / zoom;
 
@@ -4459,15 +4459,15 @@ export default function SeatMap({
         newY = Math.round(newY / gridSize) * gridSize;
       }
 
-      const w = d.type === "table" 
-        ? (tables.find(t => t.id === d.id)?.width || 110) 
+      const w = d.type === "table"
+        ? (tables.find(t => t.id === d.id)?.width || 110)
         : d.type === "fixture"
           ? (fixtures.find(f => f.id === d.id)?.width || 80)
           : d.type === "label"
             ? 100
             : 38;
-      const h = d.type === "table" 
-        ? (tables.find(t => t.id === d.id)?.height || 70) 
+      const h = d.type === "table"
+        ? (tables.find(t => t.id === d.id)?.height || 70)
         : d.type === "fixture"
           ? (fixtures.find(f => f.id === d.id)?.height || 60)
           : d.type === "label"
@@ -4489,33 +4489,33 @@ export default function SeatMap({
 
       for (const cand of candidates) {
         const leftAlign = Math.abs(newX - cand.x);
-        const centerAlign = Math.abs((newX + w/2) - (cand.x + cand.w/2));
+        const centerAlign = Math.abs((newX + w / 2) - (cand.x + cand.w / 2));
         const rightAlign = Math.abs((newX + w) - (cand.x + cand.w));
 
         if (leftAlign < ALIGN_THRESHOLD) { newX = cand.x; alignX = cand.x; }
-        else if (centerAlign < ALIGN_THRESHOLD) { newX = cand.x + cand.w/2 - w/2; alignX = cand.x + cand.w/2; }
+        else if (centerAlign < ALIGN_THRESHOLD) { newX = cand.x + cand.w / 2 - w / 2; alignX = cand.x + cand.w / 2; }
         else if (rightAlign < ALIGN_THRESHOLD) { newX = cand.x + cand.w - w; alignX = cand.x + cand.w; }
 
         const topAlign = Math.abs(newY - cand.y);
-        const middleAlign = Math.abs((newY + h/2) - (cand.y + cand.h/2));
+        const middleAlign = Math.abs((newY + h / 2) - (cand.y + cand.h / 2));
         const bottomAlign = Math.abs((newY + h) - (cand.y + cand.h));
 
         if (topAlign < ALIGN_THRESHOLD) { newY = cand.y; alignY = cand.y; }
-        else if (middleAlign < ALIGN_THRESHOLD) { newY = cand.y + cand.h/2 - h/2; alignY = cand.y + cand.h/2; }
+        else if (middleAlign < ALIGN_THRESHOLD) { newY = cand.y + cand.h / 2 - h / 2; alignY = cand.y + cand.h / 2; }
         else if (bottomAlign < ALIGN_THRESHOLD) { newY = cand.y + cand.h - h; alignY = cand.y + cand.h; }
       }
 
       setAlignGuides({ x: alignX, y: alignY });
 
-      if      (d.type === "table")          setTables(p => p.map(t => t.id === d.id ? { ...t, x: newX, y: newY } : t));
-      else if (d.type === "label")          setLabels(p => p.map(l => l.id === d.id ? { ...l, x: newX, y: newY } : l));
+      if (d.type === "table") setTables(p => p.map(t => t.id === d.id ? { ...t, x: newX, y: newY } : t));
+      else if (d.type === "label") setLabels(p => p.map(l => l.id === d.id ? { ...l, x: newX, y: newY } : l));
       else if (d.type === "standaloneSeat") setStandaloneSeats(p => p.map(ss => ss.id === d.id ? { ...ss, x: newX, y: newY } : ss));
-      else if (d.type === "fixture")        setFixtures(p => p.map(f => f.id === d.id ? { ...f, x: newX, y: newY } : f));
+      else if (d.type === "fixture") setFixtures(p => p.map(f => f.id === d.id ? { ...f, x: newX, y: newY } : f));
     };
-    const onUp = () => { 
-      dragging.current = null; 
-      setActiveDragId(null); 
-      setAlignGuides(null); 
+    const onUp = () => {
+      dragging.current = null;
+      setActiveDragId(null);
+      setAlignGuides(null);
     };
     window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp);
     return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
@@ -4564,28 +4564,28 @@ export default function SeatMap({
   }, [editMode, selected, tables, standaloneSeats, fixtures, selectedTable, selectedStandaloneSeatObj, selectedFixtureObj, undo, redo]);
 
   const startTableDrag = useCallback((e, id) => {
-    e.preventDefault(); 
+    e.preventDefault();
     const t = tables.find(t => t.id === id);
     if (t?.editor?.locked) return;
     dragging.current = { type: "table", id, startX: e.clientX, startY: e.clientY, originX: t?.x || 0, originY: t?.y || 0, active: false };
   }, [tables]);
 
   const startTableResize = useCallback((e) => { e.preventDefault(); }, []);
-  
+
   const startLabelDrag = useCallback((e, id) => {
     e.preventDefault(); const l = labels.find(l => l.id === id);
     dragging.current = { type: "label", id, startX: e.clientX, startY: e.clientY, originX: l?.x || 0, originY: l?.y || 0, active: false };
   }, [labels]);
 
   const startStandaloneSeatDrag = useCallback((e, id) => {
-    e.preventDefault(); 
+    e.preventDefault();
     const ss = standaloneSeats.find(s => s.id === id);
     if (ss?.editor?.locked) return;
     dragging.current = { type: "standaloneSeat", id, startX: e.clientX, startY: e.clientY, originX: ss?.x || 0, originY: ss?.y || 0, active: false };
   }, [standaloneSeats]);
 
   const startFixtureDrag = useCallback((e, id) => {
-    e.preventDefault(); 
+    e.preventDefault();
     const f = fixtures.find(f => f.id === id);
     if (f?.editor?.locked) return;
     dragging.current = { type: "fixture", id, startX: e.clientX, startY: e.clientY, originX: f?.x || 0, originY: f?.y || 0, active: false };
@@ -4680,7 +4680,7 @@ export default function SeatMap({
     if (!fid) return;
     const fixtureToDelete = fixtures.find(f => f.id === fid);
     if (fixtureToDelete?.editor?.locked) return;
-    
+
     pushHistory();
     setFixtures(p => p.filter(f => f.id !== fid));
     if (!id || selected?.fixtureId === fid) setSelected(null);
@@ -4690,20 +4690,20 @@ export default function SeatMap({
     if (!editMode) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     const cx = Math.max(0, (e.clientX - rect.left) / zoom), cy = Math.max(0, (e.clientY - rect.top) / zoom);
-    
-    if (tool === "addTable") { 
+
+    if (tool === "addTable") {
       pushHistory();
-      const t = makeTable(cx - 55, cy - 27); 
-      setTables(p => [...p, t]); 
-      setSelected({ type: "table", tableId: t.id }); 
-      setTool("select"); 
+      const t = makeTable(cx - 55, cy - 27);
+      setTables(p => [...p, t]);
+      setSelected({ type: "table", tableId: t.id });
+      setTool("select");
     }
-    else if (tool === "addSeat") { 
+    else if (tool === "addSeat") {
       pushHistory();
-      const ss = makeStandaloneSeat(cx - 19, cy - 19); 
-      setStandaloneSeats(p => [...p, ss]); 
-      setSelected({ type: "standaloneSeat", standaloneSeatId: ss.id }); 
-      setTool("select"); 
+      const ss = makeStandaloneSeat(cx - 19, cy - 19);
+      setStandaloneSeats(p => [...p, ss]);
+      setSelected({ type: "standaloneSeat", standaloneSeatId: ss.id });
+      setTool("select");
     }
   };
 
@@ -4732,7 +4732,7 @@ export default function SeatMap({
       // Center the dropped preset based on its dimensions
       const w = preset.width || (presetType === "table" ? 110 : presetType === "fixture" ? 80 : 38);
       const h = preset.height || (presetType === "table" ? 70 : presetType === "fixture" ? 60 : 38);
-      
+
       cx = cx - w / 2;
       cy = cy - h / 2;
 
@@ -4837,10 +4837,10 @@ export default function SeatMap({
     if (!tid) return;
     const tableToDelete = tables.find(t => t.id === tid);
     if (tableToDelete?.editor?.locked) return;
-    
+
     pushHistory();
     if (tableToDelete) {
-      try { await cleanupReservationsForDeletedTable(tableToDelete, activeWing, activeRoom, "admin"); } catch {}
+      try { await cleanupReservationsForDeletedTable(tableToDelete, activeWing, activeRoom, "admin"); } catch { }
     }
     setTables(p => p.filter(t => t.id !== tid));
     if (!id || selected?.tableId === tid) setSelected(null);
@@ -4851,10 +4851,10 @@ export default function SeatMap({
     if (!sid) return;
     const seatToDelete = standaloneSeats.find(s => s.id === sid);
     if (seatToDelete?.editor?.locked) return;
-    
+
     pushHistory();
     if (seatToDelete) {
-      try { await cleanupReservationsForDeletedStandaloneSeat(seatToDelete, activeWing, activeRoom, "admin"); } catch {}
+      try { await cleanupReservationsForDeletedStandaloneSeat(seatToDelete, activeWing, activeRoom, "admin"); } catch { }
     }
     setStandaloneSeats(p => p.filter(s => s.id !== sid));
     if (!id || selected?.standaloneSeatId === sid) setSelected(null);
@@ -4863,10 +4863,10 @@ export default function SeatMap({
   const deleteBulkStandaloneSeats = async () => {
     if (selectedStandaloneSeats.size === 0) return;
     const seatsToDelete = standaloneSeats.filter(s => selectedStandaloneSeats.has(s.id) && !s.editor?.locked);
-    
+
     pushHistory();
     for (const seat of seatsToDelete) {
-      try { await cleanupReservationsForDeletedStandaloneSeat(seat, activeWing, activeRoom, "admin"); } catch {}
+      try { await cleanupReservationsForDeletedStandaloneSeat(seat, activeWing, activeRoom, "admin"); } catch { }
     }
     setStandaloneSeats(p => p.filter(s => !selectedStandaloneSeats.has(s.id)));
     setSelectedStandaloneSeats(new Set());
@@ -4903,9 +4903,9 @@ export default function SeatMap({
         const confirm = window.confirm("Warning: The last seat has a pending or active booking. Are you sure you want to remove it?");
         if (!confirm) return;
       }
-      
+
       pushHistory();
-      try { await cleanupReservationsForDeletedSeat(lastSeat, table, activeWing, activeRoom, "admin"); } catch {}
+      try { await cleanupReservationsForDeletedSeat(lastSeat, table, activeWing, activeRoom, "admin"); } catch { }
     }
     setTables(p => {
       const u = p.map(t => t.id !== selected.tableId ? t : { ...t, seats: (t.seats || []).slice(0, -1) });
@@ -4926,10 +4926,10 @@ export default function SeatMap({
         const confirm = window.confirm("Warning: Some of the seats being removed have active or pending reservations. Are you sure you want to delete them? This will remove their bookings.");
         if (!confirm) return;
       }
-      
+
       pushHistory();
       for (const seat of truncated) {
-        try { await cleanupReservationsForDeletedSeat(seat, table, activeWing, activeRoom, "admin"); } catch {}
+        try { await cleanupReservationsForDeletedSeat(seat, table, activeWing, activeRoom, "admin"); } catch { }
       }
       setTables(p => p.map(t => t.id === tableId ? {
         ...t,
@@ -5103,7 +5103,7 @@ export default function SeatMap({
   const discardChanges = useCallback(() => {
     const confirm = window.confirm("Are you sure you want to discard all unsaved changes and restore the layout from the server?");
     if (!confirm) return;
-    
+
     if (!tableData) return;
     pushHistory();
     if (tableData.v === 2) {
@@ -5146,8 +5146,8 @@ export default function SeatMap({
     setSelected(null);
   }, [tableData, normalize, pushHistory]);
 
-  const updateTable           = (k, v)    => { 
-    if (!selected?.tableId) return; 
+  const updateTable = (k, v) => {
+    if (!selected?.tableId) return;
     pushHistory();
     setTables(p => p.map(t => {
       if (t.id !== selected.tableId) return t;
@@ -5155,21 +5155,21 @@ export default function SeatMap({
         return { ...t, editor: { ...(t.editor || {}), ...v } };
       }
       return { ...t, [k]: v };
-    })); 
+    }));
   };
 
-  const handleLabelEdit       = (id, val) => { pushHistory(); setTables(p => p.map(t => t.id === id ? { ...t, label: val } : t)); };
-  const handleSeatLabelEdit   = val       => { if (!selected?.seatId) return; pushHistory(); setTables(p => p.map(t => t.id !== selected.tableId ? t : { ...t, seats: (t.seats || []).map(s => s.id === selected.seatId ? { ...s, label: val } : s) })); };
-  const handleSeatStatus      = status    => { if (!selected?.seatId) return; pushHistory(); setTables(p => p.map(t => t.id !== selected.tableId ? t : { ...t, seats: (t.seats || []).map(s => s.id === selected.seatId ? { ...s, status } : s) })); };
-  const handleSeatMove        = (tableId, seatId, pos) => { pushHistory(); setTables(p => p.map(t => t.id !== tableId ? t : { ...t, seats: (t.seats || []).map(s => s.id === seatId ? { ...s, position: pos } : s) })); };
+  const handleLabelEdit = (id, val) => { pushHistory(); setTables(p => p.map(t => t.id === id ? { ...t, label: val } : t)); };
+  const handleSeatLabelEdit = val => { if (!selected?.seatId) return; pushHistory(); setTables(p => p.map(t => t.id !== selected.tableId ? t : { ...t, seats: (t.seats || []).map(s => s.id === selected.seatId ? { ...s, label: val } : s) })); };
+  const handleSeatStatus = status => { if (!selected?.seatId) return; pushHistory(); setTables(p => p.map(t => t.id !== selected.tableId ? t : { ...t, seats: (t.seats || []).map(s => s.id === selected.seatId ? { ...s, status } : s) })); };
+  const handleSeatMove = (tableId, seatId, pos) => { pushHistory(); setTables(p => p.map(t => t.id !== tableId ? t : { ...t, seats: (t.seats || []).map(s => s.id === seatId ? { ...s, position: pos } : s) })); };
   const handleStandaloneSeatStatus = (seatId, status) => { pushHistory(); setStandaloneSeats(p => p.map(s => s.id === seatId ? { ...s, status } : s)); };
-  const handleSeatClick       = (seat, tableId) => { if (!editMode) { onSeatClick?.(seat, tableId); return; } setSelected({ type: "seat", tableId, seatId: seat.id }); };
-  const handleTableSelect     = table => { if (editMode) { setSelected({ type: "table", tableId: table.id }); return; } onTableClick?.(table); };
-  const handleSelectRoom      = (w, r) => { setActiveWing(w); setActiveRoom(r); };
-  const handleSaveVenue       = newStructure => { setVenueStructure(newStructure); saveVenueStructure(newStructure); };
-  
+  const handleSeatClick = (seat, tableId) => { if (!editMode) { onSeatClick?.(seat, tableId); return; } setSelected({ type: "seat", tableId, seatId: seat.id }); };
+  const handleTableSelect = table => { if (editMode) { setSelected({ type: "table", tableId: table.id }); return; } onTableClick?.(table); };
+  const handleSelectRoom = (w, r) => { setActiveWing(w); setActiveRoom(r); };
+  const handleSaveVenue = newStructure => { setVenueStructure(newStructure); saveVenueStructure(newStructure); };
+
   const [emptyCanvasWarning, setEmptyCanvasWarning] = useState(false);
-  
+
   const handlePublishClick = () => {
     setPublishError("");
     // Detect empty canvas scenario
@@ -5181,7 +5181,7 @@ export default function SeatMap({
   const executePublish = async () => {
     const matchedVenue = venuesList.find(v => v.name === activeRoom);
     if (!matchedVenue) return;
-    
+
     setPublishError("");
     const result = await publishSeatmap(matchedVenue.id);
     if (result && result.success) {
@@ -5216,19 +5216,19 @@ export default function SeatMap({
             {labels.map(l => <StaticLabel key={`${wing}-${room}-label-${l.id}`} item={l} T={T} />)}
             {fixtures.map((f, index) => (
               <FixtureNode key={`${wing}-${room}-fixture-${f.id}-${index}`} fixture={f}
-                editMode={false} isSelected={false} onSelect={() => {}} onDragStart={() => {}} isDragging={false} T={T} />
+                editMode={false} isSelected={false} onSelect={() => { }} onDragStart={() => { }} isDragging={false} T={T} />
             ))}
             {standaloneSeats.map(s => (
               <StandaloneSeat key={`${wing}-${room}-standalone-${s.id}`} seat={s}
                 editMode={false} isSelected={selectedSeat ? (selectedSeat.parentTableId ? selectedSeat.id === s.id && selectedSeat.parentTableId === "STANDALONE" : selectedSeat.id === s.id) : false}
-                isDragging={false} onDragStart={() => {}} onSelect={() => {}}
+                isDragging={false} onDragStart={() => { }} onSelect={() => { }}
                 onSeatClick={mode === "individual" ? onSeatClick : undefined} T={T} />
             ))}
             {tables.map(t => (
               <TableNode key={`${wing}-${room}-table-${t.id}`} table={t}
                 editMode={false} isTableSelected={highlightedTable ? highlightedTable.id === t.id : false}
                 selectedSeatId={selectedSeat ? (selectedSeat.parentTableId ? (selectedSeat.parentTableId === t.id ? selectedSeat.id : null) : selectedSeat.id) : null}
-                onSelectTable={handleTableSelect} onDragStart={() => {}} onResizeStart={() => {}}
+                onSelectTable={handleTableSelect} onDragStart={() => { }} onResizeStart={() => { }}
                 onSeatClick={handleSeatClick} isDragging={false} T={T} wing={wing} room={room} mode={mode} />
             ))}
           </div>
@@ -5325,8 +5325,8 @@ export default function SeatMap({
   const renderDotGrid = () => {
     if (showGrid === false) return null;
     const isDarkBg = canvasBgVisible && isDarkColor(canvasBgColor) && canvasBgOpacity > 40;
-    const baseOpacity = isDarkBg 
-      ? Math.min(1.0, ((gridVisibility !== undefined ? gridVisibility : 30) * 1.35) / 100) 
+    const baseOpacity = isDarkBg
+      ? Math.min(1.0, ((gridVisibility !== undefined ? gridVisibility : 30) * 1.35) / 100)
       : ((gridVisibility !== undefined ? gridVisibility : 30) / 100);
     const gridColor = isDarkBg ? "#FAF3E0" : C.gold;
     return (
@@ -5421,8 +5421,8 @@ export default function SeatMap({
         </div>
         <div style={{ width: 1, height: 20, background: C.borderDefault, flexShrink: 0 }} />
         <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
-          <ToolBtn active={tool === "select"}      onClick={() => setTool("select")}      label="Select" />
-          <ToolBtn active={tool === "pan"}         onClick={() => setTool("pan")}         label="Grab Workspace" />
+          <ToolBtn active={tool === "select"} onClick={() => setTool("select")} label="Select" />
+          <ToolBtn active={tool === "pan"} onClick={() => setTool("pan")} label="Grab Workspace" />
           <ToolBtn active={tool === "multiSelect"} onClick={() => { setTool("multiSelect"); setSelectedStandaloneSeats(new Set()); }} label="Multi-Select" />
         </div>
 
@@ -5459,7 +5459,7 @@ export default function SeatMap({
 
           {saved && (
             <span style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", background: C.greenFaint, color: C.green, borderRadius: 5, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", border: `1px solid ${C.greenBorder}`, animation: "sm-fadeIn 0.16s ease" }}>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
               Saved
             </span>
           )}
@@ -5467,9 +5467,9 @@ export default function SeatMap({
           <button onClick={handlePublishClick}
             disabled={!isDraft}
             style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 16px", background: isDraft ? C.gold : C.surfaceRaised, color: isDraft ? "#fff" : C.textTertiary, border: `1px solid ${isDraft ? C.gold : C.borderDefault}`, borderRadius: 7, fontFamily: F, fontWeight: 700, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", cursor: isDraft ? "pointer" : "not-allowed", transition: "all 0.14s", boxShadow: isDraft ? "0 2px 8px rgba(140,107,42,0.20)" : "none" }}
-            onMouseEnter={e => { if (isDraft) e.currentTarget.style.background = C.goldLight; }} 
+            onMouseEnter={e => { if (isDraft) e.currentTarget.style.background = C.goldLight; }}
             onMouseLeave={e => { if (isDraft) e.currentTarget.style.background = C.gold; }}>
-            <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2 2h8l2 2v8a1 1 0 01-1 1H3a1 1 0 01-1-1V2z" stroke="currentColor" strokeWidth="1.3" fill="none"/><rect x="4" y="8" width="6" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.3" fill="none"/><rect x="4.5" y="2" width="4" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.3" fill="none"/></svg>
+            <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2 2h8l2 2v8a1 1 0 01-1 1H3a1 1 0 01-1-1V2z" stroke="currentColor" strokeWidth="1.3" fill="none" /><rect x="4" y="8" width="6" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.3" fill="none" /><rect x="4.5" y="2" width="4" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.3" fill="none" /></svg>
             {isDraft ? "Publish Layout" : "Up to Date"}
           </button>
         </div>
@@ -5480,11 +5480,11 @@ export default function SeatMap({
           <div style={{ background: C.surfaceRaised, border: `1px solid ${C.borderDefault}`, borderRadius: 16, width: 380, padding: 24, boxShadow: "0 10px 40px rgba(0,0,0,0.2)", animation: "sm-slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
               <div style={{ width: 32, height: 32, borderRadius: 8, background: C.goldFaintest, display: "flex", alignItems: "center", justifyContent: "center", color: C.gold }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
               </div>
               <h3 style={{ fontFamily: F, fontSize: 16, fontWeight: 700, color: C.textPrimary, margin: 0 }}>Publish Layout?</h3>
             </div>
-            
+
             <p style={{ fontFamily: F, fontSize: 13, color: C.textSecondary, lineHeight: 1.5, margin: "0 0 16px 0" }}>
               Publishing this layout will instantly update the live guest reservation page. Guests booking right now will immediately see this new layout.
             </p>
@@ -5492,7 +5492,7 @@ export default function SeatMap({
             {emptyCanvasWarning && (
               <div style={{ padding: "12px 14px", background: "#3a1a1a", border: "1px solid #8b3a3a", borderRadius: 10, color: "#ff9999", fontFamily: F, fontSize: 12, marginBottom: 16, lineHeight: 1.6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff6666" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff6666" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
                   <strong style={{ color: "#ff6666", fontSize: 13 }}>Empty Layout Warning</strong>
                 </div>
                 This canvas has no tables or seats. Publishing it will <strong>remove</strong> the current guest-facing layout for this room. Guests will see an empty page.
@@ -5501,7 +5501,7 @@ export default function SeatMap({
 
             {publishError && (
               <div style={{ padding: "10px 12px", background: C.redFaint, border: `1px solid ${C.redBorder}`, borderRadius: 8, color: C.red, fontFamily: F, fontSize: 12, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
                 {publishError}
               </div>
             )}
@@ -5537,7 +5537,7 @@ export default function SeatMap({
         {/* CAD Drafting Table Canvas Viewport */}
         <div style={{ flex: "1 1 0", minWidth: 0, padding: 14, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", background: C.surfaceRaised }}>
           <div style={{ flex: "1 1 0", minHeight: 0, position: "relative", border: `1px solid ${C.borderDefault}`, borderRadius: 12, overflow: "hidden", background: C.canvasBg }}>
-            
+
             {/* SVG rulers */}
             {renderHorizontalRuler()}
             {renderVerticalRuler()}
@@ -5548,7 +5548,7 @@ export default function SeatMap({
             </div>
 
             {/* Scrollable Viewport Canvas Container */}
-            <div 
+            <div
               ref={canvasViewportRef}
               style={{
                 position: "absolute",
@@ -5573,7 +5573,7 @@ export default function SeatMap({
               }}
             >
               {/* Inner zoomable/panable sheet canvas of roomWidth x roomHeight */}
-              <div 
+              <div
                 ref={canvasRef}
                 style={{
                   position: "absolute",
@@ -5685,7 +5685,7 @@ export default function SeatMap({
                 {tables.length === 0 && standaloneSeats.length === 0 && fixtures.length === 0 && (
                   <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none", gap: 10, animation: "sm-fadeUp 0.3s ease" }}>
                     <div style={{ width: 44, height: 44, borderRadius: 10, border: `1.5px dashed ${C.borderStrong}`, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.35 }}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.textSecondary} strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.textSecondary} strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>
                     </div>
                     <p style={{ color: C.textSecondary, fontSize: 12, fontFamily: F, margin: 0 }}>Empty canvas — use the toolbar to add tables or seats</p>
                   </div>
@@ -5732,29 +5732,29 @@ export default function SeatMap({
                     {/* Header */}
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, paddingBottom: "8px", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` }}>
                       <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-                        <input 
-                          value={selectedTable.label || selectedTable.id} 
+                        <input
+                          value={selectedTable.label || selectedTable.id}
                           onChange={e => updateTable("label", e.target.value)}
-                          style={{ 
-                            background: "transparent", 
-                            border: "none", 
-                            color: hudText, 
-                            fontFamily: F, 
-                            fontWeight: 700, 
-                            fontSize: "12px", 
-                            outline: "none", 
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: hudText,
+                            fontFamily: F,
+                            fontWeight: 700,
+                            fontSize: "12px",
+                            outline: "none",
                             width: "180px",
                             borderBottom: `1px dashed ${isDark ? "rgba(196, 163, 90, 0.30)" : "rgba(140, 107, 42, 0.40)"}`,
                             padding: "2px 0"
-                          }} 
+                          }}
                           placeholder="Table Label"
                         />
                         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                          <span style={{ 
-                            background: isDark ? "rgba(196, 163, 90, 0.15)" : "rgba(140, 107, 42, 0.08)", 
-                            color: isDark ? "#C4A35A" : "#8C6B2A", 
-                            fontSize: "8px", 
-                            fontWeight: 800, 
+                          <span style={{
+                            background: isDark ? "rgba(196, 163, 90, 0.15)" : "rgba(140, 107, 42, 0.08)",
+                            color: isDark ? "#C4A35A" : "#8C6B2A",
+                            fontSize: "8px",
+                            fontWeight: 800,
                             letterSpacing: "0.08em",
                             textTransform: "uppercase",
                             padding: "2px 6px",
@@ -5762,11 +5762,11 @@ export default function SeatMap({
                           }}>
                             {preset?.label || "Custom"}
                           </span>
-                          <span style={{ 
-                            background: isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.04)", 
-                            color: secondaryText, 
-                            fontSize: "8px", 
-                            fontWeight: 800, 
+                          <span style={{
+                            background: isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.04)",
+                            color: secondaryText,
+                            fontSize: "8px",
+                            fontWeight: 800,
                             letterSpacing: "0.08em",
                             textTransform: "uppercase",
                             padding: "2px 6px",
@@ -5778,18 +5778,18 @@ export default function SeatMap({
                       </div>
 
                       {/* Close button */}
-                      <button 
-                        onClick={() => setSelected(null)} 
-                        style={{ 
-                          background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", 
-                          border: "none", 
-                          color: secondaryText, 
-                          cursor: "pointer", 
-                          width: "20px", 
-                          height: "20px", 
-                          borderRadius: "50%", 
-                          display: "flex", 
-                          alignItems: "center", 
+                      <button
+                        onClick={() => setSelected(null)}
+                        style={{
+                          background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+                          border: "none",
+                          color: secondaryText,
+                          cursor: "pointer",
+                          width: "20px",
+                          height: "20px",
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
                           justifyContent: "center",
                           fontSize: "9px",
                           transition: "all 0.15s"
@@ -5805,49 +5805,49 @@ export default function SeatMap({
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{ fontSize: "8px", fontWeight: 800, color: secondaryText, letterSpacing: "0.08em", textTransform: "uppercase" }}>Chairs</span>
-                        <input 
-                          type="number" 
-                          min={minChairs} 
-                          max={maxChairs} 
-                          value={seatCount} 
-                          onChange={e => handleSeatCountChange(selectedTable.id, Math.min(maxChairs, Math.max(minChairs, Number(e.target.value))))} 
-                          style={{ 
-                            width: "36px", 
-                            background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", 
-                            border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`, 
-                            borderRadius: "4px", 
-                            color: hudText, 
-                            fontSize: "10px", 
-                            fontFamily: "monospace", 
+                        <input
+                          type="number"
+                          min={minChairs}
+                          max={maxChairs}
+                          value={seatCount}
+                          onChange={e => handleSeatCountChange(selectedTable.id, Math.min(maxChairs, Math.max(minChairs, Number(e.target.value))))}
+                          style={{
+                            width: "36px",
+                            background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+                            border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`,
+                            borderRadius: "4px",
+                            color: hudText,
+                            fontSize: "10px",
+                            fontFamily: "monospace",
                             textAlign: "center",
                             outline: "none"
-                          }} 
+                          }}
                         />
                       </div>
-                      <input 
-                        type="range" 
-                        min={minChairs} 
-                        max={maxChairs} 
-                        value={seatCount} 
-                        onChange={e => handleSeatCountChange(selectedTable.id, Number(e.target.value))} 
-                        style={{ width: "100%", accentColor: C.gold, cursor: "pointer" }} 
+                      <input
+                        type="range"
+                        min={minChairs}
+                        max={maxChairs}
+                        value={seatCount}
+                        onChange={e => handleSeatCountChange(selectedTable.id, Number(e.target.value))}
+                        style={{ width: "100%", accentColor: C.gold, cursor: "pointer" }}
                       />
                     </div>
 
                     {/* Chair Style Selector */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                       <span style={{ fontSize: "8px", fontWeight: 800, color: secondaryText, letterSpacing: "0.08em", textTransform: "uppercase" }}>Chair Style</span>
-                      <select 
-                        value={selectedTable.editor?.chair_style || "standard-dining"} 
-                        onChange={e => updateTable("editor", { chair_style: e.target.value })} 
-                        style={{ 
-                          width: "100%", 
-                          padding: "6px 8px", 
-                          background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", 
-                          border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`, 
-                          borderRadius: "6px", 
-                          color: hudText, 
-                          fontSize: "11px", 
+                      <select
+                        value={selectedTable.editor?.chair_style || "standard-dining"}
+                        onChange={e => updateTable("editor", { chair_style: e.target.value })}
+                        style={{
+                          width: "100%",
+                          padding: "6px 8px",
+                          background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+                          border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`,
+                          borderRadius: "6px",
+                          color: hudText,
+                          fontSize: "11px",
                           fontFamily: F,
                           outline: "none",
                           cursor: "pointer"
@@ -5865,22 +5865,22 @@ export default function SeatMap({
                         <span style={{ fontSize: "8px", fontWeight: 800, color: secondaryText, letterSpacing: "0.08em", textTransform: "uppercase" }}>Chair Spacing</span>
                         <span style={{ fontSize: "9px", fontFamily: "monospace", color: C.gold }}>{selectedTable.editor?.seat_spacing_cm || 8}cm</span>
                       </div>
-                      <input 
-                        type="range" 
-                        min="4" 
-                        max="16" 
-                        value={selectedTable.editor?.seat_spacing_cm || 8} 
-                        onChange={e => updateTable("editor", { seat_spacing_cm: Number(e.target.value) })} 
-                        style={{ width: "100%", accentColor: C.gold, cursor: "pointer" }} 
+                      <input
+                        type="range"
+                        min="4"
+                        max="16"
+                        value={selectedTable.editor?.seat_spacing_cm || 8}
+                        onChange={e => updateTable("editor", { seat_spacing_cm: Number(e.target.value) })}
+                        style={{ width: "100%", accentColor: C.gold, cursor: "pointer" }}
                       />
                     </div>
 
                     {/* Spacing and Lock Toggle */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "4px" }}>
                       <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
-                        <input 
-                          type="checkbox" 
-                          checked={isLocked} 
+                        <input
+                          type="checkbox"
+                          checked={isLocked}
                           onChange={e => updateTable("editor", { locked: e.target.checked })}
                           style={{ accentColor: C.gold }}
                         />
@@ -5890,29 +5890,29 @@ export default function SeatMap({
 
                     {/* Footer Actions */}
                     <div style={{ display: "flex", gap: 6, paddingTop: "8px", borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, marginTop: "2px" }}>
-                      <button 
-                        onClick={() => bringTableToFront(selectedTable.id)} 
+                      <button
+                        onClick={() => bringTableToFront(selectedTable.id)}
                         style={{ flex: 1, padding: "5px 0", background: "transparent", border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`, borderRadius: "4px", color: hudText, fontSize: "9px", fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
                         title="Bring to Front"
                       >
                         ▲ Front
                       </button>
-                      <button 
-                        onClick={() => sendTableToBack(selectedTable.id)} 
+                      <button
+                        onClick={() => sendTableToBack(selectedTable.id)}
                         style={{ flex: 1, padding: "5px 0", background: "transparent", border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`, borderRadius: "4px", color: hudText, fontSize: "9px", fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
                         title="Send to Back"
                       >
                         ▼ Back
                       </button>
-                      <button 
-                        onClick={() => duplicateTable(selectedTable)} 
+                      <button
+                        onClick={() => duplicateTable(selectedTable)}
                         style={{ flex: 1, padding: "5px 0", background: "transparent", border: `1px solid ${isDark ? "rgba(196, 163, 90, 0.40)" : "rgba(140, 107, 42, 0.35)"}`, borderRadius: "4px", color: C.gold, fontSize: "9px", fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
                         title="Duplicate"
                       >
                         Copy
                       </button>
-                      <button 
-                        onClick={() => handleRequestDelete("table")} 
+                      <button
+                        onClick={() => handleRequestDelete("table")}
                         style={{ flex: 1, padding: "5px 0", background: "transparent", border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`, borderRadius: "4px", color: C.red, fontSize: "9px", fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
                         title="Delete Safely"
                       >
