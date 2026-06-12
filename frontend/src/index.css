@@ -62,3 +62,48 @@ button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
+
+/* Uniform Admin Scrollbar Styles */
+body.bellevue-admin-page * {
+  scrollbar-width: thin !important;
+}
+
+body.bellevue-admin-page ::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+body.bellevue-admin-page ::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* Light theme scrollbars */
+body.bellevue-admin-page.bellevue-admin-light ::-webkit-scrollbar-thumb {
+  background: rgba(140, 107, 42, 0.45) !important;
+  border-radius: 999px !important;
+  transition: background 0.2s ease !important;
+}
+
+body.bellevue-admin-page.bellevue-admin-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 107, 42, 0.75) !important;
+}
+
+body.bellevue-admin-page.bellevue-admin-light * {
+  scrollbar-color: rgba(140, 107, 42, 0.45) transparent !important;
+}
+
+/* Dark theme scrollbars */
+body.bellevue-admin-page.bellevue-admin-dark ::-webkit-scrollbar-thumb {
+  background: rgba(196, 163, 90, 0.55) !important;
+  border-radius: 999px !important;
+  transition: background 0.2s ease !important;
+}
+
+body.bellevue-admin-page.bellevue-admin-dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(196, 163, 90, 0.85) !important;
+}
+
+body.bellevue-admin-page.bellevue-admin-dark * {
+  scrollbar-color: rgba(196, 163, 90, 0.55) transparent !important;
+}
+

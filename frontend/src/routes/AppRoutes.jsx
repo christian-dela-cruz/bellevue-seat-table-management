@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import ReservationLanding from "../features/client/pages/ReservationLanding";
 import ManageBooking from "../features/client/pages/ManageBooking";
 import DynamicVenueReservation from "../features/client/pages/DynamicVenueReservation";
@@ -32,6 +33,18 @@ function RequireAdminAuth({ children, permission }) {
   return children;
 }
 
+function AdminClassWrapper({ children }) {
+  const location = useLocation();
+  useEffect(() => {
+    if (location.pathname.startsWith("/admin")) {
+      document.body.classList.add("bellevue-admin-page");
+    } else {
+      document.body.classList.remove("bellevue-admin-page");
+    }
+  }, [location.pathname]);
+  return children;
+}
+
 function AdminEntry() {
   return <Navigate to="/login" replace />;
 }
@@ -40,7 +53,8 @@ export default function AppRoutes() {
   return (
     <AdminThemeProvider>
       <BrowserRouter>
-        <Routes>
+        <AdminClassWrapper>
+          <Routes>
         <Route path="/" element={<ReservationLanding />} />
         <Route path="/venues" element={<ReservationLanding />} />
         <Route path="/manage-booking" element={<ManageBooking />} />
@@ -179,8 +193,9 @@ export default function AppRoutes() {
         <Route path="/events/:slug" element={<EventBooking />} />
         <Route path="/:venueSlug" element={<DynamicVenueReservation />} />
 
-      </Routes>
-    </BrowserRouter>
+          </Routes>
+        </AdminClassWrapper>
+      </BrowserRouter>
     </AdminThemeProvider>
   );
 }

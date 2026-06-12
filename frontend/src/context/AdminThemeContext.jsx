@@ -155,6 +155,13 @@ export const AdminThemeProvider = ({ children }) => {
 
   useEffect(() => {
     isDarkTheme = isDark;
+    if (isDark) {
+      document.body.classList.add("bellevue-admin-dark");
+      document.body.classList.remove("bellevue-admin-light");
+    } else {
+      document.body.classList.add("bellevue-admin-light");
+      document.body.classList.remove("bellevue-admin-dark");
+    }
   }, [isDark]);
 
   return (

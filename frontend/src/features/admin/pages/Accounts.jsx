@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronRight as ChevronRightIcon, Search, UserPlus, X, AlertTriangle } from "lucide-react";
+import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronRight as ChevronRightIcon, Search, UserPlus, X, AlertTriangle, Check } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
@@ -1192,76 +1192,110 @@ export default function Accounts() {
 
           {saveFeedback && (
             <div className="account-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSaveFeedback(null); }} style={{ position: "fixed", inset: 0, zIndex: 8200, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
-              <section className="account-confirm" role="dialog" aria-modal="true" aria-labelledby="save-feedback-title" style={{ width: "min(440px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", padding: 24 }}>
-                <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-                  <span style={{ width: 40, height: 40, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: "rgba(46,122,90,0.08)", color: "#2E7A5A" }}>
-                    <Check size={20} />
+              <section className="account-confirm" role="dialog" aria-modal="true" aria-labelledby="save-feedback-title" style={{ width: "min(460px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", padding: "32px 32px 28px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", marginBottom: 24 }}>
+                  <span style={{ 
+                    width: 60, 
+                    height: 60, 
+                    borderRadius: "50%", 
+                    display: "inline-flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    background: C.greenFaint, 
+                    color: C.green, 
+                    border: `1px solid ${C.greenBorder}`, 
+                    boxShadow: "0 4px 12px rgba(46,122,90,0.08)",
+                    marginBottom: 16
+                  }}>
+                    <Check size={28} strokeWidth={2.5} />
                   </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h2 id="save-feedback-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 650 }}>
-                      {saveFeedback.type === "create" ? "Account Created" : "Account Updated"}
-                    </h2>
-                    <p style={{ margin: "6px 0 0", fontSize: 13, color: C.muted }}>
-                      The user account has been configured and saved successfully.
-                    </p>
-                    
-                    <div style={{ marginTop: 16, border: `1px solid ${C.border}`, borderRadius: 10, background: C.surfaceSoft, padding: 14, display: "grid", gap: 10 }}>
-                      <div>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.08em" }}>Full Name</span>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginTop: 1 }}>{saveFeedback.account.name}</div>
+                  <h2 id="save-feedback-title" style={{ margin: 0, fontSize: 20, lineHeight: 1.25, color: C.text, fontWeight: 760 }}>
+                    {saveFeedback.type === "create" ? "Account Created" : "Account Updated"}
+                  </h2>
+                  <p style={{ margin: "8px 0 0", fontSize: 13.5, color: C.muted, maxWidth: 360, lineHeight: 1.5 }}>
+                    The user account has been configured and saved successfully.
+                  </p>
+                </div>
+                
+                <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.surfaceSoft, padding: "20px 24px", display: "grid", gap: 14, marginBottom: 26, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4)" }}>
+                  <div>
+                    <span style={{ display: "block", fontSize: 9, fontWeight: 800, color: C.faint, textTransform: "uppercase", letterSpacing: "0.12em" }}>Full Name</span>
+                    <div style={{ fontSize: 14.5, fontWeight: 650, color: C.text, marginTop: 4 }}>{saveFeedback.account.name}</div>
+                  </div>
+                  
+                  <div style={{ height: 1, background: C.divider }} />
+                  
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div>
+                      <span style={{ display: "block", fontSize: 9, fontWeight: 800, color: C.faint, textTransform: "uppercase", letterSpacing: "0.12em" }}>Assigned Role</span>
+                      <div style={{ fontSize: 13.5, fontWeight: 750, color: C.gold, marginTop: 4 }}>
+                        {getRoleName(saveFeedback.account.role)}
                       </div>
-                      <div>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.08em" }}>Username & Email</span>
-                        <div style={{ fontSize: 13, color: C.muted, marginTop: 1 }}>
-                          @{saveFeedback.account.username} · {saveFeedback.account.email}
-                        </div>
+                    </div>
+                    <div>
+                      <span style={{ display: "block", fontSize: 9, fontWeight: 800, color: C.faint, textTransform: "uppercase", letterSpacing: "0.12em" }}>Access Scope</span>
+                      <div style={{ fontSize: 13.5, color: C.text, fontWeight: 650, marginTop: 4 }}>
+                        {saveFeedback.account.scope_type === "all" 
+                          ? "All Outlets" 
+                          : `${saveFeedback.account.outlet_scope?.length || 0} venues`}
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                        <div>
-                          <span style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.08em" }}>Assigned Role</span>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: C.gold, marginTop: 1 }}>
-                            {getRoleName(saveFeedback.account.role)}
-                          </div>
-                        </div>
-                        <div>
-                          <span style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.08em" }}>Access Scope</span>
-                          <div style={{ fontSize: 13, color: C.text, marginTop: 1 }}>
-                            {saveFeedback.account.scope_type === "all" 
-                              ? "All Outlets" 
-                              : `${saveFeedback.account.outlet_scope?.length || 0} venues`}
-                          </div>
-                        </div>
-                      </div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ height: 1, background: C.divider }} />
+                  
+                  <div>
+                    <span style={{ display: "block", fontSize: 9, fontWeight: 800, color: C.faint, textTransform: "uppercase", letterSpacing: "0.12em" }}>Username</span>
+                    <div style={{ fontSize: 13.5, fontWeight: 550, color: C.text, marginTop: 4, wordBreak: "break-all" }}>
+                      @{saveFeedback.account.username}
+                    </div>
+                  </div>
+                  
+                  <div style={{ height: 1, background: C.divider }} />
+                  
+                  <div>
+                    <span style={{ display: "block", fontSize: 9, fontWeight: 800, color: C.faint, textTransform: "uppercase", letterSpacing: "0.12em" }}>Email Address</span>
+                    <div style={{ fontSize: 13.5, color: C.muted, marginTop: 4, wordBreak: "break-all" }}>
+                      {saveFeedback.account.email}
                     </div>
                   </div>
                 </div>
                 
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-                  <button 
-                    type="button" 
-                    onClick={() => setSaveFeedback(null)} 
-                    style={{ 
-                      padding: "0 16px", 
-                      height: 36, 
-                      border: "none", 
-                      borderRadius: 8, 
-                      background: C.gold, 
-                      color: "#fff", 
-                      fontFamily: F.label, 
-                      fontSize: 10, 
-                      fontWeight: 700, 
-                      letterSpacing: "0.12em", 
-                      textTransform: "uppercase", 
-                      cursor: "pointer",
-                      display: "inline-flex", 
-                      alignItems: "center", 
-                      justifyContent: "center",
-                      minWidth: 140
-                    }}
-                  >
-                    Back to Accounts
-                  </button>
-                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setSaveFeedback(null)} 
+                  style={{ 
+                    width: "100%", 
+                    height: 44, 
+                    border: "none", 
+                    borderRadius: 10, 
+                    background: C.gold, 
+                    color: "#fff", 
+                    fontFamily: F.label, 
+                    fontSize: 11, 
+                    fontWeight: 750, 
+                    letterSpacing: "0.12em", 
+                    textTransform: "uppercase", 
+                    cursor: "pointer",
+                    display: "inline-flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    boxShadow: `0 4px 12px rgba(140,107,42,0.15)`,
+                    transition: "all 0.16s ease"
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = C.goldLight;
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow = `0 6px 16px rgba(140,107,42,0.22)`;
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = C.gold;
+                    e.currentTarget.style.transform = "none";
+                    e.currentTarget.style.boxShadow = `0 4px 12px rgba(140,107,42,0.15)`;
+                  }}
+                >
+                  Back to Accounts
+                </button>
               </section>
             </div>
           )}
