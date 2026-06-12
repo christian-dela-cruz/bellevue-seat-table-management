@@ -590,6 +590,7 @@ function OutletChartTooltip({ active, payload, label }) {
 }
 
 function LineChart({ rows, period = "monthly" }) {
+  const { isDark } = useAdminTheme();
   const crossesYears = useMemo(() => {
     if (!rows || rows.length < 2) return false;
     const years = new Set();
@@ -621,7 +622,19 @@ function LineChart({ rows, period = "monthly" }) {
   }, [data.length, period]);
 
   return (
-    <div style={{ width: "100%", minHeight: 260, borderRadius: 14, background: "linear-gradient(135deg,#FFFFFF 0%,#FAF8F4 58%,#F1ECE1 100%)", border: `1px solid ${C.divider}`, padding: "16px 12px 8px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)" }}>
+    <div style={{ 
+      width: "100%", 
+      minHeight: 260, 
+      borderRadius: 14, 
+      background: isDark 
+        ? "linear-gradient(135deg, #111009 0%, #161410 58%, #201B12 100%)" 
+        : "linear-gradient(135deg, #FFFFFF 0%, #FAF8F4 58%, #F1ECE1 100%)", 
+      border: `1px solid ${C.divider}`, 
+      padding: "16px 12px 8px", 
+      boxShadow: isDark 
+        ? "inset 0 1px 0 rgba(255,255,255,0.05)" 
+        : "inset 0 1px 0 rgba(255,255,255,0.72)" 
+    }}>
       <ResponsiveContainer width="100%" height={235}>
         <ComposedChart data={data} margin={{ top: 12, right: 26, bottom: 20, left: -8 }}>
           <defs>
@@ -634,7 +647,7 @@ function LineChart({ rows, period = "monthly" }) {
               <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#3B6FA8" floodOpacity="0.16" />
             </filter>
           </defs>
-          <CartesianGrid stroke="rgba(24,20,14,0.07)" vertical={false} />
+          <CartesianGrid stroke={isDark ? "rgba(255,255,255,0.06)" : "rgba(24,20,14,0.07)"} vertical={false} />
           <XAxis
             dataKey="label"
             interval={labelInterval}

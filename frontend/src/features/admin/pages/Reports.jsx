@@ -740,6 +740,7 @@ function MonthlyLineChart({
   description = "Reservation volume by month, with promotion mentions shown as a comparison line.",
   xAxisKey = "label",
 }) {
+  const { isDark } = useAdminTheme();
   const data = (months || []).map((row) => ({
     ...row,
     label: row.label || row.month || row.date_range || row.date,
@@ -754,7 +755,19 @@ function MonthlyLineChart({
         <div style={{ fontSize: 12.5, color: C.muted }}>{description}</div>
       </div>
 
-      <div style={{ width: "100%", minHeight: 320, borderRadius: 14, background: "linear-gradient(135deg,#FFFFFF 0%,#FAF8F4 58%,#F1ECE1 100%)", border: `1px solid ${C.divider}`, padding: "16px 12px 8px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)" }}>
+      <div style={{ 
+        width: "100%", 
+        minHeight: 320, 
+        borderRadius: 14, 
+        background: isDark 
+          ? "linear-gradient(135deg, #111009 0%, #161410 58%, #201B12 100%)" 
+          : "linear-gradient(135deg, #FFFFFF 0%, #FAF8F4 58%, #F1ECE1 100%)", 
+        border: `1px solid ${C.divider}`, 
+        padding: "16px 12px 8px", 
+        boxShadow: isDark 
+          ? "inset 0 1px 0 rgba(255,255,255,0.05)" 
+          : "inset 0 1px 0 rgba(255,255,255,0.72)" 
+      }}>
         <ResponsiveContainer width="100%" height={290}>
           <ComposedChart data={data} margin={{ top: 12, right: 28, bottom: 8, left: -8 }}>
             <defs>
@@ -767,7 +780,7 @@ function MonthlyLineChart({
                 <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#3B6FA8" floodOpacity="0.16" />
               </filter>
             </defs>
-            <CartesianGrid stroke="rgba(24,20,14,0.07)" vertical={false} />
+            <CartesianGrid stroke={isDark ? "rgba(255,255,255,0.06)" : "rgba(24,20,14,0.07)"} vertical={false} />
             <XAxis
               dataKey={xAxisKey}
               interval={labelInterval}
@@ -2429,7 +2442,7 @@ export default function Reports() {
               </div>
 
               {/* Right Live Preview Column */}
-              <div style={{ flex: 1, background: "#FAF8F4", borderLeft: `1px solid ${C.border}`, padding: "30px 20px", overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0 }}>
+              <div style={{ flex: 1, background: C.soft, borderLeft: `1px solid ${C.border}`, padding: "30px 20px", overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0 }}>
                 <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold, marginBottom: 16 }}>Live Layout Preview</div>
 
                 {/* Paper sheet container */}
@@ -2730,7 +2743,7 @@ export default function Reports() {
               </div>
 
               {/* Right Live Preview Column */}
-              <div style={{ flex: 1, background: "#FAF8F4", borderLeft: `1px solid ${C.border}`, padding: "24px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+              <div style={{ flex: 1, background: C.soft, borderLeft: `1px solid ${C.border}`, padding: "24px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
 
                 {/* Header Stats */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
@@ -2927,7 +2940,19 @@ export default function Reports() {
                       No active audit records found for this outlet in the selected date range.
                     </div>
                   ) : (
-                    <div style={{ width: "100%", minHeight: 260, borderRadius: 14, background: "linear-gradient(135deg,#FFFFFF 0%,#FAF8F4 58%,#F1ECE1 100%)", border: `1px solid ${C.divider}`, padding: "16px 12px 8px" }}>
+                    <div style={{ 
+                      width: "100%", 
+                      minHeight: 260, 
+                      borderRadius: 14, 
+                      background: isDark 
+                        ? "linear-gradient(135deg, #111009 0%, #161410 58%, #201B12 100%)" 
+                        : "linear-gradient(135deg, #FFFFFF 0%, #FAF8F4 58%, #F1ECE1 100%)", 
+                      border: `1px solid ${C.divider}`, 
+                      padding: "16px 12px 8px",
+                      boxShadow: isDark 
+                        ? "inset 0 1px 0 rgba(255,255,255,0.05)" 
+                        : "inset 0 1px 0 rgba(255,255,255,0.72)"
+                    }}>
                       <ResponsiveContainer width="100%" height={235}>
                         <ComposedChart data={outletChartData} margin={{ top: 12, right: 26, bottom: 8, left: -8 }}>
                           <defs>
@@ -2940,7 +2965,7 @@ export default function Reports() {
                               <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#3B6FA8" floodOpacity="0.16" />
                             </filter>
                           </defs>
-                          <CartesianGrid stroke="rgba(24,20,14,0.07)" vertical={false} />
+                          <CartesianGrid stroke={isDark ? "rgba(255,255,255,0.06)" : "rgba(24,20,14,0.07)"} vertical={false} />
                           <XAxis
                             dataKey="label"
                             tick={{ fill: C.muted, fontSize: 10 }}
@@ -3425,7 +3450,7 @@ function tableHeadStyle() {
   return {
     textAlign: "left",
     padding: "12px 16px",
-    borderBottom: `1px solid rgba(140,107,42,0.15)`,
+    borderBottom: `1px solid ${C.divider}`,
     color: C.muted,
     fontFamily: F.label,
     fontSize: 9.5,
@@ -3433,14 +3458,14 @@ function tableHeadStyle() {
     letterSpacing: "0.08em",
     textTransform: "uppercase",
     whiteSpace: "nowrap",
-    background: "#FAF8F4",
+    background: C.soft,
   };
 }
 
 function cellStyle(strong = false) {
   return {
     padding: "14px 16px",
-    borderBottom: `1px solid rgba(0,0,0,0.04)`,
+    borderBottom: `1px solid ${C.divider}`,
     color: strong ? C.text : C.muted,
     fontWeight: strong ? 650 : 550,
     fontSize: 12.5,
