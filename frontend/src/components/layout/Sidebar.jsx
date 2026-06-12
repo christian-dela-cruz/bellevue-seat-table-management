@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { authAPI } from "../../services/authAPI";
 import { useAdminTheme } from "../../context/AdminThemeContext";
+import bellevueLogo from "../../assets/bellevue-logo.png";
 
 const F = { body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" };
 
@@ -532,41 +533,50 @@ export default function Sidebar({
         }}
       >
         {effectiveOpen ? (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              fontFamily: F.body,
-              overflow: "hidden",
-            }}
-          >
-            <span
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img
+              src={bellevueLogo}
+              alt="The Bellevue Manila"
+              style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }}
+            />
+            <div
               style={{
-                color: isDark ? "#EDE8DF" : "#18140E",
-                fontSize: 14.5,
-                fontWeight: 600,
-                letterSpacing: 0.2,
-                lineHeight: 1.2,
+                display: "flex",
+                flexDirection: "column",
+                fontFamily: F.body,
+                overflow: "hidden",
               }}
             >
-              Seat & Table
-            </span>
-            <span
-              style={{
-                color: isDark ? "#8A8278" : "#7A7060",
-                fontSize: 11.5,
-                fontWeight: 500,
-                letterSpacing: 0.1,
-                lineHeight: 1.2,
-              }}
-            >
-              Reservation System
-            </span>
+              <span
+                style={{
+                  color: isDark ? "#EDE8DF" : "#18140E",
+                  fontSize: 14.5,
+                  fontWeight: 600,
+                  letterSpacing: 0.2,
+                  lineHeight: 1.2,
+                }}
+              >
+                Seat & Table
+              </span>
+              <span
+                style={{
+                  color: isDark ? "#8A8278" : "#7A7060",
+                  fontSize: 11.5,
+                  fontWeight: 500,
+                  letterSpacing: 0.1,
+                  lineHeight: 1.2,
+                }}
+              >
+                Reservation System
+              </span>
+            </div>
           </div>
         ) : (
-          <span style={{ color: isDark ? "#C4A35A" : "#8C6B2A", fontSize: 12, fontWeight: 800, fontFamily: F.body, letterSpacing: 0.5 }}>
-            S&T
-          </span>
+          <img
+            src={bellevueLogo}
+            alt="The Bellevue Manila"
+            style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }}
+          />
         )}
       </div>
 
