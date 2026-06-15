@@ -361,7 +361,7 @@ class AdminRejectReservationReasonTest extends TestCase
         ], $adminHeaders)
             ->assertCreated()
             ->assertJsonFragment([
-                'message' => 'Admin account created successfully.',
+                'message' => 'Admin account created successfully. Invitation email sent.',
                 'role' => 'supervisor',
                 'scope_type' => 'assigned',
             ]);
@@ -377,7 +377,7 @@ class AdminRejectReservationReasonTest extends TestCase
         ], $adminHeaders)
             ->assertCreated()
             ->assertJsonFragment([
-                'message' => 'Admin account created successfully.',
+                'message' => 'Admin account created successfully. Invitation email sent.',
                 'role' => 'staff',
             ]);
 

@@ -134,6 +134,14 @@ function SaveFeedbackModal({ type, item, onClose }) {
   );
 }
 
+function resolveEventImage(image) {
+  if (!image) return "";
+  if (/^(https?:|data:|blob:)/i.test(image)) return image;
+  const apiRoot = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "");
+  let cleanPath = String(image).replace(/\\/g, "/").replace(/^\/+/, "");
+  return `${apiRoot}/${cleanPath}`;
+}
+
 export default function EventManagement() {
   const { isDark } = useAdminTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -362,7 +370,7 @@ export default function EventManagement() {
                   
                   return (
                     <div key={ev.id} className="event-card" style={{ background: C.surface, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                      <div style={{ height: 120, background: C.soft, backgroundImage: `url(${ev.banner_image})`, backgroundSize: "cover", backgroundPosition: "center", position: "relative" }}>
+                      <div style={{ height: 120, background: C.soft, backgroundImage: `url(${resolveEventImage(ev.banner_image)})`, backgroundSize: "cover", backgroundPosition: "center", position: "relative" }}>
                         {!ev.banner_image && <ImageIcon size={24} style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: C.border }} />}
                         <div style={{ position: "absolute", top: 12, right: 12, padding: "4px 8px", background: statusBg, color: statusColor, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", borderRadius: 6, backdropFilter: "blur(4px)" }}>
                           {ev.status}

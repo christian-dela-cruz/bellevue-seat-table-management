@@ -28,6 +28,10 @@ class ClientDisplaySettingController extends Controller
             'card_size' => 'nullable|string|in:compact,standard,feature',
             'ordered_ids' => 'nullable|array',
             'hidden_ids' => 'nullable|array',
+            'layout_engine' => 'nullable|string|in:grid,flex',
+            'card_width' => 'nullable|integer|min:150|max:600',
+            'stretch_to_fill' => 'nullable|boolean',
+            'flex_alignment' => 'nullable|string|in:center,flex-start,flex-end',
         ]);
 
         $setting = ClientDisplaySetting::firstOrCreate(

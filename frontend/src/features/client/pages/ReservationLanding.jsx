@@ -529,6 +529,7 @@ export default function ReservationLanding() {
   const [diningOutlets, setDiningOutlets] = useState(fallbackDiningOutlets);
   const [eventVenues, setEventVenues] = useState(null);
   const [publishedEvents, setPublishedEvents] = useState([]);
+  const [mixedEventItems, setMixedEventItems] = useState(null);
   const [displaySettings, setDisplaySettings] = useState({ dining: {}, events: {} });
   const isLight = theme === "light";
 
@@ -545,8 +546,9 @@ export default function ReservationLanding() {
     const loadConfiguredRooms = () => {
       Promise.all([
         venueAPI.getAll({ _t: Date.now() }).catch(() => []),
-        clientDisplayAPI.getAll().catch(() => [])
-      ]).then(([rooms, settings]) => {
+        clientDisplayAPI.getAll().catch(() => []),
+        eventAPI.getPublic().catch(() => ({ status: "success", data: [] }))
+      ]).then(([rooms, settings, eventsRes]) => {
         if (!mounted) return;
         const venueRows = Array.isArray(rooms) ? rooms : [];
         const settingsMap = { dining: {}, events: {} };
@@ -555,22 +557,90 @@ export default function ReservationLanding() {
         }
         setDisplaySettings(settingsMap);
 
-        let dining = buildDiningOutletsFromConfig(venueRows);
-        let events = buildEventVenuesFromConfig(venueRows);
+        const dining = buildDiningOutletsFromConfig(venueRows);
+        const events = buildEventVenuesFromConfig(venueRows);
 
         setDiningOutlets(dining);
         setEventVenues(events);
 
-        eventAPI.getPublic().then((res) => {
-          if (!mounted) return;
-          if (res && res.status === "success" && Array.isArray(res.data)) {
-            setPublishedEvents(res.data.filter(e => e.status === 'published'));
-          } else {
-            setPublishedEvents([]);
+        const eventsList = (eventsRes && eventsRes.status === "success" && Array.isArray(eventsRes.data))
+          ? eventsRes.data.filter(e => e.status === 'published')
+          : [];
+        setPublishedEvents(eventsList);
+
+        // Build mixed event items
+        const eventSettings = settingsMap.events || {};
+        const orderedIds = eventSettings.ordered_ids || [];
+        const hiddenIds = eventSettings.hidden_ids || [];
+
+        // Map venues to mixed format
+        const venueItems = events.map(v => ({
+          type: "venue",
+          id: v._original?.id,
+          title: v.title,
+          image: v.image,
+          route: v.route,
+          disabled: v.disabled,
+          rooms: v.rooms,
+          imageFocus: v.imageFocus,
+          _original: v._original
+        }));
+
+        // Map events to mixed format
+        const eventItems = eventsList.map(evt => ({
+          type: "event",
+          id: evt.id,
+          title: evt.title,
+          image: resolveRoomImage(evt.banner_image || evt.venue?.image),
+          route: `/events/${evt.slug}`,
+          disabled: false,
+          _original: evt
+        }));
+
+        const combined = [...eventItems, ...venueItems];
+
+        // Filter out hidden items
+        const visibleCombined = combined.filter(item => {
+          const key = `${item.type}:${item.id}`;
+          // If explicitly hidden in settings
+          if (hiddenIds.includes(key)) return false;
+          // If venue and show_on_landing is false, hide it
+          if (item.type === "venue" && item._original && !item._original.show_on_landing) {
+            return false;
           }
-        }).catch(() => {
-          if (mounted) setPublishedEvents([]);
+          return true;
         });
+
+        // Sort items
+        let sorted;
+        if (Array.isArray(orderedIds) && orderedIds.length > 0) {
+          sorted = [...visibleCombined].sort((a, b) => {
+            const aKey = `${a.type}:${a.id}`;
+            const bKey = `${b.type}:${b.id}`;
+            const aIndex = orderedIds.indexOf(aKey);
+            const bIndex = orderedIds.indexOf(bKey);
+
+            if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+            if (aIndex !== -1) return -1;
+            if (bIndex !== -1) return 1;
+
+            if (a.type !== b.type) return a.type === "event" ? -1 : 1;
+            if (a.type === "venue") {
+              return (a._original?.display_order || 0) - (b._original?.display_order || 0);
+            }
+            return a.id - b.id;
+          });
+        } else {
+          sorted = visibleCombined.sort((a, b) => {
+            if (a.type !== b.type) return a.type === "event" ? -1 : 1;
+            if (a.type === "venue") {
+              return (a._original?.display_order || 0) - (b._original?.display_order || 0);
+            }
+            return a.id - b.id;
+          });
+        }
+
+        setMixedEventItems(sorted);
       });
     };
 
@@ -698,30 +768,18 @@ export default function ReservationLanding() {
                   : (displaySettings.events?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.events.desktop_columns}, minmax(0, 1fr))` } : undefined)
               }
             >
-              {publishedEvents.map((evt) => {
-                const eventImage = resolveRoomImage(evt.banner_image || evt.venue?.image);
-                
-                return (
-                  <VenueCard 
-                    key={evt.id} 
-                    item={{
-                      title: evt.title,
-                      image: eventImage,
-                      route: `/events/${evt.slug}`,
-                    }} 
-                    variant="event" 
-                  />
-                );
-              })}
-
-              {eventVenues === null ? (
+              {mixedEventItems === null ? (
                 <div className="reservation-empty-state">
                   <strong>Loading configured venues.</strong>
                   <span>Preparing the current Bellevue function room availability.</span>
                 </div>
-              ) : (eventVenues.length > 0 || publishedEvents.length > 0) ? (
-                eventVenues.map((venue) => (
-                  <VenueCard key={venue.title} item={venue} />
+              ) : mixedEventItems.length > 0 ? (
+                mixedEventItems.map((item) => (
+                  <VenueCard 
+                    key={`${item.type}:${item.id}`} 
+                    item={item} 
+                    variant={item.type === "event" ? "event" : "venue"} 
+                  />
                 ))
               ) : (
                 <div className="reservation-empty-state">

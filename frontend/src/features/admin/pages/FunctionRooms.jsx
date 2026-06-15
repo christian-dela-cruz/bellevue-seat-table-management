@@ -74,11 +74,31 @@ function SortableVenueCard({ id, item, variant: rawVariant, isHidden, onToggleHi
     opacity: isHidden ? 0.4 : 1,
   };
 
+  const isEvent = item.type === "event";
+
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <div style={{ pointerEvents: "none" }}>
-        <VenueCard item={item} variant={variant} isInteractive={false} />
+        <VenueCard item={item} variant={isEvent ? "event" : variant} isInteractive={false} />
       </div>
+      {isEvent && (
+        <div style={{
+          position: "absolute",
+          top: 10, left: 10,
+          background: "rgba(164, 120, 33, 0.95)",
+          color: "#fff",
+          padding: "4px 8px",
+          borderRadius: 6,
+          fontSize: 10,
+          fontWeight: "700",
+          textTransform: "uppercase",
+          letterSpacing: "0.5px",
+          zIndex: 20,
+          pointerEvents: "none",
+        }}>
+          Event
+        </div>
+      )}
       <button 
         type="button"
         onPointerDown={(e) => { e.stopPropagation(); }}
@@ -1114,66 +1134,149 @@ export default function FunctionRooms() {
     return [...diningParsedVenues].sort((a, b) => (a._original?.display_order || 0) - (b._original?.display_order || 0));
   }, [diningParsedVenues]);
 
-  const eventOrderedVenues = useMemo(() => {
-    return [...eventParsedVenues].sort((a, b) => (a._original?.display_order || 0) - (b._original?.display_order || 0));
-  }, [eventParsedVenues]);
+  const eventOrderedItems = useMemo(() => {
+    const venues = eventParsedVenues.map(v => ({
+      type: "venue",
+      id: v._original?.id,
+      title: v.title,
+      image: v.image,
+      disabled: v.disabled,
+      rooms: v.rooms,
+      _original: v._original
+    }));
+
+    const events = publishedEvents.map(evt => ({
+      type: "event",
+      id: evt.id,
+      title: evt.title,
+      image: evt.banner_image || evt.venue?.image,
+      disabled: false,
+      _original: evt
+    }));
+
+    const combined = [...events, ...venues];
+    const settings = clientSettings.events || {};
+    const orderedIds = settings.ordered_ids || [];
+
+    if (Array.isArray(orderedIds) && orderedIds.length > 0) {
+      return [...combined].sort((a, b) => {
+        const aKey = `${a.type}:${a.id}`;
+        const bKey = `${b.type}:${b.id}`;
+        const aIndex = orderedIds.indexOf(aKey);
+        const bIndex = orderedIds.indexOf(bKey);
+
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+        if (aIndex !== -1) return -1;
+        if (bIndex !== -1) return 1;
+
+        if (a.type !== b.type) return a.type === "event" ? -1 : 1;
+        if (a.type === "venue") {
+          return (a._original?.display_order || 0) - (b._original?.display_order || 0);
+        }
+        return a.id - b.id;
+      });
+    }
+
+    return combined.sort((a, b) => {
+      if (a.type !== b.type) return a.type === "event" ? -1 : 1;
+      if (a.type === "venue") {
+        return (a._original?.display_order || 0) - (b._original?.display_order || 0);
+      }
+      return a.id - b.id;
+    });
+  }, [eventParsedVenues, publishedEvents, clientSettings.events]);
 
   const handleGridDragEnd = (event, section) => {
     const { active, over } = event;
     if (!active || !over || active.id === over.id) return;
     if (!canManage) return;
 
-    const list = section === "dining" ? diningOrderedVenues : eventOrderedVenues;
-    const oldIndex = list.findIndex(v => v.title === active.id);
-    const newIndex = list.findIndex(v => v.title === over.id);
-    
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const newArray = arrayMove(list, oldIndex, newIndex);
+    if (section === "dining") {
+      const list = diningOrderedVenues;
+      const oldIndex = list.findIndex(v => v.title === active.id);
+      const newIndex = list.findIndex(v => v.title === over.id);
       
-      // We must preserve the existing global display_order slots for this subset
-      // rather than blindly assigning 1, 2, 3... which would overwrite and collide with other venues.
-      const availableSlots = list
-        .map(v => v._original?.display_order || 0)
-        .sort((a, b) => a - b);
-      
-      const updates = [];
-      newArray.forEach((item, idx) => {
-        const targetOrder = availableSlots[idx];
-        if (item._original && item._original.display_order !== targetOrder) {
-           updates.push({ id: item._original.id, display_order: targetOrder });
-        }
-      });
-      
-      // Optimistically update
-      setRooms(current => current.map(r => {
-        const update = updates.find(u => Number(u.id) === Number(r.id));
-        return update ? { ...r, display_order: update.display_order } : r;
-      }));
-
-      setPendingLayoutChanges(current => {
-        const newChanges = { ...current };
-        updates.forEach(u => {
-          newChanges[u.id] = { ...(newChanges[u.id] || {}), display_order: u.display_order };
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newArray = arrayMove(list, oldIndex, newIndex);
+        
+        const availableSlots = list
+          .map(v => v._original?.display_order || 0)
+          .sort((a, b) => a - b);
+        
+        const updates = [];
+        newArray.forEach((item, idx) => {
+          const targetOrder = availableSlots[idx];
+          if (item._original && item._original.display_order !== targetOrder) {
+             updates.push({ id: item._original.id, display_order: targetOrder });
+          }
         });
-        return newChanges;
-      });
+        
+        setRooms(current => current.map(r => {
+          const update = updates.find(u => Number(u.id) === Number(r.id));
+          return update ? { ...r, display_order: update.display_order } : r;
+        }));
+
+        setPendingLayoutChanges(current => {
+          const newChanges = { ...current };
+          updates.forEach(u => {
+            newChanges[u.id] = { ...(newChanges[u.id] || {}), display_order: u.display_order };
+          });
+          return newChanges;
+        });
+      }
+    } else {
+      const list = eventOrderedItems;
+      const oldIndex = list.findIndex(item => `${item.type}:${item.id}` === active.id);
+      const newIndex = list.findIndex(item => `${item.type}:${item.id}` === over.id);
+      
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newArray = arrayMove(list, oldIndex, newIndex);
+        const nextOrderedIds = newArray.map(item => `${item.type}:${item.id}`);
+        
+        updateClientSetting("events", "ordered_ids", nextOrderedIds);
+      }
     }
   };
 
   const handleGridToggleHide = (id, section) => {
-    const list = section === "dining" ? diningOrderedVenues : eventOrderedVenues;
-    const venue = list.find(v => v.title === id);
-    const originalRoom = venue?._original;
-    if (!originalRoom || !canManage) return;
-    
-    const nextValue = !originalRoom.show_on_landing;
-    
-    setRooms(current => current.map(r => Number(r.id) === Number(originalRoom.id) ? { ...r, show_on_landing: nextValue } : r));
+    if (section === "dining") {
+      const list = diningOrderedVenues;
+      const venue = list.find(v => v.title === id);
+      const originalRoom = venue?._original;
+      if (!originalRoom || !canManage) return;
+      
+      const nextValue = !originalRoom.show_on_landing;
+      
+      setRooms(current => current.map(r => Number(r.id) === Number(originalRoom.id) ? { ...r, show_on_landing: nextValue } : r));
 
-    setPendingLayoutChanges(current => ({
-      ...current,
-      [originalRoom.id]: { ...(current[originalRoom.id] || {}), show_on_landing: nextValue }
-    }));
+      setPendingLayoutChanges(current => ({
+        ...current,
+        [originalRoom.id]: { ...(current[originalRoom.id] || {}), show_on_landing: nextValue }
+      }));
+    } else {
+      const [type, itemId] = id.split(":");
+      if (type === "venue") {
+        const originalRoom = rooms.find(r => Number(r.id) === Number(itemId));
+        if (!originalRoom || !canManage) return;
+        const nextValue = !originalRoom.show_on_landing;
+        
+        setRooms(current => current.map(r => Number(r.id) === Number(originalRoom.id) ? { ...r, show_on_landing: nextValue } : r));
+
+        setPendingLayoutChanges(current => ({
+          ...current,
+          [originalRoom.id]: { ...(current[originalRoom.id] || {}), show_on_landing: nextValue }
+        }));
+      } else {
+        const currentHiddenIds = clientSettings.events?.hidden_ids || [];
+        let nextHiddenIds;
+        if (currentHiddenIds.includes(id)) {
+          nextHiddenIds = currentHiddenIds.filter(hid => hid !== id);
+        } else {
+          nextHiddenIds = [...currentHiddenIds, id];
+        }
+        updateClientSetting("events", "hidden_ids", nextHiddenIds);
+      }
+    }
   };
 
   const saveLayoutChanges = async () => {
@@ -1229,8 +1332,16 @@ export default function FunctionRooms() {
   };
 
   const handleGridAutoResize = (section) => {
-    const list = section === "dining" ? diningOrderedVenues : eventOrderedVenues;
-    const visibleCount = list.filter(v => v._original ? v._original.show_on_landing : true).length || list.length;
+    const list = section === "dining" ? diningOrderedVenues : eventOrderedItems;
+    const visibleCount = list.filter(v => {
+      if (section === "dining") {
+        return v._original ? v._original.show_on_landing : true;
+      }
+      const itemId = `${v.type}:${v.id}`;
+      return v.type === "event"
+        ? !(clientSettings.events?.hidden_ids || []).includes(itemId)
+        : (v._original ? v._original.show_on_landing : true);
+    }).length || list.length;
     let opt = visibleCount;
     if (section === "dining") {
         if (opt > 6) opt = Math.ceil(opt / 2);
@@ -2327,10 +2438,10 @@ export default function FunctionRooms() {
             ) : (
               <div style={{ padding: 24, minHeight: 600 }}>
                 {["dining", "events"].map(section => {
-                  const title = section === "dining" ? "Dining Outlets" : "Event Venues";
+                  const title = section === "dining" ? "Dining Outlets" : "Events & Venues";
                   const settings = clientSettings[section] || { desktop_columns: 3 };
                   const layoutEngine = settings.layout_engine || "grid";
-                  const list = section === "dining" ? diningOrderedVenues : eventOrderedVenues;
+                  const list = section === "dining" ? diningOrderedVenues : eventOrderedItems;
                   
                   return (
                     <div key={section} style={{ marginBottom: 40 }}>
@@ -2449,7 +2560,7 @@ export default function FunctionRooms() {
                           </div>
 
                           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleGridDragEnd(e, section)}>
-                            <SortableContext items={list.map(v => v.title)} strategy={rectSortingStrategy}>
+                            <SortableContext items={section === "dining" ? list.map(v => v.title) : list.map(v => `${v.type}:${v.id}`)} strategy={rectSortingStrategy}>
                               <div 
                                 className={`reservation-grid reservation-grid--${section === "events" ? "events" : "dining"}`}
                                 style={
@@ -2479,41 +2590,17 @@ export default function FunctionRooms() {
                                     }
                                 }
                               >
-                                {section === "events" && publishedEvents.map(evt => {
-                                  const eventItem = {
-                                    title: evt.title,
-                                    image: evt.banner_image || evt.venue?.image,
-                                    disabled: false
-                                  };
-                                  return (
-                                    <div key={`evt-${evt.id}`} style={{ position: "relative" }}>
-                                      <div style={{ pointerEvents: "none" }}>
-                                        <VenueCard item={eventItem} variant="event" isInteractive={false} />
-                                      </div>
-                                      <div style={{
-                                        position: "absolute",
-                                        top: 10, left: 10,
-                                        background: "rgba(164, 120, 33, 0.95)",
-                                        color: "#fff",
-                                        padding: "4px 8px",
-                                        borderRadius: 6,
-                                        fontSize: 10,
-                                        fontWeight: "700",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        zIndex: 20
-                                      }}>
-                                        Active Event
-                                      </div>
-                                    </div>
-                                  );
-                                })}
                                 {list.map((v) => {
-                                  const isHidden = v._original ? !v._original.show_on_landing : false;
+                                  const itemId = section === "dining" ? v.title : `${v.type}:${v.id}`;
+                                  const isHidden = section === "dining"
+                                    ? (v._original ? !v._original.show_on_landing : false)
+                                    : (v.type === "event"
+                                      ? (clientSettings.events?.hidden_ids || []).includes(itemId)
+                                      : (v._original ? !v._original.show_on_landing : false));
                                   return (
                                     <SortableVenueCard 
-                                      key={v.title}
-                                      id={v.title}
+                                      key={itemId}
+                                      id={itemId}
                                       item={v}
                                       variant={section === "events" ? "event" : section}
                                       isHidden={isHidden}

@@ -15,6 +15,10 @@ class ClientDisplaySetting extends Model
         'card_size',
         'ordered_ids',
         'hidden_ids',
+        'layout_engine',
+        'card_width',
+        'stretch_to_fill',
+        'flex_alignment',
     ];
 
     protected $casts = [
@@ -24,5 +28,7 @@ class ClientDisplaySetting extends Model
         'visible_rows' => 'integer',
         'ordered_ids' => 'array',
         'hidden_ids' => 'array',
+        'card_width' => 'integer',
+        'stretch_to_fill' => 'boolean',
     ];
 }
