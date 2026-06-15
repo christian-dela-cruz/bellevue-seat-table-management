@@ -15,6 +15,7 @@ import towerBallroomImg from "../../../assets/tower-ballroom-hires.jpg";
 import businessCenterImg from "../../../assets/business-center-hires.jpg";
 import { venueAPI } from "../../../services/venueAPI";
 import clientDisplayAPI from "../../../services/clientDisplayAPI";
+import { eventAPI } from "../../../services/eventAPI";
 
 const fallbackDiningOutlets = [
   {
@@ -527,6 +528,7 @@ export default function ReservationLanding() {
   });
   const [diningOutlets, setDiningOutlets] = useState(fallbackDiningOutlets);
   const [eventVenues, setEventVenues] = useState(null);
+  const [publishedEvents, setPublishedEvents] = useState([]);
   const [displaySettings, setDisplaySettings] = useState({ dining: {}, events: {} });
   const isLight = theme === "light";
 
@@ -558,6 +560,17 @@ export default function ReservationLanding() {
 
         setDiningOutlets(dining);
         setEventVenues(events);
+
+        eventAPI.getPublic().then((res) => {
+          if (!mounted) return;
+          if (res && res.status === "success" && Array.isArray(res.data)) {
+            setPublishedEvents(res.data.filter(e => e.status === 'published'));
+          } else {
+            setPublishedEvents([]);
+          }
+        }).catch(() => {
+          if (mounted) setPublishedEvents([]);
+        });
       });
     };
 
@@ -685,16 +698,34 @@ export default function ReservationLanding() {
                   : (displaySettings.events?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.events.desktop_columns}, minmax(0, 1fr))` } : undefined)
               }
             >
+              {publishedEvents.map((evt) => {
+                const eventImage = resolveRoomImage(evt.banner_image || evt.venue?.image);
+                
+                return (
+                  <VenueCard 
+                    key={evt.id} 
+                    item={{
+                      title: evt.title,
+                      image: eventImage,
+                      route: `/events/${evt.slug}`,
+                    }} 
+                    variant="event" 
+                  />
+                );
+              })}
+
               {eventVenues === null ? (
                 <div className="reservation-empty-state">
                   <strong>Loading configured venues.</strong>
                   <span>Preparing the current Bellevue function room availability.</span>
                 </div>
-              ) : eventVenues.length > 0 ? eventVenues.map((venue) => (
-                <VenueCard key={venue.title} item={venue} />
-              )) : (
+              ) : (eventVenues.length > 0 || publishedEvents.length > 0) ? (
+                eventVenues.map((venue) => (
+                  <VenueCard key={venue.title} item={venue} />
+                ))
+              ) : (
                 <div className="reservation-empty-state">
-                  <strong>No function venues are currently available.</strong>
+                  <strong>No function venues or events are currently available.</strong>
                   <span>Please check back later or contact The Bellevue Manila for assistance.</span>
                 </div>
               )}
@@ -1089,8 +1120,9 @@ export default function ReservationLanding() {
         .reservation-directory {
           min-width: 0;
           min-height: 0;
-          display: grid;
-          grid-template-rows: auto minmax(0, 1fr);
+          display: flex;
+          flex-direction: column;
+          overflow-y: auto;
           gap: clamp(26px, 3vh, 40px);
           padding: clamp(20px, 3.8vw, 54px) clamp(20px, 3.8vw, 54px) clamp(18px, 2.2vw, 32px);
           container-type: inline-size;

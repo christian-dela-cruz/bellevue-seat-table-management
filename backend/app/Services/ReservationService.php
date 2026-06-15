@@ -413,12 +413,41 @@ class ReservationService
         $eventDate = $data['event_date'] ?? null;
         $eventTime = $this->normalizeTimeValue($data['event_time'] ?? null);
         $type = strtolower((string) ($data['type'] ?? 'whole'));
+        $eventId = $data['event_id'] ?? null;
         $isStandalone = $type === 'standalone'
             || filter_var($data['is_standalone'] ?? false, FILTER_VALIDATE_BOOLEAN)
             || strtoupper($tableNumber) === 'STANDALONE';
 
         if (empty($data['venue_id']) || !$eventDate || !$eventTime || !$tableNumber) {
             return false;
+        }
+
+        // Standard bookings cannot overlap with a published event at the venue
+        if (!$eventId) {
+            try {
+                $reservationDatetime = \Illuminate\Support\Carbon::parse($eventDate . ' ' . $eventTime);
+                $scopeVenueIds = [(int) $data['venue_id']];
+                $venue = Venue::find($data['venue_id']);
+                if ($venue) {
+                    if ($venue->parent_id) {
+                        $scopeVenueIds[] = $venue->parent_id;
+                    }
+                    $childrenIds = $venue->children()->pluck('id')->toArray();
+                    $scopeVenueIds = array_merge($scopeVenueIds, $childrenIds);
+                }
+
+                $overlappingEvent = \App\Models\Event::whereIn('venue_id', $scopeVenueIds)
+                    ->where('status', 'published')
+                    ->where('start_datetime', '<=', $reservationDatetime)
+                    ->where('end_datetime', '>', $reservationDatetime)
+                    ->exists();
+
+                if ($overlappingEvent) {
+                    return true; // Conflict exists (event blocks standard booking)
+                }
+            } catch (\Exception $e) {
+                // Ignore parsing errors
+            }
         }
 
         $query = Reservation::query()
@@ -433,6 +462,18 @@ class ReservationService
                 }
             })
             ->whereIn('status', ['pending', 'awaiting_confirmation', 'approved', 'reserved', 'confirmed', 'unavailable']);
+
+        // If checking for a specific event reservation, ignore other GENERAL reservations for the SAME event
+        if ($eventId) {
+            $query->where(function ($q) use ($eventId) {
+                $q->where('event_id', '!=', $eventId)
+                  ->orWhereNull('event_id')
+                  ->orWhere(function ($sub) use ($eventId) {
+                      $sub->where('event_id', $eventId)
+                          ->whereRaw('UPPER(table_number) != ?', ['GENERAL']);
+                  });
+            });
+        }
 
         $assignedRoomId = $data['assigned_room_id'] ?? null;
         if (!$assignedRoomId && !empty($data['room'])) {

@@ -54,11 +54,48 @@ export function withSeatmapSchedule(url, schedule = {}) {
   return `${url}${url.includes("?") ? `&${query.slice(1)}` : query}`;
 }
 
-export default function ScheduleGate({ schedule, onChange, roomLabel = "this room", isDark = false, guests = 1 }) {
+export default function ScheduleGate({ schedule, onChange, roomLabel = "this room", isDark = false, guests = 1, locked = false }) {
   const normalized = normalizeSchedule(schedule);
   const isReady = Boolean(normalized.eventDate && normalized.eventTime);
   const [draftSchedule, setDraftSchedule] = React.useState(normalized);
   const [slots, setSlots] = React.useState([]);
+
+  if (locked && isReady) {
+    const formattedDate = new Date(normalized.eventDate).toLocaleDateString(undefined, {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    
+    // Convert 24h eventTime to 12h formatted time
+    const timeParts = String(normalized.eventTime).split(':');
+    const hr = parseInt(timeParts[0], 10);
+    const minStr = timeParts[1] || '00';
+    const formattedTime = `${hr % 12 || 12}:${minStr} ${hr >= 12 ? 'PM' : 'AM'}`;
+
+    return (
+      <div style={{
+        width: "100%",
+        display: "grid",
+        gap: 8,
+        padding: "20px",
+        borderRadius: 16,
+        border: isDark ? "1.5px solid rgba(196,163,90,0.3)" : "1.5px solid rgba(140,107,42,0.25)",
+        background: isDark ? "#111009" : "#FFFFFF",
+        boxShadow: isDark ? "0 10px 30px rgba(0,0,0,0.25)" : "0 8px 24px rgba(78,60,32,0.04)",
+        boxSizing: "border-box",
+        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+      }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"}`, paddingBottom: 8 }}>
+          <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.20em", textTransform: "uppercase", color: isDark ? "#C4A35A" : "#8C6B2A" }}>
+            Event Schedule
+          </span>
+        </div>
+        <div style={{ fontSize: 13, color: isDark ? "#EDE8DF" : "#18140E", lineHeight: 1.5, display: "grid", gap: 4 }}>
+          <div><strong>Date:</strong> {formattedDate}</div>
+          <div><strong>Time:</strong> {formattedTime}</div>
+        </div>
+      </div>
+    );
+  }
   const [slotLoading, setSlotLoading] = React.useState(false);
   const [slotError, setSlotError] = React.useState("");
   const [scheduleMessage, setScheduleMessage] = React.useState("");

@@ -113,6 +113,7 @@ class ClientReservationController extends Controller
             'is_standalone'    => 'nullable|boolean',
             'seat_id'          => 'nullable|string|max:255',
             'consent_accepted' => 'nullable|boolean',
+            'event_id'         => 'nullable|integer|exists:events,id',
         ]);
 
         $originalRoom = $request->input('room');
@@ -381,9 +382,14 @@ class ClientReservationController extends Controller
             'setup_requirements' => 'sometimes|nullable|string|max:5000',
             'special_requests' => 'sometimes|nullable|string',
             'status'           => 'sometimes|required|in:pending,approved,rejected,reserved,cancelled',
+            'event_id'         => 'sometimes|nullable|integer|exists:events,id',
         ]);
 
         $updateData = [];
+
+        if (array_key_exists('event_id', $validated)) {
+            $updateData['event_id'] = $validated['event_id'];
+        }
 
         if (isset($validated['name'])) {
             $updateData['name'] = $validated['name'];
@@ -459,6 +465,7 @@ class ClientReservationController extends Controller
             'guests_count',
             'event_date',
             'event_time',
+            'event_id',
         ]), $updateData);
         $candidate['event_date'] = $candidate['event_date'] instanceof \DateTimeInterface
             ? $candidate['event_date']->format('Y-m-d')

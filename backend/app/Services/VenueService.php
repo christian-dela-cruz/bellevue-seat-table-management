@@ -278,9 +278,51 @@ class VenueService
         }
 
         $time = $this->normalizeTimeValue($data['event_time'] ?? '');
+        $date = $data['event_date'] ?? null;
+        $eventId = $data['event_id'] ?? null;
+
+        // If date or time is not provided, cannot determine availability
+        if (!$date || !$time) {
+            return false;
+        }
+
+        // Check for overlapping published events at this venue or parent/child rooms
+        try {
+            $reservationDatetime = Carbon::parse($date . ' ' . $time);
+            
+            $scopeVenueIds = [$venue->id];
+            if ($venue->parent_id) {
+                $scopeVenueIds[] = $venue->parent_id;
+            }
+            $childrenIds = $venue->children()->pluck('id')->toArray();
+            $scopeVenueIds = array_merge($scopeVenueIds, $childrenIds);
+
+            $overlappingEventQuery = \App\Models\Event::whereIn('venue_id', $scopeVenueIds)
+                ->where('status', 'published')
+                ->where('start_datetime', '<=', $reservationDatetime)
+                ->where('end_datetime', '>', $reservationDatetime);
+
+            if ($eventId) {
+                // If checking specifically for this event, ensure the event exists at this venue
+                $eventMatches = (clone $overlappingEventQuery)->where('id', $eventId)->exists();
+                if (!$eventMatches) {
+                    return false; // Time/venue doesn't align with the event schedule
+                }
+                // If it matches, bypass the regular dining/slots limits since it's an event booking
+                return true;
+            } else {
+                // For regular bookings, if any published event is scheduled, block it
+                if ($overlappingEventQuery->exists()) {
+                    return false;
+                }
+            }
+        } catch (\Exception $e) {
+            // Fallback to standard check if date parsing fails
+        }
+
         $slots = $this->getReservationTimeSlots(
             $venue,
-            $data['event_date'] ?? null,
+            $date,
             (int) ($data['guests_count'] ?? 1),
             $data['room'] ?? null,
             $ignoreReservationId,
@@ -792,6 +834,23 @@ class VenueService
     {
         $normalized = $this->normalizeName($room);
 
+        // Try to match the room dynamically by name or normalized name
+        $venue = Venue::where('is_archived', false)
+            ->where(function ($query) use ($room, $normalized) {
+                $query->where('name', $room)
+                    ->orWhereRaw('lower(name) = ?', [strtolower(trim($room))])
+                    ->orWhereRaw("lower(replace(replace(name, ' ', ''), '/', '')) = ?", [str_replace([' ', '/'], '', $normalized)]);
+            })
+            ->first();
+
+        if ($venue && $venue->parent_id) {
+            $parent = Venue::find($venue->parent_id);
+            if ($parent) {
+                return $parent->name;
+            }
+        }
+
+        // Fallback to legacy prefix matching
         if (str_starts_with($normalized, 'laguna ballroom')) {
             return 'Laguna Ballroom';
         }

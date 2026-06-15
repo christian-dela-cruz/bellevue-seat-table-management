@@ -119,6 +119,7 @@ class AdminReservationController extends Controller
             'type'             => 'required|in:whole,individual,standalone',
             'is_standalone'    => 'nullable|boolean',
             'seat_id'          => 'nullable|string|max:255',
+            'event_id'         => 'nullable|integer|exists:events,id',
         ]);
 
         $validated['reference_code'] = date('Y') . '-' . str_pad(mt_rand(1, 9999), 4, '0', STR_PAD_LEFT);
@@ -217,6 +218,7 @@ class AdminReservationController extends Controller
             'is_standalone'    => 'sometimes|boolean',
             'assigned_room_id' => 'sometimes|nullable|exists:venues,id',
             'assignment_status' => 'sometimes|required|string|in:pending_assignment,auto_assigned,manually_assigned',
+            'event_id'         => 'sometimes|nullable|integer|exists:events,id',
         ]);
 
         $targetVenueId = (int) ($validated['venue_id'] ?? $reservation->venue_id);
@@ -282,6 +284,7 @@ class AdminReservationController extends Controller
             'type',
             'is_standalone',
             'assigned_room_id',
+            'event_id',
         ]), $validated);
 
         if ($this->reservationService->hasScheduleConflict($merged, $reservation->id)) {

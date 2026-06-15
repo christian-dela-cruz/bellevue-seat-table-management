@@ -87,4 +87,30 @@ class EventController extends Controller
             'message' => 'Event deleted successfully.'
         ]);
     }
+
+    public function uploadImage(Request $request, Event $event)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
+        ]);
+
+        $directory = public_path('images/events');
+        if (!\Illuminate\Support\Facades\File::exists($directory)) {
+            \Illuminate\Support\Facades\File::makeDirectory($directory, 0755, true);
+        }
+
+        $file = $request->file('image');
+        $filename = uniqid('evt_') . '.' . $file->getClientOriginalExtension();
+        $file->move($directory, $filename);
+
+        $event->update([
+            'banner_image' => '/images/events/' . $filename
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $event->load('venue'),
+            'message' => 'Image uploaded successfully.'
+        ]);
+    }
 }

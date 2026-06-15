@@ -28,8 +28,10 @@ import {
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import Sidebar from "../../../components/layout/Sidebar";
 import { AdminPageHeader } from "../../../components/layout/AdminPage";
+import ImageUploaderCropper from "../../../components/ImageUploaderCropper";
 import { authAPI } from "../../../services/authAPI";
 import { venueAPI } from "../../../services/venueAPI";
+import { eventAPI } from "../../../services/eventAPI";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy, arrayMove, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -970,6 +972,7 @@ function VenueLandingPreview({ form, preview, childRooms = [], rooms = [], editi
 export default function FunctionRooms() {
   const { isDark } = useAdminTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [publishedEvents, setPublishedEvents] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1066,11 +1069,15 @@ export default function FunctionRooms() {
   const loadRooms = async () => {
     setLoading(true);
     try {
-      const [data, settingsRes] = await Promise.all([
+      const [data, settingsRes, eventsRes] = await Promise.all([
         venueAPI.getAll({ include_archived: false, _t: Date.now() }),
-        clientDisplayAPI.getAll().catch(() => [])
+        clientDisplayAPI.getAll().catch(() => []),
+        eventAPI.getAll().catch(() => [])
       ]);
       setRooms(Array.isArray(data) ? data : []);
+      
+      const eventsList = Array.isArray(eventsRes) ? eventsRes : (eventsRes?.data || []);
+      setPublishedEvents(eventsList.filter(e => e.status === "published"));
       
       const newSettings = {
         dining: { desktop_columns: 6, tablet_columns: 2, mobile_columns: 1 },
@@ -2472,6 +2479,35 @@ export default function FunctionRooms() {
                                     }
                                 }
                               >
+                                {section === "events" && publishedEvents.map(evt => {
+                                  const eventItem = {
+                                    title: evt.title,
+                                    image: evt.banner_image || evt.venue?.image,
+                                    disabled: false
+                                  };
+                                  return (
+                                    <div key={`evt-${evt.id}`} style={{ position: "relative" }}>
+                                      <div style={{ pointerEvents: "none" }}>
+                                        <VenueCard item={eventItem} variant="event" isInteractive={false} />
+                                      </div>
+                                      <div style={{
+                                        position: "absolute",
+                                        top: 10, left: 10,
+                                        background: "rgba(164, 120, 33, 0.95)",
+                                        color: "#fff",
+                                        padding: "4px 8px",
+                                        borderRadius: 6,
+                                        fontSize: 10,
+                                        fontWeight: "700",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        zIndex: 20
+                                      }}>
+                                        Active Event
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                                 {list.map((v) => {
                                   const isHidden = v._original ? !v._original.show_on_landing : false;
                                   return (
@@ -2713,29 +2749,21 @@ export default function FunctionRooms() {
                   <>
                 <section style={formSectionStyle()}>
                   <div style={sectionTitleStyle()}>Display Photo</div>
-                  <div style={{ width: "min(420px, 100%)", aspectRatio: "16 / 9", borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}`, background: form.type === "dining" ? "#15110C" : C.soft, display: "grid", placeItems: "center" }}>
-                    {preview ? (
-                      <img
-                        src={preview}
-                        alt=""
-                        decoding="async"
-                        loading="eager"
-                        draggable={false}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "contain",
-                          objectPosition: form.image_position || "center 50%",
-                          imageRendering: "auto",
-                        }}
-                      />
-                    ) : <div style={{ height: "100%", display: "grid", placeItems: "center", color: C.faint }}><Camera size={28} /></div>}
-                  </div>
-                  <Field label="Image path or URL"><input value={form.image} onChange={(e) => updateForm("image", e.target.value)} placeholder="Image URL or public image path" style={inputStyle()} /></Field>
-                  <label style={{ ...buttonBase(), justifyContent: "center", cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.55 }}>
-                    <Upload size={14} /> Upload image
-                    <input disabled={!canManage} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setImageFile(e.target.files?.[0] || null)} style={{ display: "none" }} />
-                  </label>
+                  <ImageUploaderCropper 
+                    value={preview}
+                    onChange={(file) => {
+                      setImageFile(file);
+                      if (file) {
+                        updateForm("image", ""); // Clear string URL if uploading file
+                      }
+                    }}
+                    aspect={16 / 9}
+                    title="Venue Image"
+                    description="Drag & drop a venue image here or click to upload"
+                  />
+                  <Field label="Image path or URL (Fallback)">
+                    <input value={form.image} onChange={(e) => updateForm("image", e.target.value)} placeholder="Image URL or public image path" style={inputStyle()} disabled={!!imageFile} />
+                  </Field>
                 </section>
 
                 <section style={formSectionStyle()}>

@@ -86,4 +86,25 @@ export const eventAPI = {
     }
     return res.json();
   },
+
+  uploadImage: async (id, file) => {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    // Get auth headers, but DO NOT set Content-Type so fetch can auto-set the boundary for multipart/form-data
+    const headers = getAuthHeaders();
+    delete headers["Content-Type"];
+
+    const res = await fetch(`${API_BASE_URL}/admin/events/${id}/image`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || "Failed to upload image");
+    }
+    return res.json();
+  },
 };

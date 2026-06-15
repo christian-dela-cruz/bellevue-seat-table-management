@@ -1142,7 +1142,7 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
 
 
 // ─── THE MASTER RESERVATION LAYOUT TEMPLATE ──────────────────────────────────────────
-export default function VenueReservationTemplate({ roomName = null, wingName = null, isDynamic = false }) {
+export default function VenueReservationTemplate({ roomName = null, wingName = null, isDynamic = false, eventId = null, preselectedSchedule = null }) {
   const navigate = useNavigate();
   const { venueSlug } = useParams();
   const location = useLocation();
@@ -1169,7 +1169,12 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   const [modal, setModal] = useState(null);
   const [guests, setGuests] = useState(2);
   const [formData, setFormData] = useState(null);
-  const [schedule, setSchedule] = useState(() => normalizeSchedule());
+  const [schedule, setSchedule] = useState(() => {
+    if (preselectedSchedule && preselectedSchedule.date && preselectedSchedule.time) {
+      return { eventDate: preselectedSchedule.date, eventTime: preselectedSchedule.time };
+    }
+    return normalizeSchedule();
+  });
   const [refCode, setRefCode] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [rebookFrom, setRebookFrom] = useState(null);
@@ -1384,7 +1389,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
 
   // Load classic slots if seatmap is not published
   const todayDate = new Date().toISOString().split("T")[0];
-  const [classicDate, setClassicDate] = useState(todayDate);
+  const [classicDate, setClassicDate] = useState(preselectedSchedule?.date || todayDate);
   const [classicGuests, setClassicGuests] = useState(2);
   const [classicConsentAccepted, setClassicConsentAccepted] = useState(false);
   const [slots, setSlots] = useState([]);
@@ -1630,6 +1635,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
           setup_chairs: formData.setupChairs ? Number(formData.setupChairs) : null,
           setup_requirements: formData.setupRequirements || "",
         } : {}),
+        ...(eventId ? { event_id: Number(eventId) } : {}),
       };
 
       const result = await reservationAPI.create(payload);
@@ -1684,6 +1690,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
           setup_chairs: form.setup_chairs ? Number(form.setup_chairs) : null,
           setup_requirements: form.setup_requirements || "",
         } : {}),
+        ...(eventId ? { event_id: Number(eventId) } : {}),
       };
 
       const result = await reservationAPI.create(payload);
@@ -1876,7 +1883,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
 
               <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden", background: C.surfaceBase }}>
                 <div style={{ padding: "10px 16px", background: isDark ? "rgba(10,9,8,0.88)" : "rgba(247,244,238,0.92)", borderBottom: `1px solid ${C.borderDefault}` }}>
-                  <ScheduleGate schedule={schedule} onChange={setSchedule} roomLabel={ROOM} isDark={isDark} guests={guests} />
+                  <ScheduleGate schedule={schedule} onChange={setSchedule} roomLabel={ROOM} isDark={isDark} guests={guests} locked={!!preselectedSchedule} />
                 </div>
                 <div style={{ width: "100%", height: "100%", overflow: "auto", WebkitOverflowScrolling: "touch", display: "flex", alignItems: "flex-start", justifyContent: "flex-start" }}>
                   <div style={{ width: "100%", minHeight: "100%", transformOrigin: "top left" }}>
@@ -2045,7 +2052,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                   <div style={{ display: "grid", gap: 16, position: isTablet ? "static" : "sticky", top: 80 }}>
 
                     {/* Schedule controls */}
-                    <ScheduleGate schedule={schedule} onChange={setSchedule} roomLabel={ROOM} isDark={isDark} guests={guests} />
+                    <ScheduleGate schedule={schedule} onChange={setSchedule} roomLabel={ROOM} isDark={isDark} guests={guests} locked={!!preselectedSchedule} />
 
                     {error && (
                       <div style={{

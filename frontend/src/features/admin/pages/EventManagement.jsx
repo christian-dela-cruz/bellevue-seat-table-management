@@ -23,6 +23,7 @@ import { eventAPI } from "../../../services/eventAPI";
 import { venueAPI } from "../../../services/venueAPI";
 import { authAPI } from "../../../services/authAPI";
 import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
+import ImageUploaderCropper from "../../../components/ImageUploaderCropper";
 
 
 
@@ -47,7 +48,9 @@ function Spinner({ color = "#8C6B2A", size = 16 }) {
 
 function formatDate(dateStr) {
   if (!dateStr) return "N/A";
-  const d = new Date(dateStr);
+  // Force local time parsing by removing Z and T, e.g., "2026-06-20 17:00:00"
+  const safeDateStr = dateStr.replace('T', ' ').replace('Z', '').split('.')[0];
+  const d = new Date(safeDateStr);
   return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
@@ -142,6 +145,7 @@ export default function EventManagement() {
   const [drawerClosing, setDrawerClosing] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(DEFAULT_FORM);
+  const [bannerImageFile, setBannerImageFile] = useState(null);
   const [initialForm, setInitialForm] = useState(DEFAULT_FORM);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -190,6 +194,7 @@ export default function EventManagement() {
     setEditingId(null);
     setForm(DEFAULT_FORM);
     setInitialForm(DEFAULT_FORM);
+    setBannerImageFile(null);
     setDrawerClosing(false);
     setDrawerOpen(true);
   };
@@ -202,12 +207,13 @@ export default function EventManagement() {
       venue_id: ev.venue_id || "",
       description: ev.description || "",
       banner_image: ev.banner_image || "",
-      start_datetime: ev.start_datetime ? ev.start_datetime.substring(0, 16) : "",
-      end_datetime: ev.end_datetime ? ev.end_datetime.substring(0, 16) : "",
+      start_datetime: ev.start_datetime ? ev.start_datetime.slice(0, 16) : "",
+      end_datetime: ev.end_datetime ? ev.end_datetime.slice(0, 16) : "",
       status: ev.status || "draft",
     };
     setForm(formData);
     setInitialForm(formData);
+    setBannerImageFile(null);
     setDrawerClosing(false);
     setDrawerOpen(true);
   };
@@ -230,13 +236,19 @@ export default function EventManagement() {
     e.preventDefault();
     setSaving(true);
     try {
+      let result;
       if (editingId) {
-        await eventAPI.update(editingId, form);
+        result = await eventAPI.update(editingId, form);
       } else {
-        await eventAPI.create(form);
+        result = await eventAPI.create(form);
       }
-      closeDrawer();
-      setSaveFeedback({ type: editingId ? "update" : "create", item: form });
+      
+      const eventId = result.data?.id || editingId;
+      if (bannerImageFile && eventId) {
+        await eventAPI.uploadImage(eventId, bannerImageFile);
+      }
+      closeDrawer(true);
+      setSaveFeedback({ type: editingId ? "update" : "create", item: result?.data || form });
       loadData();
     } catch (err) {
       alert(err.message || "Failed to save event.");
@@ -433,6 +445,21 @@ export default function EventManagement() {
                   <label className="form-label">End Date & Time</label>
                   <input required type="datetime-local" className="form-input" value={form.end_datetime} onChange={e => setForm(f => ({ ...f, end_datetime: e.target.value }))} />
                 </div>
+              </div>
+
+              <div style={{ marginTop: 8 }}>
+                <ImageUploaderCropper 
+                  value={form.banner_image}
+                  onChange={(file) => {
+                    setBannerImageFile(file);
+                    if (file) {
+                      setForm(f => ({ ...f, banner_image: "" }));
+                    }
+                  }}
+                  aspect={16 / 9}
+                  title="Banner Image"
+                  description="Drag & drop a banner image here or click to upload"
+                />
               </div>
 
               <div>
