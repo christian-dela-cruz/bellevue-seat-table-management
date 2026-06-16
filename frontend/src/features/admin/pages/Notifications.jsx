@@ -1,16 +1,18 @@
-// src/features/admin/pages/NotificationDashboard.jsx
+// src/features/admin/pages/Notifications.jsx
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Bell, BellDot, Clock, X, CalendarDays,
   MapPin, Users, Phone, Mail, FileText, Hash, CheckCircle,
   Wifi, WifiOff, ThumbsUp, ChevronLeft, ChevronRight,
-  XCircle, Search,
+  XCircle, Search, Inbox, Eye, EyeOff, Check, AlertCircle, ArrowUpDown, ChevronDown, Check as CheckIcon
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
+import Sidebar from "../../../components/layout/Sidebar";
+import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import { reservationAPI } from "../../../services/reservationAPI";
 import { authAPI } from "../../../services/authAPI";
-import { ADMIN_OUTLET_GROUPS, ADMIN_OUTLET_ROOMS, canonicalOutletName, getScopedOutletRooms } from "../../../constants/outletCatalog";
+import { ADMIN_OUTLET_GROUPS, ADMIN_OUTLET_ROOMS, canonicalOutletName, getScopedOutletRooms, canAccessOutlet } from "../../../constants/outletCatalog";
 
 import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
@@ -217,6 +219,21 @@ function relLabel(ms) { if (ms<=0) return "now"; const m=Math.round(ms/60000); i
 function clockStr() { return new Date().toLocaleTimeString("en-PH",{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
 function dateStr()  { return new Date().toLocaleDateString("en-PH",{weekday:"long",month:"long",day:"numeric",year:"numeric"}); }
 function notificationId(res) { return String(res?.id ?? res?.db_id ?? res?.reference_code ?? ""); }
+
+function timeAgo(dateString) {
+  if (!dateString) return "—";
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.round(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return "Yesterday";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
 function outletCountsFor(cards) {
   const counts = new Map();
@@ -1031,6 +1048,19 @@ function NotificationDashboard() {
   const canAcknowledgeNotifications = authAPI.hasPermission("acknowledge_notifications");
 
   const [allCards,setAllCards]=useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // New filters state
+  const [filterType, setFilterType] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterDateStart, setFilterDateStart] = useState("");
+  const [filterDateEnd, setFilterDateEnd] = useState("");
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
+
   const [popupQueue,setPopupQueue]=useState([]);
   const popup=popupQueue[0]??null;
   const [pickerItems,setPickerItems]=useState(null);
@@ -1059,6 +1089,258 @@ function NotificationDashboard() {
   const knownIds=useRef(new Set()),firedAlerts=useRef(new Set()),leftRef=useRef(null);
   const echoRef=useRef(null),reconnectDelay=useRef(2000),reconnectTimer=useRef(null),isMounted=useRef(true);
   const reconnectAttempts=useRef([]),pollTimer=useRef(null),recoveryTimer=useRef(null);
+
+  // Helper to determine if a reservation is read
+  const isRead = useCallback((res) => {
+    if (!res.seen_by) return false;
+    const key = String(currentUser?.id || currentUser?.email || currentUser?.name || "");
+    if (!key) return false;
+    return !!res.seen_by[key];
+  }, [currentUser]);
+
+  // Derive detailed notification state
+  const getNotificationDetails = useCallback((res) => {
+    const status = (res.status || "").toLowerCase().trim();
+    const isRoomAssigned = !!(res.room || res.venue?.name || res.venue) && (res.room || res.venue?.name || res.venue) !== "Unassigned Outlet";
+    const hasBeenUpdated = Array.isArray(res.transaction_history) && res.transaction_history.some(h => h.action === "reservation_updated" || h.action === "details_adjusted");
+    
+    if (status === "pending") {
+      if (!isRoomAssigned) {
+        return {
+          type: "room_assignment_needed",
+          label: "Room Assignment Needed",
+          color: C.red,
+          description: `New request from ${res.guest_name || res.name || "Guest"} needs room assignment.`
+        };
+      }
+      return {
+        type: "new_request",
+        label: "New Request",
+        color: C.gold,
+        description: `${res.guest_name || res.name || "Guest"} requested a booking.`
+      };
+    }
+    if (status === "cancelled" || status === "canceled") {
+      return {
+        type: "cancelled",
+        label: "Cancelled by Guest",
+        color: C.red,
+        description: `${res.guest_name || res.name || "Guest"} cancelled their booking.`
+      };
+    }
+    if (hasBeenUpdated) {
+      return {
+        type: "updated",
+        label: "Updated by Guest",
+        color: C.blue,
+        description: `${res.guest_name || res.name || "Guest"} updated booking details.`
+      };
+    }
+    if (status === "reserved" || status === "approved" || status === "confirmed") {
+      return {
+        type: "approved",
+        label: "Approved",
+        color: C.green,
+        description: `Booking confirmed for ${res.guest_name || res.name || "Guest"}.`
+      };
+    }
+    if (status === "rejected" || status === "declined") {
+      return {
+        type: "rejected",
+        label: "Declined",
+        color: C.slate,
+        description: `Booking declined for ${res.guest_name || res.name || "Guest"}.`
+      };
+    }
+    return {
+      type: "info",
+      label: "Update",
+      color: C.slate,
+      description: `Status updated for ${res.guest_name || res.name || "Guest"}.`
+    };
+  }, [C]);
+
+  // Derived Notifications respect scoping & formatting
+  const derivedNotifications = useMemo(() => {
+    return allCards
+      .filter(res => {
+        // filter by scope using canAccessOutlet
+        const outlet = canonicalOutletName(res.room || res.venue?.name || res.venue || "Unassigned Outlet");
+        return canAccessOutlet(currentUser, outlet) && (outletFilter === "ALL" || outlet === outletFilter);
+      })
+      .map(res => {
+        const details = getNotificationDetails(res);
+        const read = isRead(res);
+        const outlet = getOutletName(res);
+        const timestamp = new Date(res.created_at || res.submitted_timestamp || res.updated_at || Date.now());
+        
+        // Calculate alert urgency/acknowledgment needed
+        const dt = parseEventDate(res.event_date || res.eventDate || res.reservationDate, res.event_time || res.eventTime || res.reservationTime);
+        const now = Date.now();
+        const diff = dt ? dt.getTime() - now : null;
+        const isAlert = (res.status === "approved" || res.status === "reserved" || res.status === "confirmed") && 
+                        diff !== null && diff > 0 && diff <= 2 * 3600000;
+        
+        return {
+          res,
+          id: res.id ?? res.db_id,
+          db_id: res.db_id,
+          guest_name: res.guest_name || res.name || "Guest",
+          outlet,
+          eventDate: res.event_date || res.eventDate || res.reservationDate,
+          eventTime: res.event_time || res.eventTime || res.reservationTime,
+          guestsCount: res.guests_count || res.guests || 1,
+          referenceCode: res.reference_code || res.id,
+          status: res.status,
+          timestamp,
+          read,
+          details,
+          isAlert,
+          needsAck: isAlert && !acknowledgments[String(res.id ?? res.db_id)] && canAcknowledgeNotifications
+        };
+      });
+  }, [allCards, currentUser, outletFilter, getNotificationDetails, isRead, acknowledgments, canAcknowledgeNotifications]);
+
+  // Filtered Notifications list
+  const filteredNotifications = useMemo(() => {
+    const searchVal = filterSearch.trim().toLowerCase();
+    
+    return derivedNotifications.filter(item => {
+      // 1. Filter by Type
+      if (filterType !== "ALL" && item.details.type !== filterType) return false;
+      
+      // 2. Filter by Status
+      if (filterStatus !== "ALL" && String(item.status).toLowerCase() !== filterStatus.toLowerCase()) return false;
+      
+      // 3. Filter by Date range (on eventDate)
+      if (filterDateStart) {
+        const itemDate = new Date(item.eventDate);
+        const startDate = new Date(filterDateStart);
+        if (itemDate < startDate) return false;
+      }
+      if (filterDateEnd) {
+        const itemDate = new Date(item.eventDate);
+        const endDate = new Date(filterDateEnd);
+        endDate.setHours(23, 59, 59, 999); // include the whole end day
+        if (itemDate > endDate) return false;
+      }
+      
+      // 4. Search query
+      if (searchVal) {
+        const matchesName = String(item.guest_name).toLowerCase().includes(searchVal);
+        const matchesRef = String(item.referenceCode).toLowerCase().includes(searchVal);
+        const matchesOutlet = String(item.outlet).toLowerCase().includes(searchVal);
+        if (!matchesName && !matchesRef && !matchesOutlet) return false;
+      }
+      
+      return true;
+    });
+  }, [derivedNotifications, filterType, filterStatus, filterDateStart, filterDateEnd, filterSearch]);
+
+  // Paginated visible list
+  const paginatedNotifications = useMemo(() => {
+    return filteredNotifications.slice((page - 1) * perPage, page * perPage);
+  }, [filteredNotifications, page, perPage]);
+
+  // Group paginated items by Date (Today, Yesterday, Older)
+  const paginatedGroupedNotifications = useMemo(() => {
+    const todayStr = new Date().toLocaleDateString("en-US");
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toLocaleDateString("en-US");
+    
+    const groups = {
+      today: [],
+      yesterday: [],
+      older: []
+    };
+    
+    paginatedNotifications.forEach(item => {
+      const dateStr = new Date(item.timestamp).toLocaleDateString("en-US");
+      if (dateStr === todayStr) {
+        groups.today.push(item);
+      } else if (dateStr === yesterdayStr) {
+        groups.yesterday.push(item);
+      } else {
+        groups.older.push(item);
+      }
+    });
+    
+    return groups;
+  }, [paginatedNotifications]);
+
+  // Calculate summary counts (Pending, Unread, Acknowledged, Total)
+  const notificationCounts = useMemo(() => {
+    const pending = derivedNotifications.filter(n => n.status === "pending").length;
+    const unread = derivedNotifications.filter(n => !n.read).length;
+    const acknowledged = Object.keys(acknowledgments).length;
+    const total = derivedNotifications.length;
+    
+    return { pending, unread, acknowledged, total };
+  }, [derivedNotifications, acknowledgments]);
+
+  const markAsRead = async (id, e) => {
+    if (e) e.stopPropagation();
+    try {
+      await reservationAPI.markSeen(id);
+      const now = new Date().toISOString();
+      const key = String(currentUser.id || currentUser.email || currentUser.name || "");
+      
+      setAllCards(prev => prev.map(r => {
+        if ((r.id === id || r.db_id === id)) {
+          const seenBy = r.seen_by ? { ...r.seen_by } : {};
+          seenBy[key] = {
+            id: currentUser.id || null,
+            name: currentUser.name || null,
+            role: currentUser.role || null,
+            seen_at: now
+          };
+          return { ...r, seen_by: seenBy };
+        }
+        return r;
+      }));
+      window.dispatchEvent(new CustomEvent("bellevue:notifications-changed"));
+    } catch (err) {
+      console.warn("Failed to mark notification as read", err);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    const unread = derivedNotifications.filter(n => !n.read);
+    if (!unread.length) return;
+    try {
+      await Promise.all(unread.map(n => reservationAPI.markSeen(n.db_id)));
+      const now = new Date().toISOString();
+      const key = String(currentUser.id || currentUser.email || currentUser.name || "");
+      
+      setAllCards(prev => prev.map(r => {
+        const rId = r.id ?? r.db_id;
+        const wasUnread = unread.some(n => n.id === rId);
+        if (wasUnread) {
+          const seenBy = r.seen_by ? { ...r.seen_by } : {};
+          seenBy[key] = {
+            id: currentUser.id || null,
+            name: currentUser.name || null,
+            role: currentUser.role || null,
+            seen_at: now
+          };
+          return { ...r, seen_by: seenBy };
+        }
+        return r;
+      }));
+      window.dispatchEvent(new CustomEvent("bellevue:notifications-changed"));
+      addToast("All notifications marked as read.", "success");
+    } catch (err) {
+      console.warn("Failed to mark all notifications as read", err);
+    }
+  };
+
+  const handleCardClick = async (item) => {
+    setDetailRes(item.res);
+    if (!item.read) {
+      await markAsRead(item.db_id);
+    }
+  };
 
   useEffect(()=>{isMounted.current=true;return()=>{isMounted.current=false;};},[]);
   const addToast=useCallback((message,type="success")=>{const id=Date.now();setToasts(p=>[...p,{id,message,type}]);setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),3500);},[]);
@@ -1227,6 +1509,14 @@ function NotificationDashboard() {
 
   useEffect(()=>{syncReservations({silent:false});},[syncReservations]);
 
+  useEffect(() => {
+    const handleNotificationsChanged = () => {
+      syncReservations({ silent: true });
+    };
+    window.addEventListener("bellevue:notifications-changed", handleNotificationsChanged);
+    return () => window.removeEventListener("bellevue:notifications-changed", handleNotificationsChanged);
+  }, [syncReservations]);
+
   useEffect(()=>{
     const wsHost=import.meta.env.VITE_WS_HOST||"localhost",wsPort=import.meta.env.VITE_WS_PORT||"6001";
     const protocol=window.location.protocol==="https:"?"wss:":"ws:";
@@ -1392,145 +1682,591 @@ function NotificationDashboard() {
 
   const handlePopupView=useCallback(p=>{dismissPopup();const items=p.items||[];if(items.length===1){const full=allCards.find(r=>(r.id??r.db_id)===items[0].id);if(full)setDetailRes(full);}else setPickerItems(items);},[allCards,dismissPopup]);
 
+  const renderNotificationCard = (item) => {
+    const isNew = newIds.has(item.id);
+    const read = item.read;
+    const details = item.details;
+    const res = item.res;
+    const id = item.id;
+    const db_id = item.db_id;
+    const outlet = item.outlet;
+    const isApprovingThis = approvingIds.has(id);
+    const isDecliningThis = decliningIds.has(id);
+
+    return (
+      <div
+        key={id}
+        onClick={() => handleCardClick(item)}
+        className="notif-card"
+        style={{
+          background: isNew ? C.goldFaintest : C.cardBg,
+          border: `1px solid ${isNew ? C.borderAccent : C.cardBorder}`,
+          borderRadius: 10,
+          padding: "14px 16px",
+          position: "relative",
+          boxShadow: isNew ? `0 0 0 3px ${C.goldFaint}` : "none",
+          opacity: read ? 0.78 : 1,
+        }}
+      >
+        {/* Unread indicator dot */}
+        {!read && (
+          <div style={{
+            position: "absolute",
+            top: 18,
+            left: 6,
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: C.red,
+          }} />
+        )}
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{
+              fontFamily: F.label,
+              fontSize: 10,
+              fontWeight: 800,
+              color: details.color,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}>
+              {details.label}
+            </span>
+            <span style={{ color: C.textTertiary, fontSize: 11 }}>
+              {timeAgo(res.created_at || res.submitted_timestamp)}
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }} onClick={e => e.stopPropagation()}>
+            {item.needsAck && (
+              <button
+                onClick={(e) => handleAcknowledge(res, e)}
+                style={{
+                  padding: "4px 8px",
+                  background: C.gold,
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  fontFamily: F.label,
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                }}
+              >
+                Acknowledge
+              </button>
+            )}
+            {!read && (
+              <button
+                onClick={(e) => markAsRead(db_id, e)}
+                title="Mark as Read"
+                style={{
+                  background: "transparent",
+                  border: `1px solid ${C.borderDefault}`,
+                  color: C.textSecondary,
+                  borderRadius: 6,
+                  padding: "3px 6px",
+                  fontSize: 10,
+                  fontWeight: 500,
+                  fontFamily: F.label,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Check size={11} />
+                Mark Read
+              </button>
+            )}
+            <StatusBadge status={res.status} C={C} />
+          </div>
+        </div>
+
+        {/* Description */}
+        <div style={{
+          fontFamily: F.body,
+          fontSize: 13.5,
+          fontWeight: read ? 500 : 700,
+          color: C.textPrimary,
+          lineHeight: 1.4,
+          marginBottom: 8,
+        }}>
+          {details.description}
+        </div>
+
+        {/* Metadata Details Row */}
+        <div style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "6px 16px",
+          fontFamily: F.body,
+          fontSize: 11.5,
+          color: C.textSecondary,
+        }}>
+          <span>Reference: <strong style={{ color: C.gold, fontFamily: F.mono }}>{item.referenceCode}</strong></span>
+          <span>Venue/Outlet: <strong>{outlet}</strong></span>
+          <span>Guest Count: <strong>{res.guests_count || res.guests || 1} pax</strong></span>
+          <span>Schedule: <strong>{fmtDate(item.eventDate)} at {fmtTime(item.eventTime)}</strong></span>
+        </div>
+
+        {/* Action Button for Pending reservations */}
+        {res.status === "pending" && canManageReservations && (
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 10,
+              borderTop: `1px solid ${C.divider}`,
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 8,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => handleDeclineRequest(res)}
+              disabled={isApprovingThis || isDecliningThis}
+              style={{
+                padding: "6px 12px",
+                background: "transparent",
+                border: `1px solid ${C.redBorder}`,
+                borderRadius: 8,
+                fontFamily: F.label,
+                fontSize: 9.5,
+                fontWeight: 700,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: C.red,
+                cursor: "pointer",
+              }}
+            >
+              Decline
+            </button>
+            <button
+              onClick={() => handleApproveRequest(res)}
+              disabled={isApprovingThis || isDecliningThis}
+              style={{
+                padding: "6px 12px",
+                background: C.green,
+                border: "none",
+                borderRadius: 8,
+                fontFamily: F.label,
+                fontSize: 9.5,
+                fontWeight: 700,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              Approve
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <>
+    <div style={{ display: "flex", height: "100vh", background: C.pageBg, fontFamily: F.body }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0;}
+        * { box-sizing: border-box; }
         @keyframes spin{to{transform:rotate(360deg);}}
         @keyframes modalIn{from{opacity:0;transform:translateY(12px) scale(0.97);}to{opacity:1;transform:none;}}
         @keyframes cardSlideIn{from{opacity:0;transform:translateY(-8px) scale(0.98);}to{opacity:1;transform:none;}}
         @keyframes bellRing{0%,100%{transform:rotate(0deg);}25%{transform:rotate(-16deg);}75%{transform:rotate(16deg);}}
         @keyframes dotPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.3;transform:scale(1.8);}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+        .notif-card { transition: all 0.2s ease; cursor: pointer; }
+        .notif-card:hover { border-color: ${C.borderAccent} !important; background: ${C.goldFaintest} !important; }
+        ::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.10);border-radius:4px;}
         @media (max-width: 768px) {
           .nd-grid { grid-template-columns: 1fr !important; }
         }
-        @media (max-width: 1100px) {
-          .nd-routing-toolbar { grid-template-columns: 1fr !important; }
-        }
-        ::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.10);border-radius:4px;}
       `}</style>
 
-      <div style={{ height:"100vh",overflow:"hidden",fontFamily:F.body,background:C.pageBg,color:C.textPrimary,display:"flex",flexDirection:"column",position:"relative" }}>
+      <Sidebar activeNav="" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
-        <div style={{ position:"fixed",inset:0,zIndex:0 }}>
-          <div style={{ position:"absolute",inset:0,backgroundImage:"url('/src/assets/bg-login.jpeg')",backgroundSize:"cover",backgroundPosition:"center",filter:C.bgFilter,transform:"scale(1.05)",transition:"filter 0.40s" }}/>
-          <div style={{ position:"absolute",inset:0,background:C.bgOverlay,transition:"background 0.40s" }}/>
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
+        <AdminNavbar />
+        
+        <main style={{ flex: 1, padding: "30px 32px 42px", overflow: "auto", position: "relative" }}>
+          <div style={{ maxWidth: 1440, display: "grid", gap: 18, animation: "fadeUp 0.32s ease" }}>
+            
+            {/* Page Header */}
+            <AdminPageHeader
+              eyebrow="Monitoring"
+              title="Notification Center"
+              description="Monitor all venue requests, updates, cancellations, and coordinate operational acknowledgments in real-time."
+              C={C}
+              F={F}
+              actions={
+                notificationCounts.unread > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    style={{
+                      height: 38,
+                      padding: "0 14px",
+                      border: `1px solid ${C.borderAccent}`,
+                      borderRadius: 9,
+                      background: C.gold,
+                      color: "#fff",
+                      fontFamily: F.label,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <Check size={13} />
+                    Mark all as read
+                  </button>
+                )
+              }
+            />
 
-        <AdminNavbar
-          leftContent={(
-            <button
-              onClick={()=>navigate("/admin/reservations")}
-              title="Back to reservations"
-              style={{ height:36,padding:"0 12px",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:"#FFFFFF",color:C.textSecondary,fontFamily:F.label,fontSize:10,fontWeight:800,letterSpacing:"0.10em",textTransform:"uppercase",cursor:"pointer",display:"inline-flex",alignItems:"center",gap:7 }}
-            >
-              <ChevronLeft size={14} strokeWidth={2.4}/>
-              Back
-            </button>
-          )}
-        />
-
-        <div style={{ position:"relative",zIndex:1,height:"calc(100vh - 60px)",minHeight:0,display:"flex",flexDirection:"column",overflow:"auto" }}>
-          {loading&&(
-            <div style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16 }}>
-              <Spinner C={C} size={22}/>
-              <div style={{ fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:C.textTertiary }}>Loading…</div>
-            </div>
-          )}
-
-          {!loading&&(
-            <div style={{ flex:1,display:"flex",flexDirection:"column",padding:"clamp(32px,5vh,52px) clamp(20px,5vw,64px) clamp(24px,4vh,40px)",gap:20,animation:"fadeUp 0.32s ease" }}>
-              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(240px, 1fr))",gap:16,alignItems:"end" }}>
-                <div style={{ minWidth:0 }}>
-                  <h1 style={{ fontFamily:F.display,fontSize:"clamp(24px,4vw,40px)",fontWeight:700,color:C.textPrimary,lineHeight:1.12,margin:"0 0 8px",letterSpacing:"0.01em" }}>
-                    Notification Monitor
-                  </h1>
-                  <div style={{ fontFamily:F.label,fontSize:11,fontWeight:500,color:C.textSecondary,letterSpacing:"0.02em",textTransform:"uppercase" }}>
-                    {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })} • {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-                  </div>
-                </div>
-                <div style={{ justifySelf:"end",maxWidth:360,minWidth:0,display:"inline-flex",alignItems:"center",gap:8,padding:"8px 12px",border:`1px solid ${C.borderDefault}`,borderRadius:10,background:"rgba(255,255,255,0.76)",boxShadow:"0 8px 24px rgba(36,31,24,0.05)",fontFamily:F.label,fontSize:10,fontWeight:800,letterSpacing:"0.10em",textTransform:"uppercase",color:C.textSecondary }}>
-                  <MapPin size={13} color={C.gold} style={{ flexShrink:0 }}/>
-                  <span style={{ overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{outletFilter==="ALL"?"All Outlets":outletFilter}</span>
-                </div>
-              </div>
-
-              <div style={{ display:"grid",gridTemplateColumns:"minmax(0,3fr) minmax(0,1.4fr)",gap:14,flex:1,minHeight:0 }} className="nd-grid">
-                <div style={{ gridColumn:"1 / -1" }}>
-                  <OutletMonitorBar
-                    outlets={completeOutletSummaries}
-                    selectedOutlet={outletFilter}
-                    onSelect={(outlet)=>{setOutletFilter(outlet);setPendingPage(1);setDonePage(1);}}
-                    currentUser={currentUser}
-                    C={C}
-                  />
-                </div>
-
-                <div style={{ gridColumn:"1 / -1" }}>
-                  <AcknowledgmentMonitor activeAlerts={activeAlerts} acknowledgedAlerts={acknowledgedAlerts} onAcknowledge={acknowledgeAlerts} canAcknowledge={canAcknowledgeNotifications} C={C}/>
-                </div>
-
-                {/* LEFT */}
-                <Panel C={C} style={{ maxHeight:"clamp(360px, calc(100vh - 280px), 700px)" }}>
-                  <div style={{ padding:"12px 16px 10px",borderBottom:`1px solid ${C.divider}`,flexShrink:0 }}>
-                    <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
-                      <div style={{ display:"flex",gap:6 }}>
-                        <TabBtn active={leftTab==="pending"} onClick={()=>{setLeftTab("pending");setPendingPage(1);}} activeColor={C.gold} count={pendingCards.length} pulse={pendingCards.length>0} C={C}><Clock size={10}/>Pending</TabBtn>
-                        <TabBtn active={leftTab==="upcoming"} onClick={()=>{setLeftTab("upcoming");setPendingPage(1);}} activeColor={C.blue} count={upcomingCards.length} C={C}><CalendarDays size={10}/>Upcoming</TabBtn>
+            {/* Counts Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+              {[
+                { label: "Pending Requests", value: notificationCounts.pending, desc: "Awaiting administrator review", border: C.gold },
+                { label: "Unread Notifications", value: notificationCounts.unread, desc: "New updates needing attention", border: C.red, highlight: notificationCounts.unread > 0 },
+                { label: "Acknowledged Alerts", value: notificationCounts.acknowledged, desc: "Recent operational logs", border: C.green },
+                { label: "Total Alerts", value: notificationCounts.total, desc: "Scope-authorized entries", border: C.blue },
+              ].map((card, i) => (
+                <div
+                  key={i}
+                  style={{
+                    background: `linear-gradient(180deg, ${C.surface} 0%, ${C.surfaceSoft} 100%)`,
+                    border: `1px solid ${card.highlight ? C.redBorder : C.borderDefault}`,
+                    borderRadius: 12,
+                    padding: "16px 18px",
+                    boxShadow: C.shadowSoft,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    minHeight: 120,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                    <div>
+                      <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>
+                        {card.label}
                       </div>
-                      <span style={{ fontFamily:F.label,fontSize:9,color:C.textTertiary,letterSpacing:"0.10em",textTransform:"uppercase" }}>{leftTab==="pending"?"Tap approve to confirm":"Approved · not yet passed"}</span>
+                      <div style={{ fontSize: 11.5, color: C.textSecondary }}>{card.desc}</div>
+                    </div>
+                    <div style={{
+                      minWidth: 40,
+                      height: 36,
+                      borderRadius: 8,
+                      background: card.highlight ? C.redFaint : C.goldFaint,
+                      color: card.highlight ? C.red : C.gold,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 18,
+                      fontWeight: 800,
+                    }}>
+                      {card.value}
                     </div>
                   </div>
-                  <div ref={leftRef} style={{ flex:1,overflowY:"auto",padding:"10px 12px",minHeight:0 }}>
-                    {leftCards.length===0
-                      ? <EmptyState msg={leftTab==="upcoming"?"No upcoming reservations":"No pending reservations"} C={C}/>
-                      : leftVisible.map(res=>(
-                          <ReservationCard
-                            key={res.id??res.db_id}
-                            res={res}
-                            isNew={newIds.has(res.id??res.db_id)}
-                            onClick={setDetailRes}
-                            onApprove={handleApproveRequest}
-                            onDecline={handleDeclineRequest}
-                            approvingIds={approvingIds}
-                            decliningIds={decliningIds}
-                            canManage={canManageReservations}
-                            C={C}
+                  <div style={{ height: 2, background: `linear-gradient(90deg, ${card.border}80, transparent)`, marginTop: 12, borderRadius: 1 }} />
+                </div>
+              ))}
+            </div>
+
+            {/* Main Content Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,3fr) minmax(0,1.4fr)", gap: 14 }} className="nd-grid">
+              
+              {/* Left Side: Filter Toolbar & Notifications List */}
+              <div style={{ display: "grid", gap: 14 }}>
+                
+                {/* Filter Toolbar Panel */}
+                <Panel C={C} accentColor={C.gold}>
+                  <div style={{ padding: "14px 16px", display: "grid", gap: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${C.divider}`, paddingBottom: 8 }}>
+                      <span style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: C.gold }}>
+                        Filter Toolbar
+                      </span>
+                      {outletFilter !== "ALL" && (
+                        <span style={{ fontSize: 11.5, color: C.textSecondary, fontFamily: F.body }}>
+                          Outlet: <strong>{outletFilter}</strong>
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                      
+                      {/* Search */}
+                      <div style={{ display: "grid", gap: 4 }}>
+                        <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Search</span>
+                        <div style={{ position: "relative" }}>
+                          <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.textTertiary, pointerEvents: "none" }} />
+                          <input
+                            value={filterSearch}
+                            onChange={(e) => { setFilterSearch(e.target.value); setPage(1); }}
+                            placeholder="Guest name, reference..."
+                            style={{
+                              width: "100%",
+                              height: 36,
+                              padding: "0 10px 0 32px",
+                              border: `1px solid ${C.borderDefault}`,
+                              borderRadius: 8,
+                              background: C.surfaceInput,
+                              color: C.textPrimary,
+                              fontFamily: F.body,
+                              fontSize: 12,
+                              outline: "none",
+                            }}
                           />
-                        ))
-                    }
-                  </div>
-                  <Pagination page={pendingPage} total={leftCards.length} perPage={pendingPerPage} setPage={setPendingPage} setPerPage={setPendingPerPage} C={C}/>
-                </Panel>
-
-                {/* RIGHT */}
-                <Panel accentColor={rightTab==="declined"?C.red:C.green} C={C} style={{ maxHeight:"clamp(360px, calc(100vh - 280px), 700px)" }}>
-                  <div style={{ padding:"12px 16px 10px",borderBottom:`1px solid ${C.divider}`,flexShrink:0 }}>
-                    <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
-                      <div style={{ display:"flex",gap:6 }}>
-                        <TabBtn active={rightTab==="accepted"} onClick={()=>{setRightTab("accepted");setDonePage(1);}} activeColor={C.green} count={acceptedCards.length} C={C}><CheckCircle size={10}/>Accepted</TabBtn>
-                        <TabBtn active={rightTab==="declined"} onClick={()=>{setRightTab("declined");setDonePage(1);}} activeColor={C.red} count={declinedCards.length} C={C}><XCircle size={10}/>Declined</TabBtn>
+                        </div>
                       </div>
-                      <span style={{ fontFamily:F.label,fontSize:9,color:C.textTertiary,letterSpacing:"0.10em",textTransform:"uppercase" }}>{rightTab==="declined"?"Rejected reservations":"Approved reservations"}</span>
+
+                      {/* Outlet Filter Select */}
+                      <div style={{ display: "grid", gap: 4 }}>
+                        <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Outlet / Venue</span>
+                        <select
+                          value={outletFilter}
+                          onChange={(e) => { setOutletFilter(e.target.value); setPage(1); }}
+                          style={{
+                            width: "100%",
+                            height: 36,
+                            padding: "0 10px",
+                            border: `1px solid ${C.borderDefault}`,
+                            borderRadius: 8,
+                            background: C.surfaceBase,
+                            color: C.textPrimary,
+                            fontFamily: F.body,
+                            fontSize: 12,
+                            outline: "none",
+                          }}
+                        >
+                          <option value="ALL">All Outlets</option>
+                          {completeOutletSummaries.map(o => (
+                            <option key={o.outlet} value={o.outlet}>{o.outlet} ({o.total})</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Notification Type Filter Select */}
+                      <div style={{ display: "grid", gap: 4 }}>
+                        <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Notification Type</span>
+                        <select
+                          value={filterType}
+                          onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
+                          style={{
+                            width: "100%",
+                            height: 36,
+                            padding: "0 10px",
+                            border: `1px solid ${C.borderDefault}`,
+                            borderRadius: 8,
+                            background: C.surfaceBase,
+                            color: C.textPrimary,
+                            fontFamily: F.body,
+                            fontSize: 12,
+                            outline: "none",
+                          }}
+                        >
+                          <option value="ALL">All Types</option>
+                          <option value="new_request">New Requests</option>
+                          <option value="room_assignment_needed">Room Assignment Needed</option>
+                          <option value="cancelled">Cancellations</option>
+                          <option value="updated">Guest Updates</option>
+                          <option value="approved">Approved</option>
+                          <option value="rejected">Declined</option>
+                        </select>
+                      </div>
+
+                      {/* Date Range Start */}
+                      <div style={{ display: "grid", gap: 4 }}>
+                        <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Start Date</span>
+                        <input
+                          type="date"
+                          value={filterDateStart}
+                          onChange={(e) => { setFilterDateStart(e.target.value); setPage(1); }}
+                          style={{
+                            width: "100%",
+                            height: 36,
+                            padding: "0 10px",
+                            border: `1px solid ${C.borderDefault}`,
+                            borderRadius: 8,
+                            background: C.surfaceBase,
+                            color: C.textPrimary,
+                            fontFamily: F.body,
+                            fontSize: 12,
+                            outline: "none",
+                          }}
+                        />
+                      </div>
+
+                      {/* Date Range End */}
+                      <div style={{ display: "grid", gap: 4 }}>
+                        <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>End Date</span>
+                        <input
+                          type="date"
+                          value={filterDateEnd}
+                          onChange={(e) => { setFilterDateEnd(e.target.value); setPage(1); }}
+                          style={{
+                            width: "100%",
+                            height: 36,
+                            padding: "0 10px",
+                            border: `1px solid ${C.borderDefault}`,
+                            borderRadius: 8,
+                            background: C.surfaceBase,
+                            color: C.textPrimary,
+                            fontFamily: F.body,
+                            fontSize: 12,
+                            outline: "none",
+                          }}
+                        />
+                      </div>
+
                     </div>
                   </div>
-                  <div style={{ flex:1,overflowY:"auto",padding:"10px 12px",minHeight:0 }}>
-                    {rightCards.length===0
-                      ? <EmptyState msg={rightTab==="declined"?"No declined reservations":"No accepted reservations"} C={C}/>
-                      : doneVisible.map(res=>(
-                          <DoneCard key={`done-${res.id??res.db_id}`} res={res} onClick={setDetailRes} C={C}/>
-                        ))
-                    }
+                </Panel>
+
+                {/* Notifications List Panel */}
+                <Panel C={C} accentColor={C.gold}>
+                  <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: C.gold }}>
+                      Notification List ({filteredNotifications.length})
+                    </span>
+                    <span style={{ fontSize: 11, color: C.textSecondary, fontFamily: F.label }}>
+                      Showing {Math.min(filteredNotifications.length, page * perPage)} of {filteredNotifications.length}
+                    </span>
                   </div>
-                  <Pagination page={donePage} total={rightCards.length} perPage={donePerPage} setPage={setDonePage} setPerPage={setDonePerPage} C={C}/>
+
+                  <div style={{ padding: "14px 16px", display: "grid", gap: 16 }}>
+                    {loading ? (
+                      <div style={{ padding: "48px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+                        <Spinner C={C} size={20} />
+                        <span style={{ fontSize: 12, color: C.textSecondary, fontFamily: F.label, letterSpacing: "0.05em", textTransform: "uppercase" }}>Loading Alerts...</span>
+                      </div>
+                    ) : filteredNotifications.length === 0 ? (
+                      <div style={{ padding: "72px 0", textAlign: "center", color: C.textTertiary, fontSize: 13, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                        <Inbox size={32} style={{ strokeWidth: 1.5, opacity: 0.5 }} />
+                        No notifications match the active filters.
+                      </div>
+                    ) : (
+                      <>
+                        {/* Render Group: Today */}
+                        {paginatedGroupedNotifications.today.length > 0 && (
+                          <div>
+                            <SectionLabel C={C}>Today</SectionLabel>
+                            <div style={{ display: "grid", gap: 8 }}>
+                              {paginatedGroupedNotifications.today.map(item => renderNotificationCard(item))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Render Group: Yesterday */}
+                        {paginatedGroupedNotifications.yesterday.length > 0 && (
+                          <div style={{ marginTop: 14 }}>
+                            <SectionLabel C={C}>Yesterday</SectionLabel>
+                            <div style={{ display: "grid", gap: 8 }}>
+                              {paginatedGroupedNotifications.yesterday.map(item => renderNotificationCard(item))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Render Group: Older */}
+                        {paginatedGroupedNotifications.older.length > 0 && (
+                          <div style={{ marginTop: 14 }}>
+                            <SectionLabel C={C}>Older</SectionLabel>
+                            <div style={{ display: "grid", gap: 8 }}>
+                              {paginatedGroupedNotifications.older.map(item => renderNotificationCard(item))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <Pagination page={page} total={filteredNotifications.length} perPage={perPage} setPage={setPage} setPerPage={setPerPage} C={C} />
                 </Panel>
 
               </div>
+
+              {/* Right Side: Acknowledgment Monitor & History */}
+              <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
+                
+                {/* Active Alerts Acknowledgment Monitor */}
+                <AcknowledgmentMonitor
+                  activeAlerts={activeAlerts}
+                  acknowledgedAlerts={acknowledgedAlerts}
+                  onAcknowledge={acknowledgeAlerts}
+                  canAcknowledge={canAcknowledgeNotifications}
+                  C={C}
+                />
+
+                {/* Acknowledgment History Panel */}
+                <Panel C={C} accentColor={C.green}>
+                  <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", gap: 8 }}>
+                    <CheckCircle size={13} color={C.green} />
+                    <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: C.green }}>
+                      Acknowledgment History
+                    </span>
+                  </div>
+                  
+                  <div style={{ padding: "12px", display: "grid", gap: 10, maxHeight: 400, overflowY: "auto" }}>
+                    {acknowledgedAlerts.length === 0 ? (
+                      <div style={{ padding: "24px 0", textAlign: "center", color: C.textTertiary, fontSize: 11.5 }}>
+                        No acknowledgment records found.
+                      </div>
+                    ) : (
+                      [...acknowledgedAlerts].reverse().slice(0, 30).map((ack, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            border: `1px solid ${C.greenBorder}`,
+                            borderRadius: 8,
+                            padding: "10px 12px",
+                            background: C.greenFaint,
+                            fontSize: 12,
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+                            <strong style={{ color: C.textPrimary, fontWeight: 650 }}>{ack.name}</strong>
+                            <span style={{ color: C.textTertiary, fontSize: 10 }}>
+                              {new Date(ack.acknowledgedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                          <div style={{ color: C.textSecondary, fontSize: 11, marginBottom: 6 }}>
+                            {ack.room} · {fmtDate(ack.eventDate)} {fmtTime(ack.eventTime)}
+                          </div>
+                          <div style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            fontSize: 10,
+                            color: C.green,
+                            fontFamily: F.label,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.03em",
+                            borderTop: `1px dashed ${C.greenBorder}`,
+                            paddingTop: 6,
+                            marginTop: 4,
+                          }}>
+                            <span>By: <strong>{ack.acknowledgedBy}</strong></span>
+                            <span>{ack.acknowledgedByRole || "Staff"}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </Panel>
+
+              </div>
+
             </div>
-          )}
-        </div>
+
+          </div>
+        </main>
       </div>
 
       {popup&&<ReminderPopup popup={popup} queueCount={popupQueue.length} onView={handlePopupView} onClose={dismissPopup} onAcknowledge={acknowledgeAlerts} canAcknowledge={canAcknowledgeNotifications} C={C}/>}
@@ -1539,7 +2275,7 @@ function NotificationDashboard() {
       {confirmRes&&<ApproveConfirmModal res={confirmRes} onConfirm={handleApproveConfirm} onCancel={()=>{if(!isApproving)setConfirmRes(null);}} isApproving={isApproving} C={C}/>}
       {declineRes&&<DeclineConfirmModal res={declineRes} onConfirm={handleDeclineConfirm} onCancel={()=>{if(!isDeclining)setDeclineRes(null);}} isDeclining={isDeclining} C={C}/>}
       <Toast toasts={toasts} C={C}/>
-    </>
+    </div>
   );
 }
 
