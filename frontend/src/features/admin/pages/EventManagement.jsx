@@ -47,10 +47,11 @@ function Spinner({ color = "#8C6B2A", size = 16 }) {
 }
 
 function formatDate(dateStr) {
-  if (!dateStr) return "N/A";
+  if (!dateStr || typeof dateStr !== "string") return "N/A";
   // Force local time parsing by removing Z and T, e.g., "2026-06-20 17:00:00"
   const safeDateStr = dateStr.replace('T', ' ').replace('Z', '').split('.')[0];
   const d = new Date(safeDateStr);
+  if (isNaN(d.getTime())) return "N/A";
   return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
@@ -184,13 +185,24 @@ export default function EventManagement() {
         eventAPI.getAll(),
         venueAPI.getAll()
       ]);
-      setEvents(eventsRes.status === 'fulfilled' ? (eventsRes.value.data || []) : []);
+      
+      let parsedEvents = [];
+      if (eventsRes.status === 'fulfilled') {
+        const eData = eventsRes.value;
+        parsedEvents = Array.isArray(eData) 
+          ? eData 
+          : (eData && Array.isArray(eData.data) ? eData.data : []);
+      }
+      setEvents(parsedEvents);
+
+      let parsedVenues = [];
       if (venuesRes.status === 'fulfilled') {
         const vData = venuesRes.value;
-        setVenues(Array.isArray(vData) ? vData : (vData && vData.data ? vData.data : []));
-      } else {
-        setVenues([]);
+        parsedVenues = Array.isArray(vData) 
+          ? vData 
+          : (vData && Array.isArray(vData.data) ? vData.data : []);
       }
+      setVenues(parsedVenues);
     } catch (err) {
       console.error(err);
     } finally {
@@ -209,14 +221,20 @@ export default function EventManagement() {
 
   const handleEdit = (ev) => {
     setEditingId(ev.id);
+    const startVal = ev.start_datetime && typeof ev.start_datetime === 'string'
+      ? ev.start_datetime.slice(0, 16)
+      : "";
+    const endVal = ev.end_datetime && typeof ev.end_datetime === 'string'
+      ? ev.end_datetime.slice(0, 16)
+      : "";
     const formData = {
       title: ev.title || "",
       slug: ev.slug || "",
       venue_id: ev.venue_id || "",
       description: ev.description || "",
       banner_image: ev.banner_image || "",
-      start_datetime: ev.start_datetime ? ev.start_datetime.slice(0, 16) : "",
-      end_datetime: ev.end_datetime ? ev.end_datetime.slice(0, 16) : "",
+      start_datetime: startVal,
+      end_datetime: endVal,
       status: ev.status || "draft",
     };
     setForm(formData);
@@ -362,7 +380,8 @@ export default function EventManagement() {
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
-                {filteredEvents.map(ev => {
+                {Array.isArray(filteredEvents) && filteredEvents.map(ev => {
+                  if (!ev) return null;
                   const isPublished = ev.status === "published";
                   const isCancelled = ev.status === "cancelled";
                   const statusColor = isPublished ? C.green : isCancelled ? C.red : C.muted;
@@ -437,7 +456,7 @@ export default function EventManagement() {
                 <label className="form-label">Host Venue</label>
                 <select required className="form-input" value={form.venue_id} onChange={e => setForm(f => ({ ...f, venue_id: e.target.value }))}>
                   <option value="" disabled>Select a physical venue</option>
-                  {venues.map(v => (
+                  {Array.isArray(venues) && venues.map(v => v && (
                     <option key={v.id} value={v.id}>{v.name}</option>
                   ))}
                 </select>

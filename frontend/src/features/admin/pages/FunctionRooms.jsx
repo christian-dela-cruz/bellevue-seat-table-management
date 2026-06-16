@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Camera,
@@ -39,6 +39,32 @@ import clientDisplayAPI from "../../../services/clientDisplayAPI";
 import { buildDiningOutletsFromConfig, buildEventVenuesFromConfig, VenueCard } from "../../client/pages/ReservationLanding";
 
 import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
+
+class DrawerErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('[DrawerErrorBoundary] Caught:', error, info?.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, color: '#c00', fontFamily: 'monospace', fontSize: 13, whiteSpace: 'pre-wrap', background: '#fff8f8', border: '2px solid #c00', borderRadius: 12, margin: 20, maxHeight: '80vh', overflow: 'auto' }}>
+          <h2 style={{ margin: '0 0 12px', fontSize: 18 }}>⚠️ Drawer Render Error</h2>
+          <p><strong>{String(this.state.error)}</strong></p>
+          <p style={{ fontSize: 11, color: '#666' }}>{this.state.error?.stack}</p>
+          <button type="button" onClick={() => this.setState({ hasError: false, error: null })} style={{ marginTop: 12, padding: '8px 16px', cursor: 'pointer' }}>Retry</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function SortableRow({ id, disabled, level, className, style, children }) {
   const { isDark } = useAdminTheme();
@@ -2752,6 +2778,7 @@ export default function FunctionRooms() {
       )}
 
       {drawerVisible && createPortal((
+        <DrawerErrorBoundary>
         <div className={`function-room-drawer-backdrop${drawerClosing ? " is-closing" : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(24,20,14,0.28)", display: "flex", justifyContent: "flex-end", backdropFilter: "blur(2px)" }}>
           <aside className="function-room-drawer" role="dialog" aria-modal="true" aria-label={editing ? "Edit venue" : "Create venue"} style={{ width: "min(920px, calc(100vw - 28px))", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "18px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
@@ -2772,13 +2799,21 @@ export default function FunctionRooms() {
             <form onSubmit={saveRoom} style={{ minHeight: 0, flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
 
               <div style={{ padding: "12px 20px", borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
-                <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 2, alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", paddingBottom: 2 }}>
                   {EDITOR_TABS.map(([key, label], index) => {
                     const active = editorTab === key;
                     const completed = isStepCompleted(key);
                     const stepNum = index + 1;
+                    const activeIdx = EDITOR_TABS.findIndex(([k]) => k === editorTab) + 1;
+                    const isLineActive = activeIdx > index + 1;
+                    const nextTab = index + 1 < EDITOR_TABS.length ? EDITOR_TABS[index + 1] : null;
+                    const isLineCompleted = completed && nextTab && isStepCompleted(nextTab[0]);
+                    const lineBackground = isLineActive 
+                      ? C.gold 
+                      : (isLineCompleted ? C.green : "rgba(0,0,0,0.06)");
+
                     return (
-                      <div key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <React.Fragment key={key}>
                         <button
                           type="button"
                           onClick={() => setEditorTab(key)}
@@ -2796,7 +2831,7 @@ export default function FunctionRooms() {
                             fontSize: 12.5,
                             fontWeight: active ? 700 : 500,
                             cursor: "pointer",
-                            transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
                             boxShadow: active ? "0 3px 10px rgba(140,107,42,0.11)" : "none",
                             flexShrink: 0,
                             outline: "none",
@@ -2814,16 +2849,25 @@ export default function FunctionRooms() {
                             background: active ? C.gold : (completed ? C.greenFaint : "rgba(0,0,0,0.04)"),
                             color: active ? "#FFF" : (completed ? C.green : C.muted),
                             border: completed && !active ? `1px solid ${C.green}` : "none",
-                            transition: "all 0.2s ease",
+                            transition: "all 0.25s ease",
                           }}>
                             {completed && !active ? "✓" : stepNum}
                           </span>
                           <span style={{ letterSpacing: "0.01em" }}>{label}</span>
                         </button>
                         {index < EDITOR_TABS.length - 1 && (
-                          <span style={{ color: "rgba(0,0,0,0.12)", fontSize: 13, userSelect: "none" }}>→</span>
+                          <div 
+                            style={{ 
+                              flex: 1, 
+                              height: 2, 
+                              background: lineBackground, 
+                              borderRadius: 2,
+                              margin: "0 10px",
+                              transition: "background 0.25s ease"
+                            }} 
+                          />
                         )}
-                      </div>
+                      </React.Fragment>
                     );
                   })}
                 </div>
@@ -3215,6 +3259,7 @@ export default function FunctionRooms() {
             </form>
           </aside>
         </div>
+        </DrawerErrorBoundary>
       ), document.body)}
 
       {confirmAction && (

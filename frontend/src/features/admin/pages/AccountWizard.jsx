@@ -516,17 +516,40 @@ export default function AccountWizard({
         </div>
 
         {/* Stepper (Fixed) */}
-        <div style={{ display: "flex", padding: "12px 20px", background: C.surfaceSoft, borderBottom: `1px solid ${C.divider}`, gap: 8, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "12px 20px", background: C.surfaceSoft, borderBottom: `1px solid ${C.divider}`, flexShrink: 0 }}>
           {STEPS.map((s, i) => (
-            <div key={s.id} style={{ display: "flex", alignItems: "center", flex: 1, gap: 8, opacity: step >= s.id ? 1 : 0.4 }}>
-              <div style={{ width: 22, height: 22, borderRadius: "50%", background: step >= s.id ? C.gold : C.divider, color: step >= s.id ? "#fff" : C.muted, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <React.Fragment key={s.id}>
+              <div 
+                style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center",
+                  width: 22, 
+                  height: 22, 
+                  borderRadius: "50%", 
+                  background: step >= s.id ? C.gold : C.divider, 
+                  color: step >= s.id ? "#fff" : C.muted, 
+                  opacity: step >= s.id ? 1 : 0.4,
+                  flexShrink: 0,
+                  transition: "background 0.25s ease, color 0.25s ease, opacity 0.25s ease"
+                }}
+              >
                 {step > s.id ? <Check size={11} /> : s.icon}
               </div>
-              <span style={{ fontSize: 10, fontWeight: 700, color: step >= s.id ? C.text : C.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
-                <span style={{ display: "none", '@media (min-width: 480px)': { display: 'inline' } }}>{s.title}</span>
-              </span>
-              {i < STEPS.length - 1 && <div style={{ flex: 1, height: 2, background: step > s.id ? C.gold : C.divider, borderRadius: 2 }} />}
-            </div>
+              {i < STEPS.length - 1 && (
+                <div 
+                  style={{ 
+                    flex: 1, 
+                    height: 2, 
+                    background: step > s.id ? C.gold : C.divider, 
+                    borderRadius: 2,
+                    margin: "0 8px",
+                    opacity: step > s.id ? 1 : 0.4,
+                    transition: "background 0.25s ease, opacity 0.25s ease"
+                  }} 
+                />
+              )}
+            </React.Fragment>
           ))}
         </div>
 
