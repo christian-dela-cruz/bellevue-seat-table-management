@@ -2330,7 +2330,7 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
                         Modify Details
                       </button>
                     )}
-                    {["pending", "approved", "reserved"].includes((reservation.status || "").toLowerCase()) && canManage && (
+                    {["approved", "reserved"].includes((reservation.status || "").toLowerCase()) && canManage && (
                       <button
                         onClick={() => setShowCancelModal(true)}
                         disabled={!!actionLoading}
