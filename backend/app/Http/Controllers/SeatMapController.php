@@ -112,6 +112,29 @@ class SeatMapController extends Controller
                         'y' => $seat->y_position,
                     ];
                 }
+
+                $isRound = str_contains(strtolower($venue->name), 'ballroom') 
+                    || str_contains(strtolower($venue->name), 'tower');
+
+                foreach ($tables as &$table) {
+                    if ($isRound) {
+                        $table['shape'] = 'round';
+                        $seatCount = count($table['seats']);
+                        if ($seatCount <= 4) {
+                            $size = 90;
+                        } elseif ($seatCount <= 6) {
+                            $size = 130;
+                        } elseif ($seatCount <= 8) {
+                            $size = 150;
+                        } else {
+                            $size = 180;
+                        }
+                        $table['width'] = $size;
+                        $table['height'] = $size;
+                    }
+                }
+                unset($table);
+
                 $payload = json_encode([
                     'v' => 2,
                     'tables' => array_values($tables),
@@ -227,6 +250,29 @@ class SeatMapController extends Controller
                         'y' => $seat->y_position,
                     ];
                 }
+
+                $isRound = str_contains(strtolower($venue->name), 'ballroom') 
+                    || str_contains(strtolower($venue->name), 'tower');
+
+                foreach ($tables as &$table) {
+                    if ($isRound) {
+                        $table['shape'] = 'round';
+                        $seatCount = count($table['seats']);
+                        if ($seatCount <= 4) {
+                            $size = 90;
+                        } elseif ($seatCount <= 6) {
+                            $size = 130;
+                        } elseif ($seatCount <= 8) {
+                            $size = 150;
+                        } else {
+                            $size = 180;
+                        }
+                        $table['width'] = $size;
+                        $table['height'] = $size;
+                    }
+                }
+                unset($table);
+
                 $payload = json_encode([
                     'v' => 2,
                     'tables' => array_values($tables),
