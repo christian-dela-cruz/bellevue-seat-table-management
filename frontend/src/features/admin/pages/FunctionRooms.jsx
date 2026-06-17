@@ -125,7 +125,7 @@ function SortableVenueCard({ id, item, variant: rawVariant, isHidden, onToggleHi
           Event
         </div>
       )}
-      <button 
+      <button
         type="button"
         onPointerDown={(e) => { e.stopPropagation(); }}
         onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleHide(id); }}
@@ -463,15 +463,15 @@ function imageUrl(image) {
   if (/^(https?:|data:|blob:)/i.test(image)) return image;
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "");
   let cleanPath = String(image).replace(/\\/g, "/").replace(/^\/+/, "");
-  
+
   if (!cleanPath.includes("/")) {
     return `${apiRoot}/images/${cleanPath}`;
   }
-  
+
   if (cleanPath.startsWith("function-rooms/") && !cleanPath.startsWith("images/")) {
     cleanPath = "images/" + cleanPath;
   }
-  
+
   return `${apiRoot}/${cleanPath}`;
 }
 
@@ -480,7 +480,7 @@ async function compressImageIfNeeded(file, maxDimension = 1200, quality = 0.85) 
   if (file.size <= 1200000) {
     return file;
   }
-  
+
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -491,7 +491,7 @@ async function compressImageIfNeeded(file, maxDimension = 1200, quality = 0.85) 
         const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
-        
+
         if (width > height) {
           if (width > maxDimension) {
             height = Math.round((height * maxDimension) / width);
@@ -503,12 +503,12 @@ async function compressImageIfNeeded(file, maxDimension = 1200, quality = 0.85) 
             height = maxDimension;
           }
         }
-        
+
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
-        
+
         // Export to a compressed blob
         const outputType = file.type === "image/png" ? "image/png" : "image/jpeg";
         canvas.toBlob(
@@ -1042,7 +1042,7 @@ export default function FunctionRooms() {
   const [pendingLayoutChanges, setPendingLayoutChanges] = useState({});
   const [pendingSettingsChanges, setPendingSettingsChanges] = useState({});
   const [layoutFeedback, setLayoutFeedback] = useState(null);
-  
+
   // View Modes & Grid config
   const [viewMode, setViewMode] = useState("table"); // "table" | "grid"
   const [gridSection, setGridSection] = useState("dining"); // "dining" | "events"
@@ -1059,58 +1059,7 @@ export default function FunctionRooms() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleDragEnd = async (event) => {
-    const { active, over } = event;
-    if (!active || !over || active.id === over.id) return;
 
-    const oldIndex = groupedRows.findIndex((r) => String(r.room.id) === String(active.id));
-    const newIndex = groupedRows.findIndex((r) => String(r.room.id) === String(over.id));
-
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const activeItem = groupedRows[oldIndex].room;
-      const sortedRooms = [...rooms].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
-      const rawOldIndex = sortedRooms.findIndex(r => String(r.id) === String(activeItem.id));
-      
-      let rawNewIndex = 0;
-      if (newIndex === 0) {
-        rawNewIndex = 0;
-      } else if (newIndex === groupedRows.length - 1) {
-        rawNewIndex = sortedRooms.length - 1;
-      } else {
-        const nextItem = groupedRows[newIndex < oldIndex ? newIndex : newIndex + 1].room;
-        rawNewIndex = sortedRooms.findIndex(r => String(r.id) === String(nextItem.id));
-        if (rawNewIndex > rawOldIndex) rawNewIndex--;
-      }
-      
-      if (rawOldIndex !== -1) {
-        const item = sortedRooms.splice(rawOldIndex, 1)[0];
-        sortedRooms.splice(rawNewIndex, 0, item);
-      }
-      
-      const updates = [];
-      const updatedRooms = rooms.map(r => {
-        const sortedIndex = sortedRooms.findIndex(sr => String(sr.id) === String(r.id));
-        if (sortedIndex !== -1) {
-          const expected = sortedIndex + 1; // Strict 1, 2, 3, 4...
-          if (r.display_order !== expected) {
-            updates.push({ id: r.id, display_order: expected });
-            return { ...r, display_order: expected };
-          }
-        }
-        return r;
-      });
-      
-      setRooms(updatedRooms);
-      
-      setPendingLayoutChanges(current => {
-        const newChanges = { ...current };
-        updates.forEach(u => {
-          newChanges[u.id] = { ...(newChanges[u.id] || {}), display_order: u.display_order };
-        });
-        return newChanges;
-      });
-    }
-  };
 
   const loadRooms = async () => {
     setLoading(true);
@@ -1121,10 +1070,10 @@ export default function FunctionRooms() {
         eventAPI.getAll().catch(() => [])
       ]);
       setRooms(Array.isArray(data) ? data : []);
-      
+
       const eventsList = Array.isArray(eventsRes) ? eventsRes : (eventsRes?.data || []);
       setPublishedEvents(eventsList.filter(e => e.status === "published"));
-      
+
       const newSettings = {
         dining: { desktop_columns: 6, tablet_columns: 2, mobile_columns: 1 },
         events: { desktop_columns: 3, tablet_columns: 2, mobile_columns: 1 }
@@ -1221,22 +1170,22 @@ export default function FunctionRooms() {
       const list = diningOrderedVenues;
       const oldIndex = list.findIndex(v => v.title === active.id);
       const newIndex = list.findIndex(v => v.title === over.id);
-      
+
       if (oldIndex !== -1 && newIndex !== -1) {
         const newArray = arrayMove(list, oldIndex, newIndex);
-        
+
         const availableSlots = list
           .map(v => v._original?.display_order || 0)
           .sort((a, b) => a - b);
-        
+
         const updates = [];
         newArray.forEach((item, idx) => {
           const targetOrder = availableSlots[idx];
           if (item._original && item._original.display_order !== targetOrder) {
-             updates.push({ id: item._original.id, display_order: targetOrder });
+            updates.push({ id: item._original.id, display_order: targetOrder });
           }
         });
-        
+
         setRooms(current => current.map(r => {
           const update = updates.find(u => Number(u.id) === Number(r.id));
           return update ? { ...r, display_order: update.display_order } : r;
@@ -1254,11 +1203,11 @@ export default function FunctionRooms() {
       const list = eventOrderedItems;
       const oldIndex = list.findIndex(item => `${item.type}:${item.id}` === active.id);
       const newIndex = list.findIndex(item => `${item.type}:${item.id}` === over.id);
-      
+
       if (oldIndex !== -1 && newIndex !== -1) {
         const newArray = arrayMove(list, oldIndex, newIndex);
         const nextOrderedIds = newArray.map(item => `${item.type}:${item.id}`);
-        
+
         updateClientSetting("events", "ordered_ids", nextOrderedIds);
       }
     }
@@ -1270,9 +1219,9 @@ export default function FunctionRooms() {
       const venue = list.find(v => v.title === id);
       const originalRoom = venue?._original;
       if (!originalRoom || !canManage) return;
-      
+
       const nextValue = !originalRoom.show_on_landing;
-      
+
       setRooms(current => current.map(r => Number(r.id) === Number(originalRoom.id) ? { ...r, show_on_landing: nextValue } : r));
 
       setPendingLayoutChanges(current => ({
@@ -1285,7 +1234,7 @@ export default function FunctionRooms() {
         const originalRoom = rooms.find(r => Number(r.id) === Number(itemId));
         if (!originalRoom || !canManage) return;
         const nextValue = !originalRoom.show_on_landing;
-        
+
         setRooms(current => current.map(r => Number(r.id) === Number(originalRoom.id) ? { ...r, show_on_landing: nextValue } : r));
 
         setPendingLayoutChanges(current => ({
@@ -1311,7 +1260,7 @@ export default function FunctionRooms() {
     setError("");
     try {
       const promises = [];
-      
+
       const updates = Object.entries(pendingLayoutChanges).map(([id, changes]) => {
         return venueAPI.update(id, changes);
       });
@@ -1325,7 +1274,7 @@ export default function FunctionRooms() {
       }
 
       await Promise.all(promises);
-      
+
       setPendingLayoutChanges({});
       setPendingSettingsChanges({});
       await loadRooms();
@@ -1350,7 +1299,7 @@ export default function FunctionRooms() {
   const updateClientSetting = (section, key, value) => {
     const newSettings = { ...(clientSettings[section] || {}), [key]: value };
     setClientSettings(prev => ({ ...prev, [section]: newSettings }));
-    
+
     setPendingSettingsChanges(prev => ({
       ...prev,
       [section]: { ...(prev[section] || {}), [key]: value }
@@ -1370,9 +1319,9 @@ export default function FunctionRooms() {
     }).length || list.length;
     let opt = visibleCount;
     if (section === "dining") {
-        if (opt > 6) opt = Math.ceil(opt / 2);
+      if (opt > 6) opt = Math.ceil(opt / 2);
     } else {
-        if (opt > 4) opt = Math.ceil(opt / 2);
+      if (opt > 4) opt = Math.ceil(opt / 2);
     }
     if (opt < 1) opt = 1;
     updateClientSetting(section, 'desktop_columns', opt);
@@ -1476,10 +1425,10 @@ export default function FunctionRooms() {
       const key = diningGroup
         ? `dining:${diningGroup}`
         : derivedParent
-        ? `child:${derivedParent}:${childGroupingKey(room, derivedParent)}`
-        : room.parent_id
-          ? `child:${room.parent_id}:${nameKey}`
-          : `parent:${parentKey || room.slug || nameKey}`;
+          ? `child:${derivedParent}:${childGroupingKey(room, derivedParent)}`
+          : room.parent_id
+            ? `child:${room.parent_id}:${nameKey}`
+            : `parent:${parentKey || room.slug || nameKey}`;
       const existing = byKey.get(key);
       if (!existing || score(room) >= score(existing)) {
         byKey.set(key, room);
@@ -1756,7 +1705,7 @@ export default function FunctionRooms() {
 
   const validate = (isDraft = false) => {
     if (!form.name.trim()) return "Venue name is required.";
-    
+
     if (!isDraft) {
       if (!form.slug.trim()) return "Venue slug/code is required.";
       const duplicateSlug = uniqueRooms.find((room) => String(room.slug || "").toLowerCase() === form.slug.toLowerCase() && (!editing || Number(room.id) !== Number(editing.id)));
@@ -1770,7 +1719,7 @@ export default function FunctionRooms() {
       if (Number.isNaN(Number(form.display_order))) return "Display order must be numeric.";
       if (Number(form.availability_interval_minutes) < 15) return "Reservation interval must be at least 15 minutes.";
       if (form.availability_start_time && form.availability_end_time && form.availability_start_time === form.availability_end_time) return "Opening and closing time cannot be the same.";
-      
+
       const periods = normalizeSchedulePeriods(form.availability_periods, form);
       if (periods.length === 0) return "At least one reservation period is required.";
       for (const period of periods) {
@@ -1794,7 +1743,7 @@ export default function FunctionRooms() {
         }
       }
     }
-    
+
     if (imageFile && !["image/jpeg", "image/png", "image/webp"].includes(imageFile.type)) return "Image must be JPG, PNG, or WEBP.";
     return "";
   };
@@ -1807,7 +1756,7 @@ export default function FunctionRooms() {
       setError(validationError);
       return;
     }
-    
+
     setConfirmAction({
       type: "save_draft",
       title: "Save as Draft?",
@@ -1820,7 +1769,7 @@ export default function FunctionRooms() {
   const requestCancelDraft = (event) => {
     if (event) event.preventDefault();
     if (!canManage) return;
-    
+
     setConfirmAction({
       type: "cancel_draft",
       title: "Delete Draft?",
@@ -1842,7 +1791,7 @@ export default function FunctionRooms() {
     setConfirmAction({
       type: "save",
       title: editing ? "Save changes?" : "Create venue?",
-      message: editing 
+      message: editing
         ? `Are you sure you want to save the changes made to "${form.display_name || form.name}"?`
         : `Are you sure you want to create the new venue "${form.display_name || form.name}"?`,
       label: editing ? "Save Changes" : "Create Venue",
@@ -1917,61 +1866,61 @@ export default function FunctionRooms() {
     if (key === "is_active") {
       return nextValue
         ? {
-            title: `Enable ${venueKind}?`,
-            message: `${name} will be enabled and can be reserved when visibility settings allow it.`,
-            label: "Enable",
-            tone: "green",
-          }
+          title: `Enable ${venueKind}?`,
+          message: `${name} will be enabled and can be reserved when visibility settings allow it.`,
+          label: "Enable",
+          tone: "green",
+        }
         : {
-            title: `Disable ${venueKind}?`,
-            message: `${name} will no longer be reservable on the guest-facing venue page. Existing reservations remain preserved.`,
-            label: "Disable",
-            tone: "red",
-          };
+          title: `Disable ${venueKind}?`,
+          message: `${name} will no longer be reservable on the guest-facing venue page. Existing reservations remain preserved.`,
+          label: "Disable",
+          tone: "red",
+        };
     }
     if (key === "is_visible") {
       return nextValue
         ? {
-            title: `Show ${venueKind}?`,
-            message: `${name} will become eligible to render on the guest-facing venue page when enabled and configured for landing display.`,
-            label: "Show",
-            tone: "green",
-          }
+          title: `Show ${venueKind}?`,
+          message: `${name} will become eligible to render on the guest-facing venue page when enabled and configured for landing display.`,
+          label: "Show",
+          tone: "green",
+        }
         : {
-            title: `Hide ${venueKind}?`,
-            message: `${name} will be removed from guest-facing venue lists while remaining manageable in admin.`,
-            label: "Hide",
-            tone: "red",
-          };
+          title: `Hide ${venueKind}?`,
+          message: `${name} will be removed from guest-facing venue lists while remaining manageable in admin.`,
+          label: "Hide",
+          tone: "red",
+        };
     }
     if (key === "reservations_enabled") {
       return nextValue
         ? {
-            title: `Enable reservations for ${venueKind}?`,
-            message: `${name} will be bookable again when its schedule and capacity allow it.`,
-            label: "Enable reservations",
-            tone: "green",
-          }
+          title: `Enable reservations for ${venueKind}?`,
+          message: `${name} will be bookable again when its schedule and capacity allow it.`,
+          label: "Enable reservations",
+          tone: "green",
+        }
         : {
-            title: `Disable reservations for ${venueKind}?`,
-            message: `${name} may remain visible, but guests will not be able to submit new reservations. Existing reservations stay preserved.`,
-            label: "Disable reservations",
-            tone: "red",
-          };
+          title: `Disable reservations for ${venueKind}?`,
+          message: `${name} may remain visible, but guests will not be able to submit new reservations. Existing reservations stay preserved.`,
+          label: "Disable reservations",
+          tone: "red",
+        };
     }
     return nextValue
       ? {
-          title: "Show on landing page?",
-          message: `${name} will appear on the venue launcher when it is also enabled and visible.`,
-          label: "Show on landing",
-          tone: "green",
-        }
+        title: "Show on landing page?",
+        message: `${name} will appear on the venue launcher when it is also enabled and visible.`,
+        label: "Show on landing",
+        tone: "green",
+      }
       : {
-          title: "Remove from landing page?",
-          message: `${name} will stay in admin but will no longer appear on the venue launcher.`,
-          label: "Remove",
-          tone: "red",
-        };
+        title: "Remove from landing page?",
+        message: `${name} will stay in admin but will no longer appear on the venue launcher.`,
+        label: "Remove",
+        tone: "red",
+      };
   };
 
   const requestToggle = (room, key) => {
@@ -2069,7 +2018,7 @@ export default function FunctionRooms() {
         await loadRooms();
         notifyVenueConfigUpdated();
         setConfirmAction(null);
-        
+
         setSaveFeedback({
           type: isDraft ? "draft_saved" : (editing ? "update" : "create"),
           venueName: finalSaved.display_name || finalSaved.name,
@@ -2084,7 +2033,7 @@ export default function FunctionRooms() {
         setConfirmAction(null);
         await loadRooms();
         notifyVenueConfigUpdated();
-        
+
         setSaveFeedback({
           type: "draft_deleted",
           venueName: editing?.display_name || editing?.name || "Draft",
@@ -2183,475 +2132,437 @@ export default function FunctionRooms() {
         <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, height: "100vh", overflow: "hidden" }}>
           <AdminNavbar />
           <main style={{ flex: 1, overflow: "auto", padding: "30px 32px 42px" }}>
-          <AdminPageHeader
-            eyebrow="Venue Configuration"
-            title="Venue Management"
-            description="Configure dining outlets, function rooms, sub-rooms, photos, visibility, landing display, and reservation availability."
-            C={C}
-            F={F}
-            actions={canManage && (
-              <div style={{ display: "flex", gap: 10 }}>
-                <div style={{ display: "flex", background: C.soft, border: `1px solid ${C.border}`, borderRadius: 9, padding: 3 }}>
-                  <button type="button" onClick={() => setViewMode("table")} style={{ ...buttonBase(), border: "none", minHeight: 32, padding: "0 12px", background: viewMode === "table" ? C.surface : "transparent", color: viewMode === "table" ? C.text : C.muted, boxShadow: viewMode === "table" ? "0 2px 5px rgba(0,0,0,0.06)" : "none", textTransform: "none", letterSpacing: "normal", fontSize: 13, gap: 6, fontWeight: viewMode === "table" ? 600 : 500 }}>
-                    <List size={14} /> List
-                  </button>
-                  <button type="button" onClick={() => setViewMode("grid")} style={{ ...buttonBase(), border: "none", minHeight: 32, padding: "0 12px", background: viewMode === "grid" ? C.surface : "transparent", color: viewMode === "grid" ? C.text : C.muted, boxShadow: viewMode === "grid" ? "0 2px 5px rgba(0,0,0,0.06)" : "none", textTransform: "none", letterSpacing: "normal", fontSize: 13, gap: 6, fontWeight: viewMode === "grid" ? 600 : 500 }}>
-                    <LayoutGrid size={14} /> Landing Display
+            <AdminPageHeader
+              eyebrow="Venue Configuration"
+              title="Venue Management"
+              description="Configure dining outlets, function rooms, sub-rooms, photos, visibility, landing display, and reservation availability."
+              C={C}
+              F={F}
+              actions={canManage && (
+                <div style={{ display: "flex", gap: 10 }}>
+                  <div style={{ display: "flex", background: C.soft, border: `1px solid ${C.border}`, borderRadius: 9, padding: 3 }}>
+                    <button type="button" onClick={() => setViewMode("table")} style={{ ...buttonBase(), border: "none", minHeight: 32, padding: "0 12px", background: viewMode === "table" ? C.surface : "transparent", color: viewMode === "table" ? C.text : C.muted, boxShadow: viewMode === "table" ? "0 2px 5px rgba(0,0,0,0.06)" : "none", textTransform: "none", letterSpacing: "normal", fontSize: 13, gap: 6, fontWeight: viewMode === "table" ? 600 : 500 }}>
+                      <List size={14} /> List
+                    </button>
+                    <button type="button" onClick={() => setViewMode("grid")} style={{ ...buttonBase(), border: "none", minHeight: 32, padding: "0 12px", background: viewMode === "grid" ? C.surface : "transparent", color: viewMode === "grid" ? C.text : C.muted, boxShadow: viewMode === "grid" ? "0 2px 5px rgba(0,0,0,0.06)" : "none", textTransform: "none", letterSpacing: "normal", fontSize: 13, gap: 6, fontWeight: viewMode === "grid" ? 600 : 500 }}>
+                      <LayoutGrid size={14} /> Landing Display
+                    </button>
+                  </div>
+                  <button type="button" onClick={beginCreate} style={{ ...buttonBase(), minHeight: 40, border: "none", background: C.gold, color: "#fff", padding: "0 14px" }}>
+                    <Plus size={14} /> New Venue
                   </button>
                 </div>
-                <button type="button" onClick={beginCreate} style={{ ...buttonBase(), minHeight: 40, border: "none", background: C.gold, color: "#fff", padding: "0 14px" }}>
-                  <Plus size={14} /> New Venue
+              )}
+            />
+
+            {toast && (
+              <div style={{
+                marginBottom: 14, padding: "10px 14px", borderRadius: 10,
+                background: C.greenFaint, color: C.green,
+                border: "1px solid rgba(46,122,90,0.16)", fontSize: 12.5,
+                display: "flex", alignItems: "center", gap: 10,
+                animation: "toastSlideIn 0.28s ease both",
+                fontWeight: 550,
+              }}>
+                <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1 }}>{toast}</span>
+                <button
+                  type="button"
+                  onClick={() => setToast("")}
+                  style={{ background: "none", border: "none", color: C.green, cursor: "pointer", padding: 2, display: "flex", opacity: 0.6 }}
+                >
+                  <X size={14} />
                 </button>
               </div>
             )}
-          />
-
-          {toast && (
-            <div style={{
-              marginBottom: 14, padding: "10px 14px", borderRadius: 10,
-              background: C.greenFaint, color: C.green,
-              border: "1px solid rgba(46,122,90,0.16)", fontSize: 12.5,
-              display: "flex", alignItems: "center", gap: 10,
-              animation: "toastSlideIn 0.28s ease both",
-              fontWeight: 550,
-            }}>
-              <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
-              <span style={{ flex: 1 }}>{toast}</span>
-              <button
-                type="button"
-                onClick={() => setToast("")}
-                style={{ background: "none", border: "none", color: C.green, cursor: "pointer", padding: 2, display: "flex", opacity: 0.6 }}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          )}
-          {error && !drawerOpen && (
-            <div style={{
-              marginBottom: 14, padding: "10px 14px", borderRadius: 10,
-              background: C.redFaint, color: C.red,
-              border: "1px solid rgba(160,56,56,0.16)", fontSize: 12.5,
-              display: "flex", alignItems: "center", gap: 10,
-              fontWeight: 550,
-            }}>
-              <span style={{ flex: 1 }}>{error}</span>
-              <button
-                type="button"
-                onClick={() => setError("")}
-                style={{ background: "none", border: "none", color: C.red, cursor: "pointer", padding: 2, display: "flex", opacity: 0.6 }}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          )}
-          <style>{`
+            {error && !drawerOpen && (
+              <div style={{
+                marginBottom: 14, padding: "10px 14px", borderRadius: 10,
+                background: C.redFaint, color: C.red,
+                border: "1px solid rgba(160,56,56,0.16)", fontSize: 12.5,
+                display: "flex", alignItems: "center", gap: 10,
+                fontWeight: 550,
+              }}>
+                <span style={{ flex: 1 }}>{error}</span>
+                <button
+                  type="button"
+                  onClick={() => setError("")}
+                  style={{ background: "none", border: "none", color: C.red, cursor: "pointer", padding: 2, display: "flex", opacity: 0.6 }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            <style>{`
             @keyframes toastSlideIn {
               from { opacity: 0; transform: translateY(-8px); }
               to { opacity: 1; transform: translateY(0); }
             }
           `}</style>
 
-          <div className="function-room-stats" style={{ display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 12, marginBottom: 16 }}>
-            <SummaryCard icon={Layers} label="Configured Venues" value={stats.total} />
-            <SummaryCard icon={Camera} label="Dining Outlets" value={stats.dining} tone="gold" />
-            <SummaryCard icon={Layers} label="Function Rooms" value={stats.functionRooms} />
-            <SummaryCard icon={CheckCircle2} label="Enabled" value={stats.enabled} tone="green" />
-            <SummaryCard icon={Eye} label="Landing Visible" value={stats.visible} tone="gold" />
-          </div>
-
-          <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "visible" }}>
-            {viewMode === "table" ? (
-              <>
-                <div className="function-room-toolbar" style={{ display: "grid", gridTemplateColumns: "minmax(240px,1fr) repeat(6, minmax(128px, auto))", gap: 10, padding: 14, borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
-              <div style={{ position: "relative" }}>
-                <Search size={15} style={{ position: "absolute", left: 11, top: 12, color: C.faint }} />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search venues, slugs, wings" style={{ ...inputStyle(), paddingLeft: 34 }} />
-              </div>
-              <select value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))} style={inputStyle()}>
-                <option value="all">All types</option>
-                <option value="dining">Dining outlets</option>
-                <option value="function_room">Function rooms</option>
-                <option value="sub_room">Sub-rooms</option>
-              </select>
-              <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} style={inputStyle()}>
-                <option value="all">All status</option>
-                <option value="enabled">Enabled</option>
-                <option value="disabled">Disabled</option>
-              </select>
-              <select value={filters.visibility} onChange={(e) => setFilters((f) => ({ ...f, visibility: e.target.value }))} style={inputStyle()}>
-                <option value="all">All visibility</option>
-                <option value="visible">Visible</option>
-                <option value="hidden">Hidden</option>
-              </select>
-              <select value={filters.landing} onChange={(e) => setFilters((f) => ({ ...f, landing: e.target.value }))} style={inputStyle()}>
-                <option value="all">All landing</option>
-                <option value="shown">Shown</option>
-                <option value="hidden">Not shown</option>
-              </select>
-              <select value={filters.wing} onChange={(e) => setFilters((f) => ({ ...f, wing: e.target.value }))} style={inputStyle()}>
-                <option value="all">All wings</option>
-                <option value="Dining">Dining</option>
-                <option value="Main Wing">Main Wing</option>
-                <option value="Tower Wing">Tower Wing</option>
-              </select>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={inputStyle()}>
-                <option value="display_order">Display order</option>
-                <option value="parent_first">Parents first</option>
-                <option value="name">Alphabetical</option>
-                <option value="newest">Newest</option>
-                <option value="oldest">Oldest</option>
-                <option value="status">Enabled first</option>
-              </select>
+            <div className="function-room-stats" style={{ display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 12, marginBottom: 16 }}>
+              <SummaryCard icon={Layers} label="Configured Venues" value={stats.total} />
+              <SummaryCard icon={Camera} label="Dining Outlets" value={stats.dining} tone="gold" />
+              <SummaryCard icon={Layers} label="Function Rooms" value={stats.functionRooms} />
+              <SummaryCard icon={CheckCircle2} label="Enabled" value={stats.enabled} tone="green" />
+              <SummaryCard icon={Eye} label="Landing Visible" value={stats.visible} tone="gold" />
             </div>
 
-            <div className="function-room-table-wrap">
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1040, tableLayout: "fixed" }}>
-                  <thead>
-                    <tr style={{ background: C.surface }}>
-                      {[
-                        { label: "Venue Structure", width: "42%", align: "left" },
-                        { label: "Status", width: "11%", align: "left" },
-                        { label: "Display Settings", width: "23%", align: "left" },
-                        { label: "Order", width: "8%", align: "center" },
-                        { label: "Manage", width: "16%", align: "right" },
-                      ].map((column) => (
-                        <th key={column.label} style={{ width: column.width, padding: "11px 14px", textAlign: column.align, color: C.faint, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", borderBottom: `1px solid ${C.divider}` }}>{column.label}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <SortableContext items={groupedRows.map(r => String(r.room.id))} strategy={verticalListSortingStrategy}>
-                    <tbody>
-                      {loading ? (
-                        <tr><td colSpan={5} style={{ padding: 22, color: C.muted }}>Loading venues...</td></tr>
-                      ) : groupedRows.length === 0 ? (
-                        <tr><td colSpan={5} style={{ padding: 22, color: C.muted }}>No venues match the current filters.</td></tr>
-                      ) : groupedRows.map(({ room, level, childCount, parent }) => (
-                        <SortableRow
-                          key={`${room.id}-${level}`}
-                          id={String(room.id)}
-                          disabled={sortBy !== "display_order" || search.length > 0}
-                          level={level}
-                          className="function-room-row"
-                          style={{ background: level ? (isDark ? "rgba(255,255,255,0.03)" : "rgba(250,248,244,0.52)") : C.surface }}
-                        >
-                          {(attributes, listeners, isDragging) => (
-                            <>
-                              <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: level ? 26 : 0 }}>
-                                  {level ? (
-                                    <span style={{ width: 14, color: C.faint, display: "inline-flex", justifyContent: "center" }}><ChevronRight size={14} /></span>
-                                  ) : childCount ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleParentExpanded(room.id)}
-                                      aria-label={`${expandedParents.has(Number(room.id)) ? "Collapse" : "Expand"} ${room.display_name || room.name}`}
-                                      style={{ width: 18, height: 18, border: "none", background: "transparent", color: C.gold, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transform: expandedParents.has(Number(room.id)) ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.18s ease" }}
-                                    >
-                                      <ChevronRight size={15} />
-                                    </button>
-                                  ) : <span style={{ width: 18 }} />}
-                                  <div style={{ width: level ? 38 : 46, height: level ? 38 : 46, borderRadius: 10, background: room.type === "dining" ? "#15110C" : C.soft, overflow: "hidden", flexShrink: 0, border: `1px solid ${C.border}`, display: "grid", placeItems: "center" }}>
-                                    {room.image ? (
-                                      <img
-                                        src={imageUrl(room.image)}
-                                        alt=""
-                                        loading="lazy"
-                                        decoding="async"
-                                        draggable={false}
-                                        style={{
-                                          width: "100%",
-                                          height: "100%",
-                                          objectFit: room.type === "dining" ? "contain" : "cover",
-                                          objectPosition: room.image_position || "center 50%",
-                                          imageRendering: "auto",
-                                        }}
-                                      />
-                                    ) : <Camera size={17} style={{ color: C.faint }} />}
-                                  </div>
-                                  <div style={{ minWidth: 0 }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                                      <strong style={{ color: C.text, fontSize: level ? 12.5 : 13.5, fontWeight: level ? 560 : 640, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                        <span style={{ color: C.gold, opacity: 0.8, marginRight: 6, fontSize: '0.9em' }}>#{room.id}</span>
-                                        {room.display_name || room.name}
-                                      </strong>
-                                      {!level && (
-                                        <Badge tone={room.type === "dining" ? "gold" : "neutral"} compact>
-                                          {room.type === "dining" ? "Dining" : childCount ? `${childCount} sub-room${childCount > 1 ? "s" : ""}` : "Function"}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <div style={{ marginTop: 3, color: C.muted, fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                      {level && parent ? `${parent.display_name || parent.name} · ` : ""}{room.slug || "No slug"} · {room.wing}
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
-                                {room.is_draft ? (
-                                  <Badge tone="neutral">Draft</Badge>
-                                ) : (
-                                  <Badge tone={room.is_active ? "green" : "red"}>{room.is_active ? "Enabled" : "Disabled"}</Badge>
-                                )}
-                              </td>
-                              <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
-                                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                                  <Badge tone={room.is_visible ? "green" : "neutral"} compact>{room.is_visible ? "Visible" : "Hidden"}</Badge>
-                                  <Badge tone={room.show_on_landing ? "gold" : "neutral"} compact>{room.show_on_landing ? "Landing" : "No landing"}</Badge>
-                                  <Badge tone={room.reservations_enabled ? "green" : "red"} compact>{room.reservations_enabled ? "Reservable" : "Unavailable"}</Badge>
-                                </div>
-                              </td>
-                              <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}`, color: C.text, fontWeight: 560, fontSize: 12.5, textAlign: "center" }}>
-                                {sortBy === "display_order" && !search ? (
-                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                                    <span
-                                      {...attributes}
-                                      {...listeners}
-                                      style={{ cursor: isDragging ? "grabbing" : "grab", color: C.muted, display: "flex", alignItems: "center", padding: 4 }}
-                                      title="Drag to reorder"
-                                    >
-                                      <GripVertical size={14} />
-                                    </span>
-                                    <span>{room.display_order}</span>
-                                  </div>
-                                ) : (
-                                  room.display_order
-                                )}
-                              </td>
-                              <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}`, textAlign: "right" }}>
-                                <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end", alignItems: "center", position: "relative", minWidth: 132 }}>
-                                  <button className="function-room-action" type="button" onClick={() => beginEdit(room)} style={{ ...buttonBase(), minWidth: 84, color: C.gold }} title="Edit venue"><Edit3 size={14} /> Edit</button>
+            <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "visible" }}>
+              {viewMode === "table" ? (
+                <>
+                  <div className="function-room-toolbar" style={{ display: "grid", gridTemplateColumns: "minmax(240px,1fr) repeat(6, minmax(128px, auto))", gap: 10, padding: 14, borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
+                    <div style={{ position: "relative" }}>
+                      <Search size={15} style={{ position: "absolute", left: 11, top: 12, color: C.faint }} />
+                      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search venues, slugs, wings" style={{ ...inputStyle(), paddingLeft: 34 }} />
+                    </div>
+                    <select value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))} style={inputStyle()}>
+                      <option value="all">All types</option>
+                      <option value="dining">Dining outlets</option>
+                      <option value="function_room">Function rooms</option>
+                      <option value="sub_room">Sub-rooms</option>
+                    </select>
+                    <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} style={inputStyle()}>
+                      <option value="all">All status</option>
+                      <option value="enabled">Enabled</option>
+                      <option value="disabled">Disabled</option>
+                    </select>
+                    <select value={filters.visibility} onChange={(e) => setFilters((f) => ({ ...f, visibility: e.target.value }))} style={inputStyle()}>
+                      <option value="all">All visibility</option>
+                      <option value="visible">Visible</option>
+                      <option value="hidden">Hidden</option>
+                    </select>
+                    <select value={filters.landing} onChange={(e) => setFilters((f) => ({ ...f, landing: e.target.value }))} style={inputStyle()}>
+                      <option value="all">All landing</option>
+                      <option value="shown">Shown</option>
+                      <option value="hidden">Not shown</option>
+                    </select>
+                    <select value={filters.wing} onChange={(e) => setFilters((f) => ({ ...f, wing: e.target.value }))} style={inputStyle()}>
+                      <option value="all">All wings</option>
+                      <option value="Dining">Dining</option>
+                      <option value="Main Wing">Main Wing</option>
+                      <option value="Tower Wing">Tower Wing</option>
+                    </select>
+                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={inputStyle()}>
+                      <option value="display_order">Display order</option>
+                      <option value="parent_first">Parents first</option>
+                      <option value="name">Alphabetical</option>
+                      <option value="newest">Newest</option>
+                      <option value="oldest">Oldest</option>
+                      <option value="status">Enabled first</option>
+                    </select>
+                  </div>
+
+                  <div className="function-room-table-wrap">
+                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1040, tableLayout: "fixed" }}>
+                      <thead>
+                        <tr style={{ background: C.surface }}>
+                          {[
+                            { label: "Venue Structure", width: "48%", align: "left" },
+                            { label: "Status", width: "12%", align: "left" },
+                            { label: "Display Settings", width: "24%", align: "left" },
+                            { label: "Manage", width: "16%", align: "right" },
+                          ].map((column) => (
+                            <th key={column.label} style={{ width: column.width, padding: "11px 14px", textAlign: column.align, color: C.faint, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", borderBottom: `1px solid ${C.divider}` }}>{column.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {loading ? (
+                          <tr><td colSpan={4} style={{ padding: 22, color: C.muted }}>Loading venues...</td></tr>
+                        ) : groupedRows.length === 0 ? (
+                          <tr><td colSpan={4} style={{ padding: 22, color: C.muted }}>No venues match the current filters.</td></tr>
+                        ) : groupedRows.map(({ room, level, childCount, parent }) => (
+                          <tr
+                            key={`${room.id}-${level}`}
+                            className="function-room-row"
+                            style={{
+                              background: level ? (isDark ? "rgba(255,255,255,0.03)" : "rgba(250,248,244,0.52)") : C.surface,
+                              transition: "background 0.15s ease"
+                            }}
+                          >
+                            <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: level ? 26 : 0 }}>
+                                {level ? (
+                                  <span style={{ width: 14, color: C.faint, display: "inline-flex", justifyContent: "center" }}><ChevronRight size={14} /></span>
+                                ) : childCount ? (
                                   <button
-                                    className="function-room-action"
                                     type="button"
-                                    disabled={!canManage}
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      setOpenMenuId((current) => current === room.id ? null : room.id);
-                                    }}
-                                    style={{ ...buttonBase(), width: 38, minWidth: 38, padding: 0 }}
-                                    aria-label={`Open actions for ${room.display_name || room.name}`}
-                                    aria-expanded={openMenuId === room.id}
+                                    onClick={() => toggleParentExpanded(room.id)}
+                                    aria-label={`${expandedParents.has(Number(room.id)) ? "Collapse" : "Expand"} ${room.display_name || room.name}`}
+                                    style={{ width: 18, height: 18, border: "none", background: "transparent", color: C.gold, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transform: expandedParents.has(Number(room.id)) ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.18s ease" }}
                                   >
-                                    <MoreHorizontal size={16} />
+                                    <ChevronRight size={15} />
                                   </button>
-                                  {openMenuId === room.id && (
-                                    <div
-                                      role="menu"
-                                      onClick={(event) => event.stopPropagation()}
-                                      style={{ position: "absolute", top: 40, right: 0, zIndex: 20, width: 210, padding: 6, borderRadius: 12, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 18px 46px rgba(24,20,14,0.16)", display: "grid", gap: 2 }}
-                                    >
-                                      <MenuAction icon={room.is_active ? ToggleRight : ToggleLeft} label={room.is_active ? "Disable venue" : "Enable venue"} onClick={() => requestToggle(room, "is_active")} />
-                                      <MenuAction icon={room.is_visible ? EyeOff : Eye} label={room.is_visible ? "Hide from guests" : "Show to guests"} onClick={() => requestToggle(room, "is_visible")} />
-                                      <MenuAction icon={room.show_on_landing ? EyeOff : Eye} label={room.show_on_landing ? "Remove from landing" : "Add to landing"} onClick={() => requestToggle(room, "show_on_landing")} />
-                                      <MenuAction icon={room.reservations_enabled ? ToggleRight : ToggleLeft} label={room.reservations_enabled ? "Disable reservations" : "Enable reservations"} onClick={() => requestToggle(room, "reservations_enabled")} />
-                                      <div style={{ height: 1, background: C.divider, margin: "4px 3px" }} />
-                                      <MenuAction icon={Trash2} label="Delete venue" danger onClick={() => requestDelete(room)} />
-                                    </div>
-                                  )}
+                                ) : <span style={{ width: 18 }} />}
+                                <div style={{ width: level ? 38 : 46, height: level ? 38 : 46, borderRadius: 10, background: room.type === "dining" ? "#15110C" : C.soft, overflow: "hidden", flexShrink: 0, border: `1px solid ${C.border}`, display: "grid", placeItems: "center" }}>
+                                  {room.image ? (
+                                    <img
+                                      src={imageUrl(room.image)}
+                                      alt=""
+                                      loading="lazy"
+                                      decoding="async"
+                                      draggable={false}
+                                      style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        objectFit: room.type === "dining" ? "contain" : "cover",
+                                        objectPosition: room.image_position || "center 50%",
+                                        imageRendering: "auto",
+                                      }}
+                                    />
+                                  ) : <Camera size={17} style={{ color: C.faint }} />}
                                 </div>
-                              </td>
-                            </>
-                          )}
-                        </SortableRow>
-                      ))}
-                    </tbody>
-                  </SortableContext>
-                </table>
-              </DndContext>
-            </div>
-            </>
-            ) : (
-              <div style={{ padding: 24, minHeight: 600 }}>
-                {["dining", "events"].map(section => {
-                  const title = section === "dining" ? "Dining Outlets" : "Events & Venues";
-                  const settings = clientSettings[section] || { desktop_columns: 3 };
-                  const layoutEngine = settings.layout_engine || "grid";
-                  const list = section === "dining" ? diningOrderedVenues : eventOrderedItems;
-                  
-                  return (
-                    <div key={section} style={{ marginBottom: 40 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 20, paddingBottom: 12, borderBottom: `1px solid ${C.divider}` }}>{title}</h2>
-                      
-                      <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 24 }}>
-                        {/* Configuration Sidebar */}
-                        <div style={{ background: C.soft, padding: 20, borderRadius: 12, border: `1px solid ${C.border}`, alignSelf: "start" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-                            <Grid size={18} color={C.gold} />
-                            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: C.text }}>Grid Configuration</h3>
-                          </div>
-
-                          <div style={{ marginBottom: 24 }}>
-                            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 12 }}>Layout Engine</label>
-                            <select
-                              value={layoutEngine}
-                              onChange={(e) => updateClientSetting(section, 'layout_engine', e.target.value)}
-                              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 13, outline: "none", cursor: "pointer" }}
-                            >
-                              <option value="grid">Standard Grid (Default)</option>
-                              <option value="flex">Advanced Flexbox</option>
-                            </select>
-                            <p style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>
-                              {layoutEngine === "grid" ? "Strict grid layout defined by column count." : "Dynamic layout with strict card sizing and auto-wrapping."}
-                            </p>
-                          </div>
-
-                          {layoutEngine === "grid" ? (
-                            <>
-                              <div style={{ marginBottom: 24 }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                                  <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Desktop Columns</label>
-                                  <span style={{ fontSize: 12, color: C.muted }}>{settings.desktop_columns} Columns</span>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                    <strong style={{ color: C.text, fontSize: level ? 12.5 : 13.5, fontWeight: level ? 560 : 640, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                      <span style={{ color: C.gold, opacity: 0.8, marginRight: 6, fontSize: '0.9em' }}>#{room.id}</span>
+                                      {room.display_name || room.name}
+                                    </strong>
+                                    {!level && (
+                                      <Badge tone={room.type === "dining" ? "gold" : "neutral"} compact>
+                                        {room.type === "dining" ? "Dining" : childCount ? `${childCount} sub-room${childCount > 1 ? "s" : ""}` : "Function"}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div style={{ marginTop: 3, color: C.muted, fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {level && parent ? `${parent.display_name || parent.name} · ` : ""}{room.slug || "No slug"} · {room.wing}
+                                  </div>
                                 </div>
-                                <input
-                                  type="range"
-                                  min="1" max="6"
-                                  value={settings.desktop_columns}
-                                  onChange={(e) => updateClientSetting(section, 'desktop_columns', parseInt(e.target.value))}
-                                  style={{ width: "100%", accentColor: C.gold }}
-                                />
                               </div>
-
-                              <button 
-                                onClick={() => handleGridAutoResize(section)}
-                                style={{
-                                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                                  width: "100%", padding: "10px", borderRadius: 8,
-                                  background: C.goldFaint, color: C.gold,
-                                  border: `1px solid rgba(140,107,42,0.2)`,
-                                  fontSize: 13, fontWeight: 600, cursor: "pointer",
-                                  transition: "background 0.2s"
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(140,107,42,0.12)'}
-                                onMouseLeave={e => e.currentTarget.style.background = C.goldFaint}
-                              >
-                                <Wand2 size={16} /> Auto Resize Grid
-                              </button>
-                              <p style={{ fontSize: 11.5, color: C.muted, marginTop: 12, lineHeight: 1.45 }}>
-                                Click to automatically set the ideal number of columns based on how many venues are visible.
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <div style={{ marginBottom: 24 }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                                  <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Card Width</label>
-                                  <span style={{ fontSize: 12, color: C.muted }}>{settings.card_width || 240}px</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min="150" max="600" step="10"
-                                  value={settings.card_width || 240}
-                                  onChange={(e) => updateClientSetting(section, 'card_width', parseInt(e.target.value))}
-                                  style={{ width: "100%", accentColor: C.gold }}
-                                />
+                            </td>
+                            <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
+                              {room.is_draft ? (
+                                <Badge tone="neutral">Draft</Badge>
+                              ) : (
+                                <Badge tone={room.is_active ? "green" : "red"}>{room.is_active ? "Enabled" : "Disabled"}</Badge>
+                              )}
+                            </td>
+                            <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
+                              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                                <Badge tone={room.is_visible ? "green" : "neutral"} compact>{room.is_visible ? "Visible" : "Hidden"}</Badge>
+                                <Badge tone={room.show_on_landing ? "gold" : "neutral"} compact>{room.show_on_landing ? "Landing" : "No landing"}</Badge>
+                                <Badge tone={room.reservations_enabled ? "green" : "red"} compact>{room.reservations_enabled ? "Reservable" : "Unavailable"}</Badge>
                               </div>
+                            </td>
+                            <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}`, textAlign: "right" }}>
+                              <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end", alignItems: "center", position: "relative", minWidth: 132 }}>
+                                <button className="function-room-action" type="button" onClick={() => beginEdit(room)} style={{ ...buttonBase(), minWidth: 84, color: C.gold }} title="Edit venue"><Edit3 size={14} /> Edit</button>
+                                <button
+                                  className="function-room-action"
+                                  type="button"
+                                  disabled={!canManage}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setOpenMenuId((current) => current === room.id ? null : room.id);
+                                  }}
+                                  style={{ ...buttonBase(), width: 38, minWidth: 38, padding: 0 }}
+                                  aria-label={`Open actions for ${room.display_name || room.name}`}
+                                  aria-expanded={openMenuId === room.id}
+                                >
+                                  <MoreHorizontal size={16} />
+                                </button>
+                                {openMenuId === room.id && (
+                                  <div
+                                    role="menu"
+                                    onClick={(event) => event.stopPropagation()}
+                                    style={{ position: "absolute", top: 40, right: 0, zIndex: 20, width: 210, padding: 6, borderRadius: 12, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 18px 46px rgba(24,20,14,0.16)", display: "grid", gap: 2 }}
+                                  >
+                                    <MenuAction icon={room.is_active ? ToggleRight : ToggleLeft} label={room.is_active ? "Disable venue" : "Enable venue"} onClick={() => requestToggle(room, "is_active")} />
+                                    <MenuAction icon={room.is_visible ? EyeOff : Eye} label={room.is_visible ? "Hide from guests" : "Show to guests"} onClick={() => requestToggle(room, "is_visible")} />
+                                    <MenuAction icon={room.show_on_landing ? EyeOff : Eye} label={room.show_on_landing ? "Remove from landing" : "Add to landing"} onClick={() => requestToggle(room, "show_on_landing")} />
+                                    <MenuAction icon={room.reservations_enabled ? ToggleRight : ToggleLeft} label={room.reservations_enabled ? "Disable reservations" : "Enable reservations"} onClick={() => requestToggle(room, "reservations_enabled")} />
+                                    <div style={{ height: 1, background: C.divider, margin: "4px 3px" }} />
+                                    <MenuAction icon={Trash2} label="Delete venue" danger onClick={() => requestDelete(room)} />
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div style={{ padding: 24, minHeight: 600 }}>
+                  {["dining", "events"].map(section => {
+                    const title = section === "dining" ? "Dining Outlets" : "Events & Venues";
+                    const settings = clientSettings[section] || { desktop_columns: 3 };
+                    const list = section === "dining" ? diningOrderedVenues : eventOrderedItems;
 
-                              <div style={{ marginBottom: 24 }}>
-                                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                                  <input 
-                                    type="checkbox"
-                                    checked={settings.stretch_to_fill || false}
-                                    onChange={(e) => updateClientSetting(section, 'stretch_to_fill', e.target.checked)}
-                                    style={{ accentColor: C.gold, width: 16, height: 16 }}
-                                  />
-                                  <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Stretch to Fill</span>
-                                </label>
-                                <p style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.45, marginLeft: 26 }}>
-                                  Cards will stretch wider than the base width to fill any remaining horizontal space perfectly.
+                    const visibleList = list.filter(v => {
+                      if (section === "dining") {
+                        return v._original ? v._original.show_on_landing : true;
+                      }
+                      const itemId = `${v.type}:${v.id}`;
+                      return v.type === "event"
+                        ? !(clientSettings.events?.hidden_ids || []).includes(itemId)
+                        : (v._original ? v._original.show_on_landing : true);
+                    });
+
+                    const hiddenList = list.filter(v => {
+                      if (section === "dining") {
+                        return v._original ? !v._original.show_on_landing : false;
+                      }
+                      const itemId = `${v.type}:${v.id}`;
+                      return v.type === "event"
+                        ? (clientSettings.events?.hidden_ids || []).includes(itemId)
+                        : (v._original ? !v._original.show_on_landing : false);
+                    });
+
+                    return (
+                      <div key={section} style={{ marginBottom: 40 }}>
+                        <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 20, paddingBottom: 12, borderBottom: `1px solid ${C.divider}` }}>{title}</h2>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 24 }}>
+                          {/* Configuration Sidebar */}
+                          <div style={{ background: C.soft, padding: 20, borderRadius: 12, border: `1px solid ${C.border}`, alignSelf: "start" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+                              <Grid size={18} color={C.gold} />
+                              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: C.text }}>Grid Configuration</h3>
+                            </div>
+
+                            {section === "dining" ? (
+                              <div style={{ padding: "12px 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, display: "flex", flexDirection: "column", gap: 12 }}>
+                                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.gold }}>Premium Auto-Row</p>
+                                <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+                                  Dining outlets are automatically displayed in a single horizontal row.
+                                </p>
+                                <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+                                  Visible cards dynamically stretch to fill 100% of the container width without changing height.
                                 </p>
                               </div>
+                            ) : (
+                              <>
+                                <div style={{ marginBottom: 24 }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                                    <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Desktop Columns</label>
+                                    <span style={{ fontSize: 12, color: C.muted }}>{settings.desktop_columns} Columns</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="1" max="6"
+                                    value={settings.desktop_columns}
+                                    onChange={(e) => updateClientSetting(section, 'desktop_columns', parseInt(e.target.value))}
+                                    style={{ width: "100%", accentColor: C.gold }}
+                                  />
+                                </div>
 
-                              <div style={{ marginBottom: 24 }}>
-                                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 12 }}>Row Alignment</label>
-                                <select
-                                  value={settings.flex_alignment || "center"}
-                                  onChange={(e) => updateClientSetting(section, 'flex_alignment', e.target.value)}
-                                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 13, outline: "none", cursor: "pointer" }}
+                                <button
+                                  onClick={() => handleGridAutoResize(section)}
+                                  style={{
+                                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                    width: "100%", padding: "10px", borderRadius: 8,
+                                    background: C.goldFaint, color: C.gold,
+                                    border: `1px solid rgba(140,107,42,0.2)`,
+                                    fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                    transition: "background 0.2s"
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(140,107,42,0.12)'}
+                                  onMouseLeave={e => e.currentTarget.style.background = C.goldFaint}
                                 >
-                                  <option value="center">Center</option>
-                                  <option value="flex-start">Left</option>
-                                  <option value="flex-end">Right</option>
-                                </select>
-                              </div>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Live Preview Area */}
-                        <div style={{ background: C.surface, padding: 32, borderRadius: 12, border: `1px solid ${C.border}` }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
-                            <Monitor size={18} color={C.muted} />
-                            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: C.text }}>Visual Live Preview {section === "dining" && "(Auto-Stretching Row)"}</h3>
+                                  <Wand2 size={16} /> Auto Resize Grid
+                                </button>
+                                <p style={{ fontSize: 11.5, color: C.muted, marginTop: 12, lineHeight: 1.45 }}>
+                                  Click to automatically set the ideal number of columns based on how many venues are visible.
+                                </p>
+                              </>
+                            )}
                           </div>
 
-                          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleGridDragEnd(e, section)}>
-                            <SortableContext items={section === "dining" ? list.map(v => v.title) : list.map(v => `${v.type}:${v.id}`)} strategy={rectSortingStrategy}>
-                              <div 
-                                className={`reservation-grid reservation-grid--${section === "events" ? "events" : "dining"}`}
-                                style={
-                                  layoutEngine === "flex"
-                                  ? {
-                                      display: "flex",
-                                      flexWrap: "wrap",
-                                      justifyContent: settings.flex_alignment || "center",
-                                      gap: "clamp(14px, 1.25vw, 24px)",
-                                      background: "#fffaf1",
-                                      padding: 32,
-                                      borderRadius: 16,
-                                      border: "1px solid rgba(0,0,0,0.05)",
-                                      boxShadow: "inset 0 2px 20px rgba(0,0,0,0.02)",
-                                      "--card-width": `${settings.card_width || 240}px`,
-                                      "--card-stretch": settings.stretch_to_fill ? "1" : "0"
-                                    }
-                                  : {
-                                      display: "grid",
-                                      gap: "clamp(14px, 1.25vw, 24px)",
-                                      gridTemplateColumns: `repeat(${settings.desktop_columns}, minmax(0, 1fr))`,
-                                      background: "#fffaf1",
-                                      padding: 32,
-                                      borderRadius: 16,
-                                      border: "1px solid rgba(0,0,0,0.05)",
-                                      boxShadow: "inset 0 2px 20px rgba(0,0,0,0.02)"
-                                    }
-                                }
-                              >
-                                {list.map((v) => {
-                                  const itemId = section === "dining" ? v.title : `${v.type}:${v.id}`;
-                                  const isHidden = section === "dining"
-                                    ? (v._original ? !v._original.show_on_landing : false)
-                                    : (v.type === "event"
-                                      ? (clientSettings.events?.hidden_ids || []).includes(itemId)
-                                      : (v._original ? !v._original.show_on_landing : false));
-                                  return (
-                                    <SortableVenueCard 
-                                      key={itemId}
-                                      id={itemId}
-                                      item={v}
-                                      variant={section === "events" ? "event" : section}
-                                      isHidden={isHidden}
-                                      onToggleHide={(id) => handleGridToggleHide(id, section)}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            </SortableContext>
-                          </DndContext>
+                          {/* Live Preview Area */}
+                          <div style={{ background: C.surface, padding: 32, borderRadius: 12, border: `1px solid ${C.border}` }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+                              <Monitor size={18} color={C.muted} />
+                              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: C.text }}>Visual Live Preview {section === "dining" && "(Auto-Stretching Row)"}</h3>
+                            </div>
 
-                          <p style={{ fontSize: 12.5, color: C.muted, marginTop: 24, textAlign: "center" }}>
-                            Drag and drop the cards above to reorder them. Click "Hide" to toggle visibility.
-                          </p>
+                            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleGridDragEnd(e, section)}>
+                              <SortableContext items={section === "dining" ? visibleList.map(v => v.title) : visibleList.map(v => `${v.type}:${v.id}`)} strategy={rectSortingStrategy}>
+                                <div
+                                  className={`reservation-grid reservation-grid--${section === "events" ? "events" : "dining"}`}
+                                  style={
+                                    section === "dining"
+                                      ? {
+                                        display: "grid",
+                                        gap: "clamp(14px, 1.25vw, 24px)",
+                                        gridTemplateColumns: `repeat(var(--dining-cols, 6), minmax(0, 1fr))`,
+                                        background: "#fffaf1",
+                                        padding: 32,
+                                        borderRadius: 16,
+                                        border: "1px solid rgba(0,0,0,0.05)",
+                                        boxShadow: "inset 0 2px 20px rgba(0,0,0,0.02)",
+                                        "--dining-cols": visibleList.length || 1
+                                      }
+                                      : {
+                                        display: "grid",
+                                        gap: "clamp(14px, 1.25vw, 24px)",
+                                        gridTemplateColumns: `repeat(${settings.desktop_columns}, minmax(0, 1fr))`,
+                                        background: "#fffaf1",
+                                        padding: 32,
+                                        borderRadius: 16,
+                                        border: "1px solid rgba(0,0,0,0.05)",
+                                        boxShadow: "inset 0 2px 20px rgba(0,0,0,0.02)"
+                                      }
+                                  }
+                                >
+                                  {visibleList.map((v) => {
+                                    const itemId = section === "dining" ? v.title : `${v.type}:${v.id}`;
+                                    return (
+                                      <SortableVenueCard
+                                        key={itemId}
+                                        id={itemId}
+                                        item={v}
+                                        variant={section === "events" ? "event" : section}
+                                        isHidden={false}
+                                        onToggleHide={(id) => handleGridToggleHide(id, section)}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              </SortableContext>
+                            </DndContext>
+
+                            {hiddenList.length > 0 && (
+                              <div style={{ marginTop: 24, paddingTop: 24, borderTop: `1px dashed ${C.border}` }}>
+                                <h4 style={{ margin: "0 0 16px", fontSize: 13, fontWeight: 600, color: C.muted }}>
+                                  Hidden {section === "dining" ? "Dining Outlets" : "Events & Venues"} ({hiddenList.length})
+                                </h4>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 16, opacity: 0.85 }}>
+                                  {hiddenList.map((v) => {
+                                    const itemId = section === "dining" ? v.title : `${v.type}:${v.id}`;
+                                    return (
+                                      <div key={itemId} style={{ width: section === "dining" ? 180 : 200, pointerEvents: "auto" }}>
+                                        <SortableVenueCard
+                                          id={itemId}
+                                          item={v}
+                                          variant={section === "events" ? "event" : section}
+                                          isHidden={true}
+                                          onToggleHide={(id) => handleGridToggleHide(id, section)}
+                                        />
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            <p style={{ fontSize: 12.5, color: C.muted, marginTop: 24, textAlign: "center" }}>
+                              Drag and drop the cards above to reorder them. Click "Hide" to toggle visibility.
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-          
-          {viewMode === "grid" && (
-            <style dangerouslySetInnerHTML={{__html: `
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {viewMode === "grid" && (
+              <style dangerouslySetInnerHTML={{
+                __html: `
               .reservation-card {
                 position: relative;
                 overflow: hidden;
@@ -2750,737 +2661,737 @@ export default function FunctionRooms() {
                 background: #17130e;
               }
             `}} />
-          )}
-
-        </main>
-      </div>
-
-      {(Object.keys(pendingLayoutChanges).length > 0 || Object.keys(pendingSettingsChanges).length > 0) && (
-        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 6000, background: C.surface, border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 24px", display: "flex", alignItems: "center", gap: 16, boxShadow: "0 12px 40px rgba(201,168,76,0.2)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: "50%", background: "rgba(201,168,76,0.15)", color: C.gold }}>
-              <Edit3 size={14} />
-            </span>
-            <div>
-              <strong style={{ color: C.text, fontSize: 14, display: "block" }}>Unsaved Layout Changes</strong>
-              <span style={{ color: C.muted, fontSize: 12 }}>You have pending grid reordering or visibility changes.</span>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, paddingLeft: 16, borderLeft: `1px solid ${C.divider}` }}>
-            <button type="button" onClick={cancelLayoutChanges} disabled={saving} style={{ ...buttonBase(), background: "transparent", color: C.text, border: `1px solid ${C.border}` }}>
-              Cancel
-            </button>
-            <button type="button" onClick={saveLayoutChanges} disabled={saving} style={{ ...buttonBase(), background: C.gold, color: "#fff", border: "none", minWidth: 120 }}>
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {drawerVisible && createPortal((
-        <DrawerErrorBoundary>
-        <div className={`function-room-drawer-backdrop${drawerClosing ? " is-closing" : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(24,20,14,0.28)", display: "flex", justifyContent: "flex-end", backdropFilter: "blur(2px)" }}>
-          <aside className="function-room-drawer" role="dialog" aria-modal="true" aria-label={editing ? "Edit venue" : "Create venue"} style={{ width: "min(920px, calc(100vw - 28px))", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column" }}>
-            <div style={{ padding: "18px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
-              <div>
-                <div style={{ color: C.gold, fontSize: 8.5, fontWeight: 750, letterSpacing: "0.16em", textTransform: "uppercase" }}>Configuration</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 5, flexWrap: "wrap" }}>
-                  <h2 style={{ margin: 0, color: C.text, fontSize: 21, lineHeight: 1.15, fontWeight: 640 }}>{editing ? "Edit Venue" : "Create Venue"}</h2>
-                  {hasUnsavedChanges && (
-                    <span style={{ borderRadius: 999, padding: "4px 8px", background: C.goldFaint, color: C.gold, fontSize: 9, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                      Unsaved changes
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button type="button" onClick={closeDrawer} style={{ ...buttonBase(), width: 36, padding: 0 }} aria-label="Close panel"><X size={16} /></button>
-            </div>
-
-            <form onSubmit={saveRoom} style={{ minHeight: 0, flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
-
-              <div style={{ padding: "12px 20px", borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
-                <div style={{ display: "flex", alignItems: "center", paddingBottom: 2 }}>
-                  {EDITOR_TABS.map(([key, label], index) => {
-                    const active = editorTab === key;
-                    const completed = isStepCompleted(key);
-                    const stepNum = index + 1;
-                    const activeIdx = EDITOR_TABS.findIndex(([k]) => k === editorTab) + 1;
-                    const isLineActive = activeIdx > index + 1;
-                    const nextTab = index + 1 < EDITOR_TABS.length ? EDITOR_TABS[index + 1] : null;
-                    const isLineCompleted = completed && nextTab && isStepCompleted(nextTab[0]);
-                    const lineBackground = isLineActive 
-                      ? C.gold 
-                      : (isLineCompleted ? C.green : "rgba(0,0,0,0.06)");
-
-                    return (
-                      <React.Fragment key={key}>
-                        <button
-                          type="button"
-                          onClick={() => setEditorTab(key)}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 8,
-                            minHeight: 34,
-                            border: `1px solid ${active ? C.gold : "rgba(0,0,0,0.06)"}`,
-                            borderRadius: 10,
-                            background: active ? "linear-gradient(135deg, #FAF6EE, #F4ECE0)" : C.surface,
-                            color: active ? C.gold : C.text,
-                            padding: "0 14px",
-                            fontFamily: F.body,
-                            fontSize: 12.5,
-                            fontWeight: active ? 700 : 500,
-                            cursor: "pointer",
-                            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                            boxShadow: active ? "0 3px 10px rgba(140,107,42,0.11)" : "none",
-                            flexShrink: 0,
-                            outline: "none",
-                          }}
-                        >
-                          <span style={{
-                            width: 18,
-                            height: 18,
-                            borderRadius: "50%",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 9.5,
-                            fontWeight: 800,
-                            background: active ? C.gold : (completed ? C.greenFaint : "rgba(0,0,0,0.04)"),
-                            color: active ? "#FFF" : (completed ? C.green : C.muted),
-                            border: completed && !active ? `1px solid ${C.green}` : "none",
-                            transition: "all 0.25s ease",
-                          }}>
-                            {completed && !active ? "✓" : stepNum}
-                          </span>
-                          <span style={{ letterSpacing: "0.01em" }}>{label}</span>
-                        </button>
-                        {index < EDITOR_TABS.length - 1 && (
-                          <div 
-                            style={{ 
-                              flex: 1, 
-                              height: 2, 
-                              background: lineBackground, 
-                              borderRadius: 2,
-                              margin: "0 10px",
-                              transition: "background 0.25s ease"
-                            }} 
-                          />
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="venue-editor-body" style={{ flex: 1, overflow: "auto", padding: 20, display: "grid", gridTemplateColumns: editorTab === "preview" ? "minmax(0,1fr)" : "minmax(0,1fr) 300px", gap: 16, alignItems: "start" }}>
-                <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
-
-                {editorTab === "details" && (
-                  <>
-                <section style={formSectionStyle()}>
-                  <div style={sectionTitleStyle()}>Display Photo</div>
-                  <ImageUploaderCropper 
-                    value={preview}
-                    onChange={(file) => {
-                      setImageFile(file);
-                      if (file) {
-                        updateForm("image", ""); // Clear string URL if uploading file
-                      }
-                    }}
-                    aspect={16 / 9}
-                    title="Venue Image"
-                    description="Drag & drop a venue image here or click to upload"
-                  />
-                  <Field label="Image path or URL (Fallback)">
-                    <input value={form.image} onChange={(e) => updateForm("image", e.target.value)} placeholder="Image URL or public image path" style={inputStyle()} disabled={!!imageFile} />
-                  </Field>
-                </section>
-
-                <section style={formSectionStyle()}>
-                <div style={sectionTitleStyle()}>Venue Identity</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  <Field label="Venue Type">
-                    <select value={form.type} onChange={(e) => updateForm("type", e.target.value)} style={inputStyle()}>
-                      <option value="function_room">Function Room</option>
-                      <option value="dining">Dining Outlet</option>
-                    </select>
-                  </Field>
-                  <Field label="Order"><input type="number" min="0" value={form.display_order} onChange={(e) => updateForm("display_order", e.target.value)} style={inputStyle()} /></Field>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  <Field label="Venue Name"><input value={form.name} onChange={(e) => updateForm("name", e.target.value)} style={inputStyle()} /></Field>
-                  <Field label="Customer Display Name"><input value={form.display_name} onChange={(e) => updateForm("display_name", e.target.value)} style={inputStyle()} /></Field>
-                </div>
-                <Field 
-                  label="Venue Code / Slug" 
-                  hint="This becomes the venue’s public page URL, such as /potato-corner."
-                >
-                  <div style={{ display: "grid", gap: 4 }}>
-                    <input value={form.slug} onChange={(e) => updateForm("slug", slugify(e.target.value))} placeholder="hanakazu-japanese-restaurant" style={{ ...inputStyle(), borderColor: isSlugTaken ? C.red : C.border }} />
-                    {isSlugTaken && (
-                      <span style={{ color: C.red, fontSize: 11.5, fontWeight: 550, display: "block", marginTop: 2 }}>
-                        ⚠️ This slug is already in use by an active venue.
-                      </span>
-                    )}
-                    {form.slug && (
-                      <div style={{ marginTop: 4, padding: "5px 8px", borderRadius: 6, background: "rgba(0,0,0,0.025)", border: `1px solid ${isSlugTaken ? "rgba(160,56,56,0.1)" : "rgba(0,0,0,0.04)"}`, display: "inline-flex", alignItems: "center", gap: 6, width: "fit-content" }}>
-                        <span style={{ fontSize: 8, fontWeight: 750, color: C.gold, letterSpacing: "0.06em", textTransform: "uppercase" }}>Public URL</span>
-                        <span style={{ fontSize: 11.5, color: C.text, fontFamily: "monospace" }}>{form.reservation_route || `/${form.slug}`}</span>
-                      </div>
-                    )}
-                  </div>
-                </Field>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  <Field label="Location"><select value={form.wing} onChange={(e) => updateForm("wing", e.target.value)} style={inputStyle()}><option>Dining</option><option>Main Wing</option><option>Tower Wing</option></select></Field>
-                  <Field label="Capacity"><input type="number" min="0" value={form.capacity} onChange={(e) => updateForm("capacity", e.target.value)} style={inputStyle()} /></Field>
-                </div>
-              </section>
-
-                <section style={formSectionStyle()}>
-                  <div style={sectionTitleStyle()}>Grouping & Reservation</div>
-                  <Field label="Parent Room" hint="Leave empty for a main venue. Function-room children become chips under their parent card.">
-                    <select disabled={form.type === "dining"} value={form.parent_id} onChange={(e) => updateForm("parent_id", e.target.value)} style={inputStyle(form.type === "dining")}>
-                      <option value="">No parent room</option>
-                      {parentRooms.filter((room) => room.type === "function_room" && (!editing || room.id !== editing.id)).map((room) => <option key={room.id} value={room.id}>{room.display_name || room.name}</option>)}
-                    </select>
-                  </Field>
-                  {!form.parent_id && form.type === "function_room" && (
-                    <>
-                      <Field label="Allocation Mode" hint="Configure how subrooms are internally assigned.">
-                        <select
-                          value={form.metadata?.allocation_mode || "admin_assign"}
-                          onChange={(e) => {
-                            const mode = e.target.value;
-                            updateForm("metadata", {
-                              ...form.metadata,
-                              allocation_mode: mode,
-                              requires_admin_assignment: mode === "admin_assign",
-                            });
-                          }}
-                          style={inputStyle()}
-                        >
-                          <option value="admin_assign">Admin Assign after requests</option>
-                          <option value="auto_assign">Auto-Assign Available Subroom</option>
-                          <option value="whole_booking">Whole Parent Booking</option>
-                        </select>
-                      </Field>
-                      <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text, marginTop: 4, marginBottom: 12 }}>
-                        <span>Requires Admin Assignment</span>
-                        <input
-                          type="checkbox"
-                          checked={Boolean((form.metadata?.allocation_mode || "admin_assign") === "admin_assign")}
-                          disabled
-                          style={{ accentColor: C.gold }}
-                        />
-                      </label>
-                    </>
-                  )}
-                  <Field label="Reservation Page Route" hint="Public page opened when guests select this venue. Keep it unique and start with /.">
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
-                      <input value={form.reservation_route} onChange={(e) => updateForm("reservation_route", e.target.value)} placeholder="/hanakazu-japanese-restaurant" style={inputStyle()} />
-                      <button type="button" onClick={() => updateForm("reservation_route", routeFromSlug(form.slug || form.name))} style={{ ...buttonBase(), minHeight: 38 }}>Use slug</button>
-                    </div>
-                  </Field>
-                  <Field label="Description"><textarea value={form.description || ""} onChange={(e) => updateForm("description", e.target.value)} rows={3} style={{ ...inputStyle(), resize: "vertical" }} /></Field>
-                </section>
-                  </>
-                )}
-
-                {editorTab === "availability" && (
-                <section style={formSectionStyle()}>
-                  <div style={sectionTitleStyle()}>Availability Settings</div>
-                  <label style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, padding: 12, border: `1px solid ${isFullyAvailable ? "rgba(140,107,42,0.28)" : C.border}`, borderRadius: 12, background: isFullyAvailable ? C.goldFaint : C.surface }}>
-                    <span>
-                      <strong style={{ display: "block", color: C.text, fontSize: 12.5, fontWeight: 650 }}>Select all guest availability controls</strong>
-                      <span style={{ display: "block", marginTop: 4, color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>Turns on enabled, visible, landing display, and guest reservation access together.</span>
-                    </span>
-                    <input type="checkbox" checked={isFullyAvailable} onChange={(e) => setAllAvailabilityFlags(e.target.checked)} style={{ accentColor: C.gold, marginTop: 2 }} />
-                  </label>
-                  {[
-                    ["is_active", "Enabled"],
-                    ["is_visible", "Show to Guests"],
-                    ["show_on_landing", "Show on landing page"],
-                    ["reservations_enabled", "Allow Guest Booking"],
-                  ].map(([key, label]) => (
-                    <label key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
-                      {label}
-                      <input type="checkbox" checked={Boolean(form[key])} onChange={(e) => updateForm(key, e.target.checked)} style={{ accentColor: C.gold }} />
-                    </label>
-                  ))}
-                  {form.type !== "dining" && form.parent_id && (
-                    <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
-                      <span>Internal Subroom (Only Admin Assignable)</span>
-                      <input type="checkbox" checked={!form.child_selectable} onChange={(e) => updateForm("child_selectable", !e.target.checked)} style={{ accentColor: C.gold }} />
-                    </label>
-                  )}
-                  {form.type !== "dining" && !form.parent_id && (
-                    <>
-                      <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
-                        <span>Parent room selectable</span>
-                        <input type="checkbox" checked={Boolean(form.parent_selectable)} onChange={(e) => updateForm("parent_selectable", e.target.checked)} style={{ accentColor: C.gold }} />
-                      </label>
-                      <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
-                        <span>Child rooms selectable</span>
-                        <input type="checkbox" checked={Boolean(form.child_selectable)} onChange={(e) => updateForm("child_selectable", e.target.checked)} style={{ accentColor: C.gold }} />
-                      </label>
-                    </>
-                  )}
-                </section>
-                )}
-
-                {editorTab === "schedule" && (
-                <section style={formSectionStyle()}>
-                  <div style={sectionTitleStyle()}>Reservation Time Rules</div>
-                  <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text, padding: "10px 12px", border: `1px solid ${form.availability_enabled ? "rgba(140,107,42,0.28)" : C.border}`, borderRadius: 10, background: form.availability_enabled ? C.goldFaint : C.surface, transition: "all 0.2s ease", cursor: "pointer" }}>
-                    <span style={{ fontWeight: 600 }}>Use schedule for guest reservations</span>
-                    <input type="checkbox" checked={Boolean(form.availability_enabled)} onChange={(e) => updateForm("availability_enabled", e.target.checked)} style={{ accentColor: C.gold }} />
-                  </label>
-                  
-                  {form.availability_enabled ? (
-                    <>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 0", borderTop: `1px solid ${C.divider}` }}>
-                        <span style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
-                          Add multiple service periods for breakfast, lunch, dinner, private dining, or event windows.
-                        </span>
-                        <button type="button" onClick={applyDefaultSchedule} style={{ ...buttonBase(), alignSelf: "flex-start", padding: "8px 14px", border: `1px solid ${C.gold}`, color: C.gold, background: "transparent", transition: "all 0.2s" }} onMouseEnter={e => { e.currentTarget.style.background = C.goldFaint; }} onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
-                          Apply Template
-                        </button>
-                      </div>
-                      <div style={{ display: "grid", gap: 7 }}>
-                        <span style={{ color: C.faint, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>Quick add period</span>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          {schedulePresets.map((preset) => (
-                            <button key={`${preset.label}-${preset.start_time}`} type="button" onClick={() => addPresetPeriod(preset)} style={{ ...buttonBase(), minHeight: 30 }}>
-                              <Plus size={12} /> {preset.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div style={{ display: "grid", gap: 10 }}>
-                        {schedulePeriods.map((period, index) => (
-                          <div key={period.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: C.soft, display: "grid", gap: 10 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                              <strong style={{ color: C.text, fontSize: 12.5, fontWeight: 650 }}>Service Period {index + 1}</strong>
-                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: C.muted, fontSize: 11.5 }}>
-                                  Enabled
-                                  <input type="checkbox" checked={Boolean(period.enabled)} onChange={(event) => updatePeriod(period.id, "enabled", event.target.checked)} style={{ accentColor: C.gold }} />
-                                </label>
-                                <button type="button" onClick={() => removePeriod(period.id)} style={{ ...buttonBase(), minHeight: 30, color: C.red }}>Remove</button>
-                              </div>
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                              <Field label="Label"><input value={period.label} onChange={(e) => updatePeriod(period.id, "label", e.target.value)} style={inputStyle()} /></Field>
-                              <Field label="Service Type"><input value={period.service_type} onChange={(e) => updatePeriod(period.id, "service_type", e.target.value)} placeholder="Buffet, à la carte, private dining" style={inputStyle()} /></Field>
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 0.75fr", gap: 10 }}>
-                              <Field label="Start"><input type="time" value={period.start_time} onChange={(e) => updatePeriod(period.id, "start_time", e.target.value)} style={inputStyle()} /></Field>
-                              <Field label="End"><input type="time" value={period.end_time} onChange={(e) => updatePeriod(period.id, "end_time", e.target.value)} style={inputStyle()} /></Field>
-                              <Field label="Interval"><input type="number" min="15" step="15" value={period.interval_minutes} onChange={(e) => updatePeriod(period.id, "interval_minutes", e.target.value)} style={inputStyle()} /></Field>
-                            </div>
-                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                              {DAY_OPTIONS.map(([value, label]) => {
-                                const checked = period.days.map(Number).includes(Number(value));
-                                return (
-                                  <button
-                                    key={`${period.id}-${value}`}
-                                    type="button"
-                                    onClick={() => togglePeriodDay(period.id, value)}
-                                    style={{
-                                      minHeight: 28,
-                                      borderRadius: 999,
-                                      border: checked ? "1px solid rgba(140,107,42,0.34)" : `1px solid ${C.border}`,
-                                      background: checked ? C.goldFaint : C.surface,
-                                      color: checked ? C.gold : C.muted,
-                                      padding: "0 9px",
-                                      fontSize: 10,
-                                      fontWeight: 700,
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    {label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                              <Field label="Slot Capacity"><input type="number" min="0" value={period.slot_capacity} onChange={(e) => updatePeriod(period.id, "slot_capacity", e.target.value)} style={inputStyle()} /></Field>
-                              <Field label="Min Guests"><input type="number" min="0" value={period.min_guests} onChange={(e) => updatePeriod(period.id, "min_guests", e.target.value)} style={inputStyle()} /></Field>
-                              <Field label="Max Guests"><input type="number" min="0" value={period.max_guests} onChange={(e) => updatePeriod(period.id, "max_guests", e.target.value)} style={inputStyle()} /></Field>
-                            </div>
-                          </div>
-                        ))}
-                        <button type="button" onClick={addPeriod} style={{ ...buttonBase(), justifyContent: "center" }}>
-                          <Plus size={14} /> Add service period
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ padding: "20px 14px", textAlign: "center", border: `1px dashed ${C.border}`, borderRadius: 12, background: C.soft, color: C.muted, fontSize: 13, lineHeight: 1.6 }}>
-                      🕒 Reservation scheduling is currently disabled. <br />
-                      <span style={{ fontSize: 11.5 }}>Tick the checkbox above to enable and configure custom service periods for breakfast, lunch, or dinner.</span>
-                    </div>
-                  )}
-                </section>
-                )}
-
-                {editorTab === "exceptions" && (
-                <section style={formSectionStyle()}>
-                  <div style={sectionTitleStyle()}>Closures & Blocked Times</div>
-                  <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
-                    Add calendar-based exceptions for closures, private events, blocked slots, special hours, or one-day capacity changes.
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 8 }}>
-                    <button type="button" onClick={() => addOverride("closed")} style={{ ...buttonBase(), justifyContent: "center" }}><Plus size={14} /> Closure</button>
-                    <button type="button" onClick={() => addOverride("block_time")} style={{ ...buttonBase(), justifyContent: "center" }}><Plus size={14} /> Block time</button>
-                    <button type="button" onClick={() => addOverride("special_hours")} style={{ ...buttonBase(), justifyContent: "center" }}><Plus size={14} /> Special hours</button>
-                    <button type="button" onClick={() => addOverride("capacity")} style={{ ...buttonBase(), justifyContent: "center" }}><Plus size={14} /> Capacity</button>
-                  </div>
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {scheduleOverrides.map((override, index) => (
-                      <div key={override.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: C.soft, display: "grid", gap: 10 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                          <div>
-                            <strong style={{ color: C.text, fontSize: 12.5, fontWeight: 650 }}>{overrideTitle(override)} {index + 1}</strong>
-                            <div style={{ marginTop: 3, color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>{overrideSummary(override)}</div>
-                          </div>
-                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: C.muted, fontSize: 11.5 }}>
-                              Active
-                              <input type="checkbox" checked={Boolean(override.enabled)} onChange={(event) => updateOverride(override.id, "enabled", event.target.checked)} style={{ accentColor: C.gold }} />
-                            </label>
-                            <button type="button" onClick={() => removeOverride(override.id)} style={{ ...buttonBase(), minHeight: 30, color: C.red }}>Remove</button>
-                          </div>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                          <Field label="Date"><input type="date" value={override.date} onChange={(e) => updateOverride(override.id, "date", e.target.value)} style={inputStyle()} /></Field>
-                          <Field label="Type">
-                            <select value={override.type} onChange={(e) => updateOverride(override.id, "type", e.target.value)} style={inputStyle()}>
-                              <option value="closed">Closed full day</option>
-                              <option value="block_time">Block time range</option>
-                              <option value="special_hours">Special opening hours</option>
-                              <option value="capacity">Capacity adjustment</option>
-                            </select>
-                          </Field>
-                        </div>
-                        {override.type !== "closed" && (
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                            <Field label={override.type === "special_hours" ? "Special Open" : "Start"}><input type="time" value={override.start_time} onChange={(e) => updateOverride(override.id, "start_time", e.target.value)} style={inputStyle()} /></Field>
-                            <Field label={override.type === "special_hours" ? "Special Close" : "End"}><input type="time" value={override.end_time} onChange={(e) => updateOverride(override.id, "end_time", e.target.value)} style={inputStyle()} /></Field>
-                          </div>
-                        )}
-                        {["special_hours", "capacity"].includes(override.type) && (
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                            <Field label="Slot Capacity"><input type="number" min="0" value={override.slot_capacity} onChange={(e) => updateOverride(override.id, "slot_capacity", e.target.value)} style={inputStyle()} /></Field>
-                            <Field label="Max Bookings"><input type="number" min="0" value={override.max_reservations_per_slot} onChange={(e) => updateOverride(override.id, "max_reservations_per_slot", e.target.value)} style={inputStyle()} /></Field>
-                          </div>
-                        )}
-                        {override.type === "block_time" && (
-                          <Field label="Blocked Slot Times" hint="Optional specific slots inside the range, for example: 18:00, 18:30">
-                            <input value={override.blocked_times_text} onChange={(e) => updateOverride(override.id, "blocked_times_text", e.target.value)} placeholder="18:00, 18:30" style={inputStyle()} />
-                          </Field>
-                        )}
-                        <Field label="Note"><input value={override.note} onChange={(e) => updateOverride(override.id, "note", e.target.value)} placeholder="Private event, maintenance, holiday closure" style={inputStyle()} /></Field>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-                )}
-
-                {editorTab === "preview" && (
-                  <section style={formSectionStyle()}>
-                    <VenueLandingPreview
-                      form={form}
-                      preview={preview}
-                      childRooms={previewChildRooms}
-                      rooms={uniqueRooms}
-                      editingId={editing?.id}
-                      childrenByParent={childrenByParent}
-                      fullPage
-                    />
-                  </section>
-                )}
-                </div>
-
-                <aside className="venue-preview-panel" style={{ position: "sticky", top: 0, alignSelf: "start", display: editorTab === "preview" ? "none" : "grid", gap: 12 }}>
-                  <VenueLandingPreview
-                    form={form}
-                    preview={preview}
-                    childRooms={previewChildRooms}
-                    rooms={uniqueRooms}
-                    editingId={editing?.id}
-                    childrenByParent={childrenByParent}
-                  />
-                </aside>
-              </div>
-
-              <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 9 }}>
-                <div style={{ display: "flex", gap: 8, flex: 1 }}>
-                  {error && (
-                    <div style={{
-                      padding: "8px 12px",
-                      background: "rgba(160, 56, 56, 0.08)",
-                      border: `1px solid rgba(160, 56, 56, 0.20)`,
-                      borderRadius: 8,
-                      color: C.red,
-                      fontSize: 12.5,
-                      fontWeight: 560,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      animation: "fadeIn 0.2s ease",
-                    }}>
-                      <span style={{ fontSize: 13 }}>⚠️</span>
-                      <span>{error}</span>
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: "flex", gap: 9, flexShrink: 0 }}>
-                  <button type="button" onClick={closeDrawer} disabled={saving} style={buttonBase()}>Cancel</button>
-                  
-                  {form.is_draft && editing && (
-                    <button type="button" onClick={requestCancelDraft} disabled={saving} style={{ ...buttonBase(), background: C.redFaint, color: C.red, border: "none" }}>
-                      Delete Draft
-                    </button>
-                  )}
-
-                  {(!editing || form.is_draft) && (
-                    <button type="button" onClick={requestSaveDraft} disabled={!canManage || saving} style={{ ...buttonBase(), background: C.soft, color: C.text, border: `1px solid ${C.border}` }}>
-                      {saving ? "Saving..." : "Save Draft"}
-                    </button>
-                  )}
-
-                  <button type="submit" disabled={!canManage || saving} style={{ ...buttonBase(), minWidth: 150, border: "none", background: canManage ? C.gold : C.faint, color: "#fff", cursor: canManage && !saving ? "pointer" : "not-allowed" }}>
-                    {saving ? "Working..." : editing && !form.is_draft ? "Save Changes" : "Publish Venue"}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </aside>
-        </div>
-        </DrawerErrorBoundary>
-      ), document.body)}
-
-      {confirmAction && (
-        <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setConfirmAction(null); }} style={{ position: "fixed", inset: 0, zIndex: 10000, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
-          <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="function-room-confirm-title" style={{ width: "min(420px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", padding: 20 }}>
-            <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}>
-              <span style={{ width: 38, height: 38, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: confirmAction.tone === "red" ? C.redFaint : C.greenFaint, color: confirmAction.tone === "red" ? C.red : C.green }}>
-                {confirmAction.tone === "red" ? <Trash2 size={18} /> : <CheckCircle2 size={18} />}
-              </span>
-              <div>
-                <h2 id="function-room-confirm-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 650 }}>{confirmAction.title}</h2>
-                <p style={{ margin: "8px 0 0", fontSize: 13, lineHeight: 1.6, color: C.muted }}>{confirmAction.message}</p>
-              </div>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 18 }}>
-              <button type="button" disabled={saving} onClick={() => setConfirmAction(null)} style={buttonBase()}>Cancel</button>
-              <button type="button" disabled={saving} onClick={runConfirmedAction} style={{ ...buttonBase(), minWidth: 118, border: "none", background: confirmAction.tone === "red" ? C.red : C.green, color: "#fff" }}>
-                {saving ? "Working..." : confirmAction.label}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {showDiscardConfirm && (
-        <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowDiscardConfirm(false); }} style={{ position: "fixed", inset: 0, zIndex: 10000, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
-          <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="discard-changes-title" style={{ width: "min(420px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", padding: 20 }}>
-            <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}>
-              <span style={{ width: 38, height: 38, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: C.redFaint, color: C.red }}>
-                <AlertTriangle size={18} />
-              </span>
-              <div>
-                <h2 id="discard-changes-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 650 }}>Discard unsaved changes?</h2>
-                <p style={{ margin: "8px 0 0", fontSize: 13, lineHeight: 1.6, color: C.muted }}>You have unsaved venue configuration changes. Leaving now will discard them.</p>
-              </div>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 18 }}>
-              <button type="button" onClick={() => setShowDiscardConfirm(false)} style={buttonBase()}>Keep Editing</button>
-              <button type="button" onClick={() => closeDrawer(true)} style={{ ...buttonBase(), minWidth: 140, border: "none", background: C.gold, color: "#fff" }}>
-                Discard Changes
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {layoutFeedback && (
-        <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setLayoutFeedback(null); }} style={{ position: "fixed", inset: 0, zIndex: 10000, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
-          <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="layout-feedback-title" style={{ width: "min(420px, 100%)", borderRadius: 14, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 24px 60px rgba(24,20,14,0.18)", padding: "26px 28px", textAlign: "center" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-              <span style={{ width: 44, height: 44, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", background: layoutFeedback.type === "save_success" ? "linear-gradient(135deg, rgba(46,122,90,0.08), rgba(46,122,90,0.15))" : "rgba(255,255,255,0.05)", color: layoutFeedback.type === "save_success" ? C.green : C.text }}>
-                {layoutFeedback.type === "save_success" ? <CheckCircle2 size={24} /> : <RotateCcw size={22} />}
-              </span>
-              <div>
-                <h2 id="layout-feedback-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 700, fontFamily: F.label, letterSpacing: "-0.01em" }}>
-                  {layoutFeedback.type === "save_success" ? "Layout Saved" : "Layout Restored"}
-                </h2>
-                <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.5, color: C.muted }}>
-                  {layoutFeedback.type === "save_success" 
-                    ? "Your grid reordering and visibility changes have been successfully saved." 
-                    : "Your unsaved layout changes have been discarded, and the original layout has been restored."}
-                </p>
-              </div>
-            </div>
-            <button type="button" onClick={() => setLayoutFeedback(null)} style={{ ...buttonBase(), width: "100%", marginTop: 22, background: C.soft, border: `1px solid ${C.border}`, color: C.text }}>
-              Close
-            </button>
-          </section>
-        </div>
-      )}
-
-      {saveFeedback && (
-        <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSuccessAndDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 10000, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
-          <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="save-feedback-title" style={{ width: "min(460px, 100%)", borderRadius: 14, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 24px 60px rgba(24,20,14,0.18)", padding: "26px 28px" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 12 }}>
-              <span style={{ width: 44, height: 44, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", background: (saveFeedback.type === "delete" || saveFeedback.type === "draft_deleted") ? "linear-gradient(135deg, rgba(160,56,56,0.08), rgba(160,56,56,0.15))" : "linear-gradient(135deg, rgba(46,122,90,0.08), rgba(46,122,90,0.15))", color: (saveFeedback.type === "delete" || saveFeedback.type === "draft_deleted") ? C.red : C.green }}>
-                {(saveFeedback.type === "delete" || saveFeedback.type === "draft_deleted") ? <Trash2 size={24} /> : <CheckCircle2 size={24} />}
-              </span>
-              <div>
-                <h2 id="save-feedback-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 700, fontFamily: F.label, letterSpacing: "-0.01em" }}>
-                  {saveFeedback.type === "create" ? "Venue Created" 
-                   : saveFeedback.type === "update" ? "Venue Updated"
-                   : saveFeedback.type === "draft_saved" ? "Draft Saved"
-                   : saveFeedback.type === "delete" ? "Venue Deleted"
-                   : "Draft Deleted"}
-                </h2>
-                <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.5, color: C.muted }}>
-                  {saveFeedback.type === "draft_saved" 
-                   ? "Your draft has been saved. It is hidden from the client view until you publish it."
-                   : saveFeedback.type === "draft_deleted" || saveFeedback.type === "delete"
-                   ? "The venue has been completely removed from the system."
-                   : "Changes have been saved successfully and are now reflected in the venue directory."}
-                </p>
-              </div>
-            </div>
-
-            {saveFeedback.type !== "delete" && saveFeedback.type !== "draft_deleted" && (
-            <div style={{ marginTop: 22, display: "grid", gap: 14, padding: "16px 0", borderTop: `1px solid ${C.divider}`, borderBottom: `1px solid ${C.divider}` }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 20px" }}>
-                <div>
-                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Venue Name</span>
-                  <strong style={{ display: "block", marginTop: 3, color: C.text, fontSize: 12.5, fontWeight: 650 }}>{saveFeedback.venueName}</strong>
-                </div>
-
-                <div>
-                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Venue Type</span>
-                  <span style={{ display: "block", marginTop: 3, color: C.muted, fontSize: 12.5 }}>{form.type === "dining" ? "Dining Outlet" : "Function Room"}</span>
-                </div>
-
-                <div>
-                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Location Wing</span>
-                  <span style={{ display: "block", marginTop: 3, color: C.muted, fontSize: 12.5 }}>{form.wing || "Main Wing"}</span>
-                </div>
-
-                <div>
-                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Status</span>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 4 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: form.is_active ? C.green : C.red }} />
-                    <span style={{ color: C.text, fontSize: 12.5, fontWeight: 600 }}>{form.is_active ? "Enabled" : "Disabled"}</span>
-                  </span>
-                </div>
-
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Public URL Route</span>
-                  <span style={{ display: "block", marginTop: 3, color: C.text, fontFamily: "monospace", fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {saveFeedback.reservationRoute || `/${saveFeedback.slug}`}
-                  </span>
-                </div>
-
-                <div>
-                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Visibility</span>
-                  <span style={{ display: "block", marginTop: 3, color: C.muted, fontSize: 12.5 }}>{form.is_visible ? "Visible to guests" : "Hidden in concierge"}</span>
-                </div>
-
-                <div>
-                  <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Schedule periods</span>
-                  <span style={{ display: "block", marginTop: 3, color: C.muted, fontSize: 12.5 }}>{schedulePeriods.length} active service(s)</span>
-                </div>
-              </div>
-            </div>
             )}
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 22 }}>
-              <button
-                type="button"
-                onClick={closeSuccessAndDrawer}
-                style={{
-                  ...buttonBase(),
-                  minHeight: 38,
-                  border: "none",
-                  background: C.gold,
-                  color: "#fff",
-                  width: "100%",
-                  fontSize: 11.5,
-                  fontWeight: 700,
-                  letterSpacing: "0.05em",
-                  boxShadow: "0 2px 8px rgba(140, 107, 42, 0.15)",
-                  justifyContent: "center",
-                }}
-              >
-                Done
+          </main>
+        </div>
+
+        {(Object.keys(pendingLayoutChanges).length > 0 || Object.keys(pendingSettingsChanges).length > 0) && (
+          <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 6000, background: C.surface, border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 24px", display: "flex", alignItems: "center", gap: 16, boxShadow: "0 12px 40px rgba(201,168,76,0.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: "50%", background: "rgba(201,168,76,0.15)", color: C.gold }}>
+                <Edit3 size={14} />
+              </span>
+              <div>
+                <strong style={{ color: C.text, fontSize: 14, display: "block" }}>Unsaved Layout Changes</strong>
+                <span style={{ color: C.muted, fontSize: 12 }}>You have pending grid reordering or visibility changes.</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, paddingLeft: 16, borderLeft: `1px solid ${C.divider}` }}>
+              <button type="button" onClick={cancelLayoutChanges} disabled={saving} style={{ ...buttonBase(), background: "transparent", color: C.text, border: `1px solid ${C.border}` }}>
+                Cancel
               </button>
+              <button type="button" onClick={saveLayoutChanges} disabled={saving} style={{ ...buttonBase(), background: C.gold, color: "#fff", border: "none", minWidth: 120 }}>
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        )}
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {saveFeedback.type === "create" ? (
-                  <button
-                    type="button"
-                    onClick={createAnotherVenue}
-                    style={{
-                      ...buttonBase(),
-                      minHeight: 36,
-                      borderColor: "rgba(0,0,0,0.12)",
-                      background: C.surface,
-                      color: C.text,
-                      fontSize: 11,
-                      fontWeight: 650,
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Plus size={13} /> Create Another
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={continueEditingVenue}
-                    style={{
-                      ...buttonBase(),
-                      minHeight: 36,
-                      borderColor: "rgba(0,0,0,0.12)",
-                      background: C.surface,
-                      color: C.text,
-                      fontSize: 11,
-                      fontWeight: 650,
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Edit3 size={13} /> Continue Editing
-                  </button>
-                )}
+        {drawerVisible && createPortal((
+          <DrawerErrorBoundary>
+            <div className={`function-room-drawer-backdrop${drawerClosing ? " is-closing" : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(24,20,14,0.28)", display: "flex", justifyContent: "flex-end", backdropFilter: "blur(2px)" }}>
+              <aside className="function-room-drawer" role="dialog" aria-modal="true" aria-label={editing ? "Edit venue" : "Create venue"} style={{ width: "min(920px, calc(100vw - 28px))", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column" }}>
+                <div style={{ padding: "18px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                  <div>
+                    <div style={{ color: C.gold, fontSize: 8.5, fontWeight: 750, letterSpacing: "0.16em", textTransform: "uppercase" }}>Configuration</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 5, flexWrap: "wrap" }}>
+                      <h2 style={{ margin: 0, color: C.text, fontSize: 21, lineHeight: 1.15, fontWeight: 640 }}>{editing ? "Edit Venue" : "Create Venue"}</h2>
+                      {hasUnsavedChanges && (
+                        <span style={{ borderRadius: 999, padding: "4px 8px", background: C.goldFaint, color: C.gold, fontSize: 9, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                          Unsaved changes
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button type="button" onClick={closeDrawer} style={{ ...buttonBase(), width: 36, padding: 0 }} aria-label="Close panel"><X size={16} /></button>
+                </div>
 
+                <form onSubmit={saveRoom} style={{ minHeight: 0, flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
+
+                  <div style={{ padding: "12px 20px", borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
+                    <div style={{ display: "flex", alignItems: "center", paddingBottom: 2 }}>
+                      {EDITOR_TABS.map(([key, label], index) => {
+                        const active = editorTab === key;
+                        const completed = isStepCompleted(key);
+                        const stepNum = index + 1;
+                        const activeIdx = EDITOR_TABS.findIndex(([k]) => k === editorTab) + 1;
+                        const isLineActive = activeIdx > index + 1;
+                        const nextTab = index + 1 < EDITOR_TABS.length ? EDITOR_TABS[index + 1] : null;
+                        const isLineCompleted = completed && nextTab && isStepCompleted(nextTab[0]);
+                        const lineBackground = isLineActive
+                          ? C.gold
+                          : (isLineCompleted ? C.green : "rgba(0,0,0,0.06)");
+
+                        return (
+                          <React.Fragment key={key}>
+                            <button
+                              type="button"
+                              onClick={() => setEditorTab(key)}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 8,
+                                minHeight: 34,
+                                border: `1px solid ${active ? C.gold : "rgba(0,0,0,0.06)"}`,
+                                borderRadius: 10,
+                                background: active ? "linear-gradient(135deg, #FAF6EE, #F4ECE0)" : C.surface,
+                                color: active ? C.gold : C.text,
+                                padding: "0 14px",
+                                fontFamily: F.body,
+                                fontSize: 12.5,
+                                fontWeight: active ? 700 : 500,
+                                cursor: "pointer",
+                                transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                                boxShadow: active ? "0 3px 10px rgba(140,107,42,0.11)" : "none",
+                                flexShrink: 0,
+                                outline: "none",
+                              }}
+                            >
+                              <span style={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: "50%",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 9.5,
+                                fontWeight: 800,
+                                background: active ? C.gold : (completed ? C.greenFaint : "rgba(0,0,0,0.04)"),
+                                color: active ? "#FFF" : (completed ? C.green : C.muted),
+                                border: completed && !active ? `1px solid ${C.green}` : "none",
+                                transition: "all 0.25s ease",
+                              }}>
+                                {completed && !active ? "✓" : stepNum}
+                              </span>
+                              <span style={{ letterSpacing: "0.01em" }}>{label}</span>
+                            </button>
+                            {index < EDITOR_TABS.length - 1 && (
+                              <div
+                                style={{
+                                  flex: 1,
+                                  height: 2,
+                                  background: lineBackground,
+                                  borderRadius: 2,
+                                  margin: "0 10px",
+                                  transition: "background 0.25s ease"
+                                }}
+                              />
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="venue-editor-body" style={{ flex: 1, overflow: "auto", padding: 20, display: "grid", gridTemplateColumns: editorTab === "preview" ? "minmax(0,1fr)" : "minmax(0,1fr) 300px", gap: 16, alignItems: "start" }}>
+                    <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
+
+                      {editorTab === "details" && (
+                        <>
+                          <section style={formSectionStyle()}>
+                            <div style={sectionTitleStyle()}>Display Photo</div>
+                            <ImageUploaderCropper
+                              value={preview}
+                              onChange={(file) => {
+                                setImageFile(file);
+                                if (file) {
+                                  updateForm("image", ""); // Clear string URL if uploading file
+                                }
+                              }}
+                              aspect={16 / 9}
+                              title="Venue Image"
+                              description="Drag & drop a venue image here or click to upload"
+                            />
+                            <Field label="Image path or URL (Fallback)">
+                              <input value={form.image} onChange={(e) => updateForm("image", e.target.value)} placeholder="Image URL or public image path" style={inputStyle()} disabled={!!imageFile} />
+                            </Field>
+                          </section>
+
+                          <section style={formSectionStyle()}>
+                            <div style={sectionTitleStyle()}>Venue Identity</div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                              <Field label="Venue Type">
+                                <select value={form.type} onChange={(e) => updateForm("type", e.target.value)} style={inputStyle()}>
+                                  <option value="function_room">Function Room</option>
+                                  <option value="dining">Dining Outlet</option>
+                                </select>
+                              </Field>
+                              <Field label="Order"><input type="number" min="0" value={form.display_order} onChange={(e) => updateForm("display_order", e.target.value)} style={inputStyle()} /></Field>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                              <Field label="Venue Name"><input value={form.name} onChange={(e) => updateForm("name", e.target.value)} style={inputStyle()} /></Field>
+                              <Field label="Customer Display Name"><input value={form.display_name} onChange={(e) => updateForm("display_name", e.target.value)} style={inputStyle()} /></Field>
+                            </div>
+                            <Field
+                              label="Venue Code / Slug"
+                              hint="This becomes the venue’s public page URL, such as /potato-corner."
+                            >
+                              <div style={{ display: "grid", gap: 4 }}>
+                                <input value={form.slug} onChange={(e) => updateForm("slug", slugify(e.target.value))} placeholder="hanakazu-japanese-restaurant" style={{ ...inputStyle(), borderColor: isSlugTaken ? C.red : C.border }} />
+                                {isSlugTaken && (
+                                  <span style={{ color: C.red, fontSize: 11.5, fontWeight: 550, display: "block", marginTop: 2 }}>
+                                    ⚠️ This slug is already in use by an active venue.
+                                  </span>
+                                )}
+                                {form.slug && (
+                                  <div style={{ marginTop: 4, padding: "5px 8px", borderRadius: 6, background: "rgba(0,0,0,0.025)", border: `1px solid ${isSlugTaken ? "rgba(160,56,56,0.1)" : "rgba(0,0,0,0.04)"}`, display: "inline-flex", alignItems: "center", gap: 6, width: "fit-content" }}>
+                                    <span style={{ fontSize: 8, fontWeight: 750, color: C.gold, letterSpacing: "0.06em", textTransform: "uppercase" }}>Public URL</span>
+                                    <span style={{ fontSize: 11.5, color: C.text, fontFamily: "monospace" }}>{form.reservation_route || `/${form.slug}`}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </Field>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                              <Field label="Location"><select value={form.wing} onChange={(e) => updateForm("wing", e.target.value)} style={inputStyle()}><option>Dining</option><option>Main Wing</option><option>Tower Wing</option></select></Field>
+                              <Field label="Capacity"><input type="number" min="0" value={form.capacity} onChange={(e) => updateForm("capacity", e.target.value)} style={inputStyle()} /></Field>
+                            </div>
+                          </section>
+
+                          <section style={formSectionStyle()}>
+                            <div style={sectionTitleStyle()}>Grouping & Reservation</div>
+                            <Field label="Parent Room" hint="Leave empty for a main venue. Function-room children become chips under their parent card.">
+                              <select disabled={form.type === "dining"} value={form.parent_id} onChange={(e) => updateForm("parent_id", e.target.value)} style={inputStyle(form.type === "dining")}>
+                                <option value="">No parent room</option>
+                                {parentRooms.filter((room) => room.type === "function_room" && (!editing || room.id !== editing.id)).map((room) => <option key={room.id} value={room.id}>{room.display_name || room.name}</option>)}
+                              </select>
+                            </Field>
+                            {!form.parent_id && form.type === "function_room" && (
+                              <>
+                                <Field label="Allocation Mode" hint="Configure how subrooms are internally assigned.">
+                                  <select
+                                    value={form.metadata?.allocation_mode || "admin_assign"}
+                                    onChange={(e) => {
+                                      const mode = e.target.value;
+                                      updateForm("metadata", {
+                                        ...form.metadata,
+                                        allocation_mode: mode,
+                                        requires_admin_assignment: mode === "admin_assign",
+                                      });
+                                    }}
+                                    style={inputStyle()}
+                                  >
+                                    <option value="admin_assign">Admin Assign after requests</option>
+                                    <option value="auto_assign">Auto-Assign Available Subroom</option>
+                                    <option value="whole_booking">Whole Parent Booking</option>
+                                  </select>
+                                </Field>
+                                <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text, marginTop: 4, marginBottom: 12 }}>
+                                  <span>Requires Admin Assignment</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean((form.metadata?.allocation_mode || "admin_assign") === "admin_assign")}
+                                    disabled
+                                    style={{ accentColor: C.gold }}
+                                  />
+                                </label>
+                              </>
+                            )}
+                            <Field label="Reservation Page Route" hint="Public page opened when guests select this venue. Keep it unique and start with /.">
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+                                <input value={form.reservation_route} onChange={(e) => updateForm("reservation_route", e.target.value)} placeholder="/hanakazu-japanese-restaurant" style={inputStyle()} />
+                                <button type="button" onClick={() => updateForm("reservation_route", routeFromSlug(form.slug || form.name))} style={{ ...buttonBase(), minHeight: 38 }}>Use slug</button>
+                              </div>
+                            </Field>
+                            <Field label="Description"><textarea value={form.description || ""} onChange={(e) => updateForm("description", e.target.value)} rows={3} style={{ ...inputStyle(), resize: "vertical" }} /></Field>
+                          </section>
+                        </>
+                      )}
+
+                      {editorTab === "availability" && (
+                        <section style={formSectionStyle()}>
+                          <div style={sectionTitleStyle()}>Availability Settings</div>
+                          <label style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, padding: 12, border: `1px solid ${isFullyAvailable ? "rgba(140,107,42,0.28)" : C.border}`, borderRadius: 12, background: isFullyAvailable ? C.goldFaint : C.surface }}>
+                            <span>
+                              <strong style={{ display: "block", color: C.text, fontSize: 12.5, fontWeight: 650 }}>Select all guest availability controls</strong>
+                              <span style={{ display: "block", marginTop: 4, color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>Turns on enabled, visible, landing display, and guest reservation access together.</span>
+                            </span>
+                            <input type="checkbox" checked={isFullyAvailable} onChange={(e) => setAllAvailabilityFlags(e.target.checked)} style={{ accentColor: C.gold, marginTop: 2 }} />
+                          </label>
+                          {[
+                            ["is_active", "Enabled"],
+                            ["is_visible", "Show to Guests"],
+                            ["show_on_landing", "Show on landing page"],
+                            ["reservations_enabled", "Allow Guest Booking"],
+                          ].map(([key, label]) => (
+                            <label key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
+                              {label}
+                              <input type="checkbox" checked={Boolean(form[key])} onChange={(e) => updateForm(key, e.target.checked)} style={{ accentColor: C.gold }} />
+                            </label>
+                          ))}
+                          {form.type !== "dining" && form.parent_id && (
+                            <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
+                              <span>Internal Subroom (Only Admin Assignable)</span>
+                              <input type="checkbox" checked={!form.child_selectable} onChange={(e) => updateForm("child_selectable", !e.target.checked)} style={{ accentColor: C.gold }} />
+                            </label>
+                          )}
+                          {form.type !== "dining" && !form.parent_id && (
+                            <>
+                              <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
+                                <span>Parent room selectable</span>
+                                <input type="checkbox" checked={Boolean(form.parent_selectable)} onChange={(e) => updateForm("parent_selectable", e.target.checked)} style={{ accentColor: C.gold }} />
+                              </label>
+                              <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text }}>
+                                <span>Child rooms selectable</span>
+                                <input type="checkbox" checked={Boolean(form.child_selectable)} onChange={(e) => updateForm("child_selectable", e.target.checked)} style={{ accentColor: C.gold }} />
+                              </label>
+                            </>
+                          )}
+                        </section>
+                      )}
+
+                      {editorTab === "schedule" && (
+                        <section style={formSectionStyle()}>
+                          <div style={sectionTitleStyle()}>Reservation Time Rules</div>
+                          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: C.text, padding: "10px 12px", border: `1px solid ${form.availability_enabled ? "rgba(140,107,42,0.28)" : C.border}`, borderRadius: 10, background: form.availability_enabled ? C.goldFaint : C.surface, transition: "all 0.2s ease", cursor: "pointer" }}>
+                            <span style={{ fontWeight: 600 }}>Use schedule for guest reservations</span>
+                            <input type="checkbox" checked={Boolean(form.availability_enabled)} onChange={(e) => updateForm("availability_enabled", e.target.checked)} style={{ accentColor: C.gold }} />
+                          </label>
+
+                          {form.availability_enabled ? (
+                            <>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 0", borderTop: `1px solid ${C.divider}` }}>
+                                <span style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+                                  Add multiple service periods for breakfast, lunch, dinner, private dining, or event windows.
+                                </span>
+                                <button type="button" onClick={applyDefaultSchedule} style={{ ...buttonBase(), alignSelf: "flex-start", padding: "8px 14px", border: `1px solid ${C.gold}`, color: C.gold, background: "transparent", transition: "all 0.2s" }} onMouseEnter={e => { e.currentTarget.style.background = C.goldFaint; }} onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+                                  Apply Template
+                                </button>
+                              </div>
+                              <div style={{ display: "grid", gap: 7 }}>
+                                <span style={{ color: C.faint, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>Quick add period</span>
+                                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                  {schedulePresets.map((preset) => (
+                                    <button key={`${preset.label}-${preset.start_time}`} type="button" onClick={() => addPresetPeriod(preset)} style={{ ...buttonBase(), minHeight: 30 }}>
+                                      <Plus size={12} /> {preset.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div style={{ display: "grid", gap: 10 }}>
+                                {schedulePeriods.map((period, index) => (
+                                  <div key={period.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: C.soft, display: "grid", gap: 10 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                                      <strong style={{ color: C.text, fontSize: 12.5, fontWeight: 650 }}>Service Period {index + 1}</strong>
+                                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: C.muted, fontSize: 11.5 }}>
+                                          Enabled
+                                          <input type="checkbox" checked={Boolean(period.enabled)} onChange={(event) => updatePeriod(period.id, "enabled", event.target.checked)} style={{ accentColor: C.gold }} />
+                                        </label>
+                                        <button type="button" onClick={() => removePeriod(period.id)} style={{ ...buttonBase(), minHeight: 30, color: C.red }}>Remove</button>
+                                      </div>
+                                    </div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                                      <Field label="Label"><input value={period.label} onChange={(e) => updatePeriod(period.id, "label", e.target.value)} style={inputStyle()} /></Field>
+                                      <Field label="Service Type"><input value={period.service_type} onChange={(e) => updatePeriod(period.id, "service_type", e.target.value)} placeholder="Buffet, à la carte, private dining" style={inputStyle()} /></Field>
+                                    </div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 0.75fr", gap: 10 }}>
+                                      <Field label="Start"><input type="time" value={period.start_time} onChange={(e) => updatePeriod(period.id, "start_time", e.target.value)} style={inputStyle()} /></Field>
+                                      <Field label="End"><input type="time" value={period.end_time} onChange={(e) => updatePeriod(period.id, "end_time", e.target.value)} style={inputStyle()} /></Field>
+                                      <Field label="Interval"><input type="number" min="15" step="15" value={period.interval_minutes} onChange={(e) => updatePeriod(period.id, "interval_minutes", e.target.value)} style={inputStyle()} /></Field>
+                                    </div>
+                                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                      {DAY_OPTIONS.map(([value, label]) => {
+                                        const checked = period.days.map(Number).includes(Number(value));
+                                        return (
+                                          <button
+                                            key={`${period.id}-${value}`}
+                                            type="button"
+                                            onClick={() => togglePeriodDay(period.id, value)}
+                                            style={{
+                                              minHeight: 28,
+                                              borderRadius: 999,
+                                              border: checked ? "1px solid rgba(140,107,42,0.34)" : `1px solid ${C.border}`,
+                                              background: checked ? C.goldFaint : C.surface,
+                                              color: checked ? C.gold : C.muted,
+                                              padding: "0 9px",
+                                              fontSize: 10,
+                                              fontWeight: 700,
+                                              cursor: "pointer",
+                                            }}
+                                          >
+                                            {label}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                                      <Field label="Slot Capacity"><input type="number" min="0" value={period.slot_capacity} onChange={(e) => updatePeriod(period.id, "slot_capacity", e.target.value)} style={inputStyle()} /></Field>
+                                      <Field label="Min Guests"><input type="number" min="0" value={period.min_guests} onChange={(e) => updatePeriod(period.id, "min_guests", e.target.value)} style={inputStyle()} /></Field>
+                                      <Field label="Max Guests"><input type="number" min="0" value={period.max_guests} onChange={(e) => updatePeriod(period.id, "max_guests", e.target.value)} style={inputStyle()} /></Field>
+                                    </div>
+                                  </div>
+                                ))}
+                                <button type="button" onClick={addPeriod} style={{ ...buttonBase(), justifyContent: "center" }}>
+                                  <Plus size={14} /> Add service period
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div style={{ padding: "20px 14px", textAlign: "center", border: `1px dashed ${C.border}`, borderRadius: 12, background: C.soft, color: C.muted, fontSize: 13, lineHeight: 1.6 }}>
+                              🕒 Reservation scheduling is currently disabled. <br />
+                              <span style={{ fontSize: 11.5 }}>Tick the checkbox above to enable and configure custom service periods for breakfast, lunch, or dinner.</span>
+                            </div>
+                          )}
+                        </section>
+                      )}
+
+                      {editorTab === "exceptions" && (
+                        <section style={formSectionStyle()}>
+                          <div style={sectionTitleStyle()}>Closures & Blocked Times</div>
+                          <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+                            Add calendar-based exceptions for closures, private events, blocked slots, special hours, or one-day capacity changes.
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 8 }}>
+                            <button type="button" onClick={() => addOverride("closed")} style={{ ...buttonBase(), justifyContent: "center" }}><Plus size={14} /> Closure</button>
+                            <button type="button" onClick={() => addOverride("block_time")} style={{ ...buttonBase(), justifyContent: "center" }}><Plus size={14} /> Block time</button>
+                            <button type="button" onClick={() => addOverride("special_hours")} style={{ ...buttonBase(), justifyContent: "center" }}><Plus size={14} /> Special hours</button>
+                            <button type="button" onClick={() => addOverride("capacity")} style={{ ...buttonBase(), justifyContent: "center" }}><Plus size={14} /> Capacity</button>
+                          </div>
+                          <div style={{ display: "grid", gap: 10 }}>
+                            {scheduleOverrides.map((override, index) => (
+                              <div key={override.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, background: C.soft, display: "grid", gap: 10 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                                  <div>
+                                    <strong style={{ color: C.text, fontSize: 12.5, fontWeight: 650 }}>{overrideTitle(override)} {index + 1}</strong>
+                                    <div style={{ marginTop: 3, color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>{overrideSummary(override)}</div>
+                                  </div>
+                                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: C.muted, fontSize: 11.5 }}>
+                                      Active
+                                      <input type="checkbox" checked={Boolean(override.enabled)} onChange={(event) => updateOverride(override.id, "enabled", event.target.checked)} style={{ accentColor: C.gold }} />
+                                    </label>
+                                    <button type="button" onClick={() => removeOverride(override.id)} style={{ ...buttonBase(), minHeight: 30, color: C.red }}>Remove</button>
+                                  </div>
+                                </div>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                                  <Field label="Date"><input type="date" value={override.date} onChange={(e) => updateOverride(override.id, "date", e.target.value)} style={inputStyle()} /></Field>
+                                  <Field label="Type">
+                                    <select value={override.type} onChange={(e) => updateOverride(override.id, "type", e.target.value)} style={inputStyle()}>
+                                      <option value="closed">Closed full day</option>
+                                      <option value="block_time">Block time range</option>
+                                      <option value="special_hours">Special opening hours</option>
+                                      <option value="capacity">Capacity adjustment</option>
+                                    </select>
+                                  </Field>
+                                </div>
+                                {override.type !== "closed" && (
+                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                                    <Field label={override.type === "special_hours" ? "Special Open" : "Start"}><input type="time" value={override.start_time} onChange={(e) => updateOverride(override.id, "start_time", e.target.value)} style={inputStyle()} /></Field>
+                                    <Field label={override.type === "special_hours" ? "Special Close" : "End"}><input type="time" value={override.end_time} onChange={(e) => updateOverride(override.id, "end_time", e.target.value)} style={inputStyle()} /></Field>
+                                  </div>
+                                )}
+                                {["special_hours", "capacity"].includes(override.type) && (
+                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                                    <Field label="Slot Capacity"><input type="number" min="0" value={override.slot_capacity} onChange={(e) => updateOverride(override.id, "slot_capacity", e.target.value)} style={inputStyle()} /></Field>
+                                    <Field label="Max Bookings"><input type="number" min="0" value={override.max_reservations_per_slot} onChange={(e) => updateOverride(override.id, "max_reservations_per_slot", e.target.value)} style={inputStyle()} /></Field>
+                                  </div>
+                                )}
+                                {override.type === "block_time" && (
+                                  <Field label="Blocked Slot Times" hint="Optional specific slots inside the range, for example: 18:00, 18:30">
+                                    <input value={override.blocked_times_text} onChange={(e) => updateOverride(override.id, "blocked_times_text", e.target.value)} placeholder="18:00, 18:30" style={inputStyle()} />
+                                  </Field>
+                                )}
+                                <Field label="Note"><input value={override.note} onChange={(e) => updateOverride(override.id, "note", e.target.value)} placeholder="Private event, maintenance, holiday closure" style={inputStyle()} /></Field>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      )}
+
+                      {editorTab === "preview" && (
+                        <section style={formSectionStyle()}>
+                          <VenueLandingPreview
+                            form={form}
+                            preview={preview}
+                            childRooms={previewChildRooms}
+                            rooms={uniqueRooms}
+                            editingId={editing?.id}
+                            childrenByParent={childrenByParent}
+                            fullPage
+                          />
+                        </section>
+                      )}
+                    </div>
+
+                    <aside className="venue-preview-panel" style={{ position: "sticky", top: 0, alignSelf: "start", display: editorTab === "preview" ? "none" : "grid", gap: 12 }}>
+                      <VenueLandingPreview
+                        form={form}
+                        preview={preview}
+                        childRooms={previewChildRooms}
+                        rooms={uniqueRooms}
+                        editingId={editing?.id}
+                        childrenByParent={childrenByParent}
+                      />
+                    </aside>
+                  </div>
+
+                  <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 9 }}>
+                    <div style={{ display: "flex", gap: 8, flex: 1 }}>
+                      {error && (
+                        <div style={{
+                          padding: "8px 12px",
+                          background: "rgba(160, 56, 56, 0.08)",
+                          border: `1px solid rgba(160, 56, 56, 0.20)`,
+                          borderRadius: 8,
+                          color: C.red,
+                          fontSize: 12.5,
+                          fontWeight: 560,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          animation: "fadeIn 0.2s ease",
+                        }}>
+                          <span style={{ fontSize: 13 }}>⚠️</span>
+                          <span>{error}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 9, flexShrink: 0 }}>
+                      <button type="button" onClick={closeDrawer} disabled={saving} style={buttonBase()}>Cancel</button>
+
+                      {form.is_draft && editing && (
+                        <button type="button" onClick={requestCancelDraft} disabled={saving} style={{ ...buttonBase(), background: C.redFaint, color: C.red, border: "none" }}>
+                          Delete Draft
+                        </button>
+                      )}
+
+                      {(!editing || form.is_draft) && (
+                        <button type="button" onClick={requestSaveDraft} disabled={!canManage || saving} style={{ ...buttonBase(), background: C.soft, color: C.text, border: `1px solid ${C.border}` }}>
+                          {saving ? "Saving..." : "Save Draft"}
+                        </button>
+                      )}
+
+                      <button type="submit" disabled={!canManage || saving} style={{ ...buttonBase(), minWidth: 150, border: "none", background: canManage ? C.gold : C.faint, color: "#fff", cursor: canManage && !saving ? "pointer" : "not-allowed" }}>
+                        {saving ? "Working..." : editing && !form.is_draft ? "Save Changes" : "Publish Venue"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </aside>
+            </div>
+          </DrawerErrorBoundary>
+        ), document.body)}
+
+        {confirmAction && (
+          <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setConfirmAction(null); }} style={{ position: "fixed", inset: 0, zIndex: 10000, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
+            <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="function-room-confirm-title" style={{ width: "min(420px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", padding: 20 }}>
+              <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}>
+                <span style={{ width: 38, height: 38, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: confirmAction.tone === "red" ? C.redFaint : C.greenFaint, color: confirmAction.tone === "red" ? C.red : C.green }}>
+                  {confirmAction.tone === "red" ? <Trash2 size={18} /> : <CheckCircle2 size={18} />}
+                </span>
+                <div>
+                  <h2 id="function-room-confirm-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 650 }}>{confirmAction.title}</h2>
+                  <p style={{ margin: "8px 0 0", fontSize: 13, lineHeight: 1.6, color: C.muted }}>{confirmAction.message}</p>
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 18 }}>
+                <button type="button" disabled={saving} onClick={() => setConfirmAction(null)} style={buttonBase()}>Cancel</button>
+                <button type="button" disabled={saving} onClick={runConfirmedAction} style={{ ...buttonBase(), minWidth: 118, border: "none", background: confirmAction.tone === "red" ? C.red : C.green, color: "#fff" }}>
+                  {saving ? "Working..." : confirmAction.label}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {showDiscardConfirm && (
+          <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowDiscardConfirm(false); }} style={{ position: "fixed", inset: 0, zIndex: 10000, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
+            <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="discard-changes-title" style={{ width: "min(420px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", padding: 20 }}>
+              <div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}>
+                <span style={{ width: 38, height: 38, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: C.redFaint, color: C.red }}>
+                  <AlertTriangle size={18} />
+                </span>
+                <div>
+                  <h2 id="discard-changes-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 650 }}>Discard unsaved changes?</h2>
+                  <p style={{ margin: "8px 0 0", fontSize: 13, lineHeight: 1.6, color: C.muted }}>You have unsaved venue configuration changes. Leaving now will discard them.</p>
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 18 }}>
+                <button type="button" onClick={() => setShowDiscardConfirm(false)} style={buttonBase()}>Keep Editing</button>
+                <button type="button" onClick={() => closeDrawer(true)} style={{ ...buttonBase(), minWidth: 140, border: "none", background: C.gold, color: "#fff" }}>
+                  Discard Changes
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {layoutFeedback && (
+          <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setLayoutFeedback(null); }} style={{ position: "fixed", inset: 0, zIndex: 10000, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
+            <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="layout-feedback-title" style={{ width: "min(420px, 100%)", borderRadius: 14, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 24px 60px rgba(24,20,14,0.18)", padding: "26px 28px", textAlign: "center" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+                <span style={{ width: 44, height: 44, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", background: layoutFeedback.type === "save_success" ? "linear-gradient(135deg, rgba(46,122,90,0.08), rgba(46,122,90,0.15))" : "rgba(255,255,255,0.05)", color: layoutFeedback.type === "save_success" ? C.green : C.text }}>
+                  {layoutFeedback.type === "save_success" ? <CheckCircle2 size={24} /> : <RotateCcw size={22} />}
+                </span>
+                <div>
+                  <h2 id="layout-feedback-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 700, fontFamily: F.label, letterSpacing: "-0.01em" }}>
+                    {layoutFeedback.type === "save_success" ? "Layout Saved" : "Layout Restored"}
+                  </h2>
+                  <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.5, color: C.muted }}>
+                    {layoutFeedback.type === "save_success"
+                      ? "Your grid reordering and visibility changes have been successfully saved."
+                      : "Your unsaved layout changes have been discarded, and the original layout has been restored."}
+                  </p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setLayoutFeedback(null)} style={{ ...buttonBase(), width: "100%", marginTop: 22, background: C.soft, border: `1px solid ${C.border}`, color: C.text }}>
+                Close
+              </button>
+            </section>
+          </div>
+        )}
+
+        {saveFeedback && (
+          <div className="function-room-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSuccessAndDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 10000, display: "grid", placeItems: "center", padding: 18, background: "rgba(24,20,14,0.34)", backdropFilter: "blur(3px)" }}>
+            <section className="function-room-confirm" role="dialog" aria-modal="true" aria-labelledby="save-feedback-title" style={{ width: "min(460px, 100%)", borderRadius: 14, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 24px 60px rgba(24,20,14,0.18)", padding: "26px 28px" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 12 }}>
+                <span style={{ width: 44, height: 44, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", background: (saveFeedback.type === "delete" || saveFeedback.type === "draft_deleted") ? "linear-gradient(135deg, rgba(160,56,56,0.08), rgba(160,56,56,0.15))" : "linear-gradient(135deg, rgba(46,122,90,0.08), rgba(46,122,90,0.15))", color: (saveFeedback.type === "delete" || saveFeedback.type === "draft_deleted") ? C.red : C.green }}>
+                  {(saveFeedback.type === "delete" || saveFeedback.type === "draft_deleted") ? <Trash2 size={24} /> : <CheckCircle2 size={24} />}
+                </span>
+                <div>
+                  <h2 id="save-feedback-title" style={{ margin: 0, fontSize: 18, lineHeight: 1.25, color: C.text, fontWeight: 700, fontFamily: F.label, letterSpacing: "-0.01em" }}>
+                    {saveFeedback.type === "create" ? "Venue Created"
+                      : saveFeedback.type === "update" ? "Venue Updated"
+                        : saveFeedback.type === "draft_saved" ? "Draft Saved"
+                          : saveFeedback.type === "delete" ? "Venue Deleted"
+                            : "Draft Deleted"}
+                  </h2>
+                  <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.5, color: C.muted }}>
+                    {saveFeedback.type === "draft_saved"
+                      ? "Your draft has been saved. It is hidden from the client view until you publish it."
+                      : saveFeedback.type === "draft_deleted" || saveFeedback.type === "delete"
+                        ? "The venue has been completely removed from the system."
+                        : "Changes have been saved successfully and are now reflected in the venue directory."}
+                  </p>
+                </div>
+              </div>
+
+              {saveFeedback.type !== "delete" && saveFeedback.type !== "draft_deleted" && (
+                <div style={{ marginTop: 22, display: "grid", gap: 14, padding: "16px 0", borderTop: `1px solid ${C.divider}`, borderBottom: `1px solid ${C.divider}` }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 20px" }}>
+                    <div>
+                      <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Venue Name</span>
+                      <strong style={{ display: "block", marginTop: 3, color: C.text, fontSize: 12.5, fontWeight: 650 }}>{saveFeedback.venueName}</strong>
+                    </div>
+
+                    <div>
+                      <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Venue Type</span>
+                      <span style={{ display: "block", marginTop: 3, color: C.muted, fontSize: 12.5 }}>{form.type === "dining" ? "Dining Outlet" : "Function Room"}</span>
+                    </div>
+
+                    <div>
+                      <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Location Wing</span>
+                      <span style={{ display: "block", marginTop: 3, color: C.muted, fontSize: 12.5 }}>{form.wing || "Main Wing"}</span>
+                    </div>
+
+                    <div>
+                      <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Status</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 4 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: form.is_active ? C.green : C.red }} />
+                        <span style={{ color: C.text, fontSize: 12.5, fontWeight: 600 }}>{form.is_active ? "Enabled" : "Disabled"}</span>
+                      </span>
+                    </div>
+
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Public URL Route</span>
+                      <span style={{ display: "block", marginTop: 3, color: C.text, fontFamily: "monospace", fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {saveFeedback.reservationRoute || `/${saveFeedback.slug}`}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Visibility</span>
+                      <span style={{ display: "block", marginTop: 3, color: C.muted, fontSize: 12.5 }}>{form.is_visible ? "Visible to guests" : "Hidden in concierge"}</span>
+                    </div>
+
+                    <div>
+                      <span style={{ display: "block", fontSize: 8.5, fontWeight: 750, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase" }}>Schedule periods</span>
+                      <span style={{ display: "block", marginTop: 3, color: C.muted, fontSize: 12.5 }}>{schedulePeriods.length} active service(s)</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 22 }}>
                 <button
                   type="button"
-                  onClick={viewOnGuestPage}
+                  onClick={closeSuccessAndDrawer}
                   style={{
                     ...buttonBase(),
-                    minHeight: 36,
+                    minHeight: 38,
                     border: "none",
-                    background: "transparent",
-                    color: C.gold,
-                    fontSize: 11,
-                    fontWeight: 650,
+                    background: C.gold,
+                    color: "#fff",
+                    width: "100%",
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    letterSpacing: "0.05em",
+                    boxShadow: "0 2px 8px rgba(140, 107, 42, 0.15)",
                     justifyContent: "center",
                   }}
                 >
-                  <Eye size={13} /> View Guest Page
+                  Done
                 </button>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {saveFeedback.type === "create" ? (
+                    <button
+                      type="button"
+                      onClick={createAnotherVenue}
+                      style={{
+                        ...buttonBase(),
+                        minHeight: 36,
+                        borderColor: "rgba(0,0,0,0.12)",
+                        background: C.surface,
+                        color: C.text,
+                        fontSize: 11,
+                        fontWeight: 650,
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Plus size={13} /> Create Another
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={continueEditingVenue}
+                      style={{
+                        ...buttonBase(),
+                        minHeight: 36,
+                        borderColor: "rgba(0,0,0,0.12)",
+                        background: C.surface,
+                        color: C.text,
+                        fontSize: 11,
+                        fontWeight: 650,
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Edit3 size={13} /> Continue Editing
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={viewOnGuestPage}
+                    style={{
+                      ...buttonBase(),
+                      minHeight: 36,
+                      border: "none",
+                      background: "transparent",
+                      color: C.gold,
+                      fontSize: 11,
+                      fontWeight: 650,
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Eye size={13} /> View Guest Page
+                  </button>
+                </div>
               </div>
-            </div>
-          </section>
-        </div>
-      )}
+            </section>
+          </div>
+        )}
       </div>
     </>
   );

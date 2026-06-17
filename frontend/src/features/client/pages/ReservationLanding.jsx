@@ -727,18 +727,10 @@ export default function ReservationLanding() {
             </div>
 
             <div
-              className={`reservation-grid reservation-grid--dining ${displaySettings.dining?.layout_engine === 'flex' ? 'reservation-grid--flex' : ''}`}
-              style={
-                displaySettings.dining?.layout_engine === 'flex'
-                  ? {
-                    display: "flex",
-                    flexWrap: "wrap",
-                    justifyContent: displaySettings.dining.flex_alignment || "center",
-                    "--card-width": `${displaySettings.dining.card_width || 240}px`,
-                    "--card-stretch": displaySettings.dining.stretch_to_fill ? "1" : "0"
-                  }
-                  : (displaySettings.dining?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.dining.desktop_columns}, minmax(0, 1fr))` } : undefined)
-              }
+              className="reservation-grid reservation-grid--dining"
+              style={{
+                "--dining-cols": diningOutlets.length || 1
+              }}
             >
               {diningOutlets.map((outlet) => (
                 <VenueCard key={outlet.title} item={outlet} variant="dining" />
@@ -755,17 +747,11 @@ export default function ReservationLanding() {
             </div>
 
             <div
-              className={`reservation-grid reservation-grid--events ${displaySettings.events?.layout_engine === 'flex' ? 'reservation-grid--flex' : ''}`}
+              className="reservation-grid reservation-grid--events"
               style={
-                displaySettings.events?.layout_engine === 'flex'
-                  ? {
-                    display: "flex",
-                    flexWrap: "wrap",
-                    justifyContent: displaySettings.events.flex_alignment || "center",
-                    "--card-width": `${displaySettings.events.card_width || 240}px`,
-                    "--card-stretch": displaySettings.events.stretch_to_fill ? "1" : "0"
-                  }
-                  : (displaySettings.events?.desktop_columns ? { gridTemplateColumns: `repeat(${displaySettings.events.desktop_columns}, minmax(0, 1fr))` } : undefined)
+                displaySettings.events?.desktop_columns
+                  ? { gridTemplateColumns: `repeat(${displaySettings.events.desktop_columns}, minmax(0, 1fr))` }
+                  : undefined
               }
             >
               {mixedEventItems === null ? (
@@ -775,10 +761,10 @@ export default function ReservationLanding() {
                 </div>
               ) : mixedEventItems.length > 0 ? (
                 mixedEventItems.map((item) => (
-                  <VenueCard 
-                    key={`${item.type}:${item.id}`} 
-                    item={item} 
-                    variant={item.type === "event" ? "event" : "venue"} 
+                  <VenueCard
+                    key={`${item.type}:${item.id}`}
+                    item={item}
+                    variant={item.type === "event" ? "event" : "venue"}
                   />
                 ))
               ) : (
@@ -1256,7 +1242,7 @@ export default function ReservationLanding() {
         }
 
         .reservation-grid--dining {
-          grid-template-columns: repeat(6, minmax(0, 1fr));
+          grid-template-columns: repeat(var(--dining-cols, 6), minmax(0, 1fr));
           justify-content: start;
           align-items: start;
         }
@@ -1267,11 +1253,7 @@ export default function ReservationLanding() {
           min-height: 0;
         }
 
-        .reservation-grid--flex .reservation-card {
-          width: var(--card-width, auto);
-          max-width: 100%;
-          flex-grow: var(--card-stretch, 0);
-        }
+        /* Flex grid styles removed */
 
         .reservation-card {
           position: relative;
