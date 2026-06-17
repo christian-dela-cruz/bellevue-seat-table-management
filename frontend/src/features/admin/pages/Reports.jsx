@@ -1104,25 +1104,6 @@ function ReportTabs({ groups, activeTab, onChange }) {
 export default function Reports() {
   const { isDark } = useAdminTheme();
 
-  const paperColors = {
-    background: "#FFFFFF",
-    text: "#18140E",
-    muted: "#7A7060",
-    faint: "rgba(24,20,14,0.42)",
-    border: "rgba(0,0,0,0.08)",
-    divider: "rgba(0,0,0,0.05)",
-    soft: "#FAF8F4",
-    gold: "#8C6B2A",
-    green: "#2E7A5A",
-    greenFaint: "rgba(46,122,90,0.07)",
-    goldFaint: "rgba(140,107,42,0.08)",
-    red: "#A03838",
-    redFaint: "rgba(160,56,56,0.07)",
-    slate: "#6B7280",
-    slateFaint: "rgba(107,114,128,0.08)",
-    blue: "#5B8FD4",
-    blueFaint: "rgba(91,143,212,0.08)",
-  };
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("summary");
   const [startDate, setStartDate] = useState(monthStart());
@@ -1154,6 +1135,18 @@ export default function Reports() {
   const [printFontScale, setPrintFontScale] = useState("medium");
   const [printPageSize, setPrintPageSize] = useState("a4");
   const [printOrientation, setPrintOrientation] = useState("landscape");
+  const [printFontFamily, setPrintFontFamily] = useState("serif");
+  const [printFontSize, setPrintFontSize] = useState(11);
+  const [printTheme, setPrintTheme] = useState("ink_saver");
+  const [printCustomTitle, setPrintCustomTitle] = useState("");
+  const [printPageBreaks, setPrintPageBreaks] = useState({
+    overview: false,
+    mix: false,
+    outlets: false,
+    rooms: false,
+    trends: false,
+    audit: false,
+  });
   const [roomRowsPerPage, setRoomRowsPerPage] = useState(10);
   const [roomPage, setRoomPage] = useState(1);
 
@@ -1170,6 +1163,47 @@ export default function Reports() {
     outlets: true,
     rooms: true,
   });
+
+  const paperColors = useMemo(() => {
+    return printTheme === "ink_saver" ? {
+      background: "#FFFFFF",
+      text: "#000000",
+      muted: "#4B5563",
+      faint: "rgba(0,0,0,0.45)",
+      border: "#D1D5DB",
+      divider: "#E5E7EB",
+      soft: "#F3F4F6",
+      gold: "#000000",
+      green: "#059669",
+      greenFaint: "rgba(5,150,105,0.08)",
+      goldFaint: "rgba(0,0,0,0.08)",
+      red: "#DC2626",
+      redFaint: "rgba(220,38,38,0.08)",
+      slate: "#4B5563",
+      slateFaint: "rgba(75,85,99,0.08)",
+      blue: "#2563EB",
+      blueFaint: "rgba(37,99,235,0.08)",
+    } : {
+      background: "#FFFFFF",
+      text: "#18140E",
+      muted: "#7A7060",
+      faint: "rgba(24,20,14,0.42)",
+      border: "rgba(0,0,0,0.08)",
+      divider: "rgba(0,0,0,0.05)",
+      soft: "#FAF8F4",
+      gold: "#8C6B2A",
+      green: "#2E7A5A",
+      greenFaint: "rgba(46,122,90,0.07)",
+      goldFaint: "rgba(140,107,42,0.08)",
+      red: "#A03838",
+      redFaint: "rgba(160,56,56,0.07)",
+      slate: "#6B7280",
+      slateFaint: "rgba(107,114,128,0.08)",
+      blue: "#5B8FD4",
+      blueFaint: "rgba(91,143,212,0.08)",
+    };
+  }, [printTheme]);
+
   const [reservations, setReservations] = useState([]);
 
   const handlePrintReportTypeChange = (type) => {
@@ -1443,12 +1477,19 @@ export default function Reports() {
   }, [activeOutletDetails, reportOutletRows]);
 
   const printStyles = `
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;650;750;850&family=Outfit:wght@400;600;750;850&family=Playfair+Display:wght@400;650;750;850&family=Fira+Mono:wght@400;650;750&display=swap');
+
     @media print {
       /* Reset and base styles */
       html, body {
         background: #FFFFFF !important;
-        color: #18140E !important;
-        font-family: 'Inter', Arial, sans-serif !important;
+        color: ${printTheme === "ink_saver" ? "#000000" : "#18140E"} !important;
+        font-family: ${
+          printFontFamily === "sans-serif" ? F.body :
+          printFontFamily === "monospace" ? F.mono :
+          printFontFamily === "rounded" ? "'Outfit', 'Inter', sans-serif" :
+          "'Playfair Display', Georgia, serif"
+        } !important;
         margin: 0 !important;
         padding: 0 !important;
         -webkit-print-color-adjust: exact !important;
@@ -1470,10 +1511,16 @@ export default function Reports() {
         display: block !important;
         padding: 0 !important;
         background: #FFFFFF !important;
-        font-size: ${printFontScale === "small" ? "9pt" :
-      printFontScale === "large" ? "13pt" :
-        "11pt"
-    } !important;
+        font-size: ${printFontSize}pt !important;
+      }
+
+      .print-page-break {
+        page-break-after: always !important;
+        break-after: page !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
       }
 
       /* Page layout settings */
@@ -1484,7 +1531,7 @@ export default function Reports() {
 
       /* Clean luxury headings & tables for print */
       .print-header {
-        border-bottom: 3px solid #8C6B2A !important;
+        border-bottom: 3px solid ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
         padding-bottom: 12px;
         margin-bottom: 24px;
         display: flex;
@@ -1495,13 +1542,12 @@ export default function Reports() {
       .print-title {
         font-size: 20pt !important;
         font-weight: 700 !important;
-        color: #18140E !important;
+        color: ${printTheme === "ink_saver" ? "#000000" : "#18140E"} !important;
         text-transform: uppercase !important;
         letter-spacing: 0.06em !important;
       }
 
       .print-section {
-        page-break-inside: avoid !important;
         margin-bottom: 38px !important;
       }
 
@@ -1509,10 +1555,10 @@ export default function Reports() {
         font-size: 11pt !important;
         font-weight: 800 !important;
         text-transform: uppercase !important;
-        color: #8C6B2A !important;
+        color: ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
         letter-spacing: 0.12em !important;
         margin-bottom: 12px;
-        border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+        border-bottom: 1px solid ${printTheme === "ink_saver" ? "#000000" : "rgba(140,107,42,0.15)"} !important;
         padding-bottom: 4px;
       }
 
@@ -1525,21 +1571,21 @@ export default function Reports() {
       }
 
       .print-table th {
-        background: #FAF8F4 !important;
-        color: #7A7060 !important;
+        background: ${printTheme === "ink_saver" ? "#F3F4F6" : "#FAF8F4"} !important;
+        color: ${printTheme === "ink_saver" ? "#000000" : "#7A7060"} !important;
         font-weight: 700 !important;
         text-transform: uppercase !important;
         letter-spacing: 0.06em !important;
         font-size: 7.5pt !important;
         padding: 10px 8px !important;
-        border-bottom: 2px solid #8C6B2A !important;
+        border-bottom: 2px solid ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
         text-align: left !important;
       }
 
       .print-table td {
         padding: 10px 8px !important;
-        border-bottom: 1px solid rgba(0,0,0,0.06) !important;
-        color: #4A505E !important;
+        border-bottom: 1px solid ${printTheme === "ink_saver" ? "#E5E7EB" : "rgba(0,0,0,0.06)"} !important;
+        color: ${printTheme === "ink_saver" ? "#000000" : "#4A505E"} !important;
         font-size: 8.5pt !important;
       }
 
@@ -1548,7 +1594,7 @@ export default function Reports() {
       }
 
       .print-table td.strong {
-        color: #18140E !important;
+        color: ${printTheme === "ink_saver" ? "#000000" : "#18140E"} !important;
         font-weight: 700 !important;
         white-space: nowrap !important;
       }
@@ -1561,8 +1607,8 @@ export default function Reports() {
       }
 
       .print-card {
-        background: #FAF8F4 !important;
-        border: 1px solid rgba(140,107,42,0.12) !important;
+        background: ${printTheme === "ink_saver" ? "#F3F4F6" : "#FAF8F4"} !important;
+        border: 1px solid ${printTheme === "ink_saver" ? "#D1D5DB" : "rgba(140,107,42,0.12)"} !important;
         border-radius: 8px !important;
         padding: 14px 16px !important;
       }
@@ -1571,7 +1617,7 @@ export default function Reports() {
         font-size: 8pt !important;
         font-weight: 700 !important;
         text-transform: uppercase !important;
-        color: #7A7060 !important;
+        color: ${printTheme === "ink_saver" ? "#374151" : "#7A7060"} !important;
         letter-spacing: 0.08em !important;
         margin-bottom: 6px;
       }
@@ -1579,7 +1625,7 @@ export default function Reports() {
       .print-card-value {
         font-size: 16pt !important;
         font-weight: 700 !important;
-        color: #8C6B2A !important;
+        color: ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
       }
     }
 
@@ -1861,66 +1907,206 @@ export default function Reports() {
         <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
           <AdminNavbar />
           <main style={{ flex: 1, overflow: "auto", padding: "30px 32px 42px" }}>
-            <AdminPageHeader
-              eyebrow="Reports"
-              title="Outlet Performance"
-              description={canViewReports ? `${activeReport?.label || "Reports"} uses ${filterModeLabel}.` : "Performance reporting and export tools for authorized administrators."}
-              C={C}
-              F={F}
-              actions={canViewReports && (
-                <div className="reports-toolbar print-exclude" style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                  {activeTab === "monthly" ? (
-                    <>
-                      <FilterField label="Month">
-                        <select value={reportMonth} onChange={(e) => setReportMonth(e.target.value)} style={filterStyle()}>
-                          {monthSelectOptions.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
-                        </select>
-                      </FilterField>
-                      <FilterField label="Year">
+            {!showPrintConfig && !showCsvConfig && (
+              <AdminPageHeader
+                eyebrow="Reports"
+                title="Outlet Performance"
+                description={canViewReports ? `${activeReport?.label || "Reports"} uses ${filterModeLabel}.` : "Performance reporting and export tools for authorized administrators."}
+                C={C}
+                F={F}
+                actions={canViewReports && !showPrintConfig && (
+                  <div className="reports-toolbar print-exclude" style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {activeTab === "monthly" ? (
+                      <>
+                        <FilterField label="Month">
+                          <select value={reportMonth} onChange={(e) => setReportMonth(e.target.value)} style={filterStyle()}>
+                            {monthSelectOptions.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
+                          </select>
+                        </FilterField>
+                        <FilterField label="Year">
+                          <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} style={filterStyle()}>
+                            {yearOptions.map((year) => <option key={year} value={String(year)}>{year}</option>)}
+                          </select>
+                        </FilterField>
+                        <FilterField label="Group By">
+                          <div style={{ display: "flex", height: 34, border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden", background: C.surface }}>
+                            {["daily", "weekly"].map((mode) => {
+                              const active = monthlyGranularity === mode;
+                              return (
+                                <button
+                                  key={mode}
+                                  type="button"
+                                  onClick={() => setMonthlyGranularity(mode)}
+                                  style={{
+                                    border: "none",
+                                    borderRight: mode === "daily" ? `1px solid ${C.border}` : "none",
+                                    background: active ? C.goldFaint : "transparent",
+                                    color: active ? C.gold : C.muted,
+                                    padding: "0 10px",
+                                    fontFamily: F.label,
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    letterSpacing: "0.08em",
+                                    textTransform: "uppercase",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  {mode}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </FilterField>
+                      </>
+                    ) : activeTab === "yearly" ? (
+                      <FilterField label="Report Year">
                         <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} style={filterStyle()}>
                           {yearOptions.map((year) => <option key={year} value={String(year)}>{year}</option>)}
                         </select>
                       </FilterField>
-                      <FilterField label="Group By">
-                        <div style={{ display: "flex", height: 34, border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden", background: C.surface }}>
-                          {["daily", "weekly"].map((mode) => {
-                            const active = monthlyGranularity === mode;
-                            return (
-                              <button
-                                key={mode}
-                                type="button"
-                                onClick={() => setMonthlyGranularity(mode)}
-                                style={{
-                                  border: "none",
-                                  borderRight: mode === "daily" ? `1px solid ${C.border}` : "none",
-                                  background: active ? C.goldFaint : "transparent",
-                                  color: active ? C.gold : C.muted,
-                                  padding: "0 10px",
-                                  fontFamily: F.label,
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  letterSpacing: "0.08em",
-                                  textTransform: "uppercase",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                {mode}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </FilterField>
-                    </>
-                  ) : activeTab === "yearly" ? (
-                    <FilterField label="Report Year">
-                      <select value={reportYear} onChange={(e) => setReportYear(e.target.value)} style={filterStyle()}>
-                        {yearOptions.map((year) => <option key={year} value={String(year)}>{year}</option>)}
-                      </select>
-                    </FilterField>
-                  ) : (
-                    <>
+                    ) : (
+                      <>
+                        <FilterField label="Preset">
+                          <select value={datePreset} onChange={(e) => handleDatePresetChange(e.target.value)} style={filterStyle()}>
+                            <option value="custom">Custom Range</option>
+                            <option value="today">Today</option>
+                            <option value="yesterday">Yesterday</option>
+                            <option value="this_week">This Week</option>
+                            <option value="last_7">Last 7 Days</option>
+                            <option value="this_month">This Month</option>
+                            <option value="last_30">Last 30 Days</option>
+                            <option value="ytd">Year to Date</option>
+                          </select>
+                        </FilterField>
+                        {showOutletFilter && (
+                          <FilterField label="Outlet">
+                            <select value={selectedOutlet} onChange={(e) => setSelectedOutlet(e.target.value)} style={filterStyle()}>
+                              <option value="ALL">All outlets</option>
+                              {buildDynamicOutletTree(venueRows).flatMap((group) => {
+                                const groupOptions = [];
+                                const groupAccessible = group.sections.some((sec) =>
+                                  sec.items.some((item) => allOutlets.some((out) => canonicalOutletName(out.name) === canonicalOutletName(item)))
+                                );
+                                if (!groupAccessible) return [];
+
+                                groupOptions.push(
+                                  <option key={group.id} value={group.label} style={{ fontWeight: "bold", color: "#8C6B2A" }}>
+                                    -- {group.label} (All) --
+                                  </option>
+                                );
+
+                                group.sections.forEach((section) => {
+                                  const children = section.items.filter((item) =>
+                                    allOutlets.some((out) => canonicalOutletName(out.name) === canonicalOutletName(item))
+                                  );
+                                  if (children.length === 0) return;
+
+                                  const hasChildren = section.items.length > 1;
+                                  if (hasChildren) {
+                                    groupOptions.push(
+                                      <option key={section.label} value={section.label} style={{ fontWeight: "600" }}>
+                                        {section.label} (All)
+                                      </option>
+                                    );
+                                    children.forEach((item) => {
+                                      if (item !== section.label) {
+                                        groupOptions.push(
+                                          <option key={item} value={item}>
+                                            {"\u00A0\u00A0\u00A0\u00A0" + item}
+                                          </option>
+                                        );
+                                      }
+                                    });
+                                  } else {
+                                    groupOptions.push(
+                                      <option key={section.label} value={section.label}>
+                                        {section.label}
+                                      </option>
+                                    );
+                                  }
+                                });
+
+                                return groupOptions;
+                              })}
+                            </select>
+                          </FilterField>
+                        )}
+                        <FilterField label="Start">
+                          <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setDatePreset("custom"); }} style={filterStyle()} />
+                        </FilterField>
+                        <FilterField label="End">
+                          <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setDatePreset("custom"); }} style={filterStyle()} />
+                        </FilterField>
+                      </>
+                    )}
+
+                    <button
+                      onClick={loadReport}
+                      disabled={loading}
+                      style={{
+                        height: 34,
+                        padding: "0 16px",
+                        border: "none",
+                        borderRadius: 8,
+                        background: C.gold,
+                        color: "#fff",
+                        fontFamily: F.label,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                        cursor: loading ? "not-allowed" : "pointer",
+                        transition: "background 0.12s",
+                      }}
+                    >
+                      {loading ? "..." : "Apply"}
+                    </button>
+                    <ActionButton
+                      icon={Download}
+                      label="CSV"
+                      onClick={() => {
+                        const trendName = activeTab === "monthly"
+                          ? `outlet-report-${reportYear}-${String(reportMonth).padStart(2, "0")}-${monthlyGranularity}.csv`
+                          : `outlet-report-${reportYear}.csv`;
+                        const defaultFilename = isTrendTab ? trendName : `outlet-report-${startDate}-to-${endDate}.csv`;
+                        setCsvFilename(defaultFilename);
+                        setShowCsvConfig(true);
+                      }}
+                    />
+                    <ActionButton icon={Printer} label="Print" onClick={() => setShowPrintConfig(true)} />
+                  </div>
+                )}
+              />
+            )}
+
+            {!canViewReports ? (
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 22, color: C.muted }}>
+                Your account can access admin pages, but does not have report visibility.
+              </div>
+            ) : error ? (
+              <div style={{ background: C.redFaint, border: "1px solid rgba(160,56,56,0.18)", borderRadius: 10, padding: 14, color: C.red }}>{error}</div>
+            ) : showPrintConfig ? (
+              <div style={{ display: "flex", flexDirection: "column", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden", fontFamily: F.body, width: "100%" }} className="print-exclude">
+                {/* Header */}
+                <div style={{ padding: "18px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, flexShrink: 0 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: "1 1 auto" }}>
+                    <div>
+                      <div style={{ fontFamily: F.label, fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Interactive Print & PDF Suite</div>
+                      <div style={{ marginTop: 2, fontSize: 11.5, color: C.muted }}>Configure and design your management report with a live synchronized preview.</div>
+                    </div>
+
+                    {/* Date filter presets inline right under subtitle */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
                       <FilterField label="Preset">
-                        <select value={datePreset} onChange={(e) => handleDatePresetChange(e.target.value)} style={filterStyle()}>
+                        <select value={datePreset} onChange={(e) => {
+                          handleDatePresetChange(e.target.value);
+                          if (e.target.value !== "custom") {
+                            const dates = getPresetDates(e.target.value);
+                            if (dates) {
+                              setTimeout(() => loadReport(), 50);
+                            }
+                          }
+                        }} style={filterStyle()}>
                           <option value="custom">Custom Range</option>
                           <option value="today">Today</option>
                           <option value="yesterday">Yesterday</option>
@@ -1931,112 +2117,797 @@ export default function Reports() {
                           <option value="ytd">Year to Date</option>
                         </select>
                       </FilterField>
-                      {showOutletFilter && (
-                        <FilterField label="Outlet">
-                          <select value={selectedOutlet} onChange={(e) => setSelectedOutlet(e.target.value)} style={filterStyle()}>
-                            <option value="ALL">All outlets</option>
-                            {buildDynamicOutletTree(venueRows).flatMap((group) => {
-                              const groupOptions = [];
-                              const groupAccessible = group.sections.some((sec) =>
-                                sec.items.some((item) => allOutlets.some((out) => canonicalOutletName(out.name) === canonicalOutletName(item)))
-                              );
-                              if (!groupAccessible) return [];
-
-                              groupOptions.push(
-                                <option key={group.id} value={group.label} style={{ fontWeight: "bold", color: "#8C6B2A" }}>
-                                  -- {group.label} (All) --
-                                </option>
-                              );
-
-                              group.sections.forEach((section) => {
-                                const children = section.items.filter((item) =>
-                                  allOutlets.some((out) => canonicalOutletName(out.name) === canonicalOutletName(item))
-                                );
-                                if (children.length === 0) return;
-
-                                const hasChildren = section.items.length > 1;
-                                if (hasChildren) {
-                                  groupOptions.push(
-                                    <option key={section.label} value={section.label} style={{ fontWeight: "600" }}>
-                                      {section.label} (All)
-                                    </option>
-                                  );
-                                  children.forEach((item) => {
-                                    if (item !== section.label) {
-                                      groupOptions.push(
-                                        <option key={item} value={item}>
-                                          {"\u00A0\u00A0\u00A0\u00A0" + item}
-                                        </option>
-                                      );
-                                    }
-                                  });
-                                } else {
-                                  groupOptions.push(
-                                    <option key={section.label} value={section.label}>
-                                      {section.label}
-                                    </option>
-                                  );
-                                }
-                              });
-
-                              return groupOptions;
-                            })}
-                          </select>
-                        </FilterField>
-                      )}
                       <FilterField label="Start">
                         <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setDatePreset("custom"); }} style={filterStyle()} />
                       </FilterField>
                       <FilterField label="End">
                         <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setDatePreset("custom"); }} style={filterStyle()} />
                       </FilterField>
-                    </>
-                  )}
+                      <button
+                        type="button"
+                        onClick={loadReport}
+                        disabled={loading}
+                        style={{
+                          height: 34,
+                          padding: "0 16px",
+                          background: C.gold,
+                          color: "#fff",
+                          fontFamily: F.label,
+                          fontSize: 9.5,
+                          fontWeight: 700,
+                          letterSpacing: "0.10em",
+                          textTransform: "uppercase",
+                          cursor: loading ? "not-allowed" : "pointer",
+                          border: "none",
+                          borderRadius: 8,
+                          alignSelf: "flex-end"
+                        }}
+                      >
+                        {loading ? "..." : "Apply"}
+                      </button>
+                    </div>
+                  </div>
 
                   <button
-                    onClick={loadReport}
-                    disabled={loading}
-                    style={{
-                      height: 34,
-                      padding: "0 16px",
-                      border: "none",
-                      borderRadius: 8,
-                      background: C.gold,
-                      color: "#fff",
-                      fontFamily: F.label,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      transition: "background 0.12s",
-                    }}
+                    type="button"
+                    onClick={() => setShowPrintConfig(false)}
+                    style={{ border: "none", background: "transparent", color: C.muted, fontSize: 18, cursor: "pointer", fontWeight: 300, padding: 6 }}
                   >
-                    {loading ? "..." : "Apply"}
+                    ✕
                   </button>
-                  <ActionButton
-                    icon={Download}
-                    label="CSV"
-                    onClick={() => {
-                      const trendName = activeTab === "monthly"
-                        ? `outlet-report-${reportYear}-${String(reportMonth).padStart(2, "0")}-${monthlyGranularity}.csv`
-                        : `outlet-report-${reportYear}.csv`;
-                      const defaultFilename = isTrendTab ? trendName : `outlet-report-${startDate}-to-${endDate}.csv`;
-                      setCsvFilename(defaultFilename);
-                      setShowCsvConfig(true);
-                    }}
-                  />
-                  <ActionButton icon={Printer} label="Print" onClick={() => setShowPrintConfig(true)} />
                 </div>
-              )}
-            />
 
-            {!canViewReports ? (
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 22, color: C.muted }}>
-                Your account can access admin pages, but does not have report visibility.
+                {/* Split Content Area */}
+                <div style={{ display: "flex", minHeight: "680px", height: "calc(100vh - 230px)" }}>
+                  {/* Left Config Column */}
+                  <div style={{ width: 320, borderRight: `1px solid ${C.divider}`, padding: "20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 20, minWidth: 320 }}>
+                    {/* General or Custom selector */}
+                    <div style={{ display: "grid", gap: 14 }}>
+                      <FilterField label="Report Type">
+                        <select value={printReportType} onChange={(e) => handlePrintReportTypeChange(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                          <option value="general">General Executive Report (All Sections)</option>
+                          <option value="custom">Custom Report (Choose below)</option>
+                        </select>
+                      </FilterField>
+                    </div>
+
+                    <div style={{ height: 1, background: C.divider }} />
+
+                    {/* Custom Branding Title */}
+                    <div style={{ display: "grid", gap: 14 }}>
+                      <FilterField label="Custom Report Title">
+                        <input
+                          type="text"
+                          value={printCustomTitle}
+                          onChange={(e) => printCustomTitle !== e.target.value && setPrintCustomTitle(e.target.value)}
+                          placeholder="THE BELLEVUE MANILA"
+                          style={{
+                            ...filterStyle(),
+                            width: "100%",
+                            boxSizing: "border-box"
+                          }}
+                        />
+                      </FilterField>
+                    </div>
+
+                    <div style={{ height: 1, background: C.divider }} />
+
+                    {/* In-sidebar Outlet selector */}
+                    <div style={{ display: "grid", gap: 14 }}>
+                      <FilterField label="Outlet / Venue Filter">
+                        <select
+                          value={selectedOutlet}
+                          onChange={(e) => setSelectedOutlet(e.target.value)}
+                          style={{ ...filterStyle(), width: "100%" }}
+                        >
+                          <option value="ALL">All outlets</option>
+                          {buildDynamicOutletTree(venueRows).flatMap((group) => {
+                            const groupOptions = [];
+                            const groupAccessible = group.sections.some((sec) =>
+                              sec.items.some((item) => allOutlets.some((out) => canonicalOutletName(out.name) === canonicalOutletName(item)))
+                            );
+                            if (!groupAccessible) return [];
+
+                            groupOptions.push(
+                              <option key={group.id} value={group.label} style={{ fontWeight: "bold", color: C.gold }}>
+                                -- {group.label} (All) --
+                              </option>
+                            );
+
+                            group.sections.forEach((section) => {
+                              const children = section.items.filter((item) =>
+                                allOutlets.some((out) => canonicalOutletName(out.name) === canonicalOutletName(item))
+                              );
+                              if (children.length === 0) return;
+
+                              const hasChildren = section.items.length > 1;
+                              if (hasChildren) {
+                                groupOptions.push(
+                                  <option key={section.label} value={section.label} style={{ fontWeight: "600" }}>
+                                    {section.label} (All)
+                                  </option>
+                                );
+                                children.forEach((item) => {
+                                  if (item !== section.label) {
+                                    groupOptions.push(
+                                      <option key={item} value={item}>
+                                        {"\u00A0\u00A0\u00A0\u00A0" + item}
+                                      </option>
+                                    );
+                                  }
+                                });
+                              } else {
+                                groupOptions.push(
+                                  <option key={section.label} value={section.label}>
+                                    {section.label}
+                                  </option>
+                                );
+                              }
+                            });
+
+                            return groupOptions;
+                          })}
+                        </select>
+                      </FilterField>
+                    </div>
+
+                    <div style={{ height: 1, background: C.divider }} />
+
+                    {/* Sections & Page Breaks to Print */}
+                    <div style={{ display: "grid", gap: 10 }}>
+                      <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Select Sections & Breaks</div>
+                      <div style={{ display: "grid", gap: 12 }}>
+                        {Object.keys(printSections).map((sec) => (
+                          <div key={sec} style={{ display: "flex", flexDirection: "column", gap: 4, paddingBottom: 8, borderBottom: `1px solid ${C.divider}` }}>
+                            <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: C.text, cursor: "pointer" }}>
+                              <input
+                                type="checkbox"
+                                checked={printSections[sec]}
+                                onChange={(e) => handleSectionCheckboxChange(sec, e.target.checked)}
+                                style={{ width: 17, height: 17, accentColor: C.gold }}
+                              />
+                              <span style={{ textTransform: "capitalize", fontWeight: 550 }}>
+                                {sec === "mix" ? "Distribution & status mix" : sec === "trends" ? "Granular trends & charts" : sec}
+                              </span>
+                            </label>
+                            {printSections[sec] && (
+                              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: C.muted, cursor: "pointer", marginLeft: 27 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={printPageBreaks[sec]}
+                                  onChange={(e) => setPrintPageBreaks(prev => ({ ...prev, [sec]: e.target.checked }))}
+                                  style={{ width: 14, height: 14, accentColor: C.gold }}
+                                />
+                                <span>Insert page break after section</span>
+                              </label>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Center Live Preview Column */}
+                  <div style={{ flex: 1, background: C.soft, padding: "20px", overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0, position: "relative" }}>
+                    <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold, marginBottom: 16 }}>Live Layout Preview</div>
+
+                    {/* Reloading indicator overlay */}
+                    {loading && (
+                      <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.72)", backdropFilter: "blur(2px)", zIndex: 10, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                        <div style={{ color: C.gold, fontFamily: F.label, fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Reloading Report Data...</div>
+                      </div>
+                    )}
+
+                    {/* Paper sheet container */}
+                    <div
+                      style={{
+                        background: paperColors.background,
+                        color: paperColors.text,
+                        border: `1px solid ${paperColors.border}`,
+                        borderRadius: 8,
+                        boxShadow: "0 8px 30px rgba(24,20,14,0.06)",
+                        padding: "30px 24px",
+                        width: "100%",
+                        maxWidth: printOrientation === "landscape" ? "100%" : "680px",
+                        aspectRatio: printOrientation === "landscape" ? "1.414 / 1" : "1 / 1.414",
+                        minHeight: printOrientation === "landscape" ? "540px" : "760px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 16,
+                        overflowY: "auto",
+                        fontFamily: printFontFamily === "sans-serif" ? F.body :
+                                    printFontFamily === "monospace" ? F.mono :
+                                    printFontFamily === "rounded" ? "'Outfit', sans-serif" :
+                                    "'Playfair Display', serif",
+                        fontSize: `${printFontSize}pt`,
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      {/* Preview Paper Header */}
+                      <div style={{ borderBottom: `2px solid ${paperColors.gold}`, paddingBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexShrink: 0 }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: paperColors.text, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                            {printCustomTitle.trim() || "THE BELLEVUE MANILA"}
+                          </div>
+                          <div style={{ fontSize: 9.5, color: paperColors.muted, marginTop: 2 }}>
+                            Performance & Operational Report summary{selectedOutlet !== "ALL" && ` · Filtered by: ${selectedOutlet}`}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 9.5, color: paperColors.gold, fontWeight: 700 }}>{dateRangeLabel}</div>
+                      </div>
+
+                      {/* Preview Paper Content Blocks */}
+                      <div style={{ display: "grid", gap: 14, flex: 1, overflowY: "auto", paddingRight: 4 }}>
+                        {/* Mock Overview */}
+                        {printSections.overview && (
+                          <>
+                            <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10, background: paperColors.soft }}>
+                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 6 }}>Overview Metrics</div>
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                                {[
+                                  ["Reservations", filteredSummary.reservations || 0],
+                                  ["Guests", filteredSummary.guests || 0],
+                                  ["Outlets", selectedOutlet === "ALL" ? (summary.outlets || 0) : filteredOutlets.length],
+                                  ["Transactions", transactionSummary.transactions || 0],
+                                ].map(([lbl, val]) => (
+                                  <div key={lbl} style={{ background: paperColors.background, padding: 6, borderRadius: 6, border: `1px solid ${paperColors.divider}` }}>
+                                    <div style={{ fontSize: 8, color: paperColors.faint, textTransform: "uppercase" }}>{lbl}</div>
+                                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2, color: paperColors.text }}>{val}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {printPageBreaks.overview && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }} className="print-exclude">
+                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                                <span style={{ fontSize: 8, fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Mock Status Breakdown */}
+                        {printSections.mix && (
+                          <>
+                            <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
+                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 8 }}>Reservation status distribution</div>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                                <div style={{ display: "grid", gap: 4 }}>
+                                  <ProgressRow label="Reserved" value={filteredSummary.reserved} total={filteredSummary.reservations} tone="green" printMode={true} />
+                                  <ProgressRow label="Pending" value={filteredSummary.pending} total={filteredSummary.reservations} tone="gold" printMode={true} />
+                                </div>
+                                <div style={{ display: "grid", gap: 4 }}>
+                                  <ProgressRow label="Rejected" value={filteredSummary.rejected} total={filteredSummary.reservations} tone="red" printMode={true} />
+                                  <ProgressRow label="Cancelled" value={filteredSummary.cancelled} total={filteredSummary.reservations} tone="slate" printMode={true} />
+                                </div>
+                              </div>
+                            </div>
+                            {printPageBreaks.mix && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }} className="print-exclude">
+                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                                <span style={{ fontSize: 8, fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Mock Outlets */}
+                        {printSections.outlets && (
+                          <>
+                            <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
+                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 6 }}>Venue Performance Deck</div>
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                                {filteredOutlets.slice(0, 3).map((out) => (
+                                  <div key={out.name} style={{ background: paperColors.soft, border: `1px solid ${paperColors.divider}`, borderRadius: 6, padding: 6 }}>
+                                    <div style={{ fontSize: 9.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: paperColors.text }}>{out.name}</div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 8.5, color: paperColors.muted }}>
+                                      <span>Bookings: {out.total_reservations || 0}</span>
+                                      <span>{out.acceptance_rate}% approved</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              {filteredOutlets.length > 3 && (
+                                <div style={{ fontSize: 8.5, color: paperColors.faint, marginTop: 4, textAlign: "right" }}>+ {filteredOutlets.length - 3} more outlets will print in full document page...</div>
+                              )}
+                            </div>
+                            {printPageBreaks.outlets && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }} className="print-exclude">
+                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                                <span style={{ fontSize: 8, fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Mock Rooms */}
+                        {printSections.rooms && (
+                          <>
+                            <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
+                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 6 }}>Room totals performance listing</div>
+                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 9.5, color: paperColors.text }}>
+                                <thead>
+                                  <tr style={{ background: paperColors.soft, color: paperColors.faint, textTransform: "uppercase", fontSize: 8 }}>
+                                    <th style={{ textAlign: "left", padding: "4px" }}>Room</th>
+                                    <th style={{ textAlign: "left", padding: "4px" }}>Bookings</th>
+                                    <th style={{ textAlign: "left", padding: "4px" }}>Guests</th>
+                                    <th style={{ textAlign: "left", padding: "4px" }}>Reserved</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {roomDetails.slice(0, 3).map((r) => (
+                                    <tr key={r.room} style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
+                                      <td style={{ padding: "4px", fontWeight: 650 }}>{r.room}</td>
+                                      <td style={{ padding: "4px" }}>{r.reservations}</td>
+                                      <td style={{ padding: "4px" }}>{r.guests}</td>
+                                      <td style={{ padding: "4px" }}>{r.reserved}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              {roomDetails.length > 3 && (
+                                <div style={{ fontSize: 8.5, color: paperColors.faint, marginTop: 4, textAlign: "right" }}>+ {roomDetails.length - 3} more rooms will print in full document list...</div>
+                              )}
+                            </div>
+                            {printPageBreaks.rooms && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }} className="print-exclude">
+                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                                <span style={{ fontSize: 8, fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Mock Trend Chart */}
+                        {printSections.trends && (
+                          <>
+                            <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
+                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 4 }}>Reservation density trends</div>
+                              <div style={{ height: 40, border: `1px dashed ${paperColors.border}`, borderRadius: 6, display: "grid", placeItems: "center", background: paperColors.soft, color: paperColors.muted, fontSize: 10 }}>
+                                📊 Composed trend line visualization will render in full high-resolution printout
+                              </div>
+                            </div>
+                            {printPageBreaks.trends && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }} className="print-exclude">
+                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                                <span style={{ fontSize: 8, fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Mock Audit */}
+                        {printSections.audit && (
+                          <>
+                            <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
+                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 4 }}>Audit trail transaction monitor logs</div>
+                              <div style={{ fontSize: 9, color: paperColors.muted }}>Transaction record logs (Time, Reference code, Coordinator action) will print as structured list pages at the end of the report document.</div>
+                            </div>
+                            {printPageBreaks.audit && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }} className="print-exclude">
+                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                                <span style={{ fontSize: 8, fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      {/* Preview Footer */}
+                      <div style={{ borderTop: `1px solid ${paperColors.divider}`, paddingTop: 6, display: "flex", justifyContent: "space-between", fontSize: 8.5, color: paperColors.faint, flexShrink: 0 }}>
+                        <span>Report size standard: {printPageSize.toUpperCase()} · {printOrientation.toUpperCase()}</span>
+                        <span>Document Page 1 of 1 (Preview)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Settings Column */}
+                  <div style={{ width: 320, borderLeft: `1px solid ${C.divider}`, padding: "20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 20, minWidth: 320 }}>
+                    <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Document Layout Settings</div>
+
+                    <FilterField label="Orientation style">
+                      <select value={printOrientation} onChange={(e) => setPrintOrientation(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                        <option value="portrait">Portrait (Vertical)</option>
+                        <option value="landscape">Landscape (Horizontal)</option>
+                      </select>
+                    </FilterField>
+
+                    <FilterField label="Paper size standard">
+                      <select value={printPageSize} onChange={(e) => setPrintPageSize(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                        <option value="a4">A4 (210mm x 297mm)</option>
+                        <option value="letter">US Letter (8.5" x 11")</option>
+                      </select>
+                    </FilterField>
+
+                    <FilterField label="Print Color Theme">
+                      <select value={printTheme} onChange={(e) => setPrintTheme(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                        <option value="ink_saver">Ink Saver (Pure Black & White)</option>
+                        <option value="bellevue_luxe">Bellevue Luxe (Luxury Brand Gold & Charcoal)</option>
+                      </select>
+                    </FilterField>
+
+                    <FilterField label="Typography Font Family">
+                      <select value={printFontFamily} onChange={(e) => setPrintFontFamily(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                        <option value="serif">Bellevue Serif (Luxury Brand)</option>
+                        <option value="sans-serif">Corporate Sans-Serif (Modern Clean)</option>
+                        <option value="rounded">Friendly Rounded (Outfit)</option>
+                        <option value="monospace">Technical Monospace (Fira Mono)</option>
+                      </select>
+                    </FilterField>
+
+                    <FilterField label={`Base Font Size: ${printFontSize}pt`}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
+                        <span style={{ fontSize: 11, color: C.muted }}>8pt</span>
+                        <input
+                          type="range"
+                          min="8"
+                          max="16"
+                          step="0.5"
+                          value={printFontSize}
+                          onChange={(e) => setPrintFontSize(parseFloat(e.target.value))}
+                          style={{ flex: 1, accentColor: C.gold, height: 6, cursor: "pointer" }}
+                        />
+                        <span style={{ fontSize: 11, color: C.muted }}>16pt</span>
+                      </div>
+                    </FilterField>
+                  </div>
+                </div>
+
+                {/* Bottom Actions Bar */}
+                <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", gap: 12, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowPrintConfig(false)}
+                    style={{ height: 38, padding: "0 16px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, color: C.muted, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", cursor: "pointer" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPrintConfig(false);
+                      setTimeout(() => window.print(), 150);
+                    }}
+                    style={{ height: 38, padding: "0 22px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+                  >
+                    Print Report Document
+                  </button>
+                </div>
               </div>
-            ) : error ? (
-              <div style={{ background: C.redFaint, border: "1px solid rgba(160,56,56,0.18)", borderRadius: 10, padding: 14, color: C.red }}>{error}</div>
+            ) : showCsvConfig ? (
+              <div style={{ display: "flex", flexDirection: "column", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden", fontFamily: F.body, width: "100%" }} className="print-exclude">
+                {/* Header */}
+                <div style={{ padding: "18px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, flexShrink: 0 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: "1 1 auto" }}>
+                    <div>
+                      <div style={{ fontFamily: F.label, fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Interactive Excel & CSV Export Suite</div>
+                      <div style={{ marginTop: 2, fontSize: 11.5, color: C.muted }}>Configure spreadsheet structure, delimiters, and target sections with real-time importable preview.</div>
+                    </div>
+
+                    {/* Date filter presets inline right under subtitle */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
+                      <FilterField label="Preset">
+                        <select value={datePreset} onChange={(e) => {
+                          handleDatePresetChange(e.target.value);
+                          if (e.target.value !== "custom") {
+                            const dates = getPresetDates(e.target.value);
+                            if (dates) {
+                              setTimeout(() => loadReport(), 50);
+                            }
+                          }
+                        }} style={filterStyle()}>
+                          <option value="custom">Custom Range</option>
+                          <option value="today">Today</option>
+                          <option value="yesterday">Yesterday</option>
+                          <option value="this_week">This Week</option>
+                          <option value="last_7">Last 7 Days</option>
+                          <option value="this_month">This Month</option>
+                          <option value="last_30">Last 30 Days</option>
+                          <option value="ytd">Year to Date</option>
+                        </select>
+                      </FilterField>
+                      <FilterField label="Start">
+                        <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setDatePreset("custom"); }} style={filterStyle()} />
+                      </FilterField>
+                      <FilterField label="End">
+                        <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setDatePreset("custom"); }} style={filterStyle()} />
+                      </FilterField>
+                      <button
+                        type="button"
+                        onClick={loadReport}
+                        disabled={loading}
+                        style={{
+                          height: 34,
+                          padding: "0 16px",
+                          background: C.gold,
+                          color: "#fff",
+                          fontFamily: F.label,
+                          fontSize: 9.5,
+                          fontWeight: 700,
+                          letterSpacing: "0.10em",
+                          textTransform: "uppercase",
+                          cursor: loading ? "not-allowed" : "pointer",
+                          border: "none",
+                          borderRadius: 8,
+                          alignSelf: "flex-end"
+                        }}
+                      >
+                        {loading ? "..." : "Apply"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCsvConfig(false)}
+                    style={{ border: "none", background: "transparent", color: C.muted, fontSize: 18, cursor: "pointer", fontWeight: 300, padding: 6 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Split Content Area */}
+                <div style={{ display: "flex", minHeight: "680px", height: "calc(100vh - 230px)" }}>
+                  {/* Left Config Column */}
+                  <div style={{ width: 380, borderRight: `1px solid ${C.divider}`, padding: "20px 24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 20, minWidth: 380 }}>
+
+                    {/* Filename Customizer */}
+                    <div style={{ display: "grid", gap: 6 }}>
+                      <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Target File Name</div>
+                      <input
+                        type="text"
+                        value={csvFilename}
+                        onChange={(e) => setCsvFilename(e.target.value)}
+                        style={{
+                          height: 36,
+                          border: `1px solid ${C.border}`,
+                          borderRadius: 8,
+                          padding: "0 12px",
+                          fontSize: 12,
+                          fontFamily: F.body,
+                          color: C.text,
+                          background: C.surfaceInput,
+                          outline: "none",
+                          width: "100%",
+                          boxSizing: "border-box"
+                        }}
+                        placeholder="Enter file name"
+                      />
+                      <div style={{ fontSize: 10.5, color: C.muted }}>Pre-filled with date range parameter for Bellevue audits.</div>
+                    </div>
+
+                    <div style={{ height: 1, background: C.divider }} />
+
+                    {/* Export Style */}
+                    <div style={{ display: "grid", gap: 14 }}>
+                      <FilterField label="Export Data Structure Style">
+                        <select value={csvExportType} onChange={(e) => setCsvExportType(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                          <option value="unified">Unified Executive View (Combined reports)</option>
+                          <option value="raw">Raw BI Spreadsheet Flat-Grid (Pivot ready)</option>
+                        </select>
+                      </FilterField>
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: -4, lineHeight: 1.4 }}>
+                        {csvExportType === "unified"
+                          ? "Consolidates overview stats, status, trends, and outlet lists into a clean, human-readable document view."
+                          : "Exports a perfect single flat table of all matching reservation records, ideal for Excel Pivot Tables, Google Sheets, or PowerBI imports."}
+                      </div>
+                    </div>
+
+                    <div style={{ height: 1, background: C.divider }} />
+
+                    {/* Delimiter Selector */}
+                    <div style={{ display: "grid", gap: 14 }}>
+                      <FilterField label="Excel Delimiter Character">
+                        <select value={csvDelimiter} onChange={(e) => setCsvDelimiter(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
+                          <option value=",">Comma ( , ) – Standard US format</option>
+                          <option value=";">Semicolon ( ; ) – European Excel standard</option>
+                        </select>
+                      </FilterField>
+                    </div>
+
+                    <div style={{ height: 1, background: C.divider }} />
+
+                    {/* Include Metadata Headers */}
+                    <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: C.text, cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={csvIncludeHeaders}
+                        onChange={(e) => setCsvIncludeHeaders(e.target.checked)}
+                        style={{ width: 17, height: 17, accentColor: C.gold }}
+                      />
+                      <span style={{ fontWeight: 550 }}>Include Document Headers & Titles</span>
+                    </label>
+
+                    {csvExportType === "unified" && (
+                      <>
+                        <div style={{ height: 1, background: C.divider }} />
+
+                        {/* Section Selector */}
+                        <div style={{ display: "grid", gap: 10 }}>
+                          <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Sections to Compile</div>
+                          <div style={{ display: "grid", gap: 8 }}>
+                            {Object.keys(csvSections).map((sec) => (
+                              <label key={sec} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: C.text, cursor: "pointer", padding: "2px 0" }}>
+                                <input
+                                  type="checkbox"
+                                  checked={csvSections[sec]}
+                                  onChange={(e) => setCsvSections((prev) => ({ ...prev, [sec]: e.target.checked }))}
+                                  style={{ width: 17, height: 17, accentColor: C.gold }}
+                                />
+                                <span style={{ textTransform: "capitalize", fontWeight: 550 }}>
+                                  {sec === "summary" ? "Overview summary details"
+                                    : sec === "status" ? "Status breakdown mix"
+                                      : sec === "trends" ? "Annual & monthly trends"
+                                        : sec}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                  </div>
+
+                  {/* Right Live Preview Column */}
+                  <div style={{ flex: 1, background: C.soft, borderLeft: `1px solid ${C.border}`, padding: "24px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+
+                    {/* Header Stats */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+                      <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold }}>Spreadsheet Preview Grid</div>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <span style={{ background: C.goldFaint, color: C.gold, padding: "3px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700 }}>
+                          Estimated Columns: {csvExportType === "raw" ? 16 : "Dynamic"}
+                        </span>
+                        <span style={{ background: "rgba(46,122,90,0.08)", color: C.green, padding: "3px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700 }}>
+                          Estimated Rows: {compileCsvData().length}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Paper sheet spreadsheet preview container */}
+                    <div
+                      style={{
+                        background: paperColors.background,
+                        border: `1px solid ${paperColors.border}`,
+                        borderRadius: 12,
+                        boxShadow: "0 8px 30px rgba(24,20,14,0.04)",
+                        padding: 20,
+                        width: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 14,
+                        boxSizing: "border-box",
+                        flexShrink: 0,
+                        overflowX: "auto"
+                      }}
+                    >
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5, minWidth: 600, color: paperColors.text }}>
+                        <thead>
+                          <tr style={{ background: paperColors.soft, color: paperColors.faint, borderBottom: `2px solid ${paperColors.gold}` }}>
+                            {csvExportType === "raw" ? (
+                              <>
+                                <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Ref Code</th>
+                                <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Guest Name</th>
+                                <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Email</th>
+                                <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Outlet (Parent)</th>
+                                <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Subroom (Child)</th>
+                              </>
+                            ) : (
+                              <>
+                                <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", width: "40%" }}>Section / Label</th>
+                                <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Spreadsheet Output Values Preview</th>
+                              </>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {csvExportType === "raw" ? (
+                            <>
+                              <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
+                                <td style={{ padding: "8px 6px", fontWeight: 700, color: paperColors.text }}>Bellevue-5812</td>
+                                <td style={{ padding: "8px 6px" }}>Christian Dela Cruz</td>
+                                <td style={{ padding: "8px 6px" }}>christian@example.com</td>
+                                <td style={{ padding: "8px 6px" }}>20/20 Function Room</td>
+                                <td style={{ padding: "8px 6px", color: paperColors.green, fontWeight: 650 }}>20/20 Function Room A</td>
+                              </tr>
+                              <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
+                                <td style={{ padding: "8px 6px", fontWeight: 700, color: paperColors.text }}>Bellevue-3421</td>
+                                <td style={{ padding: "8px 6px" }}>John Doe</td>
+                                <td style={{ padding: "8px 6px" }}>john.doe@example.com</td>
+                                <td style={{ padding: "8px 6px" }}>Grand Ballroom</td>
+                                <td style={{ padding: "8px 6px", color: paperColors.green, fontWeight: 650 }}>Grand Ballroom B</td>
+                              </tr>
+                              <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
+                                <td style={{ padding: "8px 6px", fontWeight: 700, color: paperColors.text }}>Bellevue-9856</td>
+                                <td style={{ padding: "8px 6px" }}>Jane Smith</td>
+                                <td style={{ padding: "8px 6px" }}>jane.smith@example.com</td>
+                                <td style={{ padding: "8px 6px" }}>Laguna Ballroom</td>
+                                <td style={{ padding: "8px 6px", color: paperColors.green, fontWeight: 650 }}>Laguna Ballroom 2</td>
+                              </tr>
+                            </>
+                          ) : (
+                            <>
+                              {csvIncludeHeaders && (
+                                <tr style={{ borderBottom: `1px solid ${paperColors.divider}`, background: paperColors.soft }}>
+                                  <td style={{ padding: "8px 6px", fontWeight: 700, color: paperColors.gold }}>[HEADER]</td>
+                                  <td style={{ padding: "8px 6px", fontStyle: "italic", color: paperColors.muted }}>BELLEVUE OUTLET & ROOM PERFORMANCE REPORT · Date: {dateRangeLabel}</td>
+                                </tr>
+                              )}
+                              {csvSections.summary && (
+                                <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
+                                  <td style={{ padding: "8px 6px", fontWeight: 700 }}>OVERVIEW SUMMARY</td>
+                                  <td style={{ padding: "8px 6px" }}>Reservations Total: {summary.reservations || 0} · Guests Total: {summary.guests || 0}</td>
+                                </tr>
+                              )}
+                              {csvSections.status && (
+                                <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
+                                  <td style={{ padding: "8px 6px", fontWeight: 700 }}>STATUS BREAKDOWN</td>
+                                  <td style={{ padding: "8px 6px" }}>Approved: {reservedCount} · Pending: {statuses.pending || 0} · Rejected: {statuses.rejected || 0}</td>
+                                </tr>
+                              )}
+                            </>
+                          )}
+                          <tr>
+                            <td colSpan={csvExportType === "raw" ? 5 : 2} style={{ padding: "10px 6px", textTransform: "uppercase", fontSize: 9, color: paperColors.faint, fontWeight: 800, textAlign: "center" }}>
+                              + {Math.max(0, compileCsvData().length - 3)} additional rows will export into spreadsheet document
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Raw CSV Text Preview */}
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 180 }}>
+                      <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Raw CSV File Stream Output (First 8 lines)</div>
+                      <pre
+                        style={{
+                          flex: 1,
+                          margin: 0,
+                          background: "#18140E",
+                          color: "#FAF8F4",
+                          fontFamily: "monospace",
+                          fontSize: 11,
+                          padding: 14,
+                          borderRadius: 10,
+                          overflow: "auto",
+                          border: "1px solid rgba(255,255,255,0.06)",
+                          lineHeight: 1.5,
+                          boxSizing: "border-box"
+                        }}
+                      >
+                        {compileCsvData().slice(0, 8).map(row => row.map(csvCell).join(csvDelimiter)).join("\n")}
+                      </pre>
+                    </div>
+
+                  </div>
+
+                </div>
+
+                {/* Bottom Actions Bar */}
+                <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", gap: 12, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowCsvConfig(false)}
+                    style={{ height: 38, padding: "0 16px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, color: C.muted, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", cursor: "pointer" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportCsv}
+                    style={{ height: 38, padding: "0 22px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
+                  >
+                    Export Spreadsheet File
+                  </button>
+                </div>
+              </div>
             ) : loading ? (
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 28, color: C.muted }}>Loading reports...</div>
             ) : (
@@ -2390,549 +3261,9 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* 1. Print Config Customizer Panel with Live Preview */}
-      {showPrintConfig && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(24,20,14,0.42)", backdropFilter: "blur(4px)", display: "grid", placeItems: "center", padding: 20 }} className="print-exclude">
-          <section style={{ width: "min(1200px, 95vw)", height: "calc(100vh - 40px)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: F.body }}>
-            {/* Header */}
-            <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-              <div>
-                <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>Interactive Print & PDF Suite</div>
-                <div style={{ marginTop: 4, fontSize: 12.5, color: C.muted }}>Configure pagination, scale factors, and orientations with live document layout preview.</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowPrintConfig(false)}
-                style={{ border: "none", background: "transparent", color: C.muted, fontSize: 20, cursor: "pointer", fontWeight: 300, padding: 8 }}
-              >
-                ✕
-              </button>
-            </div>
 
-            {/* Split Content Area */}
-            <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-              {/* Left Config Column */}
-              <div style={{ width: 380, borderRight: `1px solid ${C.divider}`, padding: "20px 24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 20, minWidth: 380 }}>
-                {/* General or Custom selector */}
-                <div style={{ display: "grid", gap: 14 }}>
-                  <FilterField label="Report Type">
-                    <select value={printReportType} onChange={(e) => handlePrintReportTypeChange(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
-                      <option value="general">General Executive Report (All Sections)</option>
-                      <option value="custom">Custom Report (Choose below)</option>
-                    </select>
-                  </FilterField>
-                </div>
 
-                <div style={{ height: 1, background: C.divider }} />
-
-                {/* Sections to Print */}
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Select Sections to Include</div>
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {Object.keys(printSections).map((sec) => (
-                      <label key={sec} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: C.text, cursor: "pointer", padding: "4px 0" }}>
-                        <input
-                          type="checkbox"
-                          checked={printSections[sec]}
-                          onChange={(e) => handleSectionCheckboxChange(sec, e.target.checked)}
-                          style={{ width: 17, height: 17, accentColor: C.gold }}
-                        />
-                        <span style={{ textTransform: "capitalize", fontWeight: 550 }}>
-                          {sec === "mix" ? "Distribution & status mix" : sec === "trends" ? "Granular trends & charts" : sec}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ height: 1, background: C.divider }} />
-
-                {/* Sizing & Layout Options */}
-                <div style={{ display: "grid", gap: 14 }}>
-                  <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Document Layout Settings</div>
-
-                  <FilterField label="Orientation style">
-                    <select value={printOrientation} onChange={(e) => setPrintOrientation(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
-                      <option value="portrait">Portrait (Vertical)</option>
-                      <option value="landscape">Landscape (Horizontal)</option>
-                    </select>
-                  </FilterField>
-
-                  <FilterField label="Paper size standard">
-                    <select value={printPageSize} onChange={(e) => setPrintPageSize(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
-                      <option value="a4">A4 (210mm x 297mm)</option>
-                      <option value="letter">US Letter (8.5" x 11")</option>
-                    </select>
-                  </FilterField>
-
-                  <FilterField label="Typography font scale size">
-                    <select value={printFontScale} onChange={(e) => setPrintFontScale(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
-                      <option value="small">Small size (85% scaling)</option>
-                      <option value="medium">Medium size (100% standard)</option>
-                      <option value="large">Large size (115% high-readability)</option>
-                    </select>
-                  </FilterField>
-                </div>
-              </div>
-
-              {/* Right Live Preview Column */}
-              <div style={{ flex: 1, background: C.soft, borderLeft: `1px solid ${C.border}`, padding: "30px 20px", overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0 }}>
-                <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold, marginBottom: 16 }}>Live Layout Preview</div>
-
-                {/* Paper sheet container */}
-                <div
-                  style={{
-                    background: paperColors.background,
-                    color: paperColors.text,
-                    border: `1px solid ${paperColors.border}`,
-                    borderRadius: 8,
-                    boxShadow: "0 8px 30px rgba(24,20,14,0.06)",
-                    padding: "30px 24px",
-                    width: printOrientation === "landscape" ? "100%" : "min(580px, 100%)",
-                    maxWidth: printOrientation === "landscape" ? "800px" : "580px",
-                    aspectRatio: printOrientation === "landscape" ? "1.414 / 1" : "1 / 1.414",
-                    minHeight: printOrientation === "landscape" ? "540px" : "760px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 16,
-                    overflowY: "auto",
-                    fontSize: printFontScale === "small" ? 11 : printFontScale === "large" ? 13.5 : 12,
-                    boxSizing: "border-box",
-                  }}
-                >
-                  {/* Preview Paper Header */}
-                  <div style={{ borderBottom: `2px solid ${paperColors.gold}`, paddingBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexShrink: 0 }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: paperColors.text, letterSpacing: "0.06em", textTransform: "uppercase" }}>The Bellevue Manila</div>
-                      <div style={{ fontSize: 9.5, color: paperColors.muted, marginTop: 2 }}>
-                        Performance & Operational Report summary{selectedOutlet !== "ALL" && ` · Filtered by: ${selectedOutlet}`}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 9.5, color: paperColors.gold, fontWeight: 700 }}>{dateRangeLabel}</div>
-                  </div>
-
-                  {/* Preview Paper Content Blocks */}
-                  <div style={{ display: "grid", gap: 14, flex: 1, overflowY: "auto", paddingRight: 4 }}>
-                    {/* Mock Overview */}
-                    {printSections.overview && (
-                      <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10, background: paperColors.soft }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 6 }}>Overview Metrics</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-                          {[
-                            ["Reservations", filteredSummary.reservations || 0],
-                            ["Guests", filteredSummary.guests || 0],
-                            ["Outlets", selectedOutlet === "ALL" ? (summary.outlets || 0) : filteredOutlets.length],
-                            ["Transactions", transactionSummary.transactions || 0],
-                          ].map(([lbl, val]) => (
-                            <div key={lbl} style={{ background: paperColors.background, padding: 6, borderRadius: 6, border: `1px solid ${paperColors.divider}` }}>
-                              <div style={{ fontSize: 8, color: paperColors.faint, textTransform: "uppercase" }}>{lbl}</div>
-                              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2, color: paperColors.text }}>{val}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Mock Status Breakdown */}
-                    {printSections.mix && (
-                      <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 8 }}>Reservation status distribution</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                          <div style={{ display: "grid", gap: 4 }}>
-                            <ProgressRow label="Reserved" value={filteredSummary.reserved} total={filteredSummary.reservations} tone="green" printMode={true} />
-                            <ProgressRow label="Pending" value={filteredSummary.pending} total={filteredSummary.reservations} tone="gold" printMode={true} />
-                          </div>
-                          <div style={{ display: "grid", gap: 4 }}>
-                            <ProgressRow label="Rejected" value={filteredSummary.rejected} total={filteredSummary.reservations} tone="red" printMode={true} />
-                            <ProgressRow label="Cancelled" value={filteredSummary.cancelled} total={filteredSummary.reservations} tone="slate" printMode={true} />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Mock Outlets */}
-                    {printSections.outlets && (
-                      <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 6 }}>Venue Performance Deck</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                          {filteredOutlets.slice(0, 3).map((out) => (
-                            <div key={out.name} style={{ background: paperColors.soft, border: `1px solid ${paperColors.divider}`, borderRadius: 6, padding: 6 }}>
-                              <div style={{ fontSize: 9.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: paperColors.text }}>{out.name}</div>
-                              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 8.5, color: paperColors.muted }}>
-                                <span>Bookings: {out.total_reservations || 0}</span>
-                                <span>{out.acceptance_rate}% approved</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        {filteredOutlets.length > 3 && (
-                          <div style={{ fontSize: 8.5, color: paperColors.faint, marginTop: 4, textAlign: "right" }}>+ {filteredOutlets.length - 3} more outlets will print in full document page...</div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Mock Rooms */}
-                    {printSections.rooms && (
-                      <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 6 }}>Room totals performance listing</div>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 9.5, color: paperColors.text }}>
-                          <thead>
-                            <tr style={{ background: paperColors.soft, color: paperColors.faint, textTransform: "uppercase", fontSize: 8 }}>
-                              <th style={{ textAlign: "left", padding: "4px" }}>Room</th>
-                              <th style={{ textAlign: "left", padding: "4px" }}>Bookings</th>
-                              <th style={{ textAlign: "left", padding: "4px" }}>Guests</th>
-                              <th style={{ textAlign: "left", padding: "4px" }}>Reserved</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {roomDetails.slice(0, 3).map((r) => (
-                              <tr key={r.room} style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
-                                <td style={{ padding: "4px", fontWeight: 650 }}>{r.room}</td>
-                                <td style={{ padding: "4px" }}>{r.reservations}</td>
-                                <td style={{ padding: "4px" }}>{r.guests}</td>
-                                <td style={{ padding: "4px" }}>{r.reserved}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {roomDetails.length > 3 && (
-                          <div style={{ fontSize: 8.5, color: paperColors.faint, marginTop: 4, textAlign: "right" }}>+ {roomDetails.length - 3} more rooms will print in full document list...</div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Mock Trend Chart */}
-                    {printSections.trends && (
-                      <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 4 }}>Reservation density trends</div>
-                        <div style={{ height: 40, border: `1px dashed ${paperColors.border}`, borderRadius: 6, display: "grid", placeItems: "center", background: paperColors.soft, color: paperColors.muted, fontSize: 10 }}>
-                          📊 Composed trend line visualization will render in full high-resolution printout
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Mock Audit */}
-                    {printSections.audit && (
-                      <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 4 }}>Audit trail transaction monitor logs</div>
-                        <div style={{ fontSize: 9, color: paperColors.muted }}>Transaction record logs (Time, Reference code, Coordinator action) will print as structured list pages at the end of the report document.</div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Preview Footer */}
-                  <div style={{ borderTop: `1px solid ${paperColors.divider}`, paddingTop: 6, display: "flex", justifyContent: "space-between", fontSize: 8.5, color: paperColors.faint, flexShrink: 0 }}>
-                    <span>Report size standard: {printPageSize.toUpperCase()} · {printOrientation.toUpperCase()}</span>
-                    <span>Document Page 1 of 1 (Preview)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom Actions Bar */}
-            <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", gap: 12, flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={() => setShowPrintConfig(false)}
-                style={{ height: 38, padding: "0 16px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, color: C.muted, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", cursor: "pointer" }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPrintConfig(false);
-                  setTimeout(() => window.print(), 150);
-                }}
-                style={{ height: 38, padding: "0 22px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
-              >
-                Print Report Document
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {/* CSV/Excel Export Customizer Panel with Live Preview (RPT-005) */}
-      {showCsvConfig && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(24,20,14,0.42)", backdropFilter: "blur(4px)", display: "grid", placeItems: "center", padding: 20 }} className="print-exclude">
-          <section style={{ width: "min(1200px, 95vw)", height: "calc(100vh - 40px)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: F.body }}>
-
-            {/* Header */}
-            <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-              <div>
-                <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>Interactive Excel & CSV Export Suite</div>
-                <div style={{ marginTop: 4, fontSize: 12.5, color: C.muted }}>Configure spreadsheet structure, delimiters, and target sections with real-time importable preview.</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCsvConfig(false)}
-                style={{ border: "none", background: "transparent", color: C.muted, fontSize: 20, cursor: "pointer", fontWeight: 300, padding: 8 }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Split Content Area */}
-            <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-
-              {/* Left Config Column */}
-              <div style={{ width: 380, borderRight: `1px solid ${C.divider}`, padding: "20px 24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 20, minWidth: 380 }}>
-
-                {/* Filename Customizer */}
-                <div style={{ display: "grid", gap: 6 }}>
-                  <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Target File Name</div>
-                  <input
-                    type="text"
-                    value={csvFilename}
-                    onChange={(e) => setCsvFilename(e.target.value)}
-                    style={{
-                      height: 36,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 8,
-                      padding: "0 12px",
-                      fontSize: 12,
-                      fontFamily: F.body,
-                      color: C.text,
-                      background: C.surfaceInput,
-                      outline: "none",
-                      width: "100%",
-                      boxSizing: "border-box"
-                    }}
-                    placeholder="Enter file name"
-                  />
-                  <div style={{ fontSize: 10.5, color: C.muted }}>Pre-filled with date range parameter for Bellevue audits.</div>
-                </div>
-
-                <div style={{ height: 1, background: C.divider }} />
-
-                {/* Export Style */}
-                <div style={{ display: "grid", gap: 14 }}>
-                  <FilterField label="Export Data Structure Style">
-                    <select value={csvExportType} onChange={(e) => setCsvExportType(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
-                      <option value="unified">Unified Executive View (Combined reports)</option>
-                      <option value="raw">Raw BI Spreadsheet Flat-Grid (Pivot ready)</option>
-                    </select>
-                  </FilterField>
-                  <div style={{ fontSize: 11, color: C.muted, marginTop: -4, lineHeight: 1.4 }}>
-                    {csvExportType === "unified"
-                      ? "Consolidates overview stats, status, trends, and outlet lists into a clean, human-readable document view."
-                      : "Exports a perfect single flat table of all matching reservation records, ideal for Excel Pivot Tables, Google Sheets, or PowerBI imports."}
-                  </div>
-                </div>
-
-                <div style={{ height: 1, background: C.divider }} />
-
-                {/* Delimiter Selector */}
-                <div style={{ display: "grid", gap: 14 }}>
-                  <FilterField label="Excel Delimiter Character">
-                    <select value={csvDelimiter} onChange={(e) => setCsvDelimiter(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
-                      <option value=",">Comma ( , ) – Standard US format</option>
-                      <option value=";">Semicolon ( ; ) – European Excel standard</option>
-                    </select>
-                  </FilterField>
-                </div>
-
-                <div style={{ height: 1, background: C.divider }} />
-
-                {/* Include Metadata Headers */}
-                <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: C.text, cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={csvIncludeHeaders}
-                    onChange={(e) => setCsvIncludeHeaders(e.target.checked)}
-                    style={{ width: 17, height: 17, accentColor: C.gold }}
-                  />
-                  <span style={{ fontWeight: 550 }}>Include Document Headers & Titles</span>
-                </label>
-
-                {csvExportType === "unified" && (
-                  <>
-                    <div style={{ height: 1, background: C.divider }} />
-
-                    {/* Section Selector */}
-                    <div style={{ display: "grid", gap: 10 }}>
-                      <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Sections to Compile</div>
-                      <div style={{ display: "grid", gap: 8 }}>
-                        {Object.keys(csvSections).map((sec) => (
-                          <label key={sec} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: C.text, cursor: "pointer", padding: "2px 0" }}>
-                            <input
-                              type="checkbox"
-                              checked={csvSections[sec]}
-                              onChange={(e) => setCsvSections((prev) => ({ ...prev, [sec]: e.target.checked }))}
-                              style={{ width: 17, height: 17, accentColor: C.gold }}
-                            />
-                            <span style={{ textTransform: "capitalize", fontWeight: 550 }}>
-                              {sec === "summary" ? "Overview summary details"
-                                : sec === "status" ? "Status breakdown mix"
-                                  : sec === "trends" ? "Annual & monthly trends"
-                                    : sec}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-              </div>
-
-              {/* Right Live Preview Column */}
-              <div style={{ flex: 1, background: C.soft, borderLeft: `1px solid ${C.border}`, padding: "24px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
-
-                {/* Header Stats */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-                  <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold }}>Spreadsheet Preview Grid</div>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <span style={{ background: C.goldFaint, color: C.gold, padding: "3px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700 }}>
-                      Estimated Columns: {csvExportType === "raw" ? 16 : "Dynamic"}
-                    </span>
-                    <span style={{ background: "rgba(46,122,90,0.08)", color: C.green, padding: "3px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700 }}>
-                      Estimated Rows: {compileCsvData().length}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Paper sheet spreadsheet preview container */}
-                <div
-                  style={{
-                    background: paperColors.background,
-                    border: `1px solid ${paperColors.border}`,
-                    borderRadius: 12,
-                    boxShadow: "0 8px 30px rgba(24,20,14,0.04)",
-                    padding: 20,
-                    width: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 14,
-                    boxSizing: "border-box",
-                    flexShrink: 0,
-                    overflowX: "auto"
-                  }}
-                >
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5, minWidth: 600, color: paperColors.text }}>
-                    <thead>
-                      <tr style={{ background: paperColors.soft, color: paperColors.faint, borderBottom: `2px solid ${paperColors.gold}` }}>
-                        {csvExportType === "raw" ? (
-                          <>
-                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Ref Code</th>
-                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Guest Name</th>
-                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Email</th>
-                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Outlet (Parent)</th>
-                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Subroom (Child)</th>
-                          </>
-                        ) : (
-                          <>
-                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", width: "40%" }}>Section / Label</th>
-                            <th style={{ padding: "8px 6px", textAlign: "left", fontSize: 9, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>Spreadsheet Output Values Preview</th>
-                          </>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {csvExportType === "raw" ? (
-                        <>
-                          <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
-                            <td style={{ padding: "8px 6px", fontWeight: 700, color: paperColors.text }}>Bellevue-5812</td>
-                            <td style={{ padding: "8px 6px" }}>Christian Dela Cruz</td>
-                            <td style={{ padding: "8px 6px" }}>christian@example.com</td>
-                            <td style={{ padding: "8px 6px" }}>20/20 Function Room</td>
-                            <td style={{ padding: "8px 6px", color: paperColors.green, fontWeight: 650 }}>20/20 Function Room A</td>
-                          </tr>
-                          <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
-                            <td style={{ padding: "8px 6px", fontWeight: 700, color: paperColors.text }}>Bellevue-3421</td>
-                            <td style={{ padding: "8px 6px" }}>John Doe</td>
-                            <td style={{ padding: "8px 6px" }}>john.doe@example.com</td>
-                            <td style={{ padding: "8px 6px" }}>Grand Ballroom</td>
-                            <td style={{ padding: "8px 6px", color: paperColors.green, fontWeight: 650 }}>Grand Ballroom B</td>
-                          </tr>
-                          <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
-                            <td style={{ padding: "8px 6px", fontWeight: 700, color: paperColors.text }}>Bellevue-9856</td>
-                            <td style={{ padding: "8px 6px" }}>Jane Smith</td>
-                            <td style={{ padding: "8px 6px" }}>jane.smith@example.com</td>
-                            <td style={{ padding: "8px 6px" }}>Laguna Ballroom</td>
-                            <td style={{ padding: "8px 6px", color: paperColors.green, fontWeight: 650 }}>Laguna Ballroom 2</td>
-                          </tr>
-                        </>
-                      ) : (
-                        <>
-                          {csvIncludeHeaders && (
-                            <tr style={{ borderBottom: `1px solid ${paperColors.divider}`, background: paperColors.soft }}>
-                              <td style={{ padding: "8px 6px", fontWeight: 700, color: paperColors.gold }}>[HEADER]</td>
-                              <td style={{ padding: "8px 6px", fontStyle: "italic", color: paperColors.muted }}>BELLEVUE OUTLET & ROOM PERFORMANCE REPORT · Date: {dateRangeLabel}</td>
-                            </tr>
-                          )}
-                          {csvSections.summary && (
-                            <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
-                              <td style={{ padding: "8px 6px", fontWeight: 700 }}>OVERVIEW SUMMARY</td>
-                              <td style={{ padding: "8px 6px" }}>Reservations Total: {summary.reservations || 0} · Guests Total: {summary.guests || 0}</td>
-                            </tr>
-                          )}
-                          {csvSections.status && (
-                            <tr style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
-                              <td style={{ padding: "8px 6px", fontWeight: 700 }}>STATUS BREAKDOWN</td>
-                              <td style={{ padding: "8px 6px" }}>Approved: {reservedCount} · Pending: {statuses.pending || 0} · Rejected: {statuses.rejected || 0}</td>
-                            </tr>
-                          )}
-                        </>
-                      )}
-                      <tr>
-                        <td colSpan={csvExportType === "raw" ? 5 : 2} style={{ padding: "10px 6px", textTransform: "uppercase", fontSize: 9, color: paperColors.faint, fontWeight: 800, textAlign: "center" }}>
-                          + {Math.max(0, compileCsvData().length - 3)} additional rows will export into spreadsheet document
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Raw CSV Text Preview */}
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 180 }}>
-                  <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Raw CSV File Stream Output (First 8 lines)</div>
-                  <pre
-                    style={{
-                      flex: 1,
-                      margin: 0,
-                      background: "#18140E",
-                      color: "#FAF8F4",
-                      fontFamily: "monospace",
-                      fontSize: 11,
-                      padding: 14,
-                      borderRadius: 10,
-                      overflow: "auto",
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      lineHeight: 1.5,
-                      boxSizing: "border-box"
-                    }}
-                  >
-                    {compileCsvData().slice(0, 8).map(row => row.map(csvCell).join(csvDelimiter)).join("\n")}
-                  </pre>
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* Bottom Actions Bar */}
-            <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", gap: 12, flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={() => setShowCsvConfig(false)}
-                style={{ height: 38, padding: "0 16px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, color: C.muted, fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", cursor: "pointer" }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleExportCsv}
-                style={{ height: 38, padding: "0 22px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer" }}
-              >
-                Export Spreadsheet File
-              </button>
-            </div>
-
-          </section>
-        </div>
-      )}
+      {/* CSV/Excel Export Customizer Panel (repositioned inline above) */}
 
       {/* 2. Outlet Detailed Modal Report */}
       {activeOutletDetails && (
@@ -3139,7 +3470,7 @@ export default function Reports() {
         {/* Printable Paper Header */}
         <div className="print-header">
           <div>
-            <div className="print-title">THE BELLEVUE MANILA</div>
+            <div className="print-title">{printCustomTitle.trim() || "THE BELLEVUE MANILA"}</div>
             <div style={{ fontSize: "10pt", color: C.muted, marginTop: 4 }}>
               Executive Performance & Operational Report · Scoped by {currentUser?.name || currentUser?.email || "Administrator"}{selectedOutlet !== "ALL" && ` · Filtered by: ${selectedOutlet}`}
             </div>
@@ -3152,288 +3483,306 @@ export default function Reports() {
 
         {/* Section 1: Overview Summary */}
         {printSections.overview && (
-          <div className="print-section">
-            <div className="print-section-title">I. Executive Summary</div>
-            <div className="print-grid">
-              <div className="print-card">
-                <div className="print-card-label">Total Reservations</div>
-                <div className="print-card-value">{filteredSummary.reservations || 0}</div>
-              </div>
-              <div className="print-card">
-                <div className="print-card-label">Total Guests</div>
-                <div className="print-card-value">{filteredSummary.guests || 0}</div>
-              </div>
-              <div className="print-card">
-                <div className="print-card-label">Active Outlets</div>
-                <div className="print-card-value">{selectedOutlet === "ALL" ? (summary.outlets || 0) : filteredOutlets.length}</div>
-              </div>
-              <div className="print-card">
-                <div className="print-card-label">Audit Logs Tracked</div>
-                <div className="print-card-value">{transactionSummary.transactions || 0}</div>
+          <>
+            <div className="print-section">
+              <div className="print-section-title">I. Executive Summary</div>
+              <div className="print-grid">
+                <div className="print-card">
+                  <div className="print-card-label">Total Reservations</div>
+                  <div className="print-card-value">{filteredSummary.reservations || 0}</div>
+                </div>
+                <div className="print-card">
+                  <div className="print-card-label">Total Guests</div>
+                  <div className="print-card-value">{filteredSummary.guests || 0}</div>
+                </div>
+                <div className="print-card">
+                  <div className="print-card-label">Active Outlets</div>
+                  <div className="print-card-value">{selectedOutlet === "ALL" ? (summary.outlets || 0) : filteredOutlets.length}</div>
+                </div>
+                <div className="print-card">
+                  <div className="print-card-label">Audit Logs Tracked</div>
+                  <div className="print-card-value">{transactionSummary.transactions || 0}</div>
+                </div>
               </div>
             </div>
-          </div>
+            {printPageBreaks.overview && <div className="print-page-break" />}
+          </>
         )}
 
         {/* Section 2: Status & Distribution Mix */}
         {printSections.mix && (
-          <div className="print-section">
-            <div className="print-section-title">II. Distribution & Booking Status Mix</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-              <div>
-                <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Reservation Status Allocation</div>
-                <table className="print-table">
-                  <thead>
-                    <tr>
-                      <th>Status Name</th>
-                      <th>Bookings count</th>
-                      <th>Percentage</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="strong">Reserved / Approved</td>
-                      <td>{filteredSummary.reserved}</td>
-                      <td>{filteredSummary.reservations ? Math.round((filteredSummary.reserved / filteredSummary.reservations) * 100) : 0}%</td>
-                    </tr>
-                    <tr>
-                      <td className="strong">Pending Coordination</td>
-                      <td>{filteredSummary.pending}</td>
-                      <td>{filteredSummary.reservations ? Math.round((filteredSummary.pending / filteredSummary.reservations) * 100) : 0}%</td>
-                    </tr>
-                    <tr>
-                      <td className="strong">Rejected / Declined</td>
-                      <td>{filteredSummary.rejected}</td>
-                      <td>{filteredSummary.reservations ? Math.round((filteredSummary.rejected / filteredSummary.reservations) * 100) : 0}%</td>
-                    </tr>
-                    <tr>
-                      <td className="strong">Cancelled By User</td>
-                      <td>{filteredSummary.cancelled}</td>
-                      <td>{filteredSummary.reservations ? Math.round((filteredSummary.cancelled / filteredSummary.reservations) * 100) : 0}%</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div>
-                <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Reservation Category Mix</div>
-                <table className="print-table">
-                  <thead>
-                    <tr>
-                      <th>Category Type</th>
-                      <th>Bookings count</th>
-                      <th>Guests count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="strong">Dine-In Outlets</td>
-                      <td>{filteredCategory.dine_in?.reservations || 0}</td>
-                      <td>{filteredCategory.dine_in?.guests || 0} guests</td>
-                    </tr>
-                    <tr>
-                      <td className="strong">Room Service / Tables</td>
-                      <td>{filteredCategory.room_reservations?.reservations || 0}</td>
-                      <td>{filteredCategory.room_reservations?.guests || 0} guests</td>
-                    </tr>
-                    <tr>
-                      <td className="strong">Promotions Mentioned</td>
-                      <td>{filteredCategory.promotion_mentions?.reservations || 0}</td>
-                      <td>-</td>
-                    </tr>
-                  </tbody>
-                </table>
+          <>
+            <div className="print-section">
+              <div className="print-section-title">II. Distribution & Booking Status Mix</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                <div>
+                  <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Reservation Status Allocation</div>
+                  <table className="print-table">
+                    <thead>
+                      <tr>
+                        <th>Status Name</th>
+                        <th>Bookings count</th>
+                        <th>Percentage</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="strong">Reserved / Approved</td>
+                        <td>{filteredSummary.reserved}</td>
+                        <td>{filteredSummary.reservations ? Math.round((filteredSummary.reserved / filteredSummary.reservations) * 100) : 0}%</td>
+                      </tr>
+                      <tr>
+                        <td className="strong">Pending Coordination</td>
+                        <td>{filteredSummary.pending}</td>
+                        <td>{filteredSummary.reservations ? Math.round((filteredSummary.pending / filteredSummary.reservations) * 100) : 0}%</td>
+                      </tr>
+                      <tr>
+                        <td className="strong">Rejected / Declined</td>
+                        <td>{filteredSummary.rejected}</td>
+                        <td>{filteredSummary.reservations ? Math.round((filteredSummary.rejected / filteredSummary.reservations) * 100) : 0}%</td>
+                      </tr>
+                      <tr>
+                        <td className="strong">Cancelled By User</td>
+                        <td>{filteredSummary.cancelled}</td>
+                        <td>{filteredSummary.reservations ? Math.round((filteredSummary.cancelled / filteredSummary.reservations) * 100) : 0}%</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div>
+                  <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Reservation Category Mix</div>
+                  <table className="print-table">
+                    <thead>
+                      <tr>
+                        <th>Category Type</th>
+                        <th>Bookings count</th>
+                        <th>Guests count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="strong">Dine-In Outlets</td>
+                        <td>{filteredCategory.dine_in?.reservations || 0}</td>
+                        <td>{filteredCategory.dine_in?.guests || 0} guests</td>
+                      </tr>
+                      <tr>
+                        <td className="strong">Room Service / Tables</td>
+                        <td>{filteredCategory.room_reservations?.reservations || 0}</td>
+                        <td>{filteredCategory.room_reservations?.guests || 0} guests</td>
+                      </tr>
+                      <tr>
+                        <td className="strong">Promotions Mentioned</td>
+                        <td>{filteredCategory.promotion_mentions?.reservations || 0}</td>
+                        <td>-</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
+            {printPageBreaks.mix && <div className="print-page-break" />}
+          </>
         )}
 
         {/* Section 3: Outlet Performance */}
         {printSections.outlets && (
-          <div className="print-section">
-            <div className="print-section-title">III. Detailed Venue Performance Listing</div>
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th>Outlet / Venue Name</th>
-                  <th>Wing Location</th>
-                  <th>Type</th>
-                  <th>Bookings</th>
-                  <th>Guests</th>
-                  <th>Approved</th>
-                  <th>Pending</th>
-                  <th>Rejected</th>
-                  <th>Cancelled</th>
-                  <th>Dine-In</th>
-                  <th>Promo Mentions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOutlets.map((outlet) => (
-                  <tr key={outlet.name || outlet.venue_id}>
-                    <td className="strong">{outlet.name}</td>
-                    <td>{outlet.wing || "Main Wing"}</td>
-                    <td>{outlet.type || "Outlet"}</td>
-                    <td className="strong">{outlet.total_reservations || 0}</td>
-                    <td>{outlet.guests || 0}</td>
-                    <td>{outlet.reserved || 0} ({outlet.acceptance_rate}%)</td>
-                    <td>{outlet.pending || 0}</td>
-                    <td>{outlet.rejected || 0}</td>
-                    <td>{outlet.cancelled || 0}</td>
-                    <td>{outlet.dine_in || 0}</td>
-                    <td>{outlet.promotion_mentions || 0}</td>
+          <>
+            <div className="print-section">
+              <div className="print-section-title">III. Detailed Venue Performance Listing</div>
+              <table className="print-table">
+                <thead>
+                  <tr>
+                    <th>Outlet / Venue Name</th>
+                    <th>Wing Location</th>
+                    <th>Type</th>
+                    <th>Bookings</th>
+                    <th>Guests</th>
+                    <th>Approved</th>
+                    <th>Pending</th>
+                    <th>Rejected</th>
+                    <th>Cancelled</th>
+                    <th>Dine-In</th>
+                    <th>Promo Mentions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredOutlets.map((outlet) => (
+                    <tr key={outlet.name || outlet.venue_id}>
+                      <td className="strong">{outlet.name}</td>
+                      <td>{outlet.wing || "Main Wing"}</td>
+                      <td>{outlet.type || "Outlet"}</td>
+                      <td className="strong">{outlet.total_reservations || 0}</td>
+                      <td>{outlet.guests || 0}</td>
+                      <td>{outlet.reserved || 0} ({outlet.acceptance_rate}%)</td>
+                      <td>{outlet.pending || 0}</td>
+                      <td>{outlet.rejected || 0}</td>
+                      <td>{outlet.cancelled || 0}</td>
+                      <td>{outlet.dine_in || 0}</td>
+                      <td>{outlet.promotion_mentions || 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {printPageBreaks.outlets && <div className="print-page-break" />}
+          </>
         )}
 
         {/* Section 4: Room Totals */}
         {printSections.rooms && (
-          <div className="print-section">
-            <div className="print-section-title">IV. Room Totals & Location Performance</div>
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th>Room / Outlet Name</th>
-                  <th>Total Reservations</th>
-                  <th>Total Guests</th>
-                  <th>Pending</th>
-                  <th>Reserved / Approved</th>
-                  <th>Rejected / Declined</th>
-                  <th>Cancelled</th>
-                  <th>Dine-In</th>
-                  <th>Promo Mentions</th>
-                  <th>Latest Active Event</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roomDetails.map((room) => (
-                  <tr key={room.room}>
-                    <td className="strong">{room.room}</td>
-                    <td className="strong">{room.reservations || 0}</td>
-                    <td>{room.guests || 0}</td>
-                    <td>{room.pending || 0}</td>
-                    <td>{room.reserved || 0}</td>
-                    <td>{room.rejected || 0}</td>
-                    <td>{room.cancelled || 0}</td>
-                    <td>{room.dine_in || 0}</td>
-                    <td>{room.promotion_mentions || 0}</td>
-                    <td>{room.latest_event_date || "-"}</td>
+          <>
+            <div className="print-section">
+              <div className="print-section-title">IV. Room Totals & Location Performance</div>
+              <table className="print-table">
+                <thead>
+                  <tr>
+                    <th>Room / Outlet Name</th>
+                    <th>Total Reservations</th>
+                    <th>Total Guests</th>
+                    <th>Pending</th>
+                    <th>Reserved / Approved</th>
+                    <th>Rejected / Declined</th>
+                    <th>Cancelled</th>
+                    <th>Dine-In</th>
+                    <th>Promo Mentions</th>
+                    <th>Latest Active Event</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {roomDetails.map((room) => (
+                    <tr key={room.room}>
+                      <td className="strong">{room.room}</td>
+                      <td className="strong">{room.reservations || 0}</td>
+                      <td>{room.guests || 0}</td>
+                      <td>{room.pending || 0}</td>
+                      <td>{room.reserved || 0}</td>
+                      <td>{room.rejected || 0}</td>
+                      <td>{room.cancelled || 0}</td>
+                      <td>{room.dine_in || 0}</td>
+                      <td>{room.promotion_mentions || 0}</td>
+                      <td>{room.latest_event_date || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {printPageBreaks.rooms && <div className="print-page-break" />}
+          </>
         )}
 
         {/* Section 5: Seasonality Trends */}
         {printSections.trends && (
-          <div className="print-section">
-            <div className="print-section-title">V. Seasonality Trends & Activity Ledger</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-              {monthlyReport.months && monthlyReport.months.length > 0 && (
-                <div>
-                  <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Annual Month-by-Month Trend</div>
-                  <table className="print-table">
-                    <thead>
-                      <tr>
-                        <th>Month Period</th>
-                        <th>Reservations count</th>
-                        <th>Promo Mentions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {monthlyReport.months.map((m) => (
-                        <tr key={m.label || m.month}>
-                          <td className="strong">{m.label || m.month}</td>
-                          <td>{m.reservations || 0}</td>
-                          <td>{m.promotion_mentions || 0}</td>
+          <>
+            <div className="print-section">
+              <div className="print-section-title">V. Seasonality Trends & Activity Ledger</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                {monthlyReport.months && monthlyReport.months.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Annual Month-by-Month Trend</div>
+                    <table className="print-table">
+                      <thead>
+                        <tr>
+                          <th>Month Period</th>
+                          <th>Reservations count</th>
+                          <th>Promo Mentions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).length > 0 && (
-                <div>
-                  <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-                    {selectedMonthLabel} {monthlyGranularity === "weekly" ? "Weekly" : "Daily"} Density
+                      </thead>
+                      <tbody>
+                        {monthlyReport.months.map((m) => (
+                          <tr key={m.label || m.month}>
+                            <td className="strong">{m.label || m.month}</td>
+                            <td>{m.reservations || 0}</td>
+                            <td>{m.promotion_mentions || 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <table className="print-table">
-                    <thead>
-                      <tr>
-                        <th>Date / Period</th>
-                        <th>Reservations count</th>
-                        <th>Promo Mentions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).slice(0, 15).map((row) => (
-                        <tr key={row.label}>
-                          <td className="strong">{row.label}</td>
-                          <td>{row.reservations || 0}</td>
-                          <td>{row.promotion_mentions || 0}</td>
+                )}
+                {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).length > 0 && (
+                  <div>
+                    <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                      {selectedMonthLabel} {monthlyGranularity === "weekly" ? "Weekly" : "Daily"} Density
+                    </div>
+                    <table className="print-table">
+                      <thead>
+                        <tr>
+                          <th>Date / Period</th>
+                          <th>Reservations count</th>
+                          <th>Promo Mentions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).length > 15 && (
-                    <div style={{ fontSize: "8pt", color: C.muted, marginTop: 6, textAlign: "right" }}>* Density ledger continues for all days in selected month...</div>
-                  )}
-                </div>
-              )}
+                      </thead>
+                      <tbody>
+                        {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).slice(0, 15).map((row) => (
+                          <tr key={row.label}>
+                            <td className="strong">{row.label}</td>
+                            <td>{row.reservations || 0}</td>
+                            <td>{row.promotion_mentions || 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).length > 15 && (
+                      <div style={{ fontSize: "8pt", color: C.muted, marginTop: 6, textAlign: "right" }}>* Density ledger continues for all days in selected month...</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+            {printPageBreaks.trends && <div className="print-page-break" />}
+          </>
         )}
 
         {/* Section 6: Audit Logs */}
         {printSections.audit && canViewTransactions && (
-          <div className="print-section">
-            <div className="print-section-title">VI. Audit Trail Transaction Ledger</div>
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Reference Code</th>
-                  <th>Guest Name</th>
-                  <th>Venue / Location</th>
-                  <th>Change Description</th>
-                  <th>Action taken</th>
-                  <th>Performed By</th>
-                  <th>Coordinator notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(transactionReport.data || []).map((row) => {
-                  const reservation = row.reservation || {};
-                  const venue = row.venue || {};
-                  return (
-                    <tr key={row.id}>
-                      <td>{readableDateTime(row.created_at)}</td>
-                      <td className="strong">{reservation.reference_code || "-"}</td>
-                      <td>{reservation.name || "-"}</td>
-                      <td>{venue.name || reservation.room || "-"}</td>
-                      <td>
-                        {row.from_status && row.to_status && row.from_status !== row.to_status
-                          ? `${row.from_status.toUpperCase()} ➔ ${row.to_status.toUpperCase()}`
-                          : (row.to_status || row.from_status || reservation.status || "-").toUpperCase()
-                        }
-                      </td>
-                      <td>{actionLabel(row.action)}</td>
-                      <td>{getPerformedBy(row)}</td>
-                      <td style={{ fontSize: "8.5pt" }}>{row.notes || "-"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="print-section">
+              <div className="print-section-title">VI. Audit Trail Transaction Ledger</div>
+              <table className="print-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Reference Code</th>
+                    <th>Guest Name</th>
+                    <th>Venue / Location</th>
+                    <th>Change Description</th>
+                    <th>Action taken</th>
+                    <th>Performed By</th>
+                    <th>Coordinator notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(transactionReport.data || []).map((row) => {
+                    const reservation = row.reservation || {};
+                    const venue = row.venue || {};
+                    return (
+                      <tr key={row.id}>
+                        <td>{readableDateTime(row.created_at)}</td>
+                        <td className="strong">{reservation.reference_code || "-"}</td>
+                        <td>{reservation.name || "-"}</td>
+                        <td>{venue.name || reservation.room || "-"}</td>
+                        <td>
+                          {row.from_status && row.to_status && row.from_status !== row.to_status
+                            ? `${row.from_status.toUpperCase()} ➔ ${row.to_status.toUpperCase()}`
+                            : (row.to_status || row.from_status || reservation.status || "-").toUpperCase()
+                          }
+                        </td>
+                        <td>{actionLabel(row.action)}</td>
+                        <td>{getPerformedBy(row)}</td>
+                        <td style={{ fontSize: "8.5pt" }}>{row.notes || "-"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {printPageBreaks.audit && <div className="print-page-break" />}
+          </>
         )}
 
         {/* Print Footer */}
-        <div style={{ borderTop: "1px solid #8C6B2A", marginTop: 40, paddingTop: 10, display: "flex", justifyContent: "space-between", fontSize: "8pt", color: C.muted }}>
-          <span>The Bellevue Manila · Confidential Management Report</span>
+        <div style={{ borderTop: printTheme === "ink_saver" ? "1px solid #000000" : "1px solid #8C6B2A", marginTop: 40, paddingTop: 10, display: "flex", justifyContent: "space-between", fontSize: "8pt", color: C.muted }}>
+          <span>{printCustomTitle.trim() || "The Bellevue Manila"} · Confidential Management Report</span>
           <span>End of Document</span>
         </div>
       </div>
