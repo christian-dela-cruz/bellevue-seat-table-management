@@ -210,9 +210,9 @@ function ProgressRow({ label, value, total, tone = "gold", printMode = false }) 
 
   return (
     <div style={{ display: "grid", gap: 4 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11.5, color: textColor }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: printMode ? "0.95em" : 11.5, color: textColor }}>
         <span>{label}</span>
-        <span>{value} <span style={{ color: pctColor, fontSize: 10.5 }}>({pct}%)</span></span>
+        <span>{value} <span style={{ color: pctColor, fontSize: printMode ? "0.85em" : 10.5 }}>({pct}%)</span></span>
       </div>
       <div style={{ height: 4, borderRadius: 999, background: trackBg, overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 999 }} />
@@ -245,6 +245,53 @@ function StatusPill({ value, printMode = false }) {
     <span style={{ display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 8px", background: tone[1], color: tone[0], fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
       {status}
     </span>
+  );
+}
+
+function Toggle({ checked, onChange, size = "md" }) {
+  const isSm = size === "sm";
+  const width = isSm ? 30 : 36;
+  const height = isSm ? 16 : 20;
+  const thumbSize = isSm ? 12 : 16;
+  const translateDist = isSm ? 14 : 16;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      style={{
+        position: "relative",
+        width,
+        height,
+        borderRadius: 999,
+        background: checked ? C.gold : "rgba(0,0,0,0.12)",
+        border: "none",
+        cursor: "pointer",
+        transition: "background-color 0.2s ease, transform 0.1s ease",
+        padding: 0,
+        display: "inline-flex",
+        alignItems: "center",
+        outline: "none",
+        flexShrink: 0,
+      }}
+      onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.96)"; }}
+      onMouseUp={(e) => { e.currentTarget.style.transform = "none"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; }}
+    >
+      <span
+        style={{
+          width: thumbSize,
+          height: thumbSize,
+          borderRadius: "50%",
+          background: "#ffffff",
+          position: "absolute",
+          left: 2,
+          transform: checked ? `translateX(${translateDist}px)` : "translateX(0)",
+          transition: "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+        }}
+      />
+    </button>
   );
 }
 
@@ -1101,6 +1148,20 @@ function ReportTabs({ groups, activeTab, onChange }) {
   );
 }
 
+const FONT_FAMILIES = {
+  playfair: { label: "Bellevue Luxe Serif (Playfair Display)", value: "'Playfair Display', Georgia, 'Times New Roman', serif" },
+  times: { label: "Times New Roman (Classic Traditional Serif)", value: "'Times New Roman', Times, Georgia, serif" },
+  georgia: { label: "Georgia (Elegant Web Serif)", value: "Georgia, 'Times New Roman', serif" },
+  garamond: { label: "Garamond (Classic Premium Serif)", value: "Garamond, Baskerville, 'Times New Roman', serif" },
+  calibri: { label: "Calibri (Standard Office Sans-Serif)", value: "Calibri, Candara, 'Segoe UI', sans-serif" },
+  arial: { label: "Arial (Standard Modern Sans-Serif)", value: "Arial, 'Helvetica Neue', Helvetica, sans-serif" },
+  inter: { label: "Inter (Premium Interface Sans-Serif)", value: "Inter, 'Helvetica Neue', sans-serif" },
+  outfit: { label: "Outfit (Premium Elegant Rounded)", value: "Outfit, 'Inter', sans-serif" },
+  trebuchet: { label: "Trebuchet MS (Warm Casual Sans-Serif)", value: "'Trebuchet MS', 'Lucida Sans Unicode', sans-serif" },
+  courier: { label: "Courier New (Classic Technical Monospace)", value: "'Courier New', Courier, monospace" },
+  fira: { label: "Fira Mono (Modern Clean Monospace)", value: "'Fira Mono', 'Courier New', monospace" },
+};
+
 export default function Reports() {
   const { isDark } = useAdminTheme();
 
@@ -1135,7 +1196,7 @@ export default function Reports() {
   const [printFontScale, setPrintFontScale] = useState("medium");
   const [printPageSize, setPrintPageSize] = useState("a4");
   const [printOrientation, setPrintOrientation] = useState("portrait");
-  const [printFontFamily, setPrintFontFamily] = useState("serif");
+  const [printFontFamily, setPrintFontFamily] = useState("playfair");
   const [printFontSize, setPrintFontSize] = useState(11);
   const [printTheme, setPrintTheme] = useState("ink_saver");
   const [printCustomTitle, setPrintCustomTitle] = useState("");
@@ -1149,6 +1210,7 @@ export default function Reports() {
   });
   const [roomRowsPerPage, setRoomRowsPerPage] = useState(10);
   const [roomPage, setRoomPage] = useState(1);
+  const [previewZoom, setPreviewZoom] = useState(1.0);
 
   // CSV Configuration States (RPT-005)
   const [showCsvConfig, setShowCsvConfig] = useState(false);
@@ -1533,17 +1595,127 @@ export default function Reports() {
   const printStyles = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;650;750;850&family=Outfit:wght@400;600;750;850&family=Playfair+Display:wght@400;650;750;850&family=Fira+Mono:wght@400;650;750&display=swap');
 
+    /* Shared layout & presentation rules for screen preview & actual print */
+    .print-preview-sheet, .print-only {
+      color: ${printTheme === "ink_saver" ? "#000000" : "#18140E"} !important;
+    }
+
+    /* Target headers & sections inside preview and printout */
+    .print-preview-sheet .print-header, .print-only .print-header {
+      border-bottom: 3px solid ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
+      padding-bottom: 12px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .print-preview-sheet .print-title, .print-only .print-title {
+      font-size: 1.8em !important;
+      font-weight: 700 !important;
+      color: ${printTheme === "ink_saver" ? "#000000" : "#18140E"} !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.06em !important;
+    }
+
+    .print-preview-sheet .print-section, .print-only .print-section {
+      margin-bottom: 38px !important;
+    }
+
+    .print-preview-sheet .print-section-title, .print-only .print-section-title {
+      font-size: 1.0em !important;
+      font-weight: 800 !important;
+      text-transform: uppercase !important;
+      color: ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
+      letter-spacing: 0.12em !important;
+      margin-bottom: 12px;
+      border-bottom: 1px solid ${printTheme === "ink_saver" ? "#000000" : "rgba(140,107,42,0.15)"} !important;
+      padding-bottom: 4px;
+    }
+
+    .print-preview-sheet .print-table, .print-only .print-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      margin-top: 12px;
+      font-size: 0.8em !important;
+      line-height: 1.45 !important;
+    }
+
+    .print-preview-sheet .print-table th, .print-only .print-table th {
+      background: ${printTheme === "ink_saver" ? "#F3F4F6" : "#FAF8F4"} !important;
+      color: ${printTheme === "ink_saver" ? "#000000" : "#7A7060"} !important;
+      font-weight: 700 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.06em !important;
+      font-size: 0.7em !important;
+      padding: 10px 8px !important;
+      border-bottom: 2px solid ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
+      text-align: left !important;
+    }
+
+    .print-preview-sheet .print-table td, .print-only .print-table td {
+      padding: 10px 8px !important;
+      border-bottom: 1px solid ${printTheme === "ink_saver" ? "#E5E7EB" : "rgba(0,0,0,0.06)"} !important;
+      color: ${printTheme === "ink_saver" ? "#000000" : "#4A505E"} !important;
+      font-size: 0.8em !important;
+    }
+
+    .print-preview-sheet .print-table tr:last-child td, .print-only .print-table tr:last-child td {
+      border-bottom: none !important;
+    }
+
+    .print-preview-sheet .print-table td.strong, .print-only .print-table td.strong {
+      color: ${printTheme === "ink_saver" ? "#000000" : "#18140E"} !important;
+      font-weight: 700 !important;
+      white-space: nowrap !important;
+    }
+
+    .print-preview-sheet .print-grid, .print-only .print-grid {
+      display: grid !important;
+      grid-template-columns: repeat(4, 1fr) !important;
+      gap: 16px !important;
+      margin-bottom: 24px !important;
+    }
+
+    .print-preview-sheet .print-card, .print-only .print-card {
+      background: ${printTheme === "ink_saver" ? "#F3F4F6" : "#FAF8F4"} !important;
+      border: 1px solid ${printTheme === "ink_saver" ? "#D1D5DB" : "rgba(140,107,42,0.12)"} !important;
+      border-radius: 8px !important;
+      padding: 14px 16px !important;
+    }
+
+    .print-preview-sheet .print-card-label, .print-only .print-card-label {
+      font-size: 0.75em !important;
+      font-weight: 700 !important;
+      text-transform: uppercase !important;
+      color: ${printTheme === "ink_saver" ? "#374151" : "#7A7060"} !important;
+      letter-spacing: 0.08em !important;
+      margin-bottom: 6px;
+    }
+
+    .print-preview-sheet .print-card-value, .print-only .print-card-value {
+      font-size: 1.5em !important;
+      font-weight: 700 !important;
+      color: ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
+    }
+
+    .print-preview-sheet .print-footer, .print-only .print-footer {
+      border-top: 1px solid ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
+      margin-top: 40px !important;
+      padding-top: 10px !important;
+      display: flex !important;
+      justify-content: space-between !important;
+      font-size: 0.75em !important;
+      color: ${printTheme === "ink_saver" ? "#4B5563" : "#7A7060"} !important;
+    }
+
     @media print {
       /* Reset and base styles */
       html, body {
         background: #FFFFFF !important;
         color: ${printTheme === "ink_saver" ? "#000000" : "#18140E"} !important;
-        font-family: ${
-          printFontFamily === "sans-serif" ? F.body :
-          printFontFamily === "monospace" ? F.mono :
-          printFontFamily === "rounded" ? "'Outfit', 'Inter', sans-serif" :
-          "'Playfair Display', Georgia, serif"
-        } !important;
+        font-family: ${FONT_FAMILIES[printFontFamily]?.value || "'Playfair Display', Georgia, serif"} !important;
+        font-size: ${printFontSize}pt !important;
         margin: 0 !important;
         padding: 0 !important;
         -webkit-print-color-adjust: exact !important;
@@ -1566,6 +1738,7 @@ export default function Reports() {
         padding: 0 !important;
         background: #FFFFFF !important;
         font-size: ${printFontSize}pt !important;
+        font-family: ${FONT_FAMILIES[printFontFamily]?.value || "'Playfair Display', Georgia, serif"} !important;
       }
 
       .print-page-break {
@@ -1581,105 +1754,6 @@ export default function Reports() {
       @page {
         size: ${printPageSize} ${printOrientation};
         margin: 1.5cm !important;
-      }
-
-      /* Clean luxury headings & tables for print */
-      .print-header {
-        border-bottom: 3px solid ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
-        padding-bottom: 12px;
-        margin-bottom: 24px;
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-      }
-
-      .print-title {
-        font-size: 20pt !important;
-        font-weight: 700 !important;
-        color: ${printTheme === "ink_saver" ? "#000000" : "#18140E"} !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.06em !important;
-      }
-
-      .print-section {
-        margin-bottom: 38px !important;
-      }
-
-      .print-section-title {
-        font-size: 11pt !important;
-        font-weight: 800 !important;
-        text-transform: uppercase !important;
-        color: ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
-        letter-spacing: 0.12em !important;
-        margin-bottom: 12px;
-        border-bottom: 1px solid ${printTheme === "ink_saver" ? "#000000" : "rgba(140,107,42,0.15)"} !important;
-        padding-bottom: 4px;
-      }
-
-      .print-table {
-        width: 100% !important;
-        border-collapse: collapse !important;
-        margin-top: 12px;
-        font-size: 8.5pt !important;
-        line-height: 1.45 !important;
-      }
-
-      .print-table th {
-        background: ${printTheme === "ink_saver" ? "#F3F4F6" : "#FAF8F4"} !important;
-        color: ${printTheme === "ink_saver" ? "#000000" : "#7A7060"} !important;
-        font-weight: 700 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.06em !important;
-        font-size: 7.5pt !important;
-        padding: 10px 8px !important;
-        border-bottom: 2px solid ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
-        text-align: left !important;
-      }
-
-      .print-table td {
-        padding: 10px 8px !important;
-        border-bottom: 1px solid ${printTheme === "ink_saver" ? "#E5E7EB" : "rgba(0,0,0,0.06)"} !important;
-        color: ${printTheme === "ink_saver" ? "#000000" : "#4A505E"} !important;
-        font-size: 8.5pt !important;
-      }
-
-      .print-table tr:last-child td {
-        border-bottom: none !important;
-      }
-
-      .print-table td.strong {
-        color: ${printTheme === "ink_saver" ? "#000000" : "#18140E"} !important;
-        font-weight: 700 !important;
-        white-space: nowrap !important;
-      }
-
-      .print-grid {
-        display: grid !important;
-        grid-template-columns: repeat(4, 1fr) !important;
-        gap: 16px !important;
-        margin-bottom: 24px !important;
-      }
-
-      .print-card {
-        background: ${printTheme === "ink_saver" ? "#F3F4F6" : "#FAF8F4"} !important;
-        border: 1px solid ${printTheme === "ink_saver" ? "#D1D5DB" : "rgba(140,107,42,0.12)"} !important;
-        border-radius: 8px !important;
-        padding: 14px 16px !important;
-      }
-
-      .print-card-label {
-        font-size: 8pt !important;
-        font-weight: 700 !important;
-        text-transform: uppercase !important;
-        color: ${printTheme === "ink_saver" ? "#374151" : "#7A7060"} !important;
-        letter-spacing: 0.08em !important;
-        margin-bottom: 6px;
-      }
-
-      .print-card-value {
-        font-size: 16pt !important;
-        font-weight: 700 !important;
-        color: ${printTheme === "ink_saver" ? "#000000" : "#8C6B2A"} !important;
       }
     }
 
@@ -1903,6 +1977,401 @@ export default function Reports() {
     const finalFilename = csvFilename.trim() || autoGeneratedCsvFilename;
     downloadCsv(finalFilename, compileCsvData(), csvDelimiter);
     setShowCsvConfig(false);
+  };
+
+  const renderPrintContent = (isForPreview = false) => {
+    return (
+      <div style={{ display: "grid", gap: "14px" }}>
+        {/* Printable Paper Header */}
+        <div className="print-header">
+          <div>
+            <div className="print-title">{printCustomTitle.trim() || "THE BELLEVUE MANILA"}</div>
+            <div style={{ fontSize: "0.9em", color: printTheme === "ink_saver" ? "#4B5563" : "#7A7060", marginTop: 4 }}>
+              Executive Performance & Operational Report · Scoped by {currentUser?.name || currentUser?.email || "Administrator"}{selectedOutlet !== "ALL" && ` · Filtered by: ${selectedOutlet}`}
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: "0.9em", fontWeight: 700, color: printTheme === "ink_saver" ? "#000000" : "#8C6B2A" }}>{dateRangeLabel}</div>
+            <div style={{ fontSize: "0.75em", color: printTheme === "ink_saver" ? "#4B5563" : "#7A7060", marginTop: 2 }}>
+              Printed on {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
+            </div>
+          </div>
+        </div>
+
+        {/* Section 1: Overview Summary */}
+        {printSections.overview && (
+          <>
+            <div className="print-section">
+              <div className="print-section-title">I. Executive Summary</div>
+              <div className="print-grid">
+                <div className="print-card">
+                  <div className="print-card-label">Total Reservations</div>
+                  <div className="print-card-value">{filteredSummary.reservations || 0}</div>
+                </div>
+                <div className="print-card">
+                  <div className="print-card-label">Total Guests</div>
+                  <div className="print-card-value">{filteredSummary.guests || 0}</div>
+                </div>
+                <div className="print-card">
+                  <div className="print-card-label">Active Outlets</div>
+                  <div className="print-card-value">{selectedOutlet === "ALL" ? (summary.outlets || 0) : filteredOutlets.length}</div>
+                </div>
+                <div className="print-card">
+                  <div className="print-card-label">Audit Logs Tracked</div>
+                  <div className="print-card-value">{transactionSummary.transactions || 0}</div>
+                </div>
+              </div>
+            </div>
+            {printPageBreaks.overview && (
+              isForPreview ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 0" }} className="print-exclude">
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                  <span style={{ fontSize: "0.73em", fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                </div>
+              ) : (
+                <div className="print-page-break" />
+              )
+            )}
+          </>
+        )}
+
+        {/* Section 2: Status & Distribution Mix */}
+        {printSections.mix && (
+          <>
+            <div className="print-section">
+              <div className="print-section-title">II. Distribution & Booking Status Mix</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                <div>
+                  <div style={{ fontSize: "0.8em", fontWeight: 700, color: printTheme === "ink_saver" ? "#4B5563" : "#7A7060", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                    Reservation Status Allocation
+                  </div>
+                  <table className="print-table">
+                    <thead>
+                      <tr>
+                        <th>Status Name</th>
+                        <th>Bookings count</th>
+                        <th>Percentage</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="strong">Reserved / Approved</td>
+                        <td>{filteredSummary.reserved}</td>
+                        <td>{filteredSummary.reservations ? Math.round((filteredSummary.reserved / filteredSummary.reservations) * 100) : 0}%</td>
+                      </tr>
+                      <tr>
+                        <td className="strong">Pending Coordination</td>
+                        <td>{filteredSummary.pending}</td>
+                        <td>{filteredSummary.reservations ? Math.round((filteredSummary.pending / filteredSummary.reservations) * 100) : 0}%</td>
+                      </tr>
+                      <tr>
+                        <td className="strong">Rejected / Declined</td>
+                        <td>{filteredSummary.rejected}</td>
+                        <td>{filteredSummary.reservations ? Math.round((filteredSummary.rejected / filteredSummary.reservations) * 100) : 0}%</td>
+                      </tr>
+                      <tr>
+                        <td className="strong">Cancelled By User</td>
+                        <td>{filteredSummary.cancelled}</td>
+                        <td>{filteredSummary.reservations ? Math.round((filteredSummary.cancelled / filteredSummary.reservations) * 100) : 0}%</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div>
+                  <div style={{ fontSize: "0.8em", fontWeight: 700, color: printTheme === "ink_saver" ? "#4B5563" : "#7A7060", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                    Reservation Category Mix
+                  </div>
+                  <table className="print-table">
+                    <thead>
+                      <tr>
+                        <th>Category Type</th>
+                        <th>Bookings count</th>
+                        <th>Guests count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="strong">Dine-In Outlets</td>
+                        <td>{filteredCategory.dine_in?.reservations || 0}</td>
+                        <td>{filteredCategory.dine_in?.guests || 0} guests</td>
+                      </tr>
+                      <tr>
+                        <td className="strong">Room Service / Tables</td>
+                        <td>{filteredCategory.room_reservations?.reservations || 0}</td>
+                        <td>{filteredCategory.room_reservations?.guests || 0} guests</td>
+                      </tr>
+                      <tr>
+                        <td className="strong">Promotions Mentioned</td>
+                        <td>{filteredCategory.promotion_mentions?.reservations || 0}</td>
+                        <td>-</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            {printPageBreaks.mix && (
+              isForPreview ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 0" }} className="print-exclude">
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                  <span style={{ fontSize: "0.73em", fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                </div>
+              ) : (
+                <div className="print-page-break" />
+              )
+            )}
+          </>
+        )}
+
+        {/* Section 3: Outlet Performance */}
+        {printSections.outlets && (
+          <>
+            <div className="print-section">
+              <div className="print-section-title">III. Detailed Venue Performance Listing</div>
+              <table className="print-table">
+                <thead>
+                  <tr>
+                    <th>Outlet / Venue Name</th>
+                    <th>Wing Location</th>
+                    <th>Type</th>
+                    <th>Bookings</th>
+                    <th>Guests</th>
+                    <th>Approved</th>
+                    <th>Pending</th>
+                    <th>Rejected</th>
+                    <th>Cancelled</th>
+                    <th>Dine-In</th>
+                    <th>Promo Mentions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredOutlets.map((outlet) => (
+                    <tr key={outlet.name || outlet.venue_id}>
+                      <td className="strong">{outlet.name}</td>
+                      <td>{outlet.wing || "Main Wing"}</td>
+                      <td>{outlet.type || "Outlet"}</td>
+                      <td className="strong">{outlet.total_reservations || 0}</td>
+                      <td>{outlet.guests || 0}</td>
+                      <td>{outlet.reserved || 0} ({outlet.acceptance_rate}%)</td>
+                      <td>{outlet.pending || 0}</td>
+                      <td>{outlet.rejected || 0}</td>
+                      <td>{outlet.cancelled || 0}</td>
+                      <td>{outlet.dine_in || 0}</td>
+                      <td>{outlet.promotion_mentions || 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {printPageBreaks.outlets && (
+              isForPreview ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 0" }} className="print-exclude">
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                  <span style={{ fontSize: "0.73em", fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                </div>
+              ) : (
+                <div className="print-page-break" />
+              )
+            )}
+          </>
+        )}
+
+        {/* Section 4: Room Totals */}
+        {printSections.rooms && (
+          <>
+            <div className="print-section">
+              <div className="print-section-title">IV. Room Totals & Location Performance</div>
+              <table className="print-table">
+                <thead>
+                  <tr>
+                    <th>Room / Outlet Name</th>
+                    <th>Total Reservations</th>
+                    <th>Total Guests</th>
+                    <th>Pending</th>
+                    <th>Reserved / Approved</th>
+                    <th>Rejected / Declined</th>
+                    <th>Cancelled</th>
+                    <th>Dine-In</th>
+                    <th>Promo Mentions</th>
+                    <th>Latest Active Event</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roomDetails.map((room) => (
+                    <tr key={room.room}>
+                      <td className="strong">{room.room}</td>
+                      <td className="strong">{room.reservations || 0}</td>
+                      <td>{room.guests || 0}</td>
+                      <td>{room.pending || 0}</td>
+                      <td>{room.reserved || 0}</td>
+                      <td>{room.rejected || 0}</td>
+                      <td>{room.cancelled || 0}</td>
+                      <td>{room.dine_in || 0}</td>
+                      <td>{room.promotion_mentions || 0}</td>
+                      <td>{room.latest_event_date || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {printPageBreaks.rooms && (
+              isForPreview ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 0" }} className="print-exclude">
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                  <span style={{ fontSize: "0.73em", fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                </div>
+              ) : (
+                <div className="print-page-break" />
+              )
+            )}
+          </>
+        )}
+
+        {/* Section 5: Seasonality Trends */}
+        {printSections.trends && (
+          <>
+            <div className="print-section">
+              <div className="print-section-title">V. Seasonality Trends & Activity Ledger</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                {monthlyReport.months && monthlyReport.months.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: "0.8em", fontWeight: 700, color: printTheme === "ink_saver" ? "#4B5563" : "#7A7060", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                      Annual Month-by-Month Trend
+                    </div>
+                    <table className="print-table">
+                      <thead>
+                        <tr>
+                          <th>Month Period</th>
+                          <th>Reservations count</th>
+                          <th>Promo Mentions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {monthlyReport.months.map((m) => (
+                          <tr key={m.label || m.month}>
+                            <td className="strong">{m.label || m.month}</td>
+                            <td>{m.reservations || 0}</td>
+                            <td>{m.promotion_mentions || 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).length > 0 && (
+                  <div>
+                    <div style={{ fontSize: "0.8em", fontWeight: 700, color: printTheme === "ink_saver" ? "#4B5563" : "#7A7060", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                      {selectedMonthLabel} {monthlyGranularity === "weekly" ? "Weekly" : "Daily"} Density
+                    </div>
+                    <table className="print-table">
+                      <thead>
+                        <tr>
+                          <th>Date / Period</th>
+                          <th>Reservations count</th>
+                          <th>Promo Mentions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).slice(0, 15).map((row) => (
+                          <tr key={row.label}>
+                            <td className="strong">{row.label}</td>
+                            <td>{row.reservations || 0}</td>
+                            <td>{row.promotion_mentions || 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).length > 15 && (
+                      <div style={{ fontSize: "0.75em", color: printTheme === "ink_saver" ? "#4B5563" : "#7A7060", marginTop: 6, textAlign: "right" }}>
+                        * Density ledger continues for all days in selected month...
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            {printPageBreaks.trends && (
+              isForPreview ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 0" }} className="print-exclude">
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                  <span style={{ fontSize: "0.73em", fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                </div>
+              ) : (
+                <div className="print-page-break" />
+              )
+            )}
+          </>
+        )}
+
+        {/* Section 6: Audit Logs */}
+        {printSections.audit && canViewTransactions && (
+          <>
+            <div className="print-section">
+              <div className="print-section-title">VI. Audit Trail Transaction Ledger</div>
+              <table className="print-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Reference Code</th>
+                    <th>Guest Name</th>
+                    <th>Venue / Location</th>
+                    <th>Change Description</th>
+                    <th>Action taken</th>
+                    <th>Performed By</th>
+                    <th>Coordinator notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(filteredTransactionReport.data || []).map((row) => {
+                    const reservation = row.reservation || {};
+                    const venue = row.venue || {};
+                    return (
+                      <tr key={row.id}>
+                        <td>{readableDateTime(row.created_at)}</td>
+                        <td className="strong">{reservation.reference_code || "-"}</td>
+                        <td>{reservation.name || "-"}</td>
+                        <td>{venue.name || reservation.room || "-"}</td>
+                        <td>
+                          {row.from_status && row.to_status && row.from_status !== row.to_status
+                            ? `${row.from_status.toUpperCase()} ➔ ${row.to_status.toUpperCase()}`
+                            : (row.to_status || row.from_status || reservation.status || "-").toUpperCase()
+                          }
+                        </td>
+                        <td>{actionLabel(row.action)}</td>
+                        <td>{getPerformedBy(row)}</td>
+                        <td style={{ fontSize: "0.8em" }}>{row.notes || "-"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {printPageBreaks.audit && (
+              isForPreview ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 0" }} className="print-exclude">
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                  <span style={{ fontSize: "0.73em", fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                </div>
+              ) : (
+                <div className="print-page-break" />
+              )
+            )}
+          </>
+        )}
+
+        {/* Print Footer */}
+        <div className="print-footer">
+          <span>{printCustomTitle.trim() || "The Bellevue Manila"} · Confidential Management Report</span>
+          <span>{isForPreview ? "Document Page 1 of 1 (Preview)" : "End of Document"}</span>
+        </div>
+      </div>
+    );
   };
   const reportGroups = [
     {
@@ -2345,9 +2814,8 @@ export default function Reports() {
                     <div style={{ height: 1, background: C.divider }} />
 
                     {/* Sections & Page Breaks to Print */}
-                    <div style={{ display: "grid", gap: 10 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint }}>Select Sections & Breaks</div>
+                    <div style={{ display: "grid", gap: 12 }}>
+                      <FilterField label="Select Sections & Breaks">
                         <select
                           onChange={(e) => {
                             const val = e.target.value;
@@ -2363,58 +2831,76 @@ export default function Reports() {
                             e.target.value = "custom";
                           }}
                           style={{
-                            border: "none",
-                            background: "transparent",
+                            ...filterStyle(),
+                            width: "100%",
                             color: C.gold,
-                            fontFamily: F.label,
-                            fontSize: 10,
                             fontWeight: 700,
-                            cursor: "pointer",
-                            outline: "none"
                           }}
                           defaultValue="custom"
                         >
-                          <option value="custom" disabled>Presets...</option>
+                          <option value="custom" disabled>Presets Selection...</option>
                           <option value="all">Select All</option>
                           <option value="executive">Executive Summary Only</option>
                           <option value="audit">Audit Trail Only</option>
                           <option value="none">Deselect All</option>
                         </select>
-                      </div>
-                      <div style={{ display: "grid", gap: 12 }}>
-                        {Object.keys(printSections).map((sec) => (
-                          <div key={sec} style={{ display: "flex", flexDirection: "column", gap: 4, paddingBottom: 8, borderBottom: `1px solid ${C.divider}` }}>
-                            <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: C.text, cursor: "pointer" }}>
-                              <input
-                                type="checkbox"
-                                checked={printSections[sec]}
-                                onChange={(e) => handleSectionCheckboxChange(sec, e.target.checked)}
-                                style={{ width: 17, height: 17, accentColor: C.gold }}
-                              />
-                              <span style={{ textTransform: "capitalize", fontWeight: 550 }}>
-                                {sec === "mix" ? "Distribution & status mix" : sec === "trends" ? "Granular trends & charts" : sec}
-                              </span>
-                            </label>
-                            {printSections[sec] && (
-                              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: C.muted, cursor: "pointer", marginLeft: 27 }}>
-                                <input
-                                  type="checkbox"
-                                  checked={printPageBreaks[sec]}
-                                  onChange={(e) => setPrintPageBreaks(prev => ({ ...prev, [sec]: e.target.checked }))}
-                                  style={{ width: 14, height: 14, accentColor: C.gold }}
+                      </FilterField>
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {Object.keys(printSections).map((sec) => {
+                          const isActive = printSections[sec];
+                          return (
+                            <div
+                              key={sec}
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 6,
+                                padding: "8px 10px",
+                                borderRadius: 8,
+                                background: isActive ? C.goldFaint : C.soft,
+                                border: `1px solid ${isActive ? "rgba(140,107,42,0.20)" : C.divider}`,
+                                transition: "all 0.15s ease",
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <span style={{ textTransform: "capitalize", fontWeight: 600, fontSize: 11.5, color: isActive ? C.text : C.muted }}>
+                                  {sec === "mix" ? "Distribution & status mix" : sec === "trends" ? "Granular trends & charts" : sec}
+                                </span>
+                                <Toggle
+                                  checked={isActive}
+                                  onChange={(checked) => handleSectionCheckboxChange(sec, checked)}
                                 />
-                                <span>Insert page break after section</span>
-                              </label>
-                            )}
-                          </div>
-                        ))}
+                              </div>
+                              {isActive && (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    paddingTop: 6,
+                                    borderTop: `1px dashed ${C.divider}`,
+                                    fontSize: 10.5,
+                                    color: C.muted,
+                                  }}
+                                >
+                                  <span>Insert page break after section</span>
+                                  <Toggle
+                                    size="sm"
+                                    checked={printPageBreaks[sec]}
+                                    onChange={(checked) => setPrintPageBreaks(prev => ({ ...prev, [sec]: checked }))}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
 
                   {/* Center Live Preview Column */}
-                  <div style={{ flex: 1, background: C.soft, padding: "20px", overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0, position: "relative" }}>
-                    <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold, marginBottom: 16 }}>Live Layout Preview</div>
+                  <div style={{ flex: 1, background: C.soft, display: "flex", flexDirection: "column", minWidth: 0, position: "relative" }}>
+                    <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold, margin: "20px 20px 0", textAlign: "center" }}>Live Layout Preview</div>
 
                     {/* Reloading indicator overlay */}
                     {loading && (
@@ -2423,212 +2909,129 @@ export default function Reports() {
                       </div>
                     )}
 
-                    {/* Paper sheet container */}
+                    {/* Scrollable Viewport for the Sheet */}
+                    <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                      {/* Paper sheet container */}
+                      <div
+                        className="print-preview-sheet"
+                        style={{
+                          background: paperColors.background,
+                          color: paperColors.text,
+                          border: `1px solid ${paperColors.border}`,
+                          borderRadius: 8,
+                          boxShadow: "0 8px 30px rgba(24,20,14,0.06)",
+                          padding: "30px 24px",
+                          width: "100%",
+                          maxWidth: printOrientation === "landscape" ? "100%" : "680px",
+                          aspectRatio: printOrientation === "landscape" ? "1.414 / 1" : "1 / 1.414",
+                          minHeight: printOrientation === "landscape" ? "540px" : "760px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 16,
+                          overflowY: "auto",
+                          fontFamily: FONT_FAMILIES[printFontFamily]?.value || "'Playfair Display', serif",
+                          fontSize: `${printFontSize}pt`,
+                          boxSizing: "border-box",
+                          zoom: previewZoom,
+                        }}
+                      >
+                        {renderPrintContent(true)}
+                      </div>
+                    </div>
+
+                    {/* Floating Zoom Controls (RPT-008) */}
                     <div
                       style={{
-                        background: paperColors.background,
-                        color: paperColors.text,
-                        border: `1px solid ${paperColors.border}`,
-                        borderRadius: 8,
-                        boxShadow: "0 8px 30px rgba(24,20,14,0.06)",
-                        padding: "30px 24px",
-                        width: "100%",
-                        maxWidth: printOrientation === "landscape" ? "100%" : "680px",
-                        aspectRatio: printOrientation === "landscape" ? "1.414 / 1" : "1 / 1.414",
-                        minHeight: printOrientation === "landscape" ? "540px" : "760px",
+                        position: "absolute",
+                        bottom: 24,
+                        right: 24,
                         display: "flex",
-                        flexDirection: "column",
-                        gap: 16,
-                        overflowY: "auto",
-                        fontFamily: printFontFamily === "sans-serif" ? F.body :
-                                    printFontFamily === "monospace" ? F.mono :
-                                    printFontFamily === "rounded" ? "'Outfit', sans-serif" :
-                                    "'Playfair Display', serif",
-                        fontSize: `${printFontSize}pt`,
-                        boxSizing: "border-box",
+                        alignItems: "center",
+                        gap: 8,
+                        background: "rgba(255, 255, 255, 0.85)",
+                        backdropFilter: "blur(12px)",
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 30,
+                        padding: "6px 12px",
+                        boxShadow: "0 6px 20px rgba(24,20,14,0.08)",
+                        zIndex: 20,
+                        transition: "all 0.2s ease",
                       }}
                     >
-                      {/* Preview Paper Header */}
-                      <div style={{ borderBottom: `2px solid ${paperColors.gold}`, paddingBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexShrink: 0 }}>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 800, color: paperColors.text, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                            {printCustomTitle.trim() || "THE BELLEVUE MANILA"}
-                          </div>
-                          <div style={{ fontSize: 9.5, color: paperColors.muted, marginTop: 2 }}>
-                            Performance & Operational Report summary{selectedOutlet !== "ALL" && ` · Filtered by: ${selectedOutlet}`}
-                          </div>
-                        </div>
-                        <div style={{ fontSize: 9.5, color: paperColors.gold, fontWeight: 700 }}>{dateRangeLabel}</div>
-                      </div>
-
-                      {/* Preview Paper Content Blocks */}
-                      <div style={{ display: "grid", gap: 14, flex: 1, overflowY: "auto", paddingRight: 4 }}>
-                        {/* Mock Overview */}
-                        {printSections.overview && (
-                          <>
-                            <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10, background: paperColors.soft }}>
-                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 6 }}>Overview Metrics</div>
-                              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-                                {[
-                                  ["Reservations", filteredSummary.reservations || 0],
-                                  ["Guests", filteredSummary.guests || 0],
-                                  ["Outlets", selectedOutlet === "ALL" ? (summary.outlets || 0) : filteredOutlets.length],
-                                  ["Transactions", transactionSummary.transactions || 0],
-                                ].map(([lbl, val]) => (
-                                  <div key={lbl} style={{ background: paperColors.background, padding: 6, borderRadius: 6, border: `1px solid ${paperColors.divider}` }}>
-                                    <div style={{ fontSize: 8, color: paperColors.faint, textTransform: "uppercase" }}>{lbl}</div>
-                                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2, color: paperColors.text }}>{val}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            {printPageBreaks.overview && (
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }} className="print-exclude">
-                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
-                                <span style={{ fontSize: 8, fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
-                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
-                              </div>
-                            )}
-                          </>
-                        )}
-
-                        {/* Mock Status Breakdown */}
-                        {printSections.mix && (
-                          <>
-                            <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
-                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 8 }}>Reservation status distribution</div>
-                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                                <div style={{ display: "grid", gap: 4 }}>
-                                  <ProgressRow label="Reserved" value={filteredSummary.reserved} total={filteredSummary.reservations} tone="green" printMode={true} />
-                                  <ProgressRow label="Pending" value={filteredSummary.pending} total={filteredSummary.reservations} tone="gold" printMode={true} />
-                                </div>
-                                <div style={{ display: "grid", gap: 4 }}>
-                                  <ProgressRow label="Rejected" value={filteredSummary.rejected} total={filteredSummary.reservations} tone="red" printMode={true} />
-                                  <ProgressRow label="Cancelled" value={filteredSummary.cancelled} total={filteredSummary.reservations} tone="slate" printMode={true} />
-                                </div>
-                              </div>
-                            </div>
-                            {printPageBreaks.mix && (
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }} className="print-exclude">
-                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
-                                <span style={{ fontSize: 8, fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
-                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
-                              </div>
-                            )}
-                          </>
-                        )}
-
-                        {/* Mock Outlets */}
-                        {printSections.outlets && (
-                          <>
-                            <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
-                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 6 }}>Venue Performance Deck</div>
-                              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                                {filteredOutlets.slice(0, 3).map((out) => (
-                                  <div key={out.name} style={{ background: paperColors.soft, border: `1px solid ${paperColors.divider}`, borderRadius: 6, padding: 6 }}>
-                                    <div style={{ fontSize: 9.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: paperColors.text }}>{out.name}</div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 8.5, color: paperColors.muted }}>
-                                      <span>Bookings: {out.total_reservations || 0}</span>
-                                      <span>{out.acceptance_rate}% approved</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                              {filteredOutlets.length > 3 && (
-                                <div style={{ fontSize: 8.5, color: paperColors.faint, marginTop: 4, textAlign: "right" }}>+ {filteredOutlets.length - 3} more outlets will print in full document page...</div>
-                              )}
-                            </div>
-                            {printPageBreaks.outlets && (
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }} className="print-exclude">
-                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
-                                <span style={{ fontSize: 8, fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
-                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
-                              </div>
-                            )}
-                          </>
-                        )}
-
-                        {/* Mock Rooms */}
-                        {printSections.rooms && (
-                          <>
-                            <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
-                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 6 }}>Room totals performance listing</div>
-                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 9.5, color: paperColors.text }}>
-                                <thead>
-                                  <tr style={{ background: paperColors.soft, color: paperColors.faint, textTransform: "uppercase", fontSize: 8 }}>
-                                    <th style={{ textAlign: "left", padding: "4px" }}>Room</th>
-                                    <th style={{ textAlign: "left", padding: "4px" }}>Bookings</th>
-                                    <th style={{ textAlign: "left", padding: "4px" }}>Guests</th>
-                                    <th style={{ textAlign: "left", padding: "4px" }}>Reserved</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {roomDetails.slice(0, 3).map((r) => (
-                                    <tr key={r.room} style={{ borderBottom: `1px solid ${paperColors.divider}` }}>
-                                      <td style={{ padding: "4px", fontWeight: 650 }}>{r.room}</td>
-                                      <td style={{ padding: "4px" }}>{r.reservations}</td>
-                                      <td style={{ padding: "4px" }}>{r.guests}</td>
-                                      <td style={{ padding: "4px" }}>{r.reserved}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                              {roomDetails.length > 3 && (
-                                <div style={{ fontSize: 8.5, color: paperColors.faint, marginTop: 4, textAlign: "right" }}>+ {roomDetails.length - 3} more rooms will print in full document list...</div>
-                              )}
-                            </div>
-                            {printPageBreaks.rooms && (
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }} className="print-exclude">
-                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
-                                <span style={{ fontSize: 8, fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
-                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
-                              </div>
-                            )}
-                          </>
-                        )}
-
-                        {/* Mock Trend Chart */}
-                        {printSections.trends && (
-                          <>
-                            <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
-                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 4 }}>Reservation density trends</div>
-                              <div style={{ height: 40, border: `1px dashed ${paperColors.border}`, borderRadius: 6, display: "grid", placeItems: "center", background: paperColors.soft, color: paperColors.muted, fontSize: 10 }}>
-                                📊 Composed trend line visualization will render in full high-resolution printout
-                              </div>
-                            </div>
-                            {printPageBreaks.trends && (
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }} className="print-exclude">
-                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
-                                <span style={{ fontSize: 8, fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
-                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
-                              </div>
-                            )}
-                          </>
-                        )}
-
-                        {/* Mock Audit */}
-                        {printSections.audit && (
-                          <>
-                            <div style={{ border: `1px solid ${paperColors.divider}`, borderRadius: 8, padding: 10 }}>
-                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: paperColors.gold, marginBottom: 4 }}>Audit trail transaction monitor logs</div>
-                              <div style={{ fontSize: 9, color: paperColors.muted }}>Transaction record logs (Time, Reference code, Coordinator action) will print as structured list pages at the end of the report document.</div>
-                            </div>
-                            {printPageBreaks.audit && (
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0" }} className="print-exclude">
-                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
-                                <span style={{ fontSize: 8, fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
-                                <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-
-                      {/* Preview Footer */}
-                      <div style={{ borderTop: `1px solid ${paperColors.divider}`, paddingTop: 6, display: "flex", justifyContent: "space-between", fontSize: 8.5, color: paperColors.faint, flexShrink: 0 }}>
-                        <span>Report size standard: {printPageSize.toUpperCase()} · {printOrientation.toUpperCase()}</span>
-                        <span>Document Page 1 of 1 (Preview)</span>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewZoom(prev => Math.max(0.5, prev - 0.1))}
+                        title="Zoom Out"
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: "50%",
+                          border: "none",
+                          background: "rgba(0, 0, 0, 0.04)",
+                          color: C.text,
+                          fontSize: 16,
+                          fontWeight: 700,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          transition: "background 0.15s ease",
+                          outline: "none",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0, 0, 0, 0.08)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0, 0, 0, 0.04)"; }}
+                      >
+                        -
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewZoom(1.0)}
+                        title="Reset Zoom to 100%"
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: C.text,
+                          fontFamily: F.mono,
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          minWidth: 42,
+                          textAlign: "center",
+                          cursor: "pointer",
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          transition: "background 0.15s ease",
+                          outline: "none",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0, 0, 0, 0.04)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                      >
+                        {Math.round(previewZoom * 100)}%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewZoom(prev => Math.min(2.0, prev + 0.1))}
+                        title="Zoom In"
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: "50%",
+                          border: "none",
+                          background: "rgba(0, 0, 0, 0.04)",
+                          color: C.text,
+                          fontSize: 16,
+                          fontWeight: 700,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          transition: "background 0.15s ease",
+                          outline: "none",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0, 0, 0, 0.08)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0, 0, 0, 0.04)"; }}
+                      >
+                        +
+                      </button>
                     </div>
                   </div>
 
@@ -2647,6 +3050,9 @@ export default function Reports() {
                       <select value={printPageSize} onChange={(e) => setPrintPageSize(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
                         <option value="a4">A4 (210mm x 297mm)</option>
                         <option value="letter">US Letter (8.5" x 11")</option>
+                        <option value="legal">US Legal (8.5" x 14")</option>
+                        <option value="a3">A3 (297mm x 420mm)</option>
+                        <option value="a5">A5 (148mm x 210mm)</option>
                       </select>
                     </FilterField>
 
@@ -2659,10 +3065,9 @@ export default function Reports() {
 
                     <FilterField label="Typography Font Family">
                       <select value={printFontFamily} onChange={(e) => setPrintFontFamily(e.target.value)} style={{ ...filterStyle(), width: "100%" }}>
-                        <option value="serif">Bellevue Serif (Luxury Brand)</option>
-                        <option value="sans-serif">Corporate Sans-Serif (Modern Clean)</option>
-                        <option value="rounded">Friendly Rounded (Outfit)</option>
-                        <option value="monospace">Technical Monospace (Fira Mono)</option>
+                        {Object.entries(FONT_FAMILIES).map(([key, config]) => (
+                          <option key={key} value={key}>{config.label}</option>
+                        ))}
                       </select>
                     </FilterField>
 
@@ -2713,40 +3118,6 @@ export default function Reports() {
 
                 {/* Bottom Actions Bar */}
                 <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", gap: 12, flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowPrintConfig(false);
-                      const trendName = activeTab === "monthly"
-                        ? `outlet-report-${reportYear}-${String(reportMonth).padStart(2, "0")}-${monthlyGranularity}.csv`
-                        : `outlet-report-${startDate}-to-${endDate}.csv`;
-                      setCsvFilename(csvFilename || trendName);
-                      setShowCsvConfig(true);
-                    }}
-                    style={{
-                      height: 38,
-                      padding: "0 16px",
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 8,
-                      background: C.surface,
-                      color: C.gold,
-                      fontFamily: F.label,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: "0.10em",
-                      textTransform: "uppercase",
-                      cursor: "pointer",
-                      marginRight: "auto",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      transition: "all 0.12s ease"
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = C.goldFaint; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = C.surface; }}
-                  >
-                    <Download size={14} /> Go to CSV Export
-                  </button>
                   <button
                     type="button"
                     onClick={() => setShowPrintConfig(false)}
@@ -3167,36 +3538,6 @@ export default function Reports() {
 
                 {/* Bottom Actions Bar */}
                 <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", gap: 12, flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCsvConfig(false);
-                      setShowPrintConfig(true);
-                    }}
-                    style={{
-                      height: 38,
-                      padding: "0 16px",
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 8,
-                      background: C.surface,
-                      color: C.gold,
-                      fontFamily: F.label,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: "0.10em",
-                      textTransform: "uppercase",
-                      cursor: "pointer",
-                      marginRight: "auto",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      transition: "all 0.12s ease"
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = C.goldFaint; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = C.surface; }}
-                  >
-                    <Printer size={14} /> Go to Print Suite
-                  </button>
                   <button
                     type="button"
                     onClick={() => setShowCsvConfig(false)}
@@ -3771,325 +4112,14 @@ export default function Reports() {
       )}
 
       {/* 3. High-fidelity print-only view */}
-      <div className="print-only">
-        {/* Printable Paper Header */}
-        <div className="print-header">
-          <div>
-            <div className="print-title">{printCustomTitle.trim() || "THE BELLEVUE MANILA"}</div>
-            <div style={{ fontSize: "10pt", color: C.muted, marginTop: 4 }}>
-              Executive Performance & Operational Report · Scoped by {currentUser?.name || currentUser?.email || "Administrator"}{selectedOutlet !== "ALL" && ` · Filtered by: ${selectedOutlet}`}
-            </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "10pt", fontWeight: 700, color: C.gold }}>{dateRangeLabel}</div>
-            <div style={{ fontSize: "8pt", color: C.muted, marginTop: 2 }}>Printed on {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</div>
-          </div>
-        </div>
-
-        {/* Section 1: Overview Summary */}
-        {printSections.overview && (
-          <>
-            <div className="print-section">
-              <div className="print-section-title">I. Executive Summary</div>
-              <div className="print-grid">
-                <div className="print-card">
-                  <div className="print-card-label">Total Reservations</div>
-                  <div className="print-card-value">{filteredSummary.reservations || 0}</div>
-                </div>
-                <div className="print-card">
-                  <div className="print-card-label">Total Guests</div>
-                  <div className="print-card-value">{filteredSummary.guests || 0}</div>
-                </div>
-                <div className="print-card">
-                  <div className="print-card-label">Active Outlets</div>
-                  <div className="print-card-value">{selectedOutlet === "ALL" ? (summary.outlets || 0) : filteredOutlets.length}</div>
-                </div>
-                <div className="print-card">
-                  <div className="print-card-label">Audit Logs Tracked</div>
-                  <div className="print-card-value">{transactionSummary.transactions || 0}</div>
-                </div>
-              </div>
-            </div>
-            {printPageBreaks.overview && <div className="print-page-break" />}
-          </>
-        )}
-
-        {/* Section 2: Status & Distribution Mix */}
-        {printSections.mix && (
-          <>
-            <div className="print-section">
-              <div className="print-section-title">II. Distribution & Booking Status Mix</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-                <div>
-                  <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Reservation Status Allocation</div>
-                  <table className="print-table">
-                    <thead>
-                      <tr>
-                        <th>Status Name</th>
-                        <th>Bookings count</th>
-                        <th>Percentage</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="strong">Reserved / Approved</td>
-                        <td>{filteredSummary.reserved}</td>
-                        <td>{filteredSummary.reservations ? Math.round((filteredSummary.reserved / filteredSummary.reservations) * 100) : 0}%</td>
-                      </tr>
-                      <tr>
-                        <td className="strong">Pending Coordination</td>
-                        <td>{filteredSummary.pending}</td>
-                        <td>{filteredSummary.reservations ? Math.round((filteredSummary.pending / filteredSummary.reservations) * 100) : 0}%</td>
-                      </tr>
-                      <tr>
-                        <td className="strong">Rejected / Declined</td>
-                        <td>{filteredSummary.rejected}</td>
-                        <td>{filteredSummary.reservations ? Math.round((filteredSummary.rejected / filteredSummary.reservations) * 100) : 0}%</td>
-                      </tr>
-                      <tr>
-                        <td className="strong">Cancelled By User</td>
-                        <td>{filteredSummary.cancelled}</td>
-                        <td>{filteredSummary.reservations ? Math.round((filteredSummary.cancelled / filteredSummary.reservations) * 100) : 0}%</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div>
-                  <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Reservation Category Mix</div>
-                  <table className="print-table">
-                    <thead>
-                      <tr>
-                        <th>Category Type</th>
-                        <th>Bookings count</th>
-                        <th>Guests count</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="strong">Dine-In Outlets</td>
-                        <td>{filteredCategory.dine_in?.reservations || 0}</td>
-                        <td>{filteredCategory.dine_in?.guests || 0} guests</td>
-                      </tr>
-                      <tr>
-                        <td className="strong">Room Service / Tables</td>
-                        <td>{filteredCategory.room_reservations?.reservations || 0}</td>
-                        <td>{filteredCategory.room_reservations?.guests || 0} guests</td>
-                      </tr>
-                      <tr>
-                        <td className="strong">Promotions Mentioned</td>
-                        <td>{filteredCategory.promotion_mentions?.reservations || 0}</td>
-                        <td>-</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-            {printPageBreaks.mix && <div className="print-page-break" />}
-          </>
-        )}
-
-        {/* Section 3: Outlet Performance */}
-        {printSections.outlets && (
-          <>
-            <div className="print-section">
-              <div className="print-section-title">III. Detailed Venue Performance Listing</div>
-              <table className="print-table">
-                <thead>
-                  <tr>
-                    <th>Outlet / Venue Name</th>
-                    <th>Wing Location</th>
-                    <th>Type</th>
-                    <th>Bookings</th>
-                    <th>Guests</th>
-                    <th>Approved</th>
-                    <th>Pending</th>
-                    <th>Rejected</th>
-                    <th>Cancelled</th>
-                    <th>Dine-In</th>
-                    <th>Promo Mentions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredOutlets.map((outlet) => (
-                    <tr key={outlet.name || outlet.venue_id}>
-                      <td className="strong">{outlet.name}</td>
-                      <td>{outlet.wing || "Main Wing"}</td>
-                      <td>{outlet.type || "Outlet"}</td>
-                      <td className="strong">{outlet.total_reservations || 0}</td>
-                      <td>{outlet.guests || 0}</td>
-                      <td>{outlet.reserved || 0} ({outlet.acceptance_rate}%)</td>
-                      <td>{outlet.pending || 0}</td>
-                      <td>{outlet.rejected || 0}</td>
-                      <td>{outlet.cancelled || 0}</td>
-                      <td>{outlet.dine_in || 0}</td>
-                      <td>{outlet.promotion_mentions || 0}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {printPageBreaks.outlets && <div className="print-page-break" />}
-          </>
-        )}
-
-        {/* Section 4: Room Totals */}
-        {printSections.rooms && (
-          <>
-            <div className="print-section">
-              <div className="print-section-title">IV. Room Totals & Location Performance</div>
-              <table className="print-table">
-                <thead>
-                  <tr>
-                    <th>Room / Outlet Name</th>
-                    <th>Total Reservations</th>
-                    <th>Total Guests</th>
-                    <th>Pending</th>
-                    <th>Reserved / Approved</th>
-                    <th>Rejected / Declined</th>
-                    <th>Cancelled</th>
-                    <th>Dine-In</th>
-                    <th>Promo Mentions</th>
-                    <th>Latest Active Event</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {roomDetails.map((room) => (
-                    <tr key={room.room}>
-                      <td className="strong">{room.room}</td>
-                      <td className="strong">{room.reservations || 0}</td>
-                      <td>{room.guests || 0}</td>
-                      <td>{room.pending || 0}</td>
-                      <td>{room.reserved || 0}</td>
-                      <td>{room.rejected || 0}</td>
-                      <td>{room.cancelled || 0}</td>
-                      <td>{room.dine_in || 0}</td>
-                      <td>{room.promotion_mentions || 0}</td>
-                      <td>{room.latest_event_date || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {printPageBreaks.rooms && <div className="print-page-break" />}
-          </>
-        )}
-
-        {/* Section 5: Seasonality Trends */}
-        {printSections.trends && (
-          <>
-            <div className="print-section">
-              <div className="print-section-title">V. Seasonality Trends & Activity Ledger</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-                {monthlyReport.months && monthlyReport.months.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Annual Month-by-Month Trend</div>
-                    <table className="print-table">
-                      <thead>
-                        <tr>
-                          <th>Month Period</th>
-                          <th>Reservations count</th>
-                          <th>Promo Mentions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {monthlyReport.months.map((m) => (
-                          <tr key={m.label || m.month}>
-                            <td className="strong">{m.label || m.month}</td>
-                            <td>{m.reservations || 0}</td>
-                            <td>{m.promotion_mentions || 0}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).length > 0 && (
-                  <div>
-                    <div style={{ fontSize: "9pt", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-                      {selectedMonthLabel} {monthlyGranularity === "weekly" ? "Weekly" : "Daily"} Density
-                    </div>
-                    <table className="print-table">
-                      <thead>
-                        <tr>
-                          <th>Date / Period</th>
-                          <th>Reservations count</th>
-                          <th>Promo Mentions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).slice(0, 15).map((row) => (
-                          <tr key={row.label}>
-                            <td className="strong">{row.label}</td>
-                            <td>{row.reservations || 0}</td>
-                            <td>{row.promotion_mentions || 0}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {((monthlyGranularity === "weekly" ? monthlyReport.selected_month?.weeks : monthlyReport.selected_month?.days) || []).length > 15 && (
-                      <div style={{ fontSize: "8pt", color: C.muted, marginTop: 6, textAlign: "right" }}>* Density ledger continues for all days in selected month...</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            {printPageBreaks.trends && <div className="print-page-break" />}
-          </>
-        )}
-
-        {/* Section 6: Audit Logs */}
-        {printSections.audit && canViewTransactions && (
-          <>
-            <div className="print-section">
-              <div className="print-section-title">VI. Audit Trail Transaction Ledger</div>
-              <table className="print-table">
-                <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>Reference Code</th>
-                    <th>Guest Name</th>
-                    <th>Venue / Location</th>
-                    <th>Change Description</th>
-                    <th>Action taken</th>
-                    <th>Performed By</th>
-                    <th>Coordinator notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(filteredTransactionReport.data || []).map((row) => {
-                    const reservation = row.reservation || {};
-                    const venue = row.venue || {};
-                    return (
-                      <tr key={row.id}>
-                        <td>{readableDateTime(row.created_at)}</td>
-                        <td className="strong">{reservation.reference_code || "-"}</td>
-                        <td>{reservation.name || "-"}</td>
-                        <td>{venue.name || reservation.room || "-"}</td>
-                        <td>
-                          {row.from_status && row.to_status && row.from_status !== row.to_status
-                            ? `${row.from_status.toUpperCase()} ➔ ${row.to_status.toUpperCase()}`
-                            : (row.to_status || row.from_status || reservation.status || "-").toUpperCase()
-                          }
-                        </td>
-                        <td>{actionLabel(row.action)}</td>
-                        <td>{getPerformedBy(row)}</td>
-                        <td style={{ fontSize: "8.5pt" }}>{row.notes || "-"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {printPageBreaks.audit && <div className="print-page-break" />}
-          </>
-        )}
-
-        {/* Print Footer */}
-        <div style={{ borderTop: printTheme === "ink_saver" ? "1px solid #000000" : "1px solid #8C6B2A", marginTop: 40, paddingTop: 10, display: "flex", justifyContent: "space-between", fontSize: "8pt", color: C.muted }}>
-          <span>{printCustomTitle.trim() || "The Bellevue Manila"} · Confidential Management Report</span>
-          <span>End of Document</span>
-        </div>
+      <div
+        className="print-only"
+        style={{
+          fontSize: `${printFontSize}pt`,
+          fontFamily: FONT_FAMILIES[printFontFamily]?.value || "'Playfair Display', serif",
+        }}
+      >
+        {renderPrintContent(false)}
       </div>
     </div>
   );
@@ -4106,6 +4136,7 @@ function FilterField({ label, children }) {
 
 function filterStyle() {
   return {
+    boxSizing: "border-box",
     height: 34,
     border: `1px solid rgba(0,0,0,0.08)`,
     borderRadius: 8,
