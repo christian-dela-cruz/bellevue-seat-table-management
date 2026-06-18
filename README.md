@@ -1,124 +1,170 @@
-<h1 align="center">
-  Mailpit - email testing for developers
-</h1>
+# Bellevue Manila - Seat & Table Management System
 
-<div align="center">
-    <a href="https://github.com/axllent/mailpit/actions/workflows/tests.yml"><img src="https://github.com/axllent/mailpit/actions/workflows/tests.yml/badge.svg" alt="CI Tests status"></a>
-    <a href="https://github.com/axllent/mailpit/actions/workflows/build-release.yml"><img src="https://github.com/axllent/mailpit/actions/workflows/build-release.yml/badge.svg" alt="CI build status"></a>
-    <a href="https://github.com/axllent/mailpit/actions/workflows/build-docker.yml"><img src="https://github.com/axllent/mailpit/actions/workflows/build-docker.yml/badge.svg" alt="CI Docker build status"></a>
-    <a href="https://github.com/axllent/mailpit/actions/workflows/codeql-analysis.yml"><img src="https://github.com/axllent/mailpit/actions/workflows/codeql-analysis.yml/badge.svg" alt="Code quality"></a>
-    <a href="https://goreportcard.com/report/github.com/axllent/mailpit"><img src="https://goreportcard.com/badge/github.com/axllent/mailpit" alt="Go Report Card"></a>
-    <br>
-    <a href="https://github.com/axllent/mailpit/releases/latest"><img src="https://img.shields.io/github/v/release/axllent/mailpit.svg" alt="Latest release"></a>
-    <a href="https://hub.docker.com/r/axllent/mailpit"><img src="https://img.shields.io/docker/pulls/axllent/mailpit.svg" alt="Docker pulls"></a>
-</div>
-<br>
-<p align="center">
-  <a href="https://mailpit.axllent.org">Website</a>  •
-  <a href="https://mailpit.axllent.org/docs/">Documentation</a>  •
-  <a href="https://mailpit.axllent.org/docs/api-v1/">API</a>
-</p>
-
-<hr>
-
-**Mailpit** is a small, fast, low memory, zero-dependency, multi-platform email testing tool & API for developers.
-
-It acts as an SMTP server, provides a modern web interface to view & test captured emails, and includes an API for automated integration testing.
-
-Mailpit was originally **inspired** by MailHog which is [no longer maintained](https://github.com/mailhog/MailHog/issues/442#issuecomment-1493415258) and hasn't seen active development or security updates for a few years now.
-
-![Mailpit](https://raw.githubusercontent.com/axllent/mailpit/develop/server/ui-src/screenshot.png)
-
-
-## Features
-
-- Runs entirely from a single [static binary](https://mailpit.axllent.org/docs/install/) or multi-architecture [Docker images](https://mailpit.axllent.org/docs/install/docker/)
-- Modern web UI with advanced [mail search](https://mailpit.axllent.org/docs/usage/search-filters/) to view emails (formatted HTML, highlighted HTML source, text, headers, raw source, and MIME attachments
-including image thumbnails), including optional [HTTPS](https://mailpit.axllent.org/docs/configuration/http/) & [authentication](https://mailpit.axllent.org/docs/configuration/http/)
-- [SMTP server](https://mailpit.axllent.org/docs/configuration/smtp/) with optional STARTTLS or SSL/TLS, authentication (including an "accept any" mode)
-- A [REST API](https://mailpit.axllent.org/docs/api-v1/) for integration testing
-- Real-time web UI updates using web sockets for new mail & optional [browser notifications](https://mailpit.axllent.org/docs/usage/notifications/) when new mail is received
-- Optional [POP3 server](https://mailpit.axllent.org/docs/configuration/pop3/) to download captured message directly into your email client
-- [HTML check](https://mailpit.axllent.org/docs/usage/html-check/) to test & score mail client compatibility with HTML emails
-- [Link check](https://mailpit.axllent.org/docs/usage/link-check/) to test message links (HTML & text) & linked images
-- [Spam check](https://mailpit.axllent.org/docs/usage/spamassassin/) to test message "spamminess" using a running SpamAssassin server
-- [Create screenshots](https://mailpit.axllent.org/docs/usage/html-screenshots/) of HTML messages via web UI
-- Mobile and tablet HTML preview toggle in desktop mode
-- [Message tagging](https://mailpit.axllent.org/docs/usage/tagging/) including manual tagging or automated tagging using filtering and "plus addressing"
-- [SMTP relaying](https://mailpit.axllent.org/docs/configuration/smtp-relay/) (message release) - relay messages via a different SMTP server including an optional allowlist of accepted recipients
-- [SMTP forwarding](https://mailpit.axllent.org/docs/configuration/smtp-forward/) - automatically forward messages via a different SMTP server to predefined email addresses
-- Fast message [storing & processing](https://mailpit.axllent.org/docs/configuration/email-storage/) - ingesting 200-300 emails per second over SMTP depending on CPU, network speed & email size,
-easily handling tens of thousands of emails, with automatic email pruning by volume or message age (by default keeping the most recent 500 emails)
-- [Chaos](https://mailpit.axllent.org/docs/integration/chaos/) feature to enable configurable SMTP errors to test application resilience
-- `List-Unsubscribe` syntax validation
-- Optional [webhook](https://mailpit.axllent.org/docs/integration/webhook/) for received messages
-
-
-## Installation
-
-The Mailpit web UI listens by default on `http://0.0.0.0:8025` and the SMTP port on `0.0.0.0:1025`.
-
-Mailpit runs as a single binary and can be installed in different ways:
-
-
-### Install via package managers
-
-- **Mac**: `brew install mailpit` (to run automatically in the background: `brew services start mailpit`)
-- **Arch Linux**: available in the AUR as `mailpit`
-- **FreeBSD**: `pkg install mailpit`
-
-
-### Install via script (Linux & Mac)
-
-Linux & Mac users can install it directly to `/usr/local/bin/mailpit` with:
-
-```shell
-sudo sh < <(curl -sL https://raw.githubusercontent.com/axllent/mailpit/develop/install.sh)
-```
-
-You can also change the install path to something else by setting the `INSTALL_PATH` environment, for example:
-
-```shell
-sudo INSTALL_PATH=/usr/bin sh < <(curl -sL https://raw.githubusercontent.com/axllent/mailpit/develop/install.sh)
-```
-
-
-### Download static binary (Windows, Linux and Mac)
-
-Static binaries can always be found on the [releases](https://github.com/axllent/mailpit/releases/latest). The `mailpit` binary can be extracted and copied to your `$PATH`, or simply run as `./mailpit`.
-
-
-### Docker
-
-See [Docker instructions](https://mailpit.axllent.org/docs/install/docker/) for 386, amd64 & arm64 images.
-
-
-### Compile from source
-
-To build Mailpit from source, see [Building from source](https://mailpit.axllent.org/docs/install/source/).
-
-
-## Usage
-
-Run `mailpit -h` to see options. More information can be seen in [the docs](https://mailpit.axllent.org/docs/configuration/runtime-options/).
-
-If installed using homebrew, you may run `brew services start mailpit` to always run mailpit automatically.
-
-
-### Testing Mailpit
-
-Please refer to [the documentation](https://mailpit.axllent.org/docs/install/testing/) on how to easily test email delivery to Mailpit.
-
-
-### Configuring sendmail
-
-Mailpit's SMTP server (default on port 1025), so you will likely need to configure your sending application to deliver mail via that port. 
-A common MTA (Mail Transfer Agent) that delivers system emails to an SMTP server is `sendmail`, used by many applications, including PHP. 
-Mailpit can also act as substitute for sendmail. For instructions on how to set this up, please refer to the [sendmail documentation](https://mailpit.axllent.org/docs/install/sendmail/).
+A real-time venue reservation, interactive seat-mapping, and layout customization system designed for premium hospitality services. This system enables guests to select specific tables or seats, allows admins to visually design seat layouts using drag-and-drop tools, and keeps data synchronized in real-time.
 
 ---
 
-<p align="center">
-  For team features, multiple inboxes, and a hosted setup, try
-  <a href="https://mailtrap.io/?ref=mailpit">Mailtrap</a>, our friendly companion.
-</p>
+## 🏗️ System Architecture
+
+The project consists of three main components:
+1. **Frontend:** React 19 + Vite client application.
+2. **Backend:** Laravel 12 API with an SQLite database.
+3. **WebSocket Helper:** A lightweight Node.js event broadcast server.
+
+```mermaid
+sequenceDiagram
+    participant Guest as Guest Browser
+    participant API as Laravel Backend
+    participant WS as WebSocket Server (Port 6001)
+    participant Admin as Admin Dashboard
+
+    Guest->>API: Create Booking (Submit Reservation)
+    API->>API: Save to DB & Dispatches Events
+    API->>WS: Post Event to /broadcast
+    WS-->>Admin: Pushes 'ReservationCreated' via WebSockets
+    WS-->>Guest: Pushes updates to other maps
+    Note over Guest,Admin: Fallbacks to HTTP Polling if WebSocket server is down
+```
+
+---
+
+## 🛠️ Technology Stack
+
+### Frontend
+- **Framework:** React 19 (compiled with Vite 7)
+- **Routing & State:** React Router Dom v7, React Hooks
+- **Layout Designer:** Custom interactive canvas built with `@dnd-kit/core` and `@dnd-kit/sortable`
+- **Animations:** GSAP & Framer Motion for premium, smooth micro-interactions
+- **Styling:** Custom Vanilla CSS for absolute control, with Tailwind CSS integrations
+- **Data Visualizations:** Recharts for analytics dashboards
+
+### Backend
+- **Framework:** Laravel 12.x (running on PHP 8.2+)
+- **Database:** SQLite (local development database)
+- **Authentication:** Laravel Sanctum (token-based api authentication)
+- **Queue System:** Laravel queue listener for async reminders and notifications
+- **Broadcasting:** Laravel Event Broadcasting with Pusher server integrations
+
+### Real-Time WebSocket Server
+- **Server:** Custom Node.js HTTP/WebSocket server (`ws` package) running on port `6001`
+- **Sync Model:** Periodically polls the Laravel `/broadcasts` endpoint or forwards incoming `/broadcast` POST payloads to all active clients
+
+### Local Dev Tools
+- **Mail sandbox:** MailHog / Mailpit (port `8025` UI / port `1025` SMTP) for tracking transactional reservation emails
+
+---
+
+## ⚙️ Project Structure
+
+```
+seat-table-mngmnt/
+├── backend/                  # Laravel 12 API Backend
+│   ├── app/                  # Controllers, Services, Models, and Jobs
+│   ├── database/             # SQLite migrations, seeders, and factories
+│   └── routes/               # API endpoints
+├── frontend/                 # React 19 Client Frontend
+│   ├── src/                  # React components, routing, and assets
+│   └── public/               # Static assets
+└── tools/
+    └── websocket/            # Custom WebSocket server implementation
+```
+
+---
+
+## 🚀 Getting Started
+
+### 📋 Prerequisites
+- **PHP** >= 8.2
+- **Composer** (PHP dependency manager)
+- **Node.js** >= 18 (with `npm`)
+
+---
+
+### 1. Backend Setup (Laravel)
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+
+2. Install PHP dependencies:
+   ```bash
+   composer install
+   ```
+
+3. Create the environment file:
+   ```bash
+   copy .env.example .env
+   ```
+
+4. Generate the application encryption key:
+   ```bash
+   php artisan key:generate
+   ```
+
+5. Run migrations and seed the database (includes roles, permissions, and initial venue mappings):
+   ```bash
+   php artisan migrate --seed
+   ```
+
+6. Boot the development servers (runs the API server, queue listener, logs, and hot-reloaders concurrently):
+   ```bash
+   composer dev
+   ```
+   *The API will run on `http://localhost:8000`.*
+
+---
+
+### 2. Frontend Setup (React)
+
+1. Navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+
+2. Install Node dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Run the Vite development server:
+   ```bash
+   npm run dev
+   ```
+   *The application UI will run on `http://localhost:5173`.*
+
+---
+
+### 3. WebSocket Helper Setup (Real-Time Sync)
+
+To keep seating maps and admin dashboards synchronized instantly without waiting for poll intervals, run the WebSocket server:
+
+1. From the project **root** directory, install standard dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Run the WebSocket server:
+   ```bash
+   npm run websocket
+   ```
+   *The WebSocket server will start on `ws://localhost:6001`.*
+
+> [!NOTE]
+> **Resiliency & Fallback Polling:** If the WebSocket server is not running (e.g., during light local development), the frontend automatically falls back to HTTP Polling. 
+> The interactive customer map polls the backend every **10 seconds**, and the admin dashboards poll every **5 seconds**. 
+
+---
+
+### 4. Transactional Mail Testing (MailHog / Mailpit)
+
+Reservation confirmations and reminders are dispatched via email. You can capture and read these locally:
+
+- **Windows:** Run `MailHog.exe` located in the root directory.
+- Open your browser and navigate to `http://localhost:8025` to view the local mail inbox.
+- Ensure your backend `.env` matches the local SMTP configuration:
+  ```env
+  MAIL_MAILER=smtp
+  MAIL_HOST=127.0.0.1
+  MAIL_PORT=1025
+  ```
