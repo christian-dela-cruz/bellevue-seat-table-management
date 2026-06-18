@@ -22,13 +22,40 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .idea
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+.vite
+dist
+dist-ssr
+*.local
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-.codex-chrome-admin-debug/ 
+.codex-chrome-admin-debug/
+.codex-chrome-shot/
+.codex-chrome-shot-2/
+scratch_*
 
 # Mail tools
 /mailhog-data
