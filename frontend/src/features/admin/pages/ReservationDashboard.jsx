@@ -1353,7 +1353,7 @@ function CancelConfirmModal({ reservation, onConfirm, onCancel, loading }) {
   );
 }
 
-function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCancel, onUpdate, canManage, canAdjust, venueRows }) {
+function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCancel, onUpdate, onPricingUpdate, canManage, canAdjust, venueRows }) {
   const [actionLoading,setActionLoading]=useState(null);
   const [showRejectModal,setShowRejectModal]=useState(false);
   const [showRevertModal,setShowRevertModal]=useState(false);
@@ -1376,6 +1376,38 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
   });
   const [pricingLoading, setPricingLoading] = useState(false);
   const [isEditingPricing, setIsEditingPricing] = useState(false);
+
+  const previewCalculatedPrice = useMemo(() => {
+    const mode = pricingForm.pricing_mode;
+    const guests = Number(reservation.guests_count || 1);
+    
+    let seats = 0;
+    if (reservation.seat_number) {
+      seats = String(reservation.seat_number).split(',').filter(Boolean).length;
+    }
+    if (seats === 0) {
+      seats = guests;
+    }
+
+    switch (mode) {
+      case 'fixed':
+        return Number(pricingForm.base_price || 0);
+      case 'per_person':
+        return Number(pricingForm.price_per_person || 0) * guests;
+      case 'per_seat':
+        return Number(pricingForm.price_per_seat || 0) * seats;
+      case 'package':
+        return Number(pricingForm.package_price || 0);
+      case 'custom':
+        return Number(pricingForm.base_price || 0);
+      default:
+        return 0;
+    }
+  }, [pricingForm, reservation.guests_count, reservation.seat_number]);
+
+  const previewFinalPrice = pricingForm.manual_price_override !== "" && pricingForm.manual_price_override !== null
+    ? Number(pricingForm.manual_price_override)
+    : previewCalculatedPrice;
   
   const [availableSubrooms, setAvailableSubrooms] = useState([]);
   const [loadingSubrooms, setLoadingSubrooms] = useState(false);
@@ -1426,6 +1458,18 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
       special_requests: reservation.special_requests || "",
       type: reservation.type || "whole",
       assigned_room_id: reservation.assigned_room_id || "",
+    });
+
+    setPricingForm({
+      pricing_mode: reservation.pricing_mode || "",
+      base_price: reservation.base_price || "",
+      price_per_person: reservation.price_per_person || "",
+      price_per_seat: reservation.price_per_seat || "",
+      package_name: reservation.package_name || "",
+      package_price: reservation.package_price || "",
+      manual_price_override: reservation.manual_price_override || "",
+      price_notes: reservation.price_notes || "",
+      show_price_to_guest: !!reservation.show_price_to_guest,
     });
   }, [reservation]);
 
@@ -1583,14 +1627,21 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
     setPricingLoading(true);
     try {
       const token = localStorage.getItem("admin_token");
-      const res = await fetch(`${API_BASE_URL}/admin/reservations/${reservation.id}/pricing`, {
+      const res = await fetch(`${API_BASE_URL}/admin/reservations/${reservation.db_id || reservation.id}/pricing`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", ...(token && { Authorization: `Bearer ${token}` }) },
+        headers: { 
+          "Content-Type": "application/json", 
+          "Accept": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }) 
+        },
         body: JSON.stringify(pricingForm)
       });
       const data = await res.json();
       if (data.success) {
         setIsEditingPricing(false);
+        if (onPricingUpdate) {
+          onPricingUpdate(reservation.db_id || reservation.id, data.reservation, data.transaction_history);
+        }
       } else {
         alert(data.message || "Failed to save pricing");
       }
@@ -2062,6 +2113,43 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
                     
                     {isEditingPricing ? (
                       <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                        
+                        {/* Parent Venue Serving Packages */}
+                        {parentVenue?.metadata?.pricing_packages?.length > 0 && (
+                          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                            <label style={{fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Select Menu / Serving Package</label>
+                            <select
+                              value={pricingForm.package_name || ""}
+                              onChange={(e) => {
+                                const selectedName = e.target.value;
+                                const selectedPkg = parentVenue.metadata.pricing_packages.find(p => p.name === selectedName);
+                                if (selectedPkg) {
+                                  setPricingForm({
+                                    ...pricingForm,
+                                    package_name: selectedPkg.name,
+                                    pricing_mode: selectedPkg.type === "per_person" ? "per_person" : "package",
+                                    price_per_person: selectedPkg.type === "per_person" ? String(selectedPkg.price) : "",
+                                    package_price: selectedPkg.type !== "per_person" ? String(selectedPkg.price) : "",
+                                  });
+                                } else {
+                                  setPricingForm({
+                                    ...pricingForm,
+                                    package_name: "",
+                                  });
+                                }
+                              }}
+                              style={{...editInputStyle(false), padding:"8px 10px", fontSize:12, width:"100%"}}
+                            >
+                              <option value="">-- Choose Package Defaults --</option>
+                              {parentVenue.metadata.pricing_packages.map((pkg, idx) => (
+                                <option key={idx} value={pkg.name}>
+                                  {pkg.name} (PHP {Number(pkg.price).toLocaleString()} / {pkg.type === "per_person" ? "pax" : "flat"})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
                         <div style={{display:"flex",flexDirection:"column",gap:4}}>
                           <label style={{fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Pricing Mode</label>
                           <select
@@ -2120,6 +2208,24 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
                         <div style={{display:"flex",flexDirection:"column",gap:4}}>
                           <label style={{fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Notes</label>
                           <textarea value={pricingForm.price_notes} onChange={(e)=>setPricingForm({...pricingForm, price_notes:e.target.value})} style={{...editInputStyle(false), padding:"8px 10px", fontSize:12, width:"100%", minHeight:60}} />
+                        </div>
+
+                        {/* Calculation Preview Box */}
+                        <div style={{
+                          marginTop: 6,
+                          padding: "10px 12px",
+                          borderRadius: 8,
+                          background: "rgba(140,107,42,0.045)",
+                          border: `1.5px dashed ${C.borderAccent}`,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.textSecondary }}>
+                            <span>Calculated Base:</span>
+                            <span>PHP {previewCalculatedPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 800, color: C.gold, marginTop: 4 }}>
+                            <span>Estimated Final Price:</span>
+                            <span>PHP {previewFinalPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                          </div>
                         </div>
 
                         <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
@@ -3175,6 +3281,26 @@ export default function ReservationDashboard() {
     }
   };
 
+  const handlePricingUpdate = (reservationId, updatedReservation, transactionHistory) => {
+    setReservations(prev =>
+      prev.map(r => (r.db_id || r.id) === (updatedReservation.id || reservationId) ? {
+        ...r,
+        ...updatedReservation,
+        id: r.id,
+        db_id: r.db_id || updatedReservation.id,
+        transaction_history: transactionHistory || r.transaction_history,
+      } : r)
+    );
+    setSelectedReservation(prev => prev && (prev.db_id || prev.id) === (updatedReservation.id || reservationId) ? {
+      ...prev,
+      ...updatedReservation,
+      id: prev.id,
+      db_id: prev.db_id || updatedReservation.id,
+      transaction_history: transactionHistory || prev.transaction_history,
+    } : prev);
+    setToast({ message: "Pricing details updated successfully.", type: "success" });
+  };
+
   const handleFocusClick = (type) => {
     let isCurrentlyActive = false;
     if (type === "PENDING") isCurrentlyActive = filterStatus === "PENDING";
@@ -3822,6 +3948,7 @@ export default function ReservationDashboard() {
             onRevert={handleRevert}
             onCancel={handleCancel}
             onUpdate={handleUpdateDetails}
+            onPricingUpdate={handlePricingUpdate}
             canManage={canManageReservations}
             canAdjust={canAdjustReservations}
             venueRows={venueRows}

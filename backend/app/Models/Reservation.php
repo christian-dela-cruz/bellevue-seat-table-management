@@ -96,6 +96,67 @@ class Reservation extends Model
                 $reservation->reservation_state = self::stateForStatus($reservation->status);
             }
 
+            // Pull default pricing settings from Venue if reservation is new and has no pricing mode set
+            if (blank($reservation->pricing_mode) && filled($reservation->venue_id)) {
+                $venue = $reservation->venue ?: \App\Models\Venue::find($reservation->venue_id);
+                if ($venue && !blank($venue->pricing_mode)) {
+                    $reservation->pricing_mode = $venue->pricing_mode;
+                    $reservation->base_price = $venue->base_price;
+                    $reservation->price_per_person = $venue->price_per_person;
+                    $reservation->price_per_seat = $venue->price_per_seat;
+                    $reservation->show_price_to_guest = $venue->show_price_to_guest_default;
+                }
+            }
+
+            // Coerce non-nullable numeric fields to 0 if null/blank
+            $reservation->base_price = $reservation->base_price ?: 0;
+            $reservation->price_per_person = $reservation->price_per_person ?: 0;
+            $reservation->price_per_seat = $reservation->price_per_seat ?: 0;
+            $reservation->package_price = $reservation->package_price ?: 0;
+
+            // Calculate calculated_price and final_price on saving
+            if (!blank($reservation->pricing_mode)) {
+                $guests = (int) ($reservation->guests_count ?: 1);
+                
+                // Estimate seat count: from database relationship or by parsing seat_number
+                $seatCount = 0;
+                if ($reservation->relationLoaded('seats') && $reservation->seats) {
+                    $seatCount = $reservation->seats->count();
+                }
+                if ($seatCount === 0 && !blank($reservation->seat_number)) {
+                    $seatCount = count(array_filter(explode(',', $reservation->seat_number)));
+                }
+                if ($seatCount === 0) {
+                    $seatCount = $guests;
+                }
+
+                switch ($reservation->pricing_mode) {
+                    case 'fixed':
+                        $reservation->calculated_price = $reservation->base_price ?: 0;
+                        break;
+                    case 'per_person':
+                        $reservation->calculated_price = ($reservation->price_per_person ?: 0) * $guests;
+                        break;
+                    case 'per_seat':
+                        $reservation->calculated_price = ($reservation->price_per_seat ?: 0) * $seatCount;
+                        break;
+                    case 'package':
+                        $reservation->calculated_price = $reservation->package_price ?: 0;
+                        break;
+                    case 'custom':
+                        $reservation->calculated_price = $reservation->base_price ?: 0;
+                        break;
+                    default:
+                        $reservation->calculated_price = 0;
+                }
+            } else {
+                $reservation->calculated_price = 0;
+            }
+
+            $reservation->final_price = $reservation->manual_price_override !== null
+                ? $reservation->manual_price_override
+                : $reservation->calculated_price;
+
             if ($reservation->isDirty('status')) {
                 $previousStatus = $reservation->getOriginal('status');
                 $currentStatus = $reservation->status;

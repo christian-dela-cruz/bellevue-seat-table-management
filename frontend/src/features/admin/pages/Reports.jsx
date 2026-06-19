@@ -10,6 +10,7 @@ import { Building2, Download, Layers, Printer, Utensils, Search, Activity, Chevr
 import { ADMIN_OUTLET_GROUPS, buildOutletGroupsFromVenues, buildOutletRowsFromVenues, canAccessOutlet, canonicalOutletName, buildDynamicOutletTree, resolveOutletChildren } from "../../../constants/outletCatalog";
 import {
   Area,
+  Bar,
   CartesianGrid,
   ComposedChart,
   Legend,
@@ -53,6 +54,15 @@ function monthOptions() {
     value: String(index + 1),
     label: monthName(index + 1),
   }));
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value || 0);
 }
 
 function readableDateTime(value) {
@@ -443,6 +453,16 @@ const SORT_OPTIONS = {
     { value: "created_at:asc", label: "Oldest first" },
     { value: "action:asc", label: "Action: A to Z" },
     { value: "to_status:asc", label: "Status: A to Z" },
+  ],
+  revenue: [
+    { value: "confirmed_revenue:desc", label: "Confirmed Revenue: high to low" },
+    { value: "confirmed_revenue:asc", label: "Confirmed Revenue: low to high" },
+    { value: "projected_revenue:desc", label: "Projected Revenue: high to low" },
+    { value: "projected_revenue:asc", label: "Projected Revenue: low to high" },
+    { value: "total_estimated:desc", label: "Total Estimated: high to low" },
+    { value: "total_estimated:asc", label: "Total Estimated: low to high" },
+    { value: "avg_guest_spend:desc", label: "Avg Guest Spend: high to low" },
+    { value: "name:asc", label: "Name: A to Z" },
   ],
 };
 
@@ -914,6 +934,80 @@ function MonthlyLineChart({
   );
 }
 
+function WingRevenueTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ 
+      background: C.surface, 
+      border: `1.5px solid rgba(140,107,42,0.18)`, 
+      borderRadius: 12, 
+      boxShadow: "0 10px 25px rgba(24,20,14,0.08)", 
+      padding: "12px 14px", 
+      minWidth: 170,
+      backdropFilter: "blur(6px)",
+      WebkitBackdropFilter: "blur(6px)"
+    }}>
+      <div style={{ 
+        fontFamily: F.label, 
+        fontSize: 10, 
+        fontWeight: 800, 
+        letterSpacing: "0.10em", 
+        textTransform: "uppercase", 
+        color: C.gold, 
+        marginBottom: 8,
+        borderBottom: `1px solid ${C.divider}`,
+        paddingBottom: 4
+      }}>
+        {label}
+      </div>
+      <div style={{ display: "grid", gap: 6 }}>
+        {payload.map((item) => (
+          <div key={item.dataKey || item.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, fontSize: 11.5, color: C.muted }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+              <span style={{ width: 7, height: 7, borderRadius: 999, background: item.color || item.fill }} />
+              {item.name}
+            </span>
+            <strong style={{ color: C.text, fontWeight: 700 }}>
+              {formatCurrency(item.value || 0)}
+            </strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WingRevenueChart({ data }) {
+  const { isDark } = useAdminTheme();
+  return (
+    <div style={{
+      width: "100%", 
+      minHeight: 280, 
+      borderRadius: 14, 
+      background: isDark 
+        ? "linear-gradient(135deg, #111009 0%, #161410 58%, #201B12 100%)" 
+        : "linear-gradient(135deg, #FFFFFF 0%, #FAF8F4 58%, #F1ECE1 100%)", 
+      border: `1px solid ${C.divider}`, 
+      padding: "16px 12px 8px", 
+      boxShadow: isDark 
+        ? "inset 0 1px 0 rgba(255,255,255,0.05)" 
+        : "inset 0 1px 0 rgba(255,255,255,0.72)" 
+    }}>
+      <ResponsiveContainer width="100%" height={250}>
+        <ComposedChart data={data} margin={{ top: 12, right: 28, bottom: 8, left: -8 }}>
+          <CartesianGrid stroke={isDark ? "rgba(255,255,255,0.06)" : "rgba(24,20,14,0.07)"} vertical={false} />
+          <XAxis dataKey="name" tick={{ fill: C.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis tickFormatter={(val) => `₱${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`} tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} width={45} />
+          <Tooltip content={<WingRevenueTooltip />} cursor={{ stroke: "rgba(140,107,42,0.12)", strokeDasharray: "4 4" }} wrapperStyle={{ outline: "none" }} />
+          <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11, paddingBottom: 12 }} />
+          <Bar dataKey="confirmed" name="Confirmed Revenue" fill={C.green} radius={[4, 4, 0, 0]} barSize={25} />
+          <Bar dataKey="projected" name="Projected Revenue" fill={C.gold} radius={[4, 4, 0, 0]} barSize={25} />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 function MonthlyReports({ monthlyReport, granularity = "daily", monthLabelText }) {
   const selectedMonth = monthlyReport.selected_month || {};
   const outlets = selectedMonth.outlets || [];
@@ -1187,6 +1281,7 @@ export default function Reports() {
   const [printReportType, setPrintReportType] = useState("general");
   const [printSections, setPrintSections] = useState({
     overview: true,
+    revenue: true,
     mix: true,
     outlets: true,
     rooms: true,
@@ -1196,12 +1291,13 @@ export default function Reports() {
   const [printFontScale, setPrintFontScale] = useState("medium");
   const [printPageSize, setPrintPageSize] = useState("a4");
   const [printOrientation, setPrintOrientation] = useState("portrait");
-  const [printFontFamily, setPrintFontFamily] = useState("playfair");
-  const [printFontSize, setPrintFontSize] = useState(11);
+  const [printFontFamily, setPrintFontFamily] = useState("arial");
+  const [printFontSize, setPrintFontSize] = useState(9);
   const [printTheme, setPrintTheme] = useState("ink_saver");
   const [printCustomTitle, setPrintCustomTitle] = useState("");
   const [printPageBreaks, setPrintPageBreaks] = useState({
     overview: false,
+    revenue: false,
     mix: false,
     outlets: false,
     rooms: false,
@@ -1210,7 +1306,11 @@ export default function Reports() {
   });
   const [roomRowsPerPage, setRoomRowsPerPage] = useState(10);
   const [roomPage, setRoomPage] = useState(1);
-  const [previewZoom, setPreviewZoom] = useState(1.0);
+  const [revenueSort, setRevenueSort] = useState({ key: "confirmed_revenue", direction: "desc" });
+  const [revenueSearchQuery, setRevenueSearchQuery] = useState("");
+  const [revenueRowsPerPage, setRevenueRowsPerPage] = useState(10);
+  const [revenuePage, setRevenuePage] = useState(1);
+  const [previewZoom, setPreviewZoom] = useState(0.8);
 
   // CSV Configuration States (RPT-005)
   const [showCsvConfig, setShowCsvConfig] = useState(false);
@@ -1287,6 +1387,7 @@ export default function Reports() {
     if (type === "general") {
       setPrintSections({
         overview: true,
+        revenue: true,
         mix: true,
         outlets: true,
         rooms: true,
@@ -1369,6 +1470,10 @@ export default function Reports() {
   useEffect(() => {
     setRoomPage(1);
   }, [roomRowsPerPage, roomSearchQuery, roomSort]);
+
+  useEffect(() => {
+    setRevenuePage(1);
+  }, [revenueRowsPerPage, revenueSearchQuery, revenueSort]);
 
   const filteredOutlets = useMemo(() => {
     const rows = reportOutletRows.filter((row) => canAccessOutlet(currentUser, row.name, outletGroups));
@@ -1479,6 +1584,49 @@ export default function Reports() {
     };
   }, [isFiltered, summary, filteredOutlets, reservedCount, statuses]);
 
+  const filteredRevenueSummary = useMemo(() => {
+    if (selectedOutlet === "ALL") {
+      const rows = reportOutletRows.filter((row) => canAccessOutlet(currentUser, row.name, outletGroups));
+      const confirmed_revenue = rows.reduce((sum, out) => sum + (Number(out.confirmed_revenue) || 0), 0);
+      const projected_revenue = rows.reduce((sum, out) => sum + (Number(out.projected_revenue) || 0), 0);
+      const totalGuests = rows.reduce((sum, out) => sum + (Number(out.guests) || 0), 0);
+      const totalReserved = rows.reduce((sum, out) => sum + (Number(out.reserved) || 0), 0);
+      return {
+        confirmed_revenue,
+        projected_revenue,
+        avg_guest_spend: totalGuests > 0 ? confirmed_revenue / totalGuests : 0,
+        avg_ticket_size: totalReserved > 0 ? confirmed_revenue / totalReserved : 0,
+      };
+    } else {
+      const children = resolveOutletChildren(selectedOutlet, venueRows);
+      const childrenSet = new Set([selectedOutlet, ...children].map(canonicalOutletName));
+      const rows = reportOutletRows.filter((row) => childrenSet.has(canonicalOutletName(row.name)));
+      const confirmed_revenue = rows.reduce((sum, out) => sum + (Number(out.confirmed_revenue) || 0), 0);
+      const projected_revenue = rows.reduce((sum, out) => sum + (Number(out.projected_revenue) || 0), 0);
+      const totalGuests = rows.reduce((sum, out) => sum + (Number(out.guests) || 0), 0);
+      const totalReserved = rows.reduce((sum, out) => sum + (Number(out.reserved) || 0), 0);
+      return {
+        confirmed_revenue,
+        projected_revenue,
+        avg_guest_spend: totalGuests > 0 ? confirmed_revenue / totalGuests : 0,
+        avg_ticket_size: totalReserved > 0 ? confirmed_revenue / totalReserved : 0,
+      };
+    }
+  }, [selectedOutlet, reportOutletRows, currentUser, outletGroups, venueRows]);
+
+  const wingRevenueData = useMemo(() => {
+    const wingsMap = {};
+    filteredOutlets.forEach((out) => {
+      const wing = out.wing || "Main Wing";
+      if (!wingsMap[wing]) {
+        wingsMap[wing] = { name: wing, confirmed: 0, projected: 0 };
+      }
+      wingsMap[wing].confirmed += Number(out.confirmed_revenue) || 0;
+      wingsMap[wing].projected += Number(out.projected_revenue) || 0;
+    });
+    return Object.values(wingsMap);
+  }, [filteredOutlets]);
+
   const filteredCategory = useMemo(() => {
     if (!isFiltered) {
       return {
@@ -1549,6 +1697,38 @@ export default function Reports() {
   const visibleRoomRows = useMemo(() => {
     return roomDetails.slice((roomPage - 1) * roomRowsPerPage, roomPage * roomRowsPerPage);
   }, [roomDetails, roomPage, roomRowsPerPage]);
+
+  const filteredRevenueLedger = useMemo(() => {
+    const rows = reportOutletRows.filter((row) => canAccessOutlet(currentUser, row.name, outletGroups));
+    const children = selectedOutlet !== "ALL" ? resolveOutletChildren(selectedOutlet, venueRows) : [];
+    const childrenSet = new Set(children.map(canonicalOutletName));
+    const outletFiltered = selectedOutlet === "ALL"
+      ? rows
+      : rows.filter((row) => {
+        const canonicalRowName = canonicalOutletName(row.name);
+        return canonicalRowName === selectedOutlet || childrenSet.has(canonicalRowName);
+      });
+    const searchFiltered = !revenueSearchQuery.trim()
+      ? outletFiltered
+      : outletFiltered.filter((row) =>
+        String(row.name).toLowerCase().includes(revenueSearchQuery.toLowerCase()) ||
+        String(row.wing || "").toLowerCase().includes(revenueSearchQuery.toLowerCase())
+      );
+    const mappedRows = searchFiltered.map((row) => {
+      const conf = Number(row.confirmed_revenue) || 0;
+      const proj = Number(row.projected_revenue) || 0;
+      return {
+        ...row,
+        total_estimated: conf + proj,
+      };
+    });
+    return sortRows(mappedRows, revenueSort);
+  }, [currentUser, outletGroups, reportOutletRows, selectedOutlet, venueRows, revenueSearchQuery, revenueSort]);
+
+  const totalRevenuePages = Math.max(1, Math.ceil(filteredRevenueLedger.length / revenueRowsPerPage));
+  const visibleRevenueRows = useMemo(() => {
+    return filteredRevenueLedger.slice((revenuePage - 1) * revenueRowsPerPage, revenuePage * revenueRowsPerPage);
+  }, [filteredRevenueLedger, revenuePage, revenueRowsPerPage]);
 
   const outletTransactions = useMemo(() => {
     if (!activeOutletDetails || !transactionReport.data) return [];
@@ -1828,6 +2008,8 @@ export default function Reports() {
         "Event Date",
         "Event Time",
         "Guests Count",
+        "Calculated Price",
+        "Final Price",
         "Status",
         "Type",
         "Table Number",
@@ -1866,6 +2048,8 @@ export default function Reports() {
         r.event_date || "-",
         r.event_time || "-",
         r.guests_count || 0,
+        r.calculated_price || 0,
+        r.final_price || 0,
         r.status || "pending",
         r.type || "Room/Table",
         r.table_number || "-",
@@ -1930,7 +2114,7 @@ export default function Reports() {
 
       if (csvSections.outlets) {
         rows.push(["OUTLET PERFORMANCE DETAILS"]);
-        rows.push(["Outlet", "Wing", "Type", "Reservations", "Guests", "Reserved", "Pending", "Rejected", "Cancelled", "Dine-In", "Promo"]);
+        rows.push(["Outlet", "Wing", "Type", "Reservations", "Guests", "Reserved", "Pending", "Rejected", "Cancelled", "Dine-In", "Promo", "Confirmed Revenue", "Projected Revenue", "Avg Guest Spend"]);
         filteredOutlets.forEach((outlet) => {
           rows.push([
             outlet.name,
@@ -1944,6 +2128,9 @@ export default function Reports() {
             outlet.cancelled || 0,
             outlet.dine_in || 0,
             outlet.promotion_mentions || 0,
+            outlet.confirmed_revenue || 0,
+            outlet.projected_revenue || 0,
+            outlet.avg_guest_spend || 0,
           ]);
         });
         rows.push([]);
@@ -1980,6 +2167,12 @@ export default function Reports() {
   };
 
   const renderPrintContent = (isForPreview = false) => {
+    let sectionCount = 1;
+    const getSectionNumber = () => {
+      const numerals = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+      return numerals[sectionCount++];
+    };
+
     return (
       <div style={{ display: "grid", gap: "14px" }}>
         {/* Printable Paper Header */}
@@ -2002,7 +2195,7 @@ export default function Reports() {
         {printSections.overview && (
           <>
             <div className="print-section">
-              <div className="print-section-title">I. Executive Summary</div>
+              <div className="print-section-title">{getSectionNumber()}. Executive Summary</div>
               <div className="print-grid">
                 <div className="print-card">
                   <div className="print-card-label">Total Reservations</div>
@@ -2036,11 +2229,49 @@ export default function Reports() {
           </>
         )}
 
+        {/* Section: Revenue & Pricing */}
+        {printSections.revenue && (
+          <>
+            <div className="print-section">
+              <div className="print-section-title">{getSectionNumber()}. Financial & Revenue Performance</div>
+              <div className="print-grid">
+                <div className="print-card">
+                  <div className="print-card-label">Confirmed Revenue</div>
+                  <div className="print-card-value">{formatCurrency(filteredRevenueSummary.confirmed_revenue)}</div>
+                </div>
+                <div className="print-card">
+                  <div className="print-card-label">Projected Revenue</div>
+                  <div className="print-card-value">{formatCurrency(filteredRevenueSummary.projected_revenue)}</div>
+                </div>
+                <div className="print-card">
+                  <div className="print-card-label">Avg Guest Spend</div>
+                  <div className="print-card-value">{formatCurrency(filteredRevenueSummary.avg_guest_spend)}</div>
+                </div>
+                <div className="print-card">
+                  <div className="print-card-label">Avg Ticket Size</div>
+                  <div className="print-card-value">{formatCurrency(filteredRevenueSummary.avg_ticket_size)}</div>
+                </div>
+              </div>
+            </div>
+            {printPageBreaks.revenue && (
+              isForPreview ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 0" }} className="print-exclude">
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                  <span style={{ fontSize: "0.73em", fontFamily: F.label, color: paperColors.gold, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7 }}>Page Break</span>
+                  <span style={{ flex: 1, borderTop: `1px dashed ${paperColors.gold}`, opacity: 0.35 }} />
+                </div>
+              ) : (
+                <div className="print-page-break" />
+              )
+            )}
+          </>
+        )}
+
         {/* Section 2: Status & Distribution Mix */}
         {printSections.mix && (
           <>
             <div className="print-section">
-              <div className="print-section-title">II. Distribution & Booking Status Mix</div>
+              <div className="print-section-title">{getSectionNumber()}. Distribution & Booking Status Mix</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                 <div>
                   <div style={{ fontSize: "0.8em", fontWeight: 700, color: printTheme === "ink_saver" ? "#4B5563" : "#7A7060", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
@@ -2129,7 +2360,7 @@ export default function Reports() {
         {printSections.outlets && (
           <>
             <div className="print-section">
-              <div className="print-section-title">III. Detailed Venue Performance Listing</div>
+              <div className="print-section-title">{getSectionNumber()}. Detailed Venue Performance Listing</div>
               <table className="print-table">
                 <thead>
                   <tr>
@@ -2140,10 +2371,9 @@ export default function Reports() {
                     <th>Guests</th>
                     <th>Approved</th>
                     <th>Pending</th>
-                    <th>Rejected</th>
-                    <th>Cancelled</th>
-                    <th>Dine-In</th>
-                    <th>Promo Mentions</th>
+                    {printSections.revenue && <th>Confirmed Rev</th>}
+                    {printSections.revenue && <th>Projected Rev</th>}
+                    {printSections.revenue && <th>Avg Spend</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -2156,10 +2386,9 @@ export default function Reports() {
                       <td>{outlet.guests || 0}</td>
                       <td>{outlet.reserved || 0} ({outlet.acceptance_rate}%)</td>
                       <td>{outlet.pending || 0}</td>
-                      <td>{outlet.rejected || 0}</td>
-                      <td>{outlet.cancelled || 0}</td>
-                      <td>{outlet.dine_in || 0}</td>
-                      <td>{outlet.promotion_mentions || 0}</td>
+                      {printSections.revenue && <td className="strong" style={{ color: paperColors.green }}>{formatCurrency(outlet.confirmed_revenue)}</td>}
+                      {printSections.revenue && <td className="strong" style={{ color: paperColors.gold }}>{formatCurrency(outlet.projected_revenue)}</td>}
+                      {printSections.revenue && <td>{formatCurrency(outlet.avg_guest_spend)}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -2183,7 +2412,7 @@ export default function Reports() {
         {printSections.rooms && (
           <>
             <div className="print-section">
-              <div className="print-section-title">IV. Room Totals & Location Performance</div>
+              <div className="print-section-title">{getSectionNumber()}. Room Totals & Location Performance</div>
               <table className="print-table">
                 <thead>
                   <tr>
@@ -2235,7 +2464,7 @@ export default function Reports() {
         {printSections.trends && (
           <>
             <div className="print-section">
-              <div className="print-section-title">V. Seasonality Trends & Activity Ledger</div>
+              <div className="print-section-title">{getSectionNumber()}. Seasonality Trends & Activity Ledger</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                 {monthlyReport.months && monthlyReport.months.length > 0 && (
                   <div>
@@ -2312,7 +2541,7 @@ export default function Reports() {
         {printSections.audit && canViewTransactions && (
           <>
             <div className="print-section">
-              <div className="print-section-title">VI. Audit Trail Transaction Ledger</div>
+              <div className="print-section-title">{getSectionNumber()}. Audit Trail Transaction Ledger</div>
               <table className="print-table">
                 <thead>
                   <tr>
@@ -2379,6 +2608,7 @@ export default function Reports() {
       description: "Date-range reports for operational review.",
       tabs: [
         { id: "summary", label: "Summary" },
+        { id: "revenue", label: "Revenue" },
         { id: "outlets", label: "Outlets" },
       ],
     },
@@ -2820,13 +3050,13 @@ export default function Reports() {
                           onChange={(e) => {
                             const val = e.target.value;
                             if (val === "all") {
-                              setPrintSections({ overview: true, mix: true, outlets: true, rooms: true, trends: true, audit: true });
+                              setPrintSections({ overview: true, revenue: true, mix: true, outlets: true, rooms: true, trends: true, audit: true });
                             } else if (val === "audit") {
-                              setPrintSections({ overview: false, mix: false, outlets: false, rooms: false, trends: false, audit: true });
+                              setPrintSections({ overview: false, revenue: false, mix: false, outlets: false, rooms: false, trends: false, audit: true });
                             } else if (val === "executive") {
-                              setPrintSections({ overview: true, mix: true, outlets: true, rooms: true, trends: true, audit: false });
+                              setPrintSections({ overview: true, revenue: true, mix: true, outlets: true, rooms: true, trends: true, audit: false });
                             } else if (val === "none") {
-                              setPrintSections({ overview: false, mix: false, outlets: false, rooms: false, trends: false, audit: false });
+                              setPrintSections({ overview: false, revenue: false, mix: false, outlets: false, rooms: false, trends: false, audit: false });
                             }
                             e.target.value = "custom";
                           }}
@@ -2864,7 +3094,7 @@ export default function Reports() {
                             >
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <span style={{ textTransform: "capitalize", fontWeight: 600, fontSize: 11.5, color: isActive ? C.text : C.muted }}>
-                                  {sec === "mix" ? "Distribution & status mix" : sec === "trends" ? "Granular trends & charts" : sec}
+                                  {sec === "mix" ? "Distribution & status mix" : sec === "trends" ? "Granular trends & charts" : sec === "revenue" ? "Revenue & pricing" : sec}
                                 </span>
                                 <Toggle
                                   checked={isActive}
@@ -3591,6 +3821,133 @@ export default function Reports() {
                           </div>
                         </SummaryPanel>
                       </div>
+                    </>
+                  )}
+
+                  {activeTab === "revenue" && (
+                    <>
+                      <div>
+                        <Section title="Revenue Overview" subtitle="Key financial performance figures for the selected date range.">
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+                            <MetricCard label="Confirmed Revenue" value={formatCurrency(filteredRevenueSummary.confirmed_revenue)} tone="green" detail="approved bookings" />
+                            <MetricCard label="Projected Revenue" value={formatCurrency(filteredRevenueSummary.projected_revenue)} tone="gold" detail="pending bookings" />
+                            <MetricCard label="Avg Guest Spend" value={formatCurrency(filteredRevenueSummary.avg_guest_spend)} tone="blue" detail="per guest" />
+                            <MetricCard label="Avg Ticket Size" value={formatCurrency(filteredRevenueSummary.avg_ticket_size)} tone="slate" detail="per booking" />
+                          </div>
+                        </Section>
+                      </div>
+
+                      <div className="reports-grid" style={{ display: "grid", gridTemplateColumns: "minmax(320px,1.15fr) minmax(280px,0.85fr)", gap: 14 }}>
+                        <SummaryPanel title="Wing Revenue Distribution">
+                          <WingRevenueChart data={wingRevenueData} />
+                        </SummaryPanel>
+
+                        <SummaryPanel title="Financial Highlights">
+                          <div style={{ display: "grid", gap: 12 }}>
+                            <InsightRow label="Confirmed Intake" value={formatCurrency(filteredRevenueSummary.confirmed_revenue)} detail="Successfully locked-in reservation revenue from approved bookings." tone="green" />
+                            <InsightRow label="Expected Pipeline" value={formatCurrency(filteredRevenueSummary.projected_revenue)} detail="Pipeline value representing pending reservation approvals." tone="gold" />
+                            <InsightRow label="Spending Power" value={formatCurrency(filteredRevenueSummary.avg_guest_spend)} detail="Average amount spent by guests at Bellevue Manila outlets." tone="blue" />
+                          </div>
+                        </SummaryPanel>
+                      </div>
+
+                      {/* Venue Revenue Performance Ledger Toolbar Card */}
+                      <ReportCard style={{ padding: 12, marginBottom: -8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", flex: 1, minWidth: 280 }}>
+                            {/* Search */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "0 10px", height: 34 }}>
+                              <Search size={13} style={{ color: C.muted }} />
+                              <input
+                                type="text"
+                                value={revenueSearchQuery}
+                                onChange={(e) => setRevenueSearchQuery(e.target.value)}
+                                placeholder="Search outlets..."
+                                style={{ border: "none", outline: "none", background: "transparent", fontSize: 12, color: C.text, width: 140, fontFamily: F.body }}
+                              />
+                            </div>
+
+                            <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>
+                              Showing <strong style={{ color: C.text }}>{filteredRevenueLedger.length === 0 ? 0 : (revenuePage - 1) * revenueRowsPerPage + 1}-{Math.min(revenuePage * revenueRowsPerPage, filteredRevenueLedger.length)}</strong> of <strong style={{ color: C.text }}>{filteredRevenueLedger.length}</strong>
+                            </span>
+                          </div>
+
+                          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                            {/* Rows Select */}
+                            <FilterField label="Show Rows">
+                              <select
+                                value={revenueRowsPerPage}
+                                onChange={(e) => setRevenueRowsPerPage(Number(e.target.value))}
+                                style={{ ...filterStyle(), minWidth: 110 }}
+                              >
+                                {[10, 25, 50, 100].map((val) => (
+                                  <option key={val} value={val}>{val} entries</option>
+                                ))}
+                                <option value={999999}>All entries</option>
+                              </select>
+                            </FilterField>
+
+                            {/* Sort Select */}
+                            <FilterField label="Sort By">
+                              <select
+                                value={sortValue(revenueSort)}
+                                onChange={(event) => setRevenueSort(sortFromValue(event.target.value))}
+                                style={{ ...filterStyle(), minWidth: 210 }}
+                              >
+                                {SORT_OPTIONS.revenue.map((option) => (
+                                  <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                              </select>
+                            </FilterField>
+                          </div>
+                        </div>
+                      </ReportCard>
+
+                      <TableCard
+                        title="Venue Revenue Performance Ledger"
+                        headers={["Outlet Name", "Wing Location", "Confirmed Revenue", "Projected Revenue", "Total Estimated", "Avg Guest Spend"]}
+                        rows={visibleRevenueRows}
+                        renderRow={(outlet) => {
+                          const conf = Number(outlet.confirmed_revenue) || 0;
+                          const proj = Number(outlet.projected_revenue) || 0;
+                          const totalEst = conf + proj;
+                          return (
+                            <tr key={outlet.name || outlet.venue_id} className="reports-table-row" onClick={() => setActiveOutletDetails(outlet.name)}>
+                              <td style={cellStyle(true)}>{outlet.name}</td>
+                              <td style={cellStyle()}>{outlet.wing || "Main Wing"}</td>
+                              <td style={cellStyle()}><span style={{ color: C.green, fontWeight: 600 }}>{formatCurrency(conf)}</span></td>
+                              <td style={cellStyle()}><span style={{ color: C.gold, fontWeight: 600 }}>{formatCurrency(proj)}</span></td>
+                              <td style={cellStyle(true)}>{formatCurrency(totalEst)}</td>
+                              <td style={cellStyle()}>{formatCurrency(Number(outlet.avg_guest_spend) || 0)}</td>
+                            </tr>
+                          );
+                        }}
+                        footer={
+                          <div style={{ padding: "11px 14px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", color: C.muted, fontSize: 12 }}>
+                            <span>
+                              Page {revenuePage} of {totalRevenuePages}
+                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <button
+                                type="button"
+                                onClick={() => setRevenuePage((current) => Math.max(1, current - 1))}
+                                disabled={revenuePage === 1}
+                                style={{ ...pagerButtonStyle(), height: 30, opacity: revenuePage === 1 ? 0.45 : 1, cursor: revenuePage === 1 ? "not-allowed" : "pointer" }}
+                              >
+                                Previous
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRevenuePage((current) => Math.min(totalRevenuePages, current + 1))}
+                                disabled={revenuePage === totalRevenuePages}
+                                style={{ ...pagerButtonStyle(), height: 30, opacity: revenuePage === totalRevenuePages ? 0.45 : 1, cursor: revenuePage === totalRevenuePages ? "not-allowed" : "pointer" }}
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        }
+                      />
                     </>
                   )}
 

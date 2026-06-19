@@ -404,9 +404,12 @@ class AdminReservationController extends Controller
         ]);
     }
 
-    public function updatePricing(Request $request, int $id): JsonResponse
+    public function updatePricing(Request $request, string $id): JsonResponse
     {
-        $reservation = Reservation::findOrFail($id);
+        $reservation = Reservation::where('id', $id)->first();
+        if (!$reservation) {
+            $reservation = Reservation::where('reference_code', $id)->firstOrFail();
+        }
         $admin = $this->currentAdmin($request);
 
         if (!$this->reservationService->canAccessReservation($admin, $reservation)) {

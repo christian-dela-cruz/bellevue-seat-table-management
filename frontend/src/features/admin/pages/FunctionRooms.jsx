@@ -183,6 +183,11 @@ const emptyForm = {
   availability_blocked_times: "",
   availability_periods: [],
   availability_overrides: [],
+  pricing_mode: "",
+  base_price: "",
+  price_per_person: "",
+  price_per_seat: "",
+  show_price_to_guest_default: false,
 };
 
 function normalizeRoom(room = {}) {
@@ -192,6 +197,11 @@ function normalizeRoom(room = {}) {
   return {
     ...emptyForm,
     ...room,
+    pricing_mode: room.pricing_mode || "",
+    base_price: room.base_price !== null && room.base_price !== undefined ? String(room.base_price) : "",
+    price_per_person: room.price_per_person !== null && room.price_per_person !== undefined ? String(room.price_per_person) : "",
+    price_per_seat: room.price_per_seat !== null && room.price_per_seat !== undefined ? String(room.price_per_seat) : "",
+    show_price_to_guest_default: !!room.show_price_to_guest_default,
     parent_id: room.parent_id ? String(room.parent_id) : "",
     capacity,
     display_order: room.display_order ?? 0,
@@ -229,6 +239,7 @@ const EDITOR_TABS = [
   ["availability", "Visibility"],
   ["schedule", "Schedule"],
   ["exceptions", "Exceptions"],
+  ["pricing", "Pricing"],
   ["preview", "Preview"],
 ];
 
@@ -1857,6 +1868,9 @@ export default function FunctionRooms() {
     if (key === "exceptions") {
       return true;
     }
+    if (key === "pricing") {
+      return true;
+    }
     return false;
   };
 
@@ -3097,6 +3111,206 @@ export default function FunctionRooms() {
                             ))}
                           </div>
                         </section>
+                      )}
+
+                      {editorTab === "pricing" && (
+                        <>
+                          <section style={formSectionStyle()}>
+                            <div style={sectionTitleStyle()}>Default Pricing Configuration</div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                              <Field label="Default Pricing Mode">
+                                <select
+                                  value={form.pricing_mode || ""}
+                                  onChange={(e) => updateForm("pricing_mode", e.target.value)}
+                                  style={inputStyle()}
+                                >
+                                  <option value="">None (Custom manually entered pricing)</option>
+                                  <option value="fixed">Fixed Flat Rate</option>
+                                  <option value="per_person">Per Person Rate</option>
+                                  <option value="per_seat">Per Seat Rate</option>
+                                  <option value="package">Package / Serving Rate</option>
+                                  <option value="custom">Custom Calc</option>
+                                </select>
+                              </Field>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 15 }}>
+                                <input
+                                  type="checkbox"
+                                  id="show_price_to_guest_default"
+                                  checked={form.show_price_to_guest_default || false}
+                                  onChange={(e) => updateForm("show_price_to_guest_default", e.target.checked)}
+                                  style={{ accentColor: C.gold }}
+                                />
+                                <label htmlFor="show_price_to_guest_default" style={{ fontFamily: F.body, fontSize: 12.5, color: C.textPrimary, cursor: "pointer" }}>
+                                  Show Estimated Price to Guests by Default
+                                </label>
+                              </div>
+                            </div>
+
+                            {form.pricing_mode === "fixed" && (
+                              <Field label="Default Base Price (PHP)">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={form.base_price || ""}
+                                  onChange={(e) => updateForm("base_price", e.target.value)}
+                                  style={inputStyle()}
+                                  placeholder="0.00"
+                                />
+                              </Field>
+                            )}
+
+                            {form.pricing_mode === "per_person" && (
+                              <Field label="Default Price Per Person (PHP)">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={form.price_per_person || ""}
+                                  onChange={(e) => updateForm("price_per_person", e.target.value)}
+                                  style={inputStyle()}
+                                  placeholder="0.00"
+                                />
+                              </Field>
+                            )}
+
+                            {form.pricing_mode === "per_seat" && (
+                              <Field label="Default Price Per Seat (PHP)">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={form.price_per_seat || ""}
+                                  onChange={(e) => updateForm("price_per_seat", e.target.value)}
+                                  style={inputStyle()}
+                                  placeholder="0.00"
+                                />
+                              </Field>
+                            )}
+                          </section>
+
+                          <section style={formSectionStyle()}>
+                            <div style={sectionTitleStyle()}>Variable Serving / Menu Packages</div>
+                            <span style={{ fontSize: 11.5, color: C.textSecondary, fontFamily: F.body, lineHeight: 1.45 }}>
+                              Configure variable serving sizes, dining tiers, or event menu packages for this venue. These can be selected on reservations.
+                            </span>
+
+                            <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                              {(form.metadata?.pricing_packages || []).map((pkg, idx) => (
+                                <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center", background: C.surfaceInput, padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.borderDefault}` }}>
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: C.textPrimary }}>{pkg.name}</div>
+                                    <div style={{ fontSize: 10, color: C.textTertiary }}>PHP {Number(pkg.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} ({pkg.type === "per_person" ? "Per Person" : "Flat Rate"})</div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updatedPkgs = [...(form.metadata?.pricing_packages || [])];
+                                      updatedPkgs.splice(idx, 1);
+                                      updateForm("metadata", {
+                                        ...(form.metadata || {}),
+                                        pricing_packages: updatedPkgs,
+                                      });
+                                    }}
+                                    style={{
+                                      background: "transparent",
+                                      border: "none",
+                                      color: C.red,
+                                      cursor: "pointer",
+                                      padding: 4,
+                                      display: "flex",
+                                      alignItems: "center"
+                                    }}
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              ))}
+
+                              {(!form.metadata?.pricing_packages || form.metadata.pricing_packages.length === 0) && (
+                                <div style={{ textAlign: "center", padding: "14px 10px", color: C.textTertiary, fontSize: 11.5, fontStyle: "italic", border: `1px dashed ${C.borderDefault}`, borderRadius: 8 }}>
+                                  No serving packages configured yet.
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Add Package form row */}
+                            <div style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 100px 100px auto",
+                              gap: 8,
+                              alignItems: "end",
+                              marginTop: 10,
+                              background: C.surfaceInput,
+                              padding: 10,
+                              borderRadius: 8,
+                              border: `1px dashed ${C.borderDefault}`
+                            }}>
+                              <label style={{ display: "grid", gap: 4 }}>
+                                <span style={{ fontSize: 9, fontWeight: 800, color: C.gold, fontFamily: F.label, textTransform: "uppercase" }}>Package Name</span>
+                                <input
+                                  type="text"
+                                  id="new-pkg-name"
+                                  placeholder="e.g. 5-Course Dinner"
+                                  style={{ ...inputStyle(), minHeight: 32 }}
+                                />
+                              </label>
+                              <label style={{ display: "grid", gap: 4 }}>
+                                <span style={{ fontSize: 9, fontWeight: 800, color: C.gold, fontFamily: F.label, textTransform: "uppercase" }}>Price (PHP)</span>
+                                <input
+                                  type="number"
+                                  id="new-pkg-price"
+                                  min="0"
+                                  placeholder="0.00"
+                                  style={{ ...inputStyle(), minHeight: 32 }}
+                                />
+                              </label>
+                              <label style={{ display: "grid", gap: 4 }}>
+                                <span style={{ fontSize: 9, fontWeight: 800, color: C.gold, fontFamily: F.label, textTransform: "uppercase" }}>Charge Type</span>
+                                <select
+                                  id="new-pkg-type"
+                                  style={{ ...inputStyle(), minHeight: 32 }}
+                                >
+                                  <option value="per_person">Per Person</option>
+                                  <option value="flat">Flat Rate</option>
+                                </select>
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nameEl = document.getElementById("new-pkg-name");
+                                  const priceEl = document.getElementById("new-pkg-price");
+                                  const typeEl = document.getElementById("new-pkg-type");
+                                  if (nameEl && priceEl && typeEl && nameEl.value.trim()) {
+                                    const newPkg = {
+                                      name: nameEl.value.trim(),
+                                      price: Number(priceEl.value || 0),
+                                      type: typeEl.value,
+                                    };
+                                    const updatedPkgs = [...(form.metadata?.pricing_packages || []), newPkg];
+                                    updateForm("metadata", {
+                                      ...(form.metadata || {}),
+                                      pricing_packages: updatedPkgs,
+                                    });
+                                    nameEl.value = "";
+                                    priceEl.value = "";
+                                    typeEl.value = "per_person";
+                                  } else {
+                                    alert("Please fill in the package name and price.");
+                                  }
+                                }}
+                                style={{
+                                  ...buttonBase(),
+                                  background: C.gold,
+                                  color: "#FFF",
+                                  border: "none",
+                                  minHeight: 32,
+                                  cursor: "pointer",
+                                  padding: "0 14px"
+                                }}
+                              >
+                                Add
+                              </button>
+                            </div>
+                          </section>
+                        </>
                       )}
 
                       {editorTab === "preview" && (

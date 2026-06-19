@@ -7,6 +7,7 @@ import {
   CheckCircle,
   ChevronDown,
   Clock,
+  DollarSign,
   Layers,
   Search,
   TrendingUp,
@@ -80,6 +81,15 @@ function readableTime(value) {
 
 function readableMonth(monthIndex) {
   return new Date(2026, monthIndex, 1).toLocaleDateString("en-US", { month: "short" });
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value || 0);
 }
 
 function periodLabel(row, period) {
@@ -498,16 +508,27 @@ function Panel({ title, subtitle, right, children, style = {} }) {
 
 function MetricCard({ icon: Icon, label, value, detail, color = C.gold, bg = C.goldFaint }) {
   return (
-    <div className="od-card" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 15, display: "grid", gap: 10, minWidth: 0 }}>
+    <div className="od-card" style={{ 
+      background: C.surface, 
+      border: `1px solid ${C.border}`, 
+      borderRadius: 12, 
+      padding: "14px 16px", 
+      display: "flex", 
+      flexDirection: "column", 
+      justifyContent: "space-between", 
+      gap: 12, 
+      minWidth: 0,
+      boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+    }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-        <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.faint }}>{label}</span>
-        <span style={{ width: 30, height: 30, borderRadius: 9, background: bg, display: "grid", placeItems: "center", color }}>
-          <Icon size={15} />
+        <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.faint }}>{label}</span>
+        <span style={{ width: 28, height: 28, borderRadius: 8, background: bg, display: "grid", placeItems: "center", color, flexShrink: 0 }}>
+          <Icon size={14} />
         </span>
       </div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <span style={{ color, fontSize: 27, lineHeight: 1, fontWeight: 700 }}>{value}</span>
-        {detail && <span style={{ color: C.muted, fontSize: 12 }}>{detail}</span>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <span style={{ color, fontSize: 24, lineHeight: 1.15, fontWeight: 700, fontFamily: F.display }}>{value}</span>
+        {detail && <span style={{ color: C.muted, fontSize: 10.5, fontWeight: 500, letterSpacing: "0.01em" }}>{detail}</span>}
       </div>
     </div>
   );
@@ -581,7 +602,9 @@ function OutletChartTooltip({ active, payload, label }) {
               <span style={{ width: 7, height: 7, borderRadius: 999, background: item.color }} />
               {item.name}
             </span>
-            <strong style={{ color: C.text, fontWeight: 750 }}>{item.value || 0}</strong>
+            <strong style={{ color: C.text, fontWeight: 750 }}>
+              {String(item.dataKey || "").toLowerCase().includes("revenue") ? formatCurrency(item.value) : (item.value || 0)}
+            </strong>
           </div>
         ))}
       </div>
@@ -589,7 +612,7 @@ function OutletChartTooltip({ active, payload, label }) {
   );
 }
 
-function LineChart({ rows, period = "monthly" }) {
+function LineChart({ rows, period = "monthly", chartMetric = "volume" }) {
   const { isDark } = useAdminTheme();
   const crossesYears = useMemo(() => {
     if (!rows || rows.length < 2) return false;
@@ -607,6 +630,8 @@ function LineChart({ rows, period = "monthly" }) {
     ...row,
     label: periodLabel(row, period),
     reservations: Number(row.count || 0),
+    confirmedRevenue: Number(row.confirmedRevenue || 0),
+    projectedRevenue: Number(row.projectedRevenue || 0),
   }));
 
   const labelInterval = useMemo(() => {
@@ -643,8 +668,18 @@ function LineChart({ rows, period = "monthly" }) {
               <stop offset="54%" stopColor={C.blue} stopOpacity="0.08" />
               <stop offset="100%" stopColor={C.blue} stopOpacity="0.01" />
             </linearGradient>
+            <linearGradient id="outletConfirmedFill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor={C.green} stopOpacity="0.22" />
+              <stop offset="100%" stopColor={C.green} stopOpacity="0.01" />
+            </linearGradient>
             <filter id="outletLineShadow" x="-20%" y="-20%" width="140%" height="140%">
               <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#3B6FA8" floodOpacity="0.16" />
+            </filter>
+            <filter id="outletConfirmedShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor={C.green} floodOpacity="0.16" />
+            </filter>
+            <filter id="outletProjectedShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor={C.gold} floodOpacity="0.16" />
             </filter>
           </defs>
           <CartesianGrid stroke={isDark ? "rgba(255,255,255,0.06)" : "rgba(24,20,14,0.07)"} vertical={false} />
@@ -673,6 +708,12 @@ function LineChart({ rows, period = "monthly" }) {
             axisLine={false}
             tickLine={false}
             width={34}
+            tickFormatter={(val) => {
+              if (chartMetric === "revenue") {
+                return val >= 1000 ? `₱${(val / 1000).toFixed(0)}k` : `₱${val}`;
+              }
+              return val;
+            }}
           />
           <Tooltip content={<OutletChartTooltip />} cursor={{ stroke: "rgba(140,107,42,0.22)", strokeDasharray: "4 4" }} wrapperStyle={{ outline: "none" }} />
           <Legend
@@ -680,33 +721,86 @@ function LineChart({ rows, period = "monthly" }) {
             align="right"
             iconType="plainline"
             wrapperStyle={{ fontSize: 11, color: C.muted, paddingBottom: 12 }}
-            payload={[{ value: "Reservations", type: "plainline", color: C.blue }]}
+            payload={
+              chartMetric === "revenue"
+                ? [
+                    { value: "Confirmed Revenue", type: "plainline", color: C.green },
+                    { value: "Projected Revenue", type: "plainline", color: C.gold },
+                  ]
+                : [{ value: "Reservations", type: "plainline", color: C.blue }]
+            }
           />
-          <Area
-            type="monotone"
-            dataKey="reservations"
-            legendType="none"
-            fill="url(#outletReservationFill)"
-            stroke="none"
-            dot={false}
-            activeDot={false}
-            connectNulls
-            isAnimationActive
-            animationDuration={760}
-          />
-          <Line
-            type="monotone"
-            dataKey="reservations"
-            name="Reservations"
-            stroke={C.blue}
-            strokeWidth={3.2}
-            dot={false}
-            activeDot={{ r: 5.5, strokeWidth: 3, stroke: C.surface, fill: C.blue }}
-            connectNulls
-            isAnimationActive
-            animationDuration={720}
-            filter="url(#outletLineShadow)"
-          />
+          {chartMetric === "revenue" ? (
+            <>
+              <Area
+                type="monotone"
+                dataKey="confirmedRevenue"
+                legendType="none"
+                fill="url(#outletConfirmedFill)"
+                stroke="none"
+                dot={false}
+                activeDot={false}
+                connectNulls
+                isAnimationActive
+                animationDuration={760}
+              />
+              <Line
+                type="monotone"
+                dataKey="confirmedRevenue"
+                name="Confirmed Revenue"
+                stroke={C.green}
+                strokeWidth={3.2}
+                dot={false}
+                activeDot={{ r: 5.5, strokeWidth: 3, stroke: C.surface, fill: C.green }}
+                connectNulls
+                isAnimationActive
+                animationDuration={720}
+                filter="url(#outletConfirmedShadow)"
+              />
+              <Line
+                type="monotone"
+                dataKey="projectedRevenue"
+                name="Projected Revenue"
+                stroke={C.gold}
+                strokeWidth={2.5}
+                strokeDasharray="4 4"
+                dot={false}
+                activeDot={{ r: 5, strokeWidth: 3, stroke: C.surface, fill: C.gold }}
+                connectNulls
+                isAnimationActive
+                animationDuration={760}
+                filter="url(#outletProjectedShadow)"
+              />
+            </>
+          ) : (
+            <>
+              <Area
+                type="monotone"
+                dataKey="reservations"
+                legendType="none"
+                fill="url(#outletReservationFill)"
+                stroke="none"
+                dot={false}
+                activeDot={false}
+                connectNulls
+                isAnimationActive
+                animationDuration={760}
+              />
+              <Line
+                type="monotone"
+                dataKey="reservations"
+                name="Reservations"
+                stroke={C.blue}
+                strokeWidth={3.2}
+                dot={false}
+                activeDot={{ r: 5.5, strokeWidth: 3, stroke: C.surface, fill: C.blue }}
+                connectNulls
+                isAnimationActive
+                animationDuration={720}
+                filter="url(#outletLineShadow)"
+              />
+            </>
+          )}
         </ComposedChart>
       </ResponsiveContainer>
     </div>
@@ -818,6 +912,7 @@ function OutletDashboard() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("date_asc");
   const [analyticsPeriod, setAnalyticsPeriod] = useState("monthly");
+  const [chartMetric, setChartMetric] = useState("volume");
   const [reports, setReports] = useState({ data: [], summary: {} });
   const [reservations, setReservations] = useState([]);
   const [venueRows, setVenueRows] = useState([]);
@@ -997,6 +1092,32 @@ function OutletDashboard() {
     navigate(`/admin/outlets/${slugify(selectedOutlet.name)}`, { replace: true });
   }, [navigate, params.outletSlug, selectedOutlet]);
 
+  const selectedOutletMetrics = useMemo(() => {
+    if (!selectedOutlet) return { confirmed_revenue: 0, projected_revenue: 0, avg_guest_spend: 0, avg_ticket_size: 0 };
+    if (selectedOutlet.aggregate) {
+      const childNames = new Set([selectedOutlet.name, ...(selectedOutlet.children || [])]);
+      const childMetrics = (reports.data || []).filter((out) => childNames.has(out.name));
+      const confirmed_revenue = childMetrics.reduce((sum, m) => sum + (Number(m.confirmed_revenue) || 0), 0);
+      const projected_revenue = childMetrics.reduce((sum, m) => sum + (Number(m.projected_revenue) || 0), 0);
+      const totalGuests = childMetrics.reduce((sum, m) => sum + (Number(m.guests) || 0), 0);
+      const totalReserved = childMetrics.reduce((sum, m) => sum + (Number(m.reserved) || 0), 0);
+      return {
+        confirmed_revenue,
+        projected_revenue,
+        avg_guest_spend: totalGuests > 0 ? confirmed_revenue / totalGuests : 0,
+        avg_ticket_size: totalReserved > 0 ? confirmed_revenue / totalReserved : 0,
+      };
+    } else {
+      const metric = (reports.data || []).find((out) => out.name === selectedOutlet.name);
+      return {
+        confirmed_revenue: Number(metric?.confirmed_revenue) || 0,
+        projected_revenue: Number(metric?.projected_revenue) || 0,
+        avg_guest_spend: Number(metric?.avg_guest_spend) || 0,
+        avg_ticket_size: Number(metric?.avg_ticket_size) || (metric?.reserved > 0 ? (metric.confirmed_revenue || 0) / metric.reserved : 0),
+      };
+    }
+  }, [reports.data, selectedOutlet]);
+
   const baseOutletReservations = useMemo(() => {
     if (!selectedOutlet) return [];
     if (selectedOutlet.aggregate) {
@@ -1058,21 +1179,34 @@ function OutletDashboard() {
   const oldestPending = pendingByPriority[0];
 
   const trendRows = useMemo(() => {
+    const getBucketMetrics = (matchingReservations) => {
+      const count = matchingReservations.length;
+      const confirmedRevenue = matchingReservations
+        .filter((r) => normalizeStatus(r.status) === "reserved")
+        .reduce((sum, r) => sum + (Number(r.final_price) || 0), 0);
+      const projectedRevenue = matchingReservations
+        .filter((r) => normalizeStatus(r.status) === "pending")
+        .reduce((sum, r) => sum + (Number(r.final_price) || 0), 0);
+      return { count, confirmedRevenue, projectedRevenue };
+    };
+
     if (analyticsPeriod === "yearly") {
       const year = Number(startDate?.slice(0, 4)) || new Date().getFullYear();
       return Array.from({ length: 12 }, (_, month) => {
         const key = `${year}-${String(month + 1).padStart(2, "0")}`;
+        const filtered = baseOutletReservations.filter((reservation) => {
+          if (!String(reservation.event_date || "").startsWith(key)) return false;
+          const status = normalizeStatus(reservation.status);
+          if (statusFilter !== "all" && status !== statusFilter) return false;
+          const eventType = eventTypeFor(reservation, selectedOutlet?.name).toLowerCase();
+          if (typeFilter !== "all" && eventType !== typeFilter) return false;
+          return true;
+        });
+        const metrics = getBucketMetrics(filtered);
         return {
           date: `${key}-01`,
           label: readableMonth(month),
-          count: baseOutletReservations.filter((reservation) => {
-            if (!String(reservation.event_date || "").startsWith(key)) return false;
-            const status = normalizeStatus(reservation.status);
-            if (statusFilter !== "all" && status !== statusFilter) return false;
-            const eventType = eventTypeFor(reservation, selectedOutlet?.name).toLowerCase();
-            if (typeFilter !== "all" && eventType !== typeFilter) return false;
-            return true;
-          }).length,
+          ...metrics,
         };
       });
     }
@@ -1080,28 +1214,29 @@ function OutletDashboard() {
     const start = new Date(`${startDate}T00:00:00`);
     const end = new Date(`${endDate}T00:00:00`);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      return [{ date: today(), count: total }];
+      const metrics = getBucketMetrics(outletReservations);
+      return [{ date: today(), label: readableDate(today()), ...metrics }];
     }
 
     const diffTime = Math.abs(end - start);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
     if (diffDays <= 45) {
-      // 1. Daily grouping
       const days = [];
       const cursor = new Date(start);
       while (cursor <= end) {
         const key = cursor.toISOString().slice(0, 10);
+        const filtered = outletReservations.filter((r) => r.event_date === key);
+        const metrics = getBucketMetrics(filtered);
         days.push({
           date: key,
           label: readableDate(key),
-          count: outletReservations.filter((r) => r.event_date === key).length,
+          ...metrics,
         });
         cursor.setDate(cursor.getDate() + 1);
       }
-      return days.length ? days : [{ date: today(), count: total }];
+      return days.length ? days : [{ date: today(), label: readableDate(today()), count: 0, confirmedRevenue: 0, projectedRevenue: 0 }];
     } else if (diffDays <= 180) {
-      // 2. Weekly grouping
       const weeks = [];
       const cursor = new Date(start);
       while (cursor <= end) {
@@ -1119,16 +1254,18 @@ function OutletDashboard() {
         const crossesYears = weekStart.getFullYear() !== weekEnd.getFullYear() || weekStart.getFullYear() !== new Date().getFullYear();
         const yearStr = crossesYears ? `, ${weekStart.getFullYear()}` : "";
 
+        const filtered = outletReservations.filter((r) => r.event_date >= key && r.event_date <= keyEnd);
+        const metrics = getBucketMetrics(filtered);
+
         weeks.push({
           date: key,
           label: `${startLabel} - ${endLabel}${yearStr}`,
-          count: outletReservations.filter((r) => r.event_date >= key && r.event_date <= keyEnd).length,
+          ...metrics,
         });
         cursor.setDate(cursor.getDate() + 7);
       }
       return weeks;
     } else {
-      // 3. Monthly grouping
       const months = [];
       const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
       const finalEnd = new Date(end.getFullYear(), end.getMonth(), 1);
@@ -1138,16 +1275,19 @@ function OutletDashboard() {
         const key = `${year}-${String(month + 1).padStart(2, "0")}`;
         const label = cursor.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 
+        const filtered = outletReservations.filter((r) => String(r.event_date || "").startsWith(key));
+        const metrics = getBucketMetrics(filtered);
+
         months.push({
           date: `${key}-01`,
           label,
-          count: outletReservations.filter((r) => String(r.event_date || "").startsWith(key)).length,
+          ...metrics,
         });
         cursor.setMonth(cursor.getMonth() + 1);
       }
       return months;
     }
-  }, [analyticsPeriod, baseOutletReservations, endDate, outletReservations, selectedOutlet?.name, startDate, statusFilter, total, typeFilter]);
+  }, [analyticsPeriod, baseOutletReservations, endDate, outletReservations, selectedOutlet?.name, startDate, statusFilter, typeFilter]);
 
   const typeRows = useMemo(() => {
     const map = new Map();
@@ -1351,21 +1491,57 @@ function OutletDashboard() {
                 </div>
               </Panel>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 12 }}>
+                <MetricCard icon={DollarSign} label="Confirmed Revenue" value={formatCurrency(selectedOutletMetrics.confirmed_revenue)} detail="approved spend" color={C.green} bg={C.greenFaint} />
+                <MetricCard icon={TrendingUp} label="Projected Revenue" value={formatCurrency(selectedOutletMetrics.projected_revenue)} detail="pending/expected" color={C.gold} bg={C.goldFaint} />
                 <MetricCard icon={CalendarDays} label="Reservations" value={total} detail="in range" color={C.blue} bg={C.blueFaint} />
-                <MetricCard icon={Clock} label="Pending Actions" value={pending.length} detail={urgentPending.length ? `${urgentPending.length} overdue` : "awaiting review"} color={urgentPending.length ? C.red : C.gold} bg={urgentPending.length ? C.redFaint : C.goldFaint} />
-                <MetricCard icon={CheckCircle} label="Approved" value={reserved.length} detail={`${acceptanceRate}% rate`} color={C.green} bg={C.greenFaint} />
-                <MetricCard icon={Activity} label="Today" value={todayCount} detail="scheduled" color={C.blue} bg={C.blueFaint} />
                 <MetricCard icon={Users} label="Guests" value={guests} detail="expected" color={C.slate} bg={C.slateFaint} />
+                <MetricCard icon={Activity} label="Today" value={todayCount} detail="scheduled" color={C.blue} bg={C.blueFaint} />
+                <MetricCard icon={CheckCircle} label="Approved" value={reserved.length} detail={`${acceptanceRate}% rate`} color={C.green} bg={C.greenFaint} />
+                <MetricCard icon={Clock} label="Pending Actions" value={pending.length} detail={urgentPending.length ? `${urgentPending.length} overdue` : "awaiting review"} color={urgentPending.length ? C.red : C.gold} bg={urgentPending.length ? C.redFaint : C.goldFaint} />
               </div>
 
               <div className="od-two" style={{ display: "grid", gridTemplateColumns: "minmax(360px,1.35fr) minmax(300px,0.8fr)", gap: 14 }}>
                 <Panel
-                  title="Reservation Trend"
+                  title={chartMetric === "revenue" ? "Revenue Seasonality Trend" : "Reservation Trend"}
                   subtitle={analyticsPeriod === "yearly" ? `Monthly activity for ${startDate?.slice(0, 4) || new Date().getFullYear()}.` : "Scheduled activity for the selected date range."}
-                  right={<PeriodSwitch value={analyticsPeriod} onChange={setAnalyticsPeriod} />}
+                  right={
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: 3, border: `1px solid ${C.border}`, borderRadius: 999, background: C.soft }}>
+                        {[
+                          ["volume", "Volume"],
+                          ["revenue", "Revenue"],
+                        ].map(([key, label]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setChartMetric(key)}
+                            style={{
+                              height: 26,
+                              border: "none",
+                              borderRadius: 999,
+                              padding: "0 10px",
+                              background: chartMetric === key ? C.surface : "transparent",
+                              color: chartMetric === key ? C.gold : C.muted,
+                              boxShadow: chartMetric === key ? "0 1px 5px rgba(40,32,18,0.04)" : "none",
+                              fontFamily: F.label,
+                              fontSize: 9,
+                              fontWeight: 850,
+                              letterSpacing: "0.10em",
+                              textTransform: "uppercase",
+                              cursor: "pointer",
+                              transition: "background 0.18s, color 0.18s, box-shadow 0.18s",
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <PeriodSwitch value={analyticsPeriod} onChange={setAnalyticsPeriod} />
+                    </div>
+                  }
                 >
-                  <LineChart rows={trendRows} period={analyticsPeriod} />
+                  <LineChart rows={trendRows} period={analyticsPeriod} chartMetric={chartMetric} />
                 </Panel>
                 <Panel title="Status Distribution" subtitle="Current workflow state for filtered reservations.">
                   <DonutChart counts={statusCounts} total={total} />

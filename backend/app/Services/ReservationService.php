@@ -628,6 +628,17 @@ class ReservationService
                         'public_room_name' => $reservation->public_room_name,
                         'internal_room_name' => $reservation->internal_room_name,
                         'assignment_status' => $reservation->assignment_status,
+                        'pricing_mode' => $reservation->pricing_mode,
+                        'base_price' => $reservation->base_price,
+                        'price_per_person' => $reservation->price_per_person,
+                        'price_per_seat' => $reservation->price_per_seat,
+                        'package_name' => $reservation->package_name,
+                        'package_price' => $reservation->package_price,
+                        'calculated_price' => $reservation->calculated_price,
+                        'manual_price_override' => $reservation->manual_price_override,
+                        'final_price' => $reservation->final_price,
+                        'price_notes' => $reservation->price_notes,
+                        'show_price_to_guest' => $reservation->show_price_to_guest,
                     ], $auditData);
                 }
             );
@@ -685,6 +696,17 @@ class ReservationService
                     'public_room_name' => $reservation->public_room_name,
                     'internal_room_name' => $reservation->internal_room_name,
                     'assignment_status' => $reservation->assignment_status,
+                    'pricing_mode' => $reservation->pricing_mode,
+                    'base_price' => $reservation->base_price,
+                    'price_per_person' => $reservation->price_per_person,
+                    'price_per_seat' => $reservation->price_per_seat,
+                    'package_name' => $reservation->package_name,
+                    'package_price' => $reservation->package_price,
+                    'calculated_price' => $reservation->calculated_price,
+                    'manual_price_override' => $reservation->manual_price_override,
+                    'final_price' => $reservation->final_price,
+                    'price_notes' => $reservation->price_notes,
+                    'show_price_to_guest' => $reservation->show_price_to_guest,
                 ], $auditData);
             })
             ->toArray();
@@ -756,17 +778,27 @@ class ReservationService
 
         $allReports = $roomReports->concat($extraRoomReports)->values();
 
+        $confirmedReservations = $reservations->filter(fn ($reservation) => in_array($reservation->status, ['reserved', 'approved'], true));
+        $pendingReservations = $reservations->where('status', 'pending');
+        $confirmedRevenue = (float) $confirmedReservations->sum('final_price');
+        $projectedRevenue = (float) $pendingReservations->sum('final_price');
+        $confirmedGuests = (int) $confirmedReservations->sum('guests_count');
+
         return [
             'summary' => [
                 'outlets' => $allReports->count(),
                 'reservations' => $reservations->count(),
                 'guests' => $reservations->sum('guests_count'),
                 'pending' => $reservations->where('status', 'pending')->count(),
-                'reserved' => $reservations->filter(fn ($reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                'reserved' => $confirmedReservations->count(),
                 'rejected' => $reservations->where('status', 'rejected')->count(),
                 'cancelled' => $reservations->where('status', 'cancelled')->count(),
                 'dine_in' => $reservations->filter(fn (Reservation $reservation) => $this->isDineInReservation($reservation))->count(),
                 'promotion_mentions' => $reservations->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
+                'confirmed_revenue' => $confirmedRevenue,
+                'projected_revenue' => $projectedRevenue,
+                'avg_guest_spend' => $confirmedGuests > 0 ? round($confirmedRevenue / $confirmedGuests, 2) : 0.0,
+                'avg_ticket_size' => $confirmedReservations->count() > 0 ? round($confirmedRevenue / $confirmedReservations->count(), 2) : 0.0,
             ],
             'status_breakdown' => $this->formatStatusBreakdown($reservations),
             'category_breakdown' => $this->formatCategoryBreakdown($reservations),
@@ -874,6 +906,10 @@ class ReservationService
                 ->unique()
                 ->count();
 
+            $confirmedItems = $items->filter(fn ($res) => in_array($res->status, ['reserved', 'approved'], true));
+            $confirmedRev = (float) $confirmedItems->sum('final_price');
+            $projectedRev = (float) $items->where('status', 'pending')->sum('final_price');
+
             return [
                 'month' => sprintf('%d-%02d', $year, $month),
                 'month_number' => $month,
@@ -885,9 +921,11 @@ class ReservationService
                 'dine_in' => $items->filter(fn (Reservation $reservation) => $this->isDineInReservation($reservation))->count(),
                 'room_reservations' => $items->reject(fn (Reservation $reservation) => $this->isDineInReservation($reservation))->count(),
                 'pending' => $items->where('status', 'pending')->count(),
-                'reserved' => $items->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                'reserved' => $confirmedItems->count(),
                 'rejected' => $items->where('status', 'rejected')->count(),
                 'cancelled' => $items->where('status', 'cancelled')->count(),
+                'confirmed_revenue' => $confirmedRev,
+                'projected_revenue' => $projectedRev,
                 'status_breakdown' => $this->formatStatusBreakdown($items),
             ];
         });
@@ -895,15 +933,21 @@ class ReservationService
         $outletSummary = $reservations
             ->groupBy(fn (Reservation $reservation) => $this->roomLabel($reservation))
             ->map(function ($items, string $outlet) {
+                $confirmedItems = $items->filter(fn ($res) => in_array($res->status, ['reserved', 'approved'], true));
+                $confirmedRev = (float) $confirmedItems->sum('final_price');
+                $projectedRev = (float) $items->where('status', 'pending')->sum('final_price');
+
                 return [
                     'outlet' => $outlet,
                     'reservations' => $items->count(),
                     'guests' => $items->sum('guests_count'),
                     'promotion_mentions' => $items->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
                     'pending' => $items->where('status', 'pending')->count(),
-                    'reserved' => $items->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                    'reserved' => $confirmedItems->count(),
                     'rejected' => $items->where('status', 'rejected')->count(),
                     'cancelled' => $items->where('status', 'cancelled')->count(),
+                    'confirmed_revenue' => $confirmedRev,
+                    'projected_revenue' => $projectedRev,
                 ];
             })
             ->sortByDesc('reservations')
@@ -917,6 +961,10 @@ class ReservationService
         $daysInMonth = $selectedMonthDate->daysInMonth;
 
         $formatActivityRow = function ($items): array {
+            $confirmedItems = $items->filter(fn ($res) => in_array($res->status, ['reserved', 'approved'], true));
+            $confirmedRev = (float) $confirmedItems->sum('final_price');
+            $projectedRev = (float) $items->where('status', 'pending')->sum('final_price');
+
             return [
                 'reservations' => $items->count(),
                 'guests' => $items->sum('guests_count'),
@@ -927,9 +975,11 @@ class ReservationService
                     ->count(),
                 'promotion_mentions' => $items->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
                 'pending' => $items->where('status', 'pending')->count(),
-                'reserved' => $items->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                'reserved' => $confirmedItems->count(),
                 'rejected' => $items->where('status', 'rejected')->count(),
                 'cancelled' => $items->where('status', 'cancelled')->count(),
+                'confirmed_revenue' => $confirmedRev,
+                'projected_revenue' => $projectedRev,
             ];
         };
 
@@ -978,6 +1028,16 @@ class ReservationService
         $peakDay = $days->sortByDesc('reservations')->first();
         $peakWeek = $weeks->sortByDesc('reservations')->first();
 
+        $confirmedYearReservations = $reservations->filter(fn ($res) => in_array($res->status, ['reserved', 'approved'], true));
+        $confirmedYearRevenue = (float) $confirmedYearReservations->sum('final_price');
+        $projectedYearRevenue = (float) $reservations->where('status', 'pending')->sum('final_price');
+        $confirmedYearGuests = (int) $confirmedYearReservations->sum('guests_count');
+
+        $confirmedMonthReservations = $selectedMonthReservations->filter(fn ($res) => in_array($res->status, ['reserved', 'approved'], true));
+        $confirmedMonthRevenue = (float) $confirmedMonthReservations->sum('final_price');
+        $projectedMonthRevenue = (float) $selectedMonthReservations->where('status', 'pending')->sum('final_price');
+        $confirmedMonthGuests = (int) $confirmedMonthReservations->sum('guests_count');
+
         return [
             'year' => $year,
             'summary' => [
@@ -986,9 +1046,13 @@ class ReservationService
                 'outlets' => $outletSummary->count(),
                 'promotion_mentions' => $reservations->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
                 'pending' => $reservations->where('status', 'pending')->count(),
-                'reserved' => $reservations->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                'reserved' => $confirmedYearReservations->count(),
                 'rejected' => $reservations->where('status', 'rejected')->count(),
                 'cancelled' => $reservations->where('status', 'cancelled')->count(),
+                'confirmed_revenue' => $confirmedYearRevenue,
+                'projected_revenue' => $projectedYearRevenue,
+                'avg_guest_spend' => $confirmedYearGuests > 0 ? round($confirmedYearRevenue / $confirmedYearGuests, 2) : 0.0,
+                'avg_ticket_size' => $confirmedYearReservations->count() > 0 ? round($confirmedYearRevenue / $confirmedYearReservations->count(), 2) : 0.0,
                 'peak_month' => $peakMonth['reservations'] > 0 ? $peakMonth['label'] : null,
             ],
             'months' => $months->values()->toArray(),
@@ -1004,9 +1068,13 @@ class ReservationService
                     'outlets' => $monthOutletSummary->count(),
                     'promotion_mentions' => $selectedMonthReservations->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
                     'pending' => $selectedMonthReservations->where('status', 'pending')->count(),
-                    'reserved' => $selectedMonthReservations->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                    'reserved' => $confirmedMonthReservations->count(),
                     'rejected' => $selectedMonthReservations->where('status', 'rejected')->count(),
                     'cancelled' => $selectedMonthReservations->where('status', 'cancelled')->count(),
+                    'confirmed_revenue' => $confirmedMonthRevenue,
+                    'projected_revenue' => $projectedMonthRevenue,
+                    'avg_guest_spend' => $confirmedMonthGuests > 0 ? round($confirmedMonthRevenue / $confirmedMonthGuests, 2) : 0.0,
+                    'avg_ticket_size' => $confirmedMonthReservations->count() > 0 ? round($confirmedMonthRevenue / $confirmedMonthReservations->count(), 2) : 0.0,
                     'active_days' => $days->where('reservations', '>', 0)->count(),
                     'peak_day' => ($peakDay['reservations'] ?? 0) > 0 ? $peakDay['label'] : null,
                     'peak_week' => ($peakWeek['reservations'] ?? 0) > 0 ? $peakWeek['label'] : null,
@@ -1314,6 +1382,11 @@ class ReservationService
         $dineIn = $reservations->filter(fn (Reservation $reservation) => $this->isDineInReservation($reservation))->count();
         $promotionMentions = $reservations->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count();
 
+        $confirmedReservations = $reservations->filter(fn ($res) => in_array($res->status, ['reserved', 'approved'], true));
+        $confirmedRevenue = (float) $confirmedReservations->sum('final_price');
+        $projectedRevenue = (float) $reservations->where('status', 'pending')->sum('final_price');
+        $confirmedGuests = (int) $confirmedReservations->sum('guests_count');
+
         return [
             'venue_id' => $venue?->id,
             'name' => $metadata['name'] ?? $fallbackName ?? $venue?->name ?? 'Unassigned Outlet',
@@ -1330,6 +1403,9 @@ class ReservationService
             'dine_in' => $dineIn,
             'promotion_mentions' => $promotionMentions,
             'guests' => $reservations->sum('guests_count'),
+            'confirmed_revenue' => $confirmedRevenue,
+            'projected_revenue' => $projectedRevenue,
+            'avg_guest_spend' => $confirmedGuests > 0 ? round($confirmedRevenue / $confirmedGuests, 2) : 0.0,
             'acceptance_rate' => $total > 0 ? round(($reserved / $total) * 100, 1) : 0,
             'latest_event_date' => $latest?->event_date?->format('Y-m-d'),
             'latest_event_time' => $latest?->event_time,
@@ -1377,17 +1453,22 @@ class ReservationService
             ->groupBy(fn (Reservation $reservation) => $this->roomLabel($reservation))
             ->map(function ($items, string $room) {
                 $latest = $items->sortByDesc('event_date')->first();
+                $confirmedItems = $items->filter(fn ($res) => in_array($res->status, ['reserved', 'approved'], true));
+                $confirmedRev = (float) $confirmedItems->sum('final_price');
+                $projectedRev = (float) $items->where('status', 'pending')->sum('final_price');
 
                 return [
                     'room' => $room,
                     'reservations' => $items->count(),
                     'guests' => $items->sum('guests_count'),
                     'pending' => $items->where('status', 'pending')->count(),
-                    'reserved' => $items->filter(fn (Reservation $reservation) => in_array($reservation->status, ['reserved', 'approved'], true))->count(),
+                    'reserved' => $confirmedItems->count(),
                     'rejected' => $items->where('status', 'rejected')->count(),
                     'cancelled' => $items->where('status', 'cancelled')->count(),
                     'dine_in' => $items->filter(fn (Reservation $reservation) => $this->isDineInReservation($reservation))->count(),
                     'promotion_mentions' => $items->filter(fn (Reservation $reservation) => $this->hasPromotionMention($reservation))->count(),
+                    'confirmed_revenue' => $confirmedRev,
+                    'projected_revenue' => $projectedRev,
                     'latest_event_date' => $latest?->event_date?->format('Y-m-d'),
                     'latest_event_time' => $latest?->event_time,
                 ];
@@ -1412,6 +1493,8 @@ class ReservationService
                     'cancelled' => 0,
                     'dine_in' => 0,
                     'promotion_mentions' => 0,
+                    'confirmed_revenue' => 0.0,
+                    'projected_revenue' => 0.0,
                     'latest_event_date' => null,
                     'latest_event_time' => null,
                 ]);
