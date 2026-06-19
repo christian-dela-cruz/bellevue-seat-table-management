@@ -193,9 +193,9 @@ function MetricCard({ label, value, detail, tone = "gold" }) {
   return (
     <ReportCard style={{ padding: "16px 17px", minWidth: 0 }}>
       <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.faint, marginBottom: 10 }}>{label}</div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <span style={{ color, background: bg, borderRadius: 8, padding: "5px 10px", minWidth: 48, textAlign: "center", fontSize: 22, fontWeight: 650, lineHeight: 1 }}>{value}</span>
-        {detail && <span style={{ color: C.muted, fontSize: 12 }}>{detail}</span>}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+        <span style={{ color, background: bg, borderRadius: 8, padding: "5px 10px", minWidth: 48, textAlign: "center", fontSize: 22, fontWeight: 650, lineHeight: 1, display: "inline-block" }}>{value}</span>
+        {detail && <span style={{ color: C.muted, fontSize: 11, display: "block" }}>{detail}</span>}
       </div>
     </ReportCard>
   );
@@ -210,7 +210,7 @@ function MiniStat({ label, value }) {
   );
 }
 
-function ProgressRow({ label, value, total, tone = "gold", printMode = false }) {
+function ProgressRow({ label, value, total, tone = "gold", printMode = false, displayValue = null }) {
   const [color] = toneColor(tone);
   const pct = total > 0 ? Math.round((value / total) * 100) : 0;
 
@@ -222,7 +222,7 @@ function ProgressRow({ label, value, total, tone = "gold", printMode = false }) 
     <div style={{ display: "grid", gap: 4 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: printMode ? "0.95em" : 11.5, color: textColor }}>
         <span>{label}</span>
-        <span>{value} <span style={{ color: pctColor, fontSize: printMode ? "0.85em" : 10.5 }}>({pct}%)</span></span>
+        <span>{displayValue !== null ? displayValue : value} <span style={{ color: pctColor, fontSize: printMode ? "0.85em" : 10.5 }}>({pct}%)</span></span>
       </div>
       <div style={{ height: 4, borderRadius: 999, background: trackBg, overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 999 }} />
@@ -588,8 +588,10 @@ function ChartTooltip({ active, payload, label }) {
   );
 }
 
-function OutletCard({ outlet, onSelect }) {
+function OutletCard({ outlet, onSelect, metricMode = "reservations" }) {
   const total = outlet.total_reservations || 0;
+  const isRevenue = metricMode === "revenue";
+  const totalRev = (Number(outlet.confirmed_revenue) || 0) + (Number(outlet.projected_revenue) || 0);
 
   return (
     <div
@@ -620,26 +622,52 @@ function OutletCard({ outlet, onSelect }) {
           <div title={outlet.name} style={{ fontSize: 15, fontWeight: 650, color: C.text, marginBottom: 4, lineHeight: 1.25, overflowWrap: "anywhere" }}>{outlet.name}</div>
           <div style={{ fontSize: 11.5, color: C.muted }}>{outlet.wing || "No wing"} - {outlet.type || "outlet"}</div>
         </div>
-        <span style={{ padding: "4px 8px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>{outlet.acceptance_rate}% approved</span>
+        {isRevenue ? (
+          <span style={{ padding: "4px 8px", borderRadius: 999, background: C.greenFaint, color: C.green, fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
+            {formatCurrency(totalRev)} est.
+          </span>
+        ) : (
+          <span style={{ padding: "4px 8px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
+            {outlet.acceptance_rate}% approved
+          </span>
+        )}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(82px,1fr))", gap: 8 }}>
-        <MiniStat label="Total" value={total} />
-        <MiniStat label="Guests" value={outlet.guests || 0} />
-        <MiniStat label="Dine-In" value={outlet.dine_in || 0} />
-        <MiniStat label="Promo" value={outlet.promotion_mentions || 0} />
-      </div>
-      <div style={{ display: "grid", gap: 8 }}>
-        <ProgressRow label="Reserved" value={outlet.reserved || 0} total={total} tone="green" />
-        <ProgressRow label="Pending" value={outlet.pending || 0} total={total} tone="gold" />
-        <ProgressRow label="Rejected" value={outlet.rejected || 0} total={total} tone="red" />
-      </div>
+      {isRevenue ? (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(82px,1fr))", gap: 8 }}>
+            <MiniStat label="Confirmed" value={formatCurrency(Number(outlet.confirmed_revenue) || 0)} />
+            <MiniStat label="Projected" value={formatCurrency(Number(outlet.projected_revenue) || 0)} />
+            <MiniStat label="Avg Guest" value={formatCurrency(Number(outlet.avg_guest_spend) || 0)} />
+          </div>
+          <div style={{ display: "grid", gap: 8 }}>
+            <ProgressRow label="Confirmed Share" value={Number(outlet.confirmed_revenue) || 0} total={totalRev} tone="green" displayValue={formatCurrency(Number(outlet.confirmed_revenue) || 0)} />
+            <ProgressRow label="Projected Share" value={Number(outlet.projected_revenue) || 0} total={totalRev} tone="gold" displayValue={formatCurrency(Number(outlet.projected_revenue) || 0)} />
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(82px,1fr))", gap: 8 }}>
+            <MiniStat label="Total" value={total} />
+            <MiniStat label="Guests" value={outlet.guests || 0} />
+            <MiniStat label="Dine-In" value={outlet.dine_in || 0} />
+            <MiniStat label="Promo" value={outlet.promotion_mentions || 0} />
+          </div>
+          <div style={{ display: "grid", gap: 8 }}>
+            <ProgressRow label="Reserved" value={outlet.reserved || 0} total={total} tone="green" />
+            <ProgressRow label="Pending" value={outlet.pending || 0} total={total} tone="gold" />
+            <ProgressRow label="Rejected" value={outlet.rejected || 0} total={total} tone="red" />
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-function RoomGridCard({ room, onSelect }) {
+function RoomGridCard({ room, onSelect, metricMode = "reservations" }) {
   const total = room.reservations || 0;
+  const isRevenue = metricMode === "revenue";
   const acceptanceRate = total > 0 ? Math.round(((room.reserved || 0) / total) * 100) : 0;
+  const totalRev = (Number(room.confirmed_revenue) || 0) + (Number(room.projected_revenue) || 0);
 
   return (
     <div
@@ -670,18 +698,42 @@ function RoomGridCard({ room, onSelect }) {
           <div title={room.room} style={{ fontSize: 14, fontWeight: 650, color: C.text, marginBottom: 4, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{room.room}</div>
           <div style={{ fontSize: 11, color: C.muted }}>Latest Event: {room.latest_event_date || "-"}</div>
         </div>
-        <span style={{ padding: "3px 7px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontSize: 9.5, fontWeight: 700, whiteSpace: "nowrap" }}>{acceptanceRate}% approved</span>
+        {isRevenue ? (
+          <span style={{ padding: "3px 7px", borderRadius: 999, background: C.greenFaint, color: C.green, fontSize: 9.5, fontWeight: 700, whiteSpace: "nowrap" }}>
+            {formatCurrency(totalRev)} est.
+          </span>
+        ) : (
+          <span style={{ padding: "3px 7px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontSize: 9.5, fontWeight: 700, whiteSpace: "nowrap" }}>
+            {acceptanceRate}% approved
+          </span>
+        )}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
-        <MiniStat label="Reservations" value={total} />
-        <MiniStat label="Guests" value={room.guests || 0} />
-        <MiniStat label="Dine-In" value={room.dine_in || 0} />
-      </div>
-      <div style={{ display: "grid", gap: 8 }}>
-        <ProgressRow label="Reserved" value={room.reserved || 0} total={total} tone="green" />
-        <ProgressRow label="Pending" value={room.pending || 0} total={total} tone="gold" />
-        <ProgressRow label="Rejected" value={room.rejected || 0} total={total} tone="red" />
-      </div>
+      {isRevenue ? (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
+            <MiniStat label="Confirmed" value={formatCurrency(Number(room.confirmed_revenue) || 0)} />
+            <MiniStat label="Projected" value={formatCurrency(Number(room.projected_revenue) || 0)} />
+            <MiniStat label="Guests" value={room.guests || 0} />
+          </div>
+          <div style={{ display: "grid", gap: 8 }}>
+            <ProgressRow label="Confirmed Share" value={Number(room.confirmed_revenue) || 0} total={totalRev} tone="green" displayValue={formatCurrency(Number(room.confirmed_revenue) || 0)} />
+            <ProgressRow label="Projected Share" value={Number(room.projected_revenue) || 0} total={totalRev} tone="gold" displayValue={formatCurrency(Number(room.projected_revenue) || 0)} />
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
+            <MiniStat label="Reservations" value={total} />
+            <MiniStat label="Guests" value={room.guests || 0} />
+            <MiniStat label="Dine-In" value={room.dine_in || 0} />
+          </div>
+          <div style={{ display: "grid", gap: 8 }}>
+            <ProgressRow label="Reserved" value={room.reserved || 0} total={total} tone="green" />
+            <ProgressRow label="Pending" value={room.pending || 0} total={total} tone="gold" />
+            <ProgressRow label="Rejected" value={room.rejected || 0} total={total} tone="red" />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1277,6 +1329,7 @@ export default function Reports() {
   const [roomViewMode, setRoomViewMode] = useState("list");
   const [outletViewMode, setOutletViewMode] = useState("grid");
   const [activeOutletDetails, setActiveOutletDetails] = useState(null);
+  const [outletMetricMode, setOutletMetricMode] = useState("reservations");
   const [showPrintConfig, setShowPrintConfig] = useState(false);
   const [printReportType, setPrintReportType] = useState("general");
   const [printSections, setPrintSections] = useState({
@@ -1742,19 +1795,38 @@ export default function Reports() {
   }, [activeOutletDetails, transactionReport.data]);
 
   const outletChartData = useMemo(() => {
-    if (!activeOutletDetails || !outletTransactions.length) return [];
+    if (!activeOutletDetails) return [];
     const countsByDate = {};
+
+    // 1. Group actual reservations (bookings) by event_date
+    const canonicalSelected = canonicalOutletName(activeOutletDetails);
+    const children = resolveOutletChildren(activeOutletDetails, venueRows);
+    const childrenSet = new Set(children.map(canonicalOutletName));
+
+    reservations.forEach((r) => {
+      const resRoom = r.internal_room_name || r.room || r.venue?.name || "";
+      const canonicalResRoom = canonicalOutletName(resRoom);
+      const isMatch = canonicalResRoom === canonicalSelected || childrenSet.has(canonicalResRoom);
+      if (!isMatch) return;
+
+      const dateVal = r.event_date;
+      if (!dateVal) return;
+      if (!countsByDate[dateVal]) {
+        countsByDate[dateVal] = { bookings: 0, audit_transactions: 0, approvals: 0 };
+      }
+      countsByDate[dateVal].bookings += 1;
+    });
+
+    // 2. Group audit transactions and approvals by created_at date
     outletTransactions.forEach((tx) => {
       const dateVal = tx.created_at ? tx.created_at.slice(0, 10) : null;
       if (!dateVal) return;
       if (!countsByDate[dateVal]) {
-        countsByDate[dateVal] = { reservations: 0, approvals: 0, rejections: 0 };
+        countsByDate[dateVal] = { bookings: 0, audit_transactions: 0, approvals: 0 };
       }
-      countsByDate[dateVal].reservations += 1;
+      countsByDate[dateVal].audit_transactions += 1;
       if (tx.to_status === "reserved" || tx.to_status === "approved") {
         countsByDate[dateVal].approvals += 1;
-      } else if (tx.to_status === "rejected") {
-        countsByDate[dateVal].rejections += 1;
       }
     });
 
@@ -1763,16 +1835,27 @@ export default function Reports() {
       .map((date) => ({
         date,
         label: readableDate(date),
-        reservations: countsByDate[date].reservations,
+        bookings: countsByDate[date].bookings,
+        audit_transactions: countsByDate[date].audit_transactions,
         approvals: countsByDate[date].approvals,
-        rejections: countsByDate[date].rejections,
       }));
-  }, [activeOutletDetails, outletTransactions]);
+  }, [activeOutletDetails, reservations, outletTransactions, venueRows]);
 
   const activeOutletRow = useMemo(() => {
     if (!activeOutletDetails) return null;
-    return reportOutletRows.find((row) => canonicalOutletName(row.name) === canonicalOutletName(activeOutletDetails));
-  }, [activeOutletDetails, reportOutletRows]);
+    const outletRow = reportOutletRows.find((row) => canonicalOutletName(row.name) === canonicalOutletName(activeOutletDetails));
+    if (outletRow) return outletRow;
+    const roomRow = roomDetails.find((row) => canonicalOutletName(row.room) === canonicalOutletName(activeOutletDetails));
+    if (roomRow) {
+      return {
+        ...roomRow,
+        name: roomRow.room,
+        total_reservations: roomRow.reservations,
+        acceptance_rate: roomRow.reservations > 0 ? Math.round(((roomRow.reserved || 0) / roomRow.reservations) * 100) : 0,
+      };
+    }
+    return null;
+  }, [activeOutletDetails, reportOutletRows, roomDetails]);
 
   const printStyles = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;650;750;850&family=Outfit:wght@400;600;750;850&family=Playfair+Display:wght@400;650;750;850&family=Fira+Mono:wght@400;650;750&display=swap');
@@ -4166,6 +4249,39 @@ export default function Reports() {
                                 })}
                               </div>
 
+                              {/* Metric Switcher: Reservations vs Revenue */}
+                              <div style={{ display: "inline-flex", height: 34, border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden", background: C.surface }}>
+                                {[
+                                  ["reservations", "Bookings"],
+                                  ["revenue", "Revenue"],
+                                ].map(([mode, label]) => {
+                                  const active = outletMetricMode === mode;
+                                  return (
+                                    <button
+                                      key={mode}
+                                      type="button"
+                                      onClick={() => setOutletMetricMode(mode)}
+                                      style={{
+                                        border: "none",
+                                        borderRight: mode === "reservations" ? `1px solid ${C.border}` : "none",
+                                        background: active ? C.goldFaint : "transparent",
+                                        color: active ? C.gold : C.muted,
+                                        padding: "0 14px",
+                                        fontFamily: F.label,
+                                        fontSize: 9.5,
+                                        fontWeight: 750,
+                                        letterSpacing: "0.06em",
+                                        textTransform: "uppercase",
+                                        cursor: "pointer",
+                                        transition: "background 0.12s, color 0.12s",
+                                      }}
+                                    >
+                                      {label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
                               <SortSelect value={outletSort} options={SORT_OPTIONS.outlets} onChange={setOutletSort} />
                             </div>
                           </div>
@@ -4185,6 +4301,7 @@ export default function Reports() {
                                     <OutletCard
                                       key={outlet.name || outlet.venue_id}
                                       outlet={outlet}
+                                      metricMode={outletMetricMode}
                                       onSelect={() => setActiveOutletDetails(outlet.name)}
                                     />
                                   ))}
@@ -4195,25 +4312,44 @@ export default function Reports() {
                         ) : (
                           <TableCard
                             title="Outlet Performance Ledger"
-                            headers={["Outlet Name", "Wing Location", "Venue Type", "Total Bookings", "Guests", "Reserved", "Pending", "Rejected", "Acceptance Rate"]}
+                            headers={
+                              outletMetricMode === "revenue"
+                                ? ["Outlet Name", "Wing Location", "Venue Type", "Confirmed Revenue", "Projected Revenue", "Total Estimated", "Avg Guest Spend"]
+                                : ["Outlet Name", "Wing Location", "Venue Type", "Total Bookings", "Guests", "Reserved", "Pending", "Rejected", "Acceptance Rate"]
+                            }
                             rows={filteredOutlets}
-                            renderRow={(outlet) => (
-                              <tr key={outlet.name || outlet.venue_id} className="reports-table-row" onClick={() => setActiveOutletDetails(outlet.name)}>
-                                <td style={cellStyle(true)}>{outlet.name}</td>
-                                <td style={cellStyle()}>{outlet.wing || "Main Wing"}</td>
-                                <td style={cellStyle()}>{outlet.type || "Outlet"}</td>
-                                <td style={cellStyle(true)}>{outlet.total_reservations || 0}</td>
-                                <td style={cellStyle()}>{outlet.guests || 0}</td>
-                                <td style={cellStyle()}><span style={{ color: C.green, fontWeight: 600 }}>{outlet.reserved || 0}</span></td>
-                                <td style={cellStyle()}><span style={{ color: C.gold, fontWeight: 600 }}>{outlet.pending || 0}</span></td>
-                                <td style={cellStyle()}><span style={{ color: C.red, fontWeight: 600 }}>{outlet.rejected || 0}</span></td>
-                                <td style={cellStyle()}>
-                                  <span style={{ padding: "3px 7px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontSize: 10, fontWeight: 700 }}>
-                                    {outlet.acceptance_rate}%
-                                  </span>
-                                </td>
-                              </tr>
-                            )}
+                            renderRow={(outlet) => {
+                              const conf = Number(outlet.confirmed_revenue) || 0;
+                              const proj = Number(outlet.projected_revenue) || 0;
+                              const totalEst = conf + proj;
+                              return outletMetricMode === "revenue" ? (
+                                <tr key={outlet.name || outlet.venue_id} className="reports-table-row" onClick={() => setActiveOutletDetails(outlet.name)}>
+                                  <td style={cellStyle(true)}>{outlet.name}</td>
+                                  <td style={cellStyle()}>{outlet.wing || "Main Wing"}</td>
+                                  <td style={cellStyle()}>{outlet.type || "Outlet"}</td>
+                                  <td style={cellStyle()}><span style={{ color: C.green, fontWeight: 600 }}>{formatCurrency(conf)}</span></td>
+                                  <td style={cellStyle()}><span style={{ color: C.gold, fontWeight: 600 }}>{formatCurrency(proj)}</span></td>
+                                  <td style={cellStyle(true)}>{formatCurrency(totalEst)}</td>
+                                  <td style={cellStyle()}>{formatCurrency(Number(outlet.avg_guest_spend) || 0)}</td>
+                                </tr>
+                              ) : (
+                                <tr key={outlet.name || outlet.venue_id} className="reports-table-row" onClick={() => setActiveOutletDetails(outlet.name)}>
+                                  <td style={cellStyle(true)}>{outlet.name}</td>
+                                  <td style={cellStyle()}>{outlet.wing || "Main Wing"}</td>
+                                  <td style={cellStyle()}>{outlet.type || "Outlet"}</td>
+                                  <td style={cellStyle(true)}>{outlet.total_reservations || 0}</td>
+                                  <td style={cellStyle()}>{outlet.guests || 0}</td>
+                                  <td style={cellStyle()}><span style={{ color: C.green, fontWeight: 600 }}>{outlet.reserved || 0}</span></td>
+                                  <td style={cellStyle()}><span style={{ color: C.gold, fontWeight: 600 }}>{outlet.pending || 0}</span></td>
+                                  <td style={cellStyle()}><span style={{ color: C.red, fontWeight: 600 }}>{outlet.rejected || 0}</span></td>
+                                  <td style={cellStyle()}>
+                                    <span style={{ padding: "3px 7px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontSize: 10, fontWeight: 700 }}>
+                                      {outlet.acceptance_rate}%
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            }}
                           />
                         )}
 
@@ -4311,22 +4447,41 @@ export default function Reports() {
                           {roomViewMode === "list" ? (
                             <TableCard
                               title="Room Registry"
-                              headers={["Room / Outlet", "Reservations", "Guests", "Pending", "Reserved", "Rejected", "Cancelled", "Dine-In", "Promo", "Latest Event"]}
+                              headers={
+                                outletMetricMode === "revenue"
+                                  ? ["Room / Outlet", "Reservations", "Guests", "Confirmed Revenue", "Projected Revenue", "Total Estimated", "Latest Event"]
+                                  : ["Room / Outlet", "Reservations", "Guests", "Pending", "Reserved", "Rejected", "Cancelled", "Dine-In", "Promo", "Latest Event"]
+                              }
                               rows={visibleRoomRows}
-                              renderRow={(room) => (
-                                <tr key={room.room} className="reports-table-row" onClick={() => setActiveOutletDetails(room.room)}>
-                                  <td style={cellStyle(true)}>{room.room}</td>
-                                  <td style={cellStyle()}>{room.reservations}</td>
-                                  <td style={cellStyle()}>{room.guests}</td>
-                                  <td style={cellStyle()}><span style={{ color: C.gold, fontWeight: 600 }}>{room.pending}</span></td>
-                                  <td style={cellStyle()}><span style={{ color: C.green, fontWeight: 600 }}>{room.reserved}</span></td>
-                                  <td style={cellStyle()}><span style={{ color: C.red, fontWeight: 600 }}>{room.rejected}</span></td>
-                                  <td style={cellStyle()}>{room.cancelled}</td>
-                                  <td style={cellStyle()}>{room.dine_in}</td>
-                                  <td style={cellStyle()}>{room.promotion_mentions}</td>
-                                  <td style={cellStyle()}>{room.latest_event_date || "-"}</td>
-                                </tr>
-                              )}
+                              renderRow={(room) => {
+                                const conf = Number(room.confirmed_revenue) || 0;
+                                const proj = Number(room.projected_revenue) || 0;
+                                const totalEst = conf + proj;
+                                return outletMetricMode === "revenue" ? (
+                                  <tr key={room.room} className="reports-table-row" onClick={() => setActiveOutletDetails(room.room)}>
+                                    <td style={cellStyle(true)}>{room.room}</td>
+                                    <td style={cellStyle()}>{room.reservations}</td>
+                                    <td style={cellStyle()}>{room.guests}</td>
+                                    <td style={cellStyle()}><span style={{ color: C.green, fontWeight: 600 }}>{formatCurrency(conf)}</span></td>
+                                    <td style={cellStyle()}><span style={{ color: C.gold, fontWeight: 600 }}>{formatCurrency(proj)}</span></td>
+                                    <td style={cellStyle(true)}>{formatCurrency(totalEst)}</td>
+                                    <td style={cellStyle()}>{room.latest_event_date || "-"}</td>
+                                  </tr>
+                                ) : (
+                                  <tr key={room.room} className="reports-table-row" onClick={() => setActiveOutletDetails(room.room)}>
+                                    <td style={cellStyle(true)}>{room.room}</td>
+                                    <td style={cellStyle()}>{room.reservations}</td>
+                                    <td style={cellStyle()}>{room.guests}</td>
+                                    <td style={cellStyle()}><span style={{ color: C.gold, fontWeight: 600 }}>{room.pending}</span></td>
+                                    <td style={cellStyle()}><span style={{ color: C.green, fontWeight: 600 }}>{room.reserved}</span></td>
+                                    <td style={cellStyle()}><span style={{ color: C.red, fontWeight: 600 }}>{room.rejected}</span></td>
+                                    <td style={cellStyle()}>{room.cancelled}</td>
+                                    <td style={cellStyle()}>{room.dine_in}</td>
+                                    <td style={cellStyle()}>{room.promotion_mentions}</td>
+                                    <td style={cellStyle()}>{room.latest_event_date || "-"}</td>
+                                  </tr>
+                                );
+                              }}
                               footer={
                                 <div style={{ padding: "11px 14px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", color: C.muted, fontSize: 12 }}>
                                   <span>
@@ -4361,7 +4516,7 @@ export default function Reports() {
                                 ) : (
                                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%, 300px),1fr))", gap: 12 }}>
                                     {visibleRoomRows.map((room) => (
-                                      <RoomGridCard key={room.room} room={room} onSelect={() => setActiveOutletDetails(room.room)} />
+                                      <RoomGridCard key={room.room} room={room} metricMode={outletMetricMode} onSelect={() => setActiveOutletDetails(room.room)} />
                                     ))}
                                   </div>
                                 )}
@@ -4416,8 +4571,15 @@ export default function Reports() {
 
       {/* 2. Outlet Detailed Modal Report */}
       {activeOutletDetails && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(24,20,14,0.42)", backdropFilter: "blur(4px)", display: "grid", placeItems: "center", padding: 20 }} className="print-exclude">
-          <section style={{ width: "min(1060px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 40px)", overflow: "hidden", fontFamily: F.body }}>
+        <div 
+          onClick={() => setActiveOutletDetails(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(24,20,14,0.42)", backdropFilter: "blur(4px)", display: "grid", placeItems: "center", padding: 20 }} 
+          className="print-exclude"
+        >
+          <section 
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "min(1060px, 100%)", borderRadius: 16, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 26px 70px rgba(24,20,14,0.24)", display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 40px)", overflow: "hidden", fontFamily: F.body }}
+          >
             {/* Header */}
             <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
               <div>
@@ -4444,6 +4606,8 @@ export default function Reports() {
                 <MetricCard label="Approval Rate" value={`${activeOutletRow?.acceptance_rate || 0}%`} detail={`${activeOutletRow?.reserved || 0} reserved`} tone="green" />
                 <MetricCard label="Total Guests" value={activeOutletRow?.guests || 0} tone="gold" />
                 <MetricCard label="Promo mentions" value={activeOutletRow?.promotion_mentions || 0} tone="slate" />
+                <MetricCard label="Confirmed Revenue" value={formatCurrency(activeOutletRow?.confirmed_revenue || 0)} tone="green" detail="approved bookings" />
+                <MetricCard label="Projected Revenue" value={formatCurrency(activeOutletRow?.projected_revenue || 0)} tone="gold" detail="pending bookings" />
               </div>
 
               {/* Charts Section */}
@@ -4501,27 +4665,38 @@ export default function Reports() {
                             iconType="plainline"
                             wrapperStyle={{ fontSize: 10, color: C.muted, paddingBottom: 8 }}
                             payload={[
-                              { value: "Audit transactions", type: "plainline", color: C.blue },
+                              { value: "Bookings", type: "plainline", color: C.blue },
+                              { value: "Audit transactions", type: "plainline", color: C.gold },
                               { value: "Approvals", type: "plainline", color: C.green },
                             ]}
                           />
                           <Area
                             type="monotone"
-                            dataKey="reservations"
+                            dataKey="bookings"
+                            legendType="none"
                             fill="url(#modalOutletReservationFill)"
-                            stroke="Monotone"
+                            stroke="none"
                             dot={false}
                             activeDot={false}
                           />
                           <Line
                             type="monotone"
-                            dataKey="reservations"
-                            name="Audit transactions"
+                            dataKey="bookings"
+                            name="Bookings"
                             stroke={C.blue}
                             strokeWidth={3}
                             dot={false}
                             activeDot={{ r: 5, strokeWidth: 2, stroke: C.surface, fill: C.blue }}
                             filter="url(#modalOutletLineShadow)"
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="audit_transactions"
+                            name="Audit transactions"
+                            stroke={C.gold}
+                            strokeWidth={2}
+                            dot={false}
+                            activeDot={{ r: 4, strokeWidth: 2, stroke: C.surface, fill: C.gold }}
                           />
                           <Line
                             type="monotone"
@@ -4600,16 +4775,7 @@ export default function Reports() {
               </SummaryPanel>
             </div>
 
-            {/* Footer */}
-            <div style={{ padding: "14px 24px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={() => setActiveOutletDetails(null)}
-                style={{ height: 38, padding: "0 22px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", cursor: "pointer" }}
-              >
-                Close Report
-              </button>
-            </div>
+
           </section>
         </div>
       )}
