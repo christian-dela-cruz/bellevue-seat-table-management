@@ -481,16 +481,24 @@ class AdminReservationController extends Controller
     public function destroy(string $id): JsonResponse
     {
         try {
+            $admin = $this->currentAdmin(request());
+            if (!$admin || ($admin['role'] ?? '') !== 'super_admin') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only Super Admins are authorized to delete reservations.'
+                ], 403);
+            }
+
             $reservation = Reservation::where('id', $id)->first();
             if (!$reservation) {
                 $reservation = Reservation::where('reference_code', $id)->firstOrFail();
             }
 
-            if (!$this->reservationService->canAccessReservation($this->currentAdmin(request()), $reservation)) {
+            if (!$this->reservationService->canAccessReservation($admin, $reservation)) {
                 return $this->scopeDeniedResponse();
             }
 
-            $this->reservationService->deleteReservation($reservation);
+            $this->reservationService->deleteReservation($reservation, $admin);
 
             broadcast(new ReservationDeleted($id))->toOthers();
             WebsocketBroadcaster::broadcast('reservations', 'ReservationDeleted', [

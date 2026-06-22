@@ -978,4 +978,55 @@ class AdminRejectReservationReasonTest extends TestCase
             'notes' => 'Cancellation email sent to guest.',
         ]);
     }
+
+    public function test_super_admin_can_delete_reservation_and_triggers_soft_delete(): void
+    {
+        $venue = $this->createVenue();
+        $reservation = $this->createReservation($venue);
+
+        $headers = $this->adminHeaders('super_admin');
+
+        $this->deleteJson("/api/admin/reservations/{$reservation->id}", [], $headers)
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('message', 'Reservation deleted successfully');
+
+        // Verify that the record is soft-deleted (deleted_at is set)
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+        ]);
+        
+        $freshReservation = Reservation::withTrashed()->find($reservation->id);
+        $this->assertNotNull($freshReservation->deleted_at);
+
+        // Verify that it is not returned by default query
+        $this->assertNull(Reservation::find($reservation->id));
+
+        // Verify that audit log (transaction) is created
+        $this->assertDatabaseHas('reservation_transactions', [
+            'reservation_id' => $reservation->id,
+            'action' => 'deleted',
+            'from_status' => $reservation->status,
+            'to_status' => 'deleted',
+        ]);
+    }
+
+    public function test_regular_admin_cannot_delete_reservation(): void
+    {
+        $venue = $this->createVenue();
+        $reservation = $this->createReservation($venue);
+
+        $headers = $this->adminHeaders('admin');
+
+        $this->deleteJson("/api/admin/reservations/{$reservation->id}", [], $headers)
+            ->assertStatus(403)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Only Super Admins are authorized to delete reservations.');
+
+        // Verify that the record is NOT deleted
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'deleted_at' => null,
+        ]);
+    }
 }

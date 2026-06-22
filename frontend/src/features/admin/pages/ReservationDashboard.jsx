@@ -1353,12 +1353,200 @@ function CancelConfirmModal({ reservation, onConfirm, onCancel, loading }) {
   );
 }
 
-function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCancel, onUpdate, onPricingUpdate, canManage, canAdjust, venueRows }) {
+// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
+function DeleteConfirmModal({ reservation, count, onConfirm, onCancel, loading }) {
+  const [confirmationInput, setConfirmationInput] = useState("");
+  const [showDoubleConfirm, setShowDoubleConfirm] = useState(false);
+  const [focused, setFocused] = useState(false);
+  
+  const isBulk = !!count && count > 1;
+  const expectedConfirmation = isBulk ? `DELETE ${count}` : "DELETE";
+  const isValid = confirmationInput.trim().toUpperCase() === expectedConfirmation;
+
+  const fmtDate=(d)=>{
+    if(!d)return"—";
+    try{return new Date(d+"T00:00:00").toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});}
+    catch{return d;}
+  };
+
+  if (showDoubleConfirm) {
+    return (
+      <div
+        style={{
+          position:"fixed",inset:0,
+          background:"rgba(0,0,0,0.65)",
+          zIndex:5200,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          padding:20,
+          backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",
+        }}
+        onClick={(e)=>{if(e.target===e.currentTarget&&!loading)onCancel();}}
+      >
+        <div style={{
+          background:C.surfaceBase,borderRadius:14,
+          width:"100%",maxWidth:460,
+          boxShadow:"0 20px 60px rgba(0,0,0,0.25)",
+          border:`1px solid ${C.redBorder}`,
+          fontFamily:F.body,
+          animation:"modalIn 0.20s cubic-bezier(0.16,1,0.3,1)",
+          overflow:"hidden",
+        }}>
+          <div style={{height:3,background:`linear-gradient(90deg,transparent 0%,${C.red} 30%,${C.red} 70%,transparent 100%)`}}/>
+          <div style={{background:C.headerGradient,padding:"18px 22px 16px",borderBottom:`1px solid ${C.divider}`}}>
+            <div style={{fontFamily:F.label,fontSize:9,letterSpacing:"0.22em",color:C.red,fontWeight:700,textTransform:"uppercase",marginBottom:5,opacity:0.9}}>
+              CRITICAL: Confirm Permanent Deletion
+            </div>
+            <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.textPrimary,lineHeight:1.2}}>
+              {isBulk ? `${count} Reservations` : (reservation.name || "Reservation")}
+            </div>
+          </div>
+          <div style={{padding:"20px 22px 24px"}}>
+            <div style={{padding:"12px 14px",borderRadius:8,marginBottom:16,background:C.redFaint,border:`1px solid ${C.redBorder}`,fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.65}}>
+              <strong>CRITICAL WARNING:</strong> This action cannot be undone. You are about to permanently delete this reservation from active records. This will instantly release all assigned seats/tables.
+            </div>
+            <div style={{marginBottom:18}}>
+              <span style={{display:"block",fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",color:C.textTertiary,marginBottom:7}}>
+                To proceed, type <strong>{expectedConfirmation}</strong> below:
+              </span>
+              <input
+                type="text"
+                value={confirmationInput}
+                onChange={(e) => setConfirmationInput(e.target.value)}
+                placeholder={`Type ${expectedConfirmation} to confirm...`}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                style={{
+                  width:"100%",padding:"10px 12px",boxSizing:"border-box",
+                  border:`1.5px solid ${focused ? C.redBorder : C.borderDefault}`,
+                  borderRadius:8,background:C.surfaceInput,
+                  fontFamily:F.body,fontSize:13,color:C.textPrimary,
+                  outline:"none",
+                  boxShadow:focused ? `0 0 0 3px ${C.redFaint}` : "none",
+                }}
+              />
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={() => setShowDoubleConfirm(false)} disabled={loading} style={{flex:1,padding:"11px",background:"transparent",border:`1px solid ${C.borderDefault}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textSecondary,cursor:loading?"not-allowed":"pointer"}}>
+                Go Back
+              </button>
+              <button
+                onClick={onConfirm}
+                disabled={loading || !isValid}
+                style={{
+                  flex:2,padding:"11px",
+                  background:loading||!isValid?"rgba(160,56,56,0.35)":C.red,
+                  border:"none",borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,
+                  letterSpacing:"0.14em",textTransform:"uppercase",color:"#fff",
+                  cursor:loading||!isValid?"not-allowed":"pointer",
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+                  transition:"all 0.18s",
+                }}
+              >
+                {loading ? <><Spinner/>Deleting...</> : "Confirm Deletion"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        position:"fixed",inset:0,
+        background:"rgba(0,0,0,0.60)",
+        zIndex:5100,
+        display:"flex",alignItems:"center",justifyContent:"center",
+        padding:20,
+        backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",
+      }}
+      onClick={(e)=>{if(e.target===e.currentTarget&&!loading)onCancel();}}
+    >
+      <div style={{
+        background:C.surfaceBase,borderRadius:14,
+        width:"100%",maxWidth:460,
+        boxShadow:"0 20px 60px rgba(0,0,0,0.20)",
+        border:`1px solid ${C.borderDefault}`,
+        fontFamily:F.body,
+        animation:"modalIn 0.20s cubic-bezier(0.16,1,0.3,1)",
+        overflow:"hidden",
+      }}>
+        <div style={{height:2,background:`linear-gradient(90deg,transparent 0%,${C.red}90 30%,${C.red}90 70%,transparent 100%)`}}/>
+        <div style={{background:C.headerGradient,padding:"18px 22px 16px",borderBottom:`1px solid ${C.divider}`}}>
+          <div style={{fontFamily:F.label,fontSize:9,letterSpacing:"0.22em",color:C.red,fontWeight:700,textTransform:"uppercase",marginBottom:5,opacity:0.85}}>
+            Delete {isBulk ? "Reservations" : "Reservation"}
+          </div>
+          <div style={{fontFamily:F.display,fontSize:17,fontWeight:600,color:C.textPrimary,lineHeight:1.2}}>
+            {isBulk ? `${count} Selected Reservations` : (reservation.name || "Reservation")}
+          </div>
+          {!isBulk && (
+            <div style={{fontFamily:F.body,fontSize:11,color:C.textSecondary,marginTop:4}}>
+              {reservation.reference_code} · {reservation.room || "—"}
+            </div>
+          )}
+        </div>
+        <div style={{padding:"20px 22px 24px"}}>
+          <div style={{padding:"10px 14px",borderRadius:8,marginBottom:14,background:C.redFaint,border:`1px solid ${C.redBorder}`,fontFamily:F.body,fontSize:12,color:C.textSecondary,lineHeight:1.65}}>
+            {isBulk 
+              ? "You are about to delete these selected reservations. This will release all assigned tables and seats." 
+              : "This will delete the reservation, release the selected seat/table, and record this action in the audit trail. This will NOT send a guest email."
+            }
+          </div>
+          
+          {!isBulk && (
+            <div style={{display:"grid",gap:8,marginBottom:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${C.divider}`}}>
+                <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Reference</span>
+                <span style={{fontFamily:F.body,fontSize:12.5,fontWeight:700,color:C.gold}}>{reservation.reference_code}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${C.divider}`}}>
+                <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Date</span>
+                <span style={{fontFamily:F.body,fontSize:12.5,fontWeight:500,color:C.textPrimary}}>{fmtDate(reservation.event_date)}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${C.divider}`}}>
+                <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Seat/Table</span>
+                <span style={{fontFamily:F.body,fontSize:12.5,fontWeight:500,color:C.textPrimary}}>
+                  {reservation.table_number && reservation.table_number !== "STANDALONE" ? `Table ${reservation.table_number}` : ""} 
+                  {reservation.seat_number ? ` (Seat ${reservation.seat_number})` : ""}
+                  {(!reservation.table_number && !reservation.seat_number) ? "—" : ""}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={onCancel} disabled={loading} style={{flex:1,padding:"11px",background:"transparent",border:`1px solid ${C.borderDefault}`,borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textSecondary,cursor:loading?"not-allowed":"pointer"}}>
+              Cancel
+            </button>
+            <button
+              onClick={() => setShowDoubleConfirm(true)}
+              disabled={loading}
+              style={{
+                flex:2,padding:"11px",
+                background:C.red,
+                border:"none",borderRadius:8,fontFamily:F.label,fontSize:10,fontWeight:700,
+                letterSpacing:"0.14em",textTransform:"uppercase",color:"#fff",
+                cursor:"pointer",
+                display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+              }}
+            >
+              Continue to Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCancel, onUpdate, onPricingUpdate, onDelete, canManage, canAdjust, canDelete, venueRows }) {
   const [actionLoading,setActionLoading]=useState(null);
   const [showRejectModal,setShowRejectModal]=useState(false);
   const [showRevertModal,setShowRevertModal]=useState(false);
   const [showApproveModal,setShowApproveModal]=useState(false);
   const [showCancelModal,setShowCancelModal]=useState(false);
+  const [showDeleteModal,setShowDeleteModal]=useState(false);
   const [isEditing,setIsEditing]=useState(false);
   const [showSaveModal,setShowSaveModal]=useState(false);
   const [editError,setEditError]=useState("");
@@ -1576,6 +1764,18 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
     setActionLoading(null);
     setShowCancelModal(false);
     onClose();
+  };
+
+  const handleDeleteConfirm=async()=>{
+    setActionLoading("delete");
+    const result = await onDelete(reservation);
+    setActionLoading(null);
+    if (result?.success) {
+      setShowDeleteModal(false);
+      onClose();
+    } else {
+      setShowDeleteModal(false);
+    }
   };
 
   const normalizeForm = () => ({
@@ -2455,6 +2655,25 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
                         {actionLoading==="cancel"?<><Spinner/>Cancelling...</>:"Cancel Reservation"}
                       </button>
                     )}
+                    {canDelete && (
+                      <button
+                        onClick={() => setShowDeleteModal(true)}
+                        disabled={!!actionLoading}
+                        style={{
+                          width:"100%",marginTop:8,padding:"9px",
+                          background:"transparent",border:`1px solid ${C.redBorder}`,
+                          borderRadius:8,fontFamily:F.label,fontSize:9,fontWeight:700,
+                          letterSpacing:"0.14em",textTransform:"uppercase",
+                          color:C.red,cursor:actionLoading?"not-allowed":"pointer",
+                          transition:"all 0.18s",
+                          display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+                        }}
+                        onMouseEnter={(e)=>{if(!actionLoading)e.currentTarget.style.background=C.redFaint;}}
+                        onMouseLeave={(e)=>{if(!actionLoading)e.currentTarget.style.background="transparent";}}
+                      >
+                        Delete Reservation
+                      </button>
+                    )}
                   </div>
 
                   {/* History & Tracking */}
@@ -2523,6 +2742,14 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
           onConfirm={handleCancelConfirm}
           onCancel={()=>setShowCancelModal(false)}
           loading={actionLoading==="cancel"}
+        />
+      )}
+      {showDeleteModal && (
+        <DeleteConfirmModal
+          reservation={reservation}
+          onConfirm={handleDeleteConfirm}
+          onCancel={()=>setShowDeleteModal(false)}
+          loading={actionLoading==="delete"}
         />
       )}
     </>
@@ -2683,7 +2910,6 @@ export default function ReservationDashboard() {
   const [toast,setToast]=useState(null);
   const [pagination,setPagination]=useState({currentPage:1,lastPage:1,totalItems:0,rowsPerPage:10});
   const [loading,setLoading]=useState(true);
-  const [selectedReservations,setSelectedReservations]=useState(new Set());
   const [searchFocused,setSearchFocused]=useState(false);
   const [venueRows,setVenueRows]=useState([]);
 
@@ -3064,56 +3290,28 @@ export default function ReservationDashboard() {
     }));
   };
 
-  const handleSelectReservation = (reservationId) => {
-    if (!canDeleteReservations) return;
-    setSelectedReservations(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(reservationId)) newSet.delete(reservationId);
-      else newSet.add(reservationId);
-      return newSet;
-    });
-  };
-
-  const handleDeleteSelected = async () => {
-    if (!canDeleteReservations) {
-      setToast({ message: "You are not authorized to delete reservations.", type: "error" });
-      return;
-    }
-    if (selectedReservations.size === 0) return;
-    if (!window.confirm(`Are you sure you want to delete ${selectedReservations.size} selected reservation(s)? This action cannot be undone.`)) return;
-
+  const handleDeleteSingle = async (reservation) => {
     try {
-      const toDelete = reservations.filter(r => selectedReservations.has(r.id));
-
-      const deletePromises = Array.from(selectedReservations).map(async (reservationId) => {
-        const token = localStorage.getItem("admin_token");
-        const response = await fetch(`${API_BASE_URL}/admin/reservations/${reservationId}`, {
-          method: "DELETE",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        return { id: reservationId, ok: response.ok };
+      const token = localStorage.getItem("admin_token");
+      const response = await fetch(`${API_BASE_URL}/admin/reservations/${reservation.db_id || reservation.id}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
-      const results = await Promise.all(deletePromises);
-      const successIds = new Set(results.filter(r => r.ok).map(r => r.id));
-      const failedCount = results.length - successIds.size;
-
-      if (successIds.size > 0) {
-        setReservations(prev => prev.filter(r => !successIds.has(r.id)));
-        toDelete
-          .filter(r => successIds.has(r.id))
-          .forEach(r => optimisticSeatUpdate(r, "available"));
-        setToast({ message: `Successfully deleted ${successIds.size} reservation(s)`, type: "success" });
+      if (response.ok) {
+        setReservations(prev => prev.filter(r => r.id !== reservation.id));
+        optimisticSeatUpdate(reservation, "available");
+        setToast({ message: "Reservation deleted successfully", type: "success" });
+        return { success: true };
+      } else {
+        const errData = await response.json();
+        setToast({ message: errData.message || "Failed to delete reservation", type: "error" });
+        return { success: false, message: errData.message };
       }
-
-      if (failedCount > 0) {
-        setToast({ message: `Failed to delete ${failedCount} reservation(s)`, type: "error" });
-      }
-
-      setSelectedReservations(new Set());
     } catch (error) {
-      console.error("[Dashboard] Failed to delete reservations:", error);
-      setToast({ message: "Failed to delete reservations", type: "error" });
+      console.error("[Dashboard] Failed to delete reservation:", error);
+      setToast({ message: "Failed to delete reservation", type: "error" });
+      return { success: false };
     }
   };
 
@@ -3572,16 +3770,7 @@ export default function ReservationDashboard() {
                       </span>
                     )}
 
-                    {canDeleteReservations && selectedReservations.size > 0 && (
-                      <button
-                        onClick={handleDeleteSelected}
-                        style={{padding:"4px 10px",background:C.red,color:"#fff",border:"none",borderRadius:6,fontFamily:F.label,fontSize:9,fontWeight:700,cursor:"pointer",transition:"all 0.15s",letterSpacing:"0.10em",textTransform:"uppercase"}}
-                        onMouseEnter={(e)=>{e.currentTarget.style.background="#C04040";}}
-                        onMouseLeave={(e)=>{e.currentTarget.style.background=C.red;}}
-                      >
-                        Delete ({selectedReservations.size})
-                      </button>
-                    )}
+
 
                     {filterStatus!=="ALL"&&(
                       <button onClick={()=>setFilterStatus("ALL")}
@@ -3597,18 +3786,7 @@ export default function ReservationDashboard() {
                     )}
                   </div>
 
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    {canDeleteReservations && <input
-                      type="checkbox"
-                      checked={selectedReservations.size === filteredReservations.length && filteredReservations.length > 0}
-                      onChange={(e) => {
-                        if (e.target.checked) setSelectedReservations(new Set(filteredReservations.map((r) => r.id)));
-                        else setSelectedReservations(new Set());
-                      }}
-                      style={{width:16,height:16,border:`1px solid ${C.borderDefault}`,borderRadius:4,backgroundColor:C.surfaceBase,cursor:"pointer"}}
-                    />}
-                    {canDeleteReservations && <span style={{fontSize:11,color:C.textSecondary,fontFamily:F.body}}>Select All</span>}
-                  </div>
+
                 </div>
 
                 <div style={{padding:isMobile?"12px 14px":"14px 22px",borderBottom:`1px solid ${C.divider}`,background:C.surfaceBase,display:"grid",gap:12}}>
@@ -3793,13 +3971,7 @@ export default function ReservationDashboard() {
                         >
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:isMobile?"wrap":"nowrap"}}>
                             <div style={{display:"flex",alignItems:"flex-start",gap:10,flex:1,minWidth:0}}>
-                              {canDeleteReservations && <input
-                                type="checkbox"
-                                checked={selectedReservations.has(reservation.id)}
-                                onChange={(e) => { e.stopPropagation(); handleSelectReservation(reservation.id); }}
-                                onClick={(e) => e.stopPropagation()}
-                                style={{width:16,height:16,border:`1px solid ${C.borderDefault}`,borderRadius:4,backgroundColor:C.surfaceBase,cursor:"pointer",marginTop:2,flexShrink:0}}
-                              />}
+
                               <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{setSelectedReservation(reservation);setShowModal(true);}}>
                                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
                                   <div style={{fontFamily:F.body,fontSize:14,fontWeight:600,color:C.textPrimary}}>{reservation.name||"-"}</div>
@@ -3949,11 +4121,15 @@ export default function ReservationDashboard() {
             onCancel={handleCancel}
             onUpdate={handleUpdateDetails}
             onPricingUpdate={handlePricingUpdate}
+            onDelete={handleDeleteSingle}
             canManage={canManageReservations}
             canAdjust={canAdjustReservations}
+            canDelete={canDeleteReservations}
             venueRows={venueRows}
           />
         )}
+
+
       </div>
     </>
   );

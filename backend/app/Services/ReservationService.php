@@ -1089,8 +1089,17 @@ class ReservationService
     /**
      * Delete a reservation and release seats
      */
-    public function deleteReservation(Reservation $reservation): bool
+    public function deleteReservation(Reservation $reservation, ?array $actor = null): bool
     {
+        $this->recordTransaction(
+            $reservation,
+            'deleted',
+            $reservation->status,
+            'deleted',
+            'Reservation deleted by super admin.',
+            [],
+            $actor
+        );
         return $reservation->delete();
     }
 
