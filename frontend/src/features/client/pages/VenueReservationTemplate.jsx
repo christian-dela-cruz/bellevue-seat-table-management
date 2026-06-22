@@ -1903,7 +1903,7 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                         </div>
                       </div>
                     ) : (
-                      <SeatMap tableData={tableData} editMode={false} mode={mode} selectedSeat={selectedSeat} onSeatClick={handleSeatClick} onTableClick={handleTableClick} windowWidth={windowSize.width} wing={WING} room={ROOM} />
+                      <SeatMap tableData={tableData} editMode={false} mode={mode} selectedSeat={selectedSeat} onSeatClick={handleSeatClick} onTableClick={handleTableClick} windowWidth={windowSize.width} wing={WING} room={ROOM} isDark={isDark} />
                     )}
                   </div>
                 </div>
@@ -1959,58 +1959,66 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
             </div>
           ) : (
             /* TWO-COLUMN PREMIUM DESKTOP LAYOUT WITH BALANCED MARGINS */
-            <div style={{ position: "relative", zIndex: 1, paddingTop: 96, paddingBottom: 48, boxSizing: "border-box" }}>
+            <div style={{ position: "relative", zIndex: 1, paddingTop: 88, paddingBottom: 24, boxSizing: "border-box" }}>
               <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
 
-                {/* Desktop top header utility row */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, animation: "fadeUp 0.28s ease" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <button onClick={() => navigate("/venues")} title="Back to venues"
-                        style={{ width: 36, height: 36, borderRadius: "50%", background: "transparent", border: `1px solid ${C.borderDefault}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.18s", padding: 0, flexShrink: 0 }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaint; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: C.textSecondary }}><path d="m15 18-6-6 6-6" /></svg>
-                      </button>
-                      <span style={{ display: "inline-block", width: 20, height: "1px", background: C.gold, opacity: 0.5 }} />
-                      <span style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.22em", color: C.gold, fontWeight: 700, textTransform: "uppercase" }}>Back to All Venues</span>
+                {/* Compact Unified Header Row */}
+                <div style={{ 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center", 
+                  marginBottom: 16, 
+                  animation: "fadeUp 0.28s ease",
+                  flexWrap: "wrap",
+                  gap: 16
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <button onClick={() => navigate("/venues")} title="Back to venues"
+                      style={{ width: 36, height: 36, borderRadius: "50%", background: "transparent", border: `1px solid ${C.borderDefault}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.18s", padding: 0, flexShrink: 0 }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.borderAccent; e.currentTarget.style.background = C.goldFaint; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = "transparent"; }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: C.textSecondary }}><path d="m15 18-6-6 6-6" /></svg>
+                    </button>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                        <span style={{ fontFamily: F.label, fontSize: 8.5, letterSpacing: "0.20em", color: C.gold, fontWeight: 700, textTransform: "uppercase" }}>{reservationLabel}</span>
+                        <span style={{ display: "inline-block", width: 4, height: 4, borderRadius: "50%", background: C.gold, opacity: 0.5 }} />
+                        <span style={{ fontFamily: F.label, fontSize: 8.5, letterSpacing: "0.15em", color: C.textSecondary, fontWeight: 700, textTransform: "uppercase" }}>{WING}</span>
+                      </div>
+                      <h1 style={{ fontFamily: F.display, fontSize: isTablet ? 24 : 28, fontWeight: 700, color: C.textPrimary, lineHeight: 1.1, margin: 0, letterSpacing: "0.01em" }}>
+                        {venueTitle}
+                      </h1>
+                    </div>
+                  </div>
+
+                  {/* Reserve Mode Switcher on the Right */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.18em", color: C.textSecondary, fontWeight: 700, textTransform: "uppercase" }}>Reserve:</span>
+                    <div style={{ display: "flex", alignItems: "center", background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)", borderRadius: 8, padding: 3, gap: 3, border: `1px solid ${C.borderDefault}` }}>
+                      {[["whole", venue?.type === "dining" ? "Whole Table" : "Whole Space"], ["individual", "Individual Seat"]].map(([val, label]) => (
+                        <button key={val}
+                          onClick={() => { setMode(val); if (val === "whole") setSelectedSeat(null); else setSelectedTable(null); }}
+                          style={{ padding: "6px 14px", border: "none", background: mode === val ? C.gold : "transparent", color: mode === val ? C.textOnAccent : C.textSecondary, cursor: "pointer", fontSize: 9.5, letterSpacing: "0.10em", fontWeight: 700, fontFamily: F.label, borderRadius: 6, transition: "all 0.18s", outline: "none", textTransform: "uppercase" }}
+                        >{label}</button>
+                      ))}
                     </div>
                   </div>
                 </div>
 
-                <div style={{ marginBottom: 28, animation: "fadeUp 0.32s ease" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                    <span style={{ display: "inline-block", width: 24, height: "1px", background: C.gold, opacity: 0.6 }} />
-                    <span style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.26em", color: C.gold, fontWeight: 700, textTransform: "uppercase" }}>{reservationLabel}</span>
-                  </div>
-                  <h1 style={{ fontFamily: F.display, fontSize: isTablet ? 34 : 42, fontWeight: 600, color: C.textPrimary, lineHeight: 1.1, margin: "0 0 10px", letterSpacing: "0.01em" }}>
-                    {venueTitle}
-                  </h1>
-                  <p style={{ fontFamily: F.body, fontSize: 13.5, color: C.textSecondary, margin: 0, lineHeight: 1.70, maxWidth: 640 }}>
+                {/* Subtext description in small compact size below */}
+                {venueDescription && (
+                  <p style={{ fontFamily: F.body, fontSize: 12.5, color: C.textSecondary, margin: "0 0 20px 50px", lineHeight: 1.6, maxWidth: 800, animation: "fadeUp 0.32s ease" }}>
                     {venueDescription}
                   </p>
-                </div>
+                )}
 
-                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28, flexWrap: "wrap", animation: "fadeUp 0.34s ease" }}>
-                  <span style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.22em", color: C.textSecondary, fontWeight: 700, textTransform: "uppercase", flexShrink: 0 }}>Reserve a:</span>
-                  <div style={{ display: "flex", alignItems: "center", background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)", borderRadius: 8, padding: 3, gap: 3, border: `1px solid ${C.borderDefault}` }}>
-                    {[["whole", venue?.type === "dining" ? "Whole Table" : "Whole Space"], ["individual", "Individual Seat"]].map(([val, label]) => (
-                      <button key={val}
-                        onClick={() => { setMode(val); if (val === "whole") setSelectedSeat(null); else setSelectedTable(null); }}
-                        style={{ padding: "8px 18px", border: "none", background: mode === val ? C.gold : "transparent", color: mode === val ? C.textOnAccent : C.textSecondary, cursor: "pointer", fontSize: 10, letterSpacing: "0.12em", fontWeight: 700, fontFamily: F.label, borderRadius: 6, transition: "all 0.18s", outline: "none", textTransform: "uppercase" }}
-                      >{label}</button>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: isTablet ? "1fr" : "minmax(0,1fr) 320px", gap: 28, alignItems: "start", animation: "fadeUp 0.36s ease" }}>
+                <div style={{ display: "grid", gridTemplateColumns: isTablet ? "1fr" : "minmax(0,1fr) 320px", gap: 24, alignItems: "start", animation: "fadeUp 0.36s ease" }}>
 
                   {/* Left Column: Intentionally framed SeatMap container card */}
-                  <div style={{ background: C.surfaceBase, border: `1.5px solid ${C.cardBorder}`, borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", height: isTablet ? 580 : 660, boxShadow: isDark ? "0 20px 50px rgba(0,0,0,0.40)" : "0 12px 36px rgba(78,60,32,0.07)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: `1px solid ${C.divider}`, background: C.surfaceRaised }}>
+                  <div style={{ background: C.surfaceBase, border: `1.5px solid ${C.cardBorder}`, borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", height: isTablet ? 500 : 540, boxShadow: isDark ? "0 20px 50px rgba(0,0,0,0.40)" : "0 12px 36px rgba(78,60,32,0.07)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: `1px solid ${C.divider}`, background: C.surfaceRaised }}>
                       <div>
-                        <div style={{ fontFamily: F.label, fontSize: 8, letterSpacing: "0.20em", color: C.gold, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>Interactive Space Planner</div>
-                        <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 600, color: C.textPrimary }}>{ROOM} ({WING})</div>
+                        <div style={{ fontFamily: F.body, fontSize: 11, color: C.textSecondary, fontWeight: 500 }}>Select a table or seat on the map below:</div>
                       </div>
 
                       {/* Deskop legend alignment */}
@@ -2042,14 +2050,14 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
                             </div>
                           </div>
                         ) : (
-                          <SeatMap tableData={tableData} editMode={false} mode={mode} selectedSeat={selectedSeat} onSeatClick={handleSeatClick} onTableClick={handleTableClick} windowWidth={windowSize.width} wing={WING} room={ROOM} />
+                          <SeatMap tableData={tableData} editMode={false} mode={mode} selectedSeat={selectedSeat} onSeatClick={handleSeatClick} onTableClick={handleTableClick} windowWidth={windowSize.width} wing={WING} room={ROOM} isDark={isDark} />
                         )}
                       </div>
                     </div>
                   </div>
 
                   {/* Right Column: Sticky Availability schedule, selection summary, and action sidebar */}
-                  <div style={{ display: "grid", gap: 16, position: isTablet ? "static" : "sticky", top: 80 }}>
+                  <div style={{ display: "grid", gap: 16, position: isTablet ? "static" : "sticky", top: 72 }}>
 
                     {/* Schedule controls */}
                     <ScheduleGate schedule={schedule} onChange={setSchedule} roomLabel={ROOM} isDark={isDark} guests={guests} locked={!!preselectedSchedule} />

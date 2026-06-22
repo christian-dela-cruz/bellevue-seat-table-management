@@ -4024,6 +4024,8 @@ export default function SeatMap({
   const adminScaleRef = useRef(1);
   const pendingCenterRef = useRef(false);
   const viewportClickStartRef = useRef({ x: 0, y: 0 });
+  const touchStartDist = useRef(null);
+  const touchStartZoom = useRef(null);
   const T = getClientTokens(isDark);
 
   useEffect(() => {
@@ -4057,18 +4059,59 @@ export default function SeatMap({
     };
   }, [canvasViewportRef.current]);
 
+  const centerMap = useCallback(() => {
+    if (viewportSize.width > 50 && viewportSize.height > 50) {
+      const padding = 28;
+      const fitZoomW = (viewportSize.width - padding * 2) / roomWidth;
+      const fitZoomH = (viewportSize.height - padding * 2) / roomHeight;
+      const zoomLevel = Math.min(fitZoomW, fitZoomH, 1.2);
+      const finalZoom = Math.max(0.15, zoomLevel);
+      const px = Math.round((viewportSize.width - roomWidth * finalZoom) / 2);
+      const py = Math.round((viewportSize.height - roomHeight * finalZoom) / 2);
+      setZoom(finalZoom);
+      setPan({ x: px, y: py });
+    }
+  }, [viewportSize, roomWidth, roomHeight]);
+
+  const handleViewportMouseDown = (e) => {
+    console.log('[SeatMap] handleViewportMouseDown button:', e.button, 'editMode:', editMode);
+    viewportClickStartRef.current = { x: e.clientX, y: e.clientY };
+    const isMiddleClick = e.button === 1;
+    const isSpaceDrag = spacePressed || tool === "pan";
+    const isClientLeftClickDrag = !editMode && e.button === 0;
+    console.log('[SeatMap] panning checks - middle:', isMiddleClick, 'space:', isSpaceDrag, 'clientLeft:', isClientLeftClickDrag);
+    if (isMiddleClick || isSpaceDrag || isClientLeftClickDrag) {
+      e.preventDefault();
+      setIsPanning(true);
+      panStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+      console.log('[SeatMap] Panning activated! panStart:', panStart.current);
+    }
+  };
+
+  const handleViewportTouchStart = (e) => {
+    if (e.touches.length === 1) {
+      setIsPanning(true);
+      const touch = e.touches[0];
+      panStart.current = { x: touch.clientX - pan.x, y: touch.clientY - pan.y };
+      touchStartDist.current = null;
+    } else if (e.touches.length === 2) {
+      setIsPanning(true);
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      touchStartDist.current = dist;
+      touchStartZoom.current = zoom;
+    }
+  };
+
   // Centering hook that triggers once viewport size is measured and valid
   useEffect(() => {
     if (!pendingCenterRef.current) return;
     if (viewportSize.width > 50 && viewportSize.height > 50) {
-      const zoomLevel = 0.60;
-      const px = Math.round((viewportSize.width - roomWidth * zoomLevel) / 2);
-      const py = Math.round((viewportSize.height - roomHeight * zoomLevel) / 2);
-      setZoom(zoomLevel);
-      setPan({ x: px, y: py });
+      centerMap();
       pendingCenterRef.current = false;
     }
-  }, [viewportSize, activeRoom, activeWing, tableData, roomWidth, roomHeight]);
+  }, [viewportSize, activeRoom, activeWing, tableData, roomWidth, roomHeight, centerMap]);
 
   useEffect(() => {
     let mounted = true;
@@ -5195,47 +5238,7 @@ export default function SeatMap({
     }
   };
 
-  // ─── CLIENT VIEW ──────────────────────────────────────────────────────────────
-  if (!editMode) {
-    const VIRTUAL_W = virtualWidth || roomWidth || 1200;
-    const VIRTUAL_H = virtualHeight || roomHeight || 800;
-    return (
-      <div style={{ width: "100%", height: "100%", background: canvasBgVisible ? hexToRgba(canvasBgColor, canvasBgOpacity) : "transparent", transition: "background 0.30s" }}>
-        <ScaledCanvas virtualW={VIRTUAL_W} virtualH={VIRTUAL_H} fitMode="contain" remountKey={0}>
-          <div style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: VIRTUAL_W,
-            height: VIRTUAL_H,
-            background: "#FFFFFF",
-            boxShadow: "0 12px 48px rgba(0,0,0,0.12)",
-            border: "1px dashed rgba(140, 107, 42, 0.25)",
-            overflow: "hidden"
-          }}>
-            {labels.map(l => <StaticLabel key={`${wing}-${room}-label-${l.id}`} item={l} T={T} />)}
-            {fixtures.map((f, index) => (
-              <FixtureNode key={`${wing}-${room}-fixture-${f.id}-${index}`} fixture={f}
-                editMode={false} isSelected={false} onSelect={() => { }} onDragStart={() => { }} isDragging={false} T={T} />
-            ))}
-            {standaloneSeats.map(s => (
-              <StandaloneSeat key={`${wing}-${room}-standalone-${s.id}`} seat={s}
-                editMode={false} isSelected={selectedSeat ? (selectedSeat.parentTableId ? selectedSeat.id === s.id && selectedSeat.parentTableId === "STANDALONE" : selectedSeat.id === s.id) : false}
-                isDragging={false} onDragStart={() => { }} onSelect={() => { }}
-                onSeatClick={mode === "individual" ? onSeatClick : undefined} T={T} />
-            ))}
-            {tables.map(t => (
-              <TableNode key={`${wing}-${room}-table-${t.id}`} table={t}
-                editMode={false} isTableSelected={highlightedTable ? highlightedTable.id === t.id : false}
-                selectedSeatId={selectedSeat ? (selectedSeat.parentTableId ? (selectedSeat.parentTableId === t.id ? selectedSeat.id : null) : selectedSeat.id) : null}
-                onSelectTable={handleTableSelect} onDragStart={() => { }} onResizeStart={() => { }}
-                onSeatClick={handleSeatClick} isDragging={false} T={T} wing={wing} room={room} mode={mode} />
-            ))}
-          </div>
-        </ScaledCanvas>
-      </div>
-    );
-  }
+
 
   // ─── ADMIN / EDIT VIEW ────────────────────────────────────────────────────────
   const isAddMode = tool === "addTable" || tool === "addSeat";
@@ -5276,7 +5279,7 @@ export default function SeatMap({
     const onWheel = (e) => {
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
-      const newZoom = Math.min(3.0, Math.max(0.4, zoom * zoomFactor));
+      const newZoom = Math.min(3.0, Math.max(0.15, zoom * zoomFactor));
       const rect = el.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
@@ -5290,21 +5293,12 @@ export default function SeatMap({
     return () => el.removeEventListener("wheel", onWheel);
   }, [zoom]);
 
-  // Mouse Drag Panning handling
-  const handleViewportMouseDown = (e) => {
-    viewportClickStartRef.current = { x: e.clientX, y: e.clientY };
-    const isMiddleClick = e.button === 1;
-    const isSpaceDrag = spacePressed || tool === "pan";
-    if (isMiddleClick || isSpaceDrag) {
-      e.preventDefault();
-      setIsPanning(true);
-      panStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-    }
-  };
+
 
   useEffect(() => {
     if (!isPanning) return;
     const handleMouseMove = (e) => {
+      console.log('[SeatMap] handleMouseMove panning to:', e.clientX - panStart.current.x, e.clientY - panStart.current.y);
       setPan({
         x: e.clientX - panStart.current.x,
         y: e.clientY - panStart.current.y
@@ -5313,13 +5307,62 @@ export default function SeatMap({
     const handleMouseUp = () => {
       setIsPanning(false);
     };
+
+    const handleTouchMove = (e) => {
+      // Prevent screen scrolling when dragging the canvas
+      if (e.cancelable) e.preventDefault();
+      
+      if (e.touches.length === 1 && touchStartDist.current === null) {
+        const touch = e.touches[0];
+        setPan({
+          x: touch.clientX - panStart.current.x,
+          y: touch.clientY - panStart.current.y
+        });
+      } else if (e.touches.length === 2 && touchStartDist.current !== null) {
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        const factor = dist / touchStartDist.current;
+        const newZoom = Math.min(3.0, Math.max(0.15, touchStartZoom.current * factor));
+        
+        const midX = (t1.clientX + t2.clientX) / 2;
+        const midY = (t1.clientY + t2.clientY) / 2;
+        const el = canvasViewportRef.current;
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const localX = midX - rect.left;
+          const localY = midY - rect.top;
+          setPan(prev => ({
+            x: localX - (localX - prev.x) * (newZoom / zoom),
+            y: localY - (localY - prev.y) * (newZoom / zoom)
+          }));
+        }
+        setZoom(newZoom);
+      }
+    };
+
+    const handleTouchEnd = (e) => {
+      if (e.touches.length === 0) {
+        setIsPanning(false);
+        touchStartDist.current = null;
+      } else if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        panStart.current = { x: touch.clientX - pan.x, y: touch.clientY - pan.y };
+        touchStartDist.current = null;
+      }
+    };
+
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd);
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [isPanning]);
+  }, [isPanning, zoom]);
 
   // Dot Grid pattern drawing
   const renderDotGrid = () => {
@@ -5403,6 +5446,121 @@ export default function SeatMap({
     if (!selectedTable) return;
     await handleSeatCountChange(selectedTable.id, newCount);
   };
+
+  // ─── CLIENT VIEW ──────────────────────────────────────────────────────────────
+  if (!editMode) {
+    return (
+      <div 
+        style={{ 
+          width: "100%", 
+          height: "100%", 
+          background: canvasBgVisible ? hexToRgba(canvasBgColor, canvasBgOpacity) : "transparent", 
+          transition: "background 0.30s",
+          position: "relative",
+          overflow: "hidden"
+        }}
+      >
+        {/* Scrollable Viewport Canvas Container */}
+        <div
+          ref={canvasViewportRef}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            overflow: "hidden",
+            cursor: isPanning ? "grabbing" : "grab",
+            userSelect: "none"
+          }}
+          onMouseDown={handleViewportMouseDown}
+          onTouchStart={handleViewportTouchStart}
+        >
+          {/* Inner zoomable/panable sheet canvas of roomWidth x roomHeight */}
+          <div
+            ref={canvasRef}
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: roomWidth,
+              height: roomHeight,
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: "top left",
+              background: "#FFFFFF",
+              boxShadow: "0 12px 48px rgba(0,0,0,0.12)",
+              transition: isPanning ? "none" : "transform 0.08s ease-out",
+              border: "1px dashed rgba(140, 107, 42, 0.25)"
+            }}
+          >
+            {labels.map(l => <StaticLabel key={`${wing}-${room}-label-${l.id}`} item={l} T={T} />)}
+            {fixtures.map((f, index) => (
+              <FixtureNode key={`${wing}-${room}-fixture-${f.id}-${index}`} fixture={f}
+                editMode={false} isSelected={false} onSelect={() => { }} onDragStart={() => { }} isDragging={false} T={T} />
+            ))}
+            {standaloneSeats.map(s => (
+              <StandaloneSeat key={`${wing}-${room}-standalone-${s.id}`} seat={s}
+                editMode={false} isSelected={selectedSeat ? (selectedSeat.parentTableId ? selectedSeat.id === s.id && selectedSeat.parentTableId === "STANDALONE" : selectedSeat.id === s.id) : false}
+                isDragging={false} onDragStart={() => { }} onSelect={() => { }}
+                onSeatClick={mode === "individual" ? onSeatClick : undefined} T={T} />
+            ))}
+            {tables.map(t => (
+              <TableNode key={`${wing}-${room}-table-${t.id}`} table={t}
+                editMode={false} isTableSelected={highlightedTable ? highlightedTable.id === t.id : false}
+                selectedSeatId={selectedSeat ? (selectedSeat.parentTableId ? (selectedSeat.parentTableId === t.id ? selectedSeat.id : null) : selectedSeat.id) : null}
+                onSelectTable={handleTableSelect} onDragStart={() => { }} onResizeStart={() => { }}
+                onSeatClick={handleSeatClick} isDragging={false} T={T} wing={wing} room={room} mode={mode} />
+            ))}
+          </div>
+        </div>
+
+        {/* Viewport Floating Zoom controls */}
+        <div style={{ 
+          position: "absolute", 
+          bottom: 12, 
+          right: 12, 
+          display: "flex", 
+          gap: 6, 
+          zIndex: 100, 
+          background: isDark ? "rgba(10, 9, 8, 0.88)" : "rgba(255, 255, 255, 0.90)", 
+          backdropFilter: "blur(6px)", 
+          WebkitBackdropFilter: "blur(6px)",
+          padding: "4px 8px", 
+          borderRadius: 8, 
+          border: `1px solid ${T.borderDefault}`, 
+          boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.40)" : "0 4px 16px rgba(0,0,0,0.06)", 
+          alignItems: "center" 
+        }}>
+          <button 
+            onClick={() => setZoom(prev => Math.min(3.0, prev + 0.1))} 
+            style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", color: T.textSecondary }} 
+            title="Zoom In"
+          >
+            <ZoomIn size={13} />
+          </button>
+          <div style={{ fontSize: 9, fontWeight: 700, fontFamily: "monospace", color: T.textPrimary, minWidth: 32, textAlign: "center" }}>
+            {Math.round(zoom * 100)}%
+          </div>
+          <button 
+            onClick={() => setZoom(prev => Math.max(0.15, prev - 0.1))} 
+            style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", color: T.textSecondary }} 
+            title="Zoom Out"
+          >
+            <ZoomOut size={13} />
+          </button>
+          <div style={{ width: 1, height: 14, background: T.divider }} />
+          <button 
+            onClick={centerMap} 
+            style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", color: T.textSecondary }} 
+            title="Reset Map to Fit Screen"
+          >
+            <RotateCcw size={11} style={{ marginRight: 2 }} />
+            <span style={{ fontSize: 8, fontWeight: 700, fontFamily: "inherit", color: T.gold, textTransform: "uppercase" }}>Fit</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", fontFamily: F, color: C.textPrimary, overflow: "hidden" }}>
@@ -5562,6 +5720,7 @@ export default function SeatMap({
                 userSelect: "none"
               }}
               onMouseDown={handleViewportMouseDown}
+              onTouchStart={handleViewportTouchStart}
               onClick={e => {
                 if (e.target === canvasViewportRef.current) {
                   const dx = Math.abs(e.clientX - viewportClickStartRef.current.x);
@@ -5932,12 +6091,12 @@ export default function SeatMap({
               <div style={{ fontSize: 9, fontWeight: 700, fontFamily: "monospace", color: C.textPrimary, minWidth: 32, textAlign: "center" }}>
                 {Math.round(zoom * 100)}%
               </div>
-              <button onClick={() => setZoom(prev => Math.max(0.4, prev - 0.1))} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", color: C.textSecondary }} title="Zoom Out">
+              <button onClick={() => setZoom(prev => Math.max(0.15, prev - 0.1))} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", color: C.textSecondary }} title="Zoom Out">
                 <ZoomOut size={13} />
               </button>
               <div style={{ width: 1, height: 14, background: C.divider }} />
-              <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 9, fontWeight: 700, color: C.gold, fontFamily: F, padding: "2px 4px" }} title="Reset Viewport Pan and Zoom">
-                1:1
+              <button onClick={centerMap} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 9, fontWeight: 700, color: C.gold, fontFamily: F, padding: "2px 4px" }} title="Reset Viewport Pan and Zoom">
+                Fit
               </button>
               <div style={{ width: 1, height: 14, background: C.divider }} />
               <button onClick={() => setSnapToGrid(prev => !prev)} style={{ background: snapToGrid ? `${C.gold}15` : "transparent", border: "none", borderRadius: 4, cursor: "pointer", padding: "4px 6px", color: snapToGrid ? C.gold : C.textSecondary, display: "flex", alignItems: "center" }} title="Toggle Snapping Grid">
