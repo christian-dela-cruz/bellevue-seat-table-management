@@ -168,3 +168,37 @@ Reservation confirmations and reminders are dispatched via email. You can captur
   MAIL_HOST=127.0.0.1
   MAIL_PORT=1025
   ```
+
+---
+
+### 5. 🕒 Scheduled Tasks & Database Backups
+
+The system automates recurring tasks and database backups using Laravel's task scheduler.
+
+#### 📅 Scheduler Configuration
+In local development, you can test scheduled tasks using the Artisan command:
+```bash
+php artisan schedule:work
+```
+
+In production, you must add the standard Cron entry to your server:
+```bash
+* * * * * cd /path-to-your-project/backend && php artisan schedule:run >> /dev/null 2>&1
+```
+
+The scheduled tasks configured in [routes/console.php](file:///c:/Users/Christian/seat-table-mngmnt/backend/routes/console.php) are:
+* **08:00 daily**: Dispatches reservation email reminders (`reservations:send-reminders`).
+* **01:00 daily**: Prunes expired database backups based on retention rules (`backup:clean`).
+* **02:00 daily**: Backs up the SQLite database and source files (`backup:run`).
+
+#### 💾 Database Backups
+Automated backups are managed via the standard `spatie/laravel-backup` package.
+
+* **Trigger Backup Manually**:
+  ```bash
+  cd backend
+  php artisan backup:run
+  ```
+* **Storage Location**: Backups are packaged into zip files and saved to the dedicated backups disk located at [backend/storage/app/backups/Laravel](file:///c:/Users/Christian/seat-table-mngmnt/backend/storage/app/backups/Laravel).
+* **Production Config**: To backup to cloud storage in production, update the destination disk inside [backup.php](file:///c:/Users/Christian/seat-table-mngmnt/backend/config/backup.php#L166-L168) (e.g., set `'disks'` to `'s3'`).
+
