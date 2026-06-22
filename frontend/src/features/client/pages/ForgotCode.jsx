@@ -7,82 +7,82 @@ import grandBallroomShowcase from "../../../assets/grand-ballroom-hires.jpg";
 import diningShowcase from "../../../assets/qsina-dining-hires.jpg";
 import towerShowcase from "../../../assets/tower-ballroom-hires.jpg";
 
-const ThemeContext = createContext({ isDark: true, toggle: () => {} });
+const ThemeContext = createContext({ isDark: true, toggle: () => { } });
 const useTheme = () => useContext(ThemeContext);
 
 function getTokens(isDark) {
   return isDark
     ? {
-        gold: "#C4A35A",
-        goldLight: "#D9BC7A",
-        goldDim: "#8C7240",
-        goldFaint: "rgba(196,163,90,0.08)",
-        goldFaintest: "rgba(196,163,90,0.04)",
-        pageBg: "#0A0908",
-        surfaceBase: "#111009",
-        surfaceRaised: "#161410",
-        surfaceInput: "rgba(255,255,255,0.04)",
-        borderFaint: "rgba(255,255,255,0.04)",
-        borderDefault: "rgba(255,255,255,0.08)",
-        borderStrong: "rgba(255,255,255,0.12)",
-        borderAccent: "rgba(196,163,90,0.30)",
-        textPrimary: "#EDE8DF",
-        textSecondary: "#8A8278",
-        textTertiary: "rgba(237,232,223,0.32)",
-        textOnAccent: "#0A0908",
-        red: "#B85C5C",
-        redFaint: "rgba(184,92,92,0.08)",
-        redBorder: "rgba(184,92,92,0.20)",
-        green: "#4A9E7E",
-        greenFaint: "rgba(74,158,126,0.08)",
-        greenBorder: "rgba(74,158,126,0.20)",
-        badgePending:  { bg: "rgba(196,163,90,0.10)",  color: "#C4A35A",  dot: "#C4A35A"  },
-        badgeApproved: { bg: "rgba(74,158,126,0.10)",  color: "#4A9E7E",  dot: "#4A9E7E"  },
-        badgeRejected: { bg: "rgba(184,92,92,0.10)",   color: "#B85C5C",  dot: "#B85C5C"  },
-        navBg: "rgba(10,9,8,0.95)",
-        navBorder: "rgba(196,163,90,0.12)",
-        divider: "rgba(255,255,255,0.05)",
-        inputFocusShadow: "0 0 0 3px rgba(196,163,90,0.12)",
-      }
+      gold: "#C4A35A",
+      goldLight: "#D9BC7A",
+      goldDim: "#8C7240",
+      goldFaint: "rgba(196,163,90,0.08)",
+      goldFaintest: "rgba(196,163,90,0.04)",
+      pageBg: "#0A0908",
+      surfaceBase: "#111009",
+      surfaceRaised: "#161410",
+      surfaceInput: "rgba(255,255,255,0.04)",
+      borderFaint: "rgba(255,255,255,0.04)",
+      borderDefault: "rgba(255,255,255,0.08)",
+      borderStrong: "rgba(255,255,255,0.12)",
+      borderAccent: "rgba(196,163,90,0.30)",
+      textPrimary: "#EDE8DF",
+      textSecondary: "#8A8278",
+      textTertiary: "rgba(237,232,223,0.32)",
+      textOnAccent: "#0A0908",
+      red: "#B85C5C",
+      redFaint: "rgba(184,92,92,0.08)",
+      redBorder: "rgba(184,92,92,0.20)",
+      green: "#4A9E7E",
+      greenFaint: "rgba(74,158,126,0.08)",
+      greenBorder: "rgba(74,158,126,0.20)",
+      badgePending: { bg: "rgba(196,163,90,0.10)", color: "#C4A35A", dot: "#C4A35A" },
+      badgeApproved: { bg: "rgba(74,158,126,0.10)", color: "#4A9E7E", dot: "#4A9E7E" },
+      badgeRejected: { bg: "rgba(184,92,92,0.10)", color: "#B85C5C", dot: "#B85C5C" },
+      navBg: "rgba(10,9,8,0.95)",
+      navBorder: "rgba(196,163,90,0.12)",
+      divider: "rgba(255,255,255,0.05)",
+      inputFocusShadow: "0 0 0 3px rgba(196,163,90,0.12)",
+    }
     : {
-        gold: "#8C6B2A",
-        goldLight: "#A07D38",
-        goldDim: "#6B5020",
-        goldFaint: "rgba(140,107,42,0.07)",
-        goldFaintest: "rgba(140,107,42,0.04)",
-        pageBg: "#F7F4EE",
-        surfaceBase: "#FFFFFF",
-        surfaceRaised: "#FAF8F4",
-        surfaceInput: "#FFFFFF",
-        borderFaint: "rgba(0,0,0,0.04)",
-        borderDefault: "rgba(0,0,0,0.08)",
-        borderStrong: "rgba(0,0,0,0.13)",
-        borderAccent: "rgba(140,107,42,0.28)",
-        textPrimary: "#18140E",
-        textSecondary: "#7A7060",
-        textTertiary: "rgba(24,20,14,0.35)",
-        textOnAccent: "#FFFFFF",
-        red: "#A03838",
-        redFaint: "rgba(160,56,56,0.07)",
-        redBorder: "rgba(160,56,56,0.18)",
-        green: "#2E7A5A",
-        greenFaint: "rgba(46,122,90,0.07)",
-        greenBorder: "rgba(46,122,90,0.18)",
-        badgePending:  { bg: "rgba(140,107,42,0.09)",  color: "#8C6B2A",  dot: "#8C6B2A"  },
-        badgeApproved: { bg: "rgba(46,122,90,0.09)",   color: "#2E7A5A",  dot: "#2E7A5A"  },
-        badgeRejected: { bg: "rgba(160,56,56,0.09)",   color: "#A03838",  dot: "#A03838"  },
-        navBg: "rgba(247,244,238,0.96)",
-        navBorder: "rgba(140,107,42,0.14)",
-        divider: "rgba(0,0,0,0.05)",
-        inputFocusShadow: "0 0 0 3px rgba(140,107,42,0.10)",
-      };
+      gold: "#8C6B2A",
+      goldLight: "#A07D38",
+      goldDim: "#6B5020",
+      goldFaint: "rgba(140,107,42,0.07)",
+      goldFaintest: "rgba(140,107,42,0.04)",
+      pageBg: "#F7F4EE",
+      surfaceBase: "#FFFFFF",
+      surfaceRaised: "#FAF8F4",
+      surfaceInput: "#FFFFFF",
+      borderFaint: "rgba(0,0,0,0.04)",
+      borderDefault: "rgba(0,0,0,0.08)",
+      borderStrong: "rgba(0,0,0,0.13)",
+      borderAccent: "rgba(140,107,42,0.28)",
+      textPrimary: "#18140E",
+      textSecondary: "#7A7060",
+      textTertiary: "rgba(24,20,14,0.35)",
+      textOnAccent: "#FFFFFF",
+      red: "#A03838",
+      redFaint: "rgba(160,56,56,0.07)",
+      redBorder: "rgba(160,56,56,0.18)",
+      green: "#2E7A5A",
+      greenFaint: "rgba(46,122,90,0.07)",
+      greenBorder: "rgba(46,122,90,0.18)",
+      badgePending: { bg: "rgba(140,107,42,0.09)", color: "#8C6B2A", dot: "#8C6B2A" },
+      badgeApproved: { bg: "rgba(46,122,90,0.09)", color: "#2E7A5A", dot: "#2E7A5A" },
+      badgeRejected: { bg: "rgba(160,56,56,0.09)", color: "#A03838", dot: "#A03838" },
+      navBg: "rgba(247,244,238,0.96)",
+      navBorder: "rgba(140,107,42,0.14)",
+      divider: "rgba(0,0,0,0.05)",
+      inputFocusShadow: "0 0 0 3px rgba(140,107,42,0.10)",
+    };
 }
 
 const F = {
   display: "'Inter', 'Helvetica Neue', Arial, sans-serif",
-  body:    "'Inter', 'Helvetica Neue', Arial, sans-serif",
-  mono:    "'Inter', 'Helvetica Neue', Arial, sans-serif",
-  label:   "'Inter', 'Helvetica Neue', Arial, sans-serif",
+  body: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+  mono: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+  label: "'Inter', 'Helvetica Neue', Arial, sans-serif",
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
@@ -98,11 +98,11 @@ function parseLookup(raw) {
 
 function extractList(data) {
   if (!data) return [];
-  if (Array.isArray(data))              return data;
-  if (Array.isArray(data.data))         return data.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.data)) return data.data;
   if (Array.isArray(data.reservations)) return data.reservations;
-  if (Array.isArray(data.results))      return data.results;
-  if (data.id || data.name)             return [data];
+  if (Array.isArray(data.results)) return data.results;
+  if (data.id || data.name) return [data];
   return [];
 }
 
@@ -111,12 +111,13 @@ function clientFilter(list, surname, phone) {
   return list
     .filter((r) => {
       const fullName = (r.name || r.full_name || r.fullName || "").trim();
-      const parts    = fullName.split(/\s+/);
+      const parts = fullName.split(/\s+/);
       const lastWord = parts[parts.length - 1]?.toLowerCase() || "";
+      const fullNameNormalized = fullName.toLowerCase().replace(/\s+/g, "");
       const nameMatch =
         lastWord === sLow ||
         parts.some((p) => p.toLowerCase().startsWith(sLow)) ||
-        fullName.toLowerCase().includes(sLow);
+        fullNameNormalized.includes(sLow);
       const ph = String(
         r.phone || r.contact_number || r.mobile || r.phone_number || ""
       ).replace(/\D/g, "");
@@ -124,12 +125,12 @@ function clientFilter(list, surname, phone) {
       return nameMatch && phoneMatch;
     })
     .sort((a, b) => {
-      const aName  = (a.name || a.full_name || a.fullName || "").trim();
-      const bName  = (b.name || b.full_name || b.fullName || "").trim();
+      const aName = (a.name || a.full_name || a.fullName || "").trim();
+      const bName = (b.name || b.full_name || b.fullName || "").trim();
       const aParts = aName.split(/\s+/);
       const bParts = bName.split(/\s+/);
-      const aLast  = aParts[aParts.length - 1]?.toLowerCase() || "";
-      const bLast  = bParts[bParts.length - 1]?.toLowerCase() || "";
+      const aLast = aParts[aParts.length - 1]?.toLowerCase() || "";
+      const bLast = bParts[bParts.length - 1]?.toLowerCase() || "";
       const aExact = aLast === sLow;
       const bExact = bLast === sLow;
       if (aExact && !bExact) return -1;
@@ -142,12 +143,12 @@ function clientFilter(list, surname, phone) {
 function StatusBadge({ status, C }) {
   const s = (status || "").toLowerCase();
   const cfg =
-    s === "pending"  ? { ...C.badgePending,  label: "Awaiting Confirmation" } :
-    s === "reserved" ? { ...C.badgeApproved, label: "Confirmed" } :
-    s === "approved" ? { ...C.badgeApproved, label: "Confirmed" } :
-    s === "rejected" ? { ...C.badgeRejected, label: "Cancelled" } :
-    s === "cancelled"? { ...C.badgeRejected, label: "Cancelled" } :
-    { bg: "rgba(130,130,130,0.10)", color: "#888", dot: "#888", label: status ?? "Unknown" };
+    s === "pending" ? { ...C.badgePending, label: "Awaiting Confirmation" } :
+      s === "reserved" ? { ...C.badgeApproved, label: "Confirmed" } :
+        s === "approved" ? { ...C.badgeApproved, label: "Confirmed" } :
+          s === "rejected" ? { ...C.badgeRejected, label: "Cancelled" } :
+            s === "cancelled" ? { ...C.badgeRejected, label: "Cancelled" } :
+              { bg: "rgba(130,130,130,0.10)", color: "#888", dot: "#888", label: status ?? "Unknown" };
 
   return (
     <span style={{
@@ -221,34 +222,34 @@ export default function ForgotCode() {
     try {
       const s = localStorage.getItem("bellevue-theme");
       if (s !== null) return s === "dark";
-    } catch {}
+    } catch { }
     return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true;
   });
 
   const toggleTheme = () =>
     setIsDark((p) => {
       const n = !p;
-      try { localStorage.setItem("bellevue-theme", n ? "dark" : "light"); } catch {}
+      try { localStorage.setItem("bellevue-theme", n ? "dark" : "light"); } catch { }
       return n;
     });
 
   const C = getTokens(isDark);
 
   const [combination, setCombination] = useState("");
-  const [searching,   setSearching]   = useState(false);
-  const [error,       setError]       = useState("");
-  const [results,     setResults]     = useState(null);
-  const [focused,     setFocused]     = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState("");
+  const [results, setResults] = useState(null);
+  const [focused, setFocused] = useState(false);
 
   // Email recovery tab state
-  const [activeTab,     setActiveTab]     = useState("combo");
+  const [activeTab, setActiveTab] = useState("email");
   const [recoveryEmail, setRecoveryEmail] = useState("");
-  const [emailSending,  setEmailSending]  = useState(false);
-  const [emailSent,     setEmailSent]     = useState(false);
-  const [emailFocused,  setEmailFocused]  = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
 
   // UX additions: copy state and email resend cooldown
-  const [copiedCode,    setCopiedCode]    = useState(null);
+  const [copiedCode, setCopiedCode] = useState(null);
   const [emailCooldown, setEmailCooldown] = useState(0);
 
   useEffect(() => {
@@ -270,7 +271,7 @@ export default function ForgotCode() {
   const fmtDate = (d) => {
     if (!d) return "—";
     const dateStr = String(d).split("T")[0]; // strip any time portion
-    const parts   = dateStr.split("-");
+    const parts = dateStr.split("-");
     if (parts.length !== 3) return d;
     const [year, month, day] = parts.map(Number);
     if (!year || !month || !day) return d;
@@ -283,7 +284,7 @@ export default function ForgotCode() {
     if (!t) return "—";
     if (typeof t === "string" && /AM|PM/i.test(t)) return t;
     const [h, m] = String(t).split(":");
-    const hr  = parseInt(h, 10) || 0;
+    const hr = parseInt(h, 10) || 0;
     const hr12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
     const min = m ? m.substring(0, 2) : "00";
     return `${hr12}:${min} ${hr < 12 ? "AM" : "PM"}`;
@@ -309,7 +310,7 @@ export default function ForgotCode() {
 
     const tryFetch = async (url) => {
       try {
-        const res  = await fetch(url, { headers: { Accept: "application/json" } });
+        const res = await fetch(url, { headers: { Accept: "application/json" } });
         const text = await res.text();
         let data;
         try { data = JSON.parse(text); } catch { return { ok: false }; }
@@ -471,9 +472,9 @@ export default function ForgotCode() {
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.background = isDark ? "rgba(17,16,9,0.58)" : "rgba(255,255,255,0.58)"; e.currentTarget.style.color = C.textSecondary; }}
           >
             {isDark ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
             ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
             )}
           </button>
         </div>
@@ -533,22 +534,26 @@ export default function ForgotCode() {
                   border: `1px solid ${C.borderDefault}`,
                 }}>
                   {[
-                    { key: "combo", label: "Combination Code", icon: (
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" strokeWidth="2.5"
-                        strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                    )},
-                    { key: "email", label: "Email Recovery", icon: (
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" strokeWidth="2.5"
-                        strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="4" width="20" height="16" rx="2" />
-                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                      </svg>
-                    )},
+                    {
+                      key: "email", label: "Email Recovery", icon: (
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="2.5"
+                          strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="4" width="20" height="16" rx="2" />
+                          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                        </svg>
+                      )
+                    },
+                    {
+                      key: "combo", label: "Combination Code", icon: (
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="2.5"
+                          strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                      )
+                    },
                   ].map(({ key, label, icon }) => (
                     <button
                       key={key}
@@ -605,7 +610,7 @@ export default function ForgotCode() {
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
                       stroke={C.gold} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8"  x2="12"   y2="12" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
                       <line x1="12" y1="16" x2="12.01" y2="16" />
                     </svg>
                   </div>
@@ -650,7 +655,7 @@ export default function ForgotCode() {
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                     onFocus={() => setFocused(true)}
                     onBlur={() => setFocused(false)}
-                    placeholder="e.g. abane35"
+                    placeholder="e.g. delacruz18"
                     autoComplete="off"
                     style={{
                       width: "100%", boxSizing: "border-box",
@@ -680,7 +685,7 @@ export default function ForgotCode() {
                       stroke="currentColor" strokeWidth="2"
                       strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8"  x2="12"    y2="12" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
                       <line x1="12" y1="16" x2="12.01" y2="16" />
                     </svg>
                     {error}
@@ -850,7 +855,7 @@ export default function ForgotCode() {
                       stroke="currentColor" strokeWidth="2"
                       strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8"  x2="12"    y2="12" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
                       <line x1="12" y1="16" x2="12.01" y2="16" />
                     </svg>
                     {error}
@@ -977,11 +982,11 @@ export default function ForgotCode() {
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.borderColor = C.borderAccent;
-                      e.currentTarget.style.color       = C.gold;
+                      e.currentTarget.style.color = C.gold;
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.borderColor = C.borderDefault;
-                      e.currentTarget.style.color       = C.textSecondary;
+                      e.currentTarget.style.color = C.textSecondary;
                     }}
                   >
                     Try Again
@@ -1049,15 +1054,15 @@ export default function ForgotCode() {
 
                 {/* Result cards */}
                 {results.map((r, idx) => {
-                  const refCode    = r.reference_code  || r.referenceCode  || r.id       || "—";
-                  const guestName  = r.name            || r.full_name      || r.fullName  || "—";
-                  const venueName  = r.room            || r.venue?.name    || r.venue_name || r.location || "No room assigned";
-                  const eventDate  = r.event_date      || r.eventDate      || r.date      || null;
-                  const eventTime  = r.event_time      || r.eventTime      || r.time      || null;
-                  const guestCount = r.guests_count    ?? r.guests         ?? r.pax       ?? null;
-                  const tableNum   = r.table_number    || r.table          || null;
-                  const seatNum    = r.seat_number     || r.seat           || null;
-                  const tableSeat  = [tableNum, seatNum].filter(Boolean).join(" / ") || "—";
+                  const refCode = r.reference_code || r.referenceCode || r.id || "—";
+                  const guestName = r.name || r.full_name || r.fullName || "—";
+                  const venueName = r.room || r.venue?.name || r.venue_name || r.location || "No room assigned";
+                  const eventDate = r.event_date || r.eventDate || r.date || null;
+                  const eventTime = r.event_time || r.eventTime || r.time || null;
+                  const guestCount = r.guests_count ?? r.guests ?? r.pax ?? null;
+                  const tableNum = r.table_number || r.table || null;
+                  const seatNum = r.seat_number || r.seat || null;
+                  const tableSeat = [tableNum, seatNum].filter(Boolean).join(" / ") || "—";
 
                   return (
                     <div
@@ -1173,9 +1178,9 @@ export default function ForgotCode() {
                           gap: "12px 20px",
                         }}>
                           {[
-                            ["Date",         fmtDate(eventDate)],
-                            ["Time",         fmtTime(eventTime)],
-                            ["Guests",       guestCount !== null ? `${guestCount} pax` : "—"],
+                            ["Date", fmtDate(eventDate)],
+                            ["Time", fmtTime(eventTime)],
+                            ["Guests", guestCount !== null ? `${guestCount} pax` : "—"],
                             ["Table / Seat", tableSeat],
                           ].map(([label, val]) => (
                             <div key={label}>
@@ -1215,11 +1220,11 @@ export default function ForgotCode() {
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.borderColor = C.borderAccent;
-                      e.currentTarget.style.color       = C.gold;
+                      e.currentTarget.style.color = C.gold;
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.borderColor = C.borderDefault;
-                      e.currentTarget.style.color       = C.textSecondary;
+                      e.currentTarget.style.color = C.textSecondary;
                     }}
                   >
                     Search Again
