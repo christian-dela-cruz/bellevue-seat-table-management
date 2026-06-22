@@ -5,7 +5,7 @@ import bellevueLogo from "../../../assets/bellevue-logo.png";
 import grandBallroomShowcase from "../../../assets/grand-ballroom-hires.jpg";
 import TowerroomShowcase from "../../../assets/tower-ballroom-hires.jpg";
 const F = {
-  display: "'Playfair Display','Georgia',serif",
+  display: "'Inter','Helvetica Neue',Arial,sans-serif",
   body: "'Inter','Helvetica Neue',Arial,sans-serif",
   mono: "'DM Mono','Courier New',monospace",
   label: "'Inter','Helvetica Neue',Arial,sans-serif",
