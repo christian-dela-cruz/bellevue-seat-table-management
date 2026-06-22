@@ -102,7 +102,7 @@ const FONTS = {
     label:   "'DM Sans', sans-serif",
   },
   dark: {
-    display: "'Playfair Display','Times New Roman',serif",
+    display: "'Inter','Helvetica Neue',Arial,sans-serif",
     body:    "'Inter','Helvetica Neue',Arial,sans-serif",
     label:   "'Inter','Helvetica Neue',Arial,sans-serif",
   },

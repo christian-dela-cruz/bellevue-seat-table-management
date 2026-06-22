@@ -80,7 +80,7 @@ function getTokens(isDark) {
   };
 }
 
-const DISPLAY = `'Playfair Display', 'Times New Roman', serif`;
+const DISPLAY = `'Inter', 'Helvetica Neue', Arial, sans-serif`;
 const BODY    = `'Inter', -apple-system, BlinkMacSystemFont, sans-serif`;
 const MONO    = `'JetBrains Mono', monospace`;
 const NAV_H   = 64;
@@ -152,7 +152,7 @@ const GLOBAL_CSS = `
   }
   .wing-card:hover .wing-chev { background: #C9A84C; border-color: #C9A84C; color: #18140E; transform: scale(1.08); }
   .wing-card .wing-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Inter', sans-serif;
     font-size: clamp(20px, 2.2vw, 34px);
     font-weight: 600; letter-spacing: -0.01em;
     transition: color .3s ease;

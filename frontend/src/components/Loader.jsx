@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import bellevueLogo from '../assets/bellevue-logo.png';
 import lottieData   from '../assets/loading.json';
 
-const DISPLAY = `'Playfair Display', 'Times New Roman', serif`;
+const DISPLAY = `'Inter', 'Helvetica Neue', Arial, sans-serif`;
 const BODY    = `'Inter', -apple-system, BlinkMacSystemFont, sans-serif`;
 
 const LOADER_CSS = `

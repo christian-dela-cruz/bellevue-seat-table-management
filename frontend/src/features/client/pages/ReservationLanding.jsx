@@ -1090,7 +1090,7 @@ export default function ReservationLanding() {
 
         .reservation-hero h1 {
           margin: 0;
-          font-family: "Playfair Display", Georgia, serif;
+          font-family: "Inter", sans-serif;
           font-size: clamp(46px, 4vw, 72px);
           line-height: 1;
           letter-spacing: 0;
@@ -1148,7 +1148,7 @@ export default function ReservationLanding() {
         }
 
         .reservation-hero__footer strong {
-          font-family: "Playfair Display", Georgia, serif;
+          font-family: "Inter", sans-serif;
           font-size: clamp(18px, 1.35vw, 23px);
           font-weight: 620;
           color: #fffaf1;
@@ -1224,7 +1224,7 @@ export default function ReservationLanding() {
 
         .reservation-section__header h2 {
           margin: 0;
-          font-family: "Playfair Display", Georgia, serif;
+          font-family: "Inter", sans-serif;
           font-size: clamp(26px, 2.1vw, 40px);
           line-height: 1.03;
           font-weight: 620;
@@ -1443,7 +1443,7 @@ export default function ReservationLanding() {
         }
 
         .reservation-card__logo span {
-          font-family: "Playfair Display", Georgia, serif;
+          font-family: "Inter", sans-serif;
           font-size: clamp(13px, 0.95vw, 17px);
           font-weight: 620;
           line-height: 1.02;

@@ -2,7 +2,7 @@ import { useState } from "react";
 import mainWingImg  from "../assets/main-wing.jpeg";
 import towerWingImg from "../assets/tower-wing.jpeg";
 
-const DISPLAY = `'Playfair Display', 'Times New Roman', serif`;
+const DISPLAY = `'Inter', 'Helvetica Neue', Arial, sans-serif`;
 const BODY    = `'Inter', -apple-system, BlinkMacSystemFont, sans-serif`;
 const MONO    = `'JetBrains Mono', monospace`;
 

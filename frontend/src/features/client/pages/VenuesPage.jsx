@@ -85,7 +85,7 @@ function getTokens(isDark) {
 }
 
 const FONT    = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const DISPLAY = "'Playfair Display', 'Times New Roman', serif";
+const DISPLAY = "'Inter', 'Helvetica Neue', Arial, sans-serif";
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 

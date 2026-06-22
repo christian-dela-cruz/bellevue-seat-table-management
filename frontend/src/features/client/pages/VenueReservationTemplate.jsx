@@ -142,7 +142,7 @@ function getTokens(isDark) {
 }
 
 const F = {
-  display: "'Playfair Display','Georgia',serif",
+  display: "'Inter','Helvetica Neue',Arial,sans-serif",
   body: "'Inter','Helvetica Neue',Arial,sans-serif",
   mono: "'DM Mono','Courier New',monospace",
   label: "'Inter','Helvetica Neue',Arial,sans-serif",
