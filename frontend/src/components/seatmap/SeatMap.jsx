@@ -2884,11 +2884,21 @@ function InspectorPanel({
             <div style={{ display: "flex", gap: 8 }}>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Width</span>
-                {iInput({ type: "number", value: roomWidth, onChange: e => setRoomWidth(Number(e.target.value)) })}
+                {iInput({
+                  type: "number",
+                  value: roomWidth,
+                  onChange: e => setRoomWidth(e.target.value === "" ? "" : Number(e.target.value)),
+                  onBlur: e => { if (e.target.value === "") setRoomWidth(1200); }
+                })}
               </div>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Height</span>
-                {iInput({ type: "number", value: roomHeight, onChange: e => setRoomHeight(Number(e.target.value)) })}
+                {iInput({
+                  type: "number",
+                  value: roomHeight,
+                  onChange: e => setRoomHeight(e.target.value === "" ? "" : Number(e.target.value)),
+                  onBlur: e => { if (e.target.value === "") setRoomHeight(800); }
+                })}
               </div>
             </div>
           </div>
@@ -3463,29 +3473,56 @@ function InspectorPanel({
             <div style={{ display: "flex", gap: 8 }}>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Width (cm)</span>
-                {iInput({ type: "number", value: Math.round(selectedTable.width || 110), onChange: e => updateTable("width", Number(e.target.value)) })}
+                {iInput({
+                  type: "number",
+                  value: typeof selectedTable.width === "number" ? Math.round(selectedTable.width) : selectedTable.width,
+                  onChange: e => updateTable("width", e.target.value === "" ? "" : Number(e.target.value)),
+                  onBlur: e => { if (e.target.value === "") updateTable("width", 110); }
+                })}
               </div>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Height (cm)</span>
-                {iInput({ type: "number", value: Math.round(selectedTable.height || 70), onChange: e => updateTable("height", Number(e.target.value)) })}
+                {iInput({
+                  type: "number",
+                  value: typeof selectedTable.height === "number" ? Math.round(selectedTable.height) : selectedTable.height,
+                  onChange: e => updateTable("height", e.target.value === "" ? "" : Number(e.target.value)),
+                  onBlur: e => { if (e.target.value === "") updateTable("height", 70); }
+                })}
               </div>
             </div>
 
             <div style={{ display: "flex", gap: 8 }}>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Position X</span>
-                {iInput({ type: "number", value: Math.round(selectedTable.x || 0), onChange: e => updateTable("x", Number(e.target.value)) })}
+                {iInput({
+                  type: "number",
+                  value: typeof selectedTable.x === "number" ? Math.round(selectedTable.x) : selectedTable.x,
+                  onChange: e => updateTable("x", e.target.value === "" ? "" : Number(e.target.value)),
+                  onBlur: e => { if (e.target.value === "") updateTable("x", 0); }
+                })}
               </div>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Position Y</span>
-                {iInput({ type: "number", value: Math.round(selectedTable.y || 0), onChange: e => updateTable("y", Number(e.target.value)) })}
+                {iInput({
+                  type: "number",
+                  value: typeof selectedTable.y === "number" ? Math.round(selectedTable.y) : selectedTable.y,
+                  onChange: e => updateTable("y", e.target.value === "" ? "" : Number(e.target.value)),
+                  onBlur: e => { if (e.target.value === "") updateTable("y", 0); }
+                })}
               </div>
             </div>
 
             <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Rotation (°)</span>
-                {iInput({ type: "number", min: 0, max: 360, value: selectedTable.editor?.rotation || 0, onChange: e => updateTable("editor", { ...(selectedTable.editor || {}), rotation: Number(e.target.value) }) })}
+                {iInput({
+                  type: "number",
+                  min: 0,
+                  max: 360,
+                  value: typeof selectedTable.editor?.rotation === "number" ? selectedTable.editor.rotation : (selectedTable.editor?.rotation ?? ""),
+                  onChange: e => updateTable("editor", { ...(selectedTable.editor || {}), rotation: e.target.value === "" ? "" : Number(e.target.value) }),
+                  onBlur: e => { if (e.target.value === "") updateTable("editor", { ...(selectedTable.editor || {}), rotation: 0 }); }
+                })}
               </div>
               <button onClick={() => updateTable("editor", { ...(selectedTable.editor || {}), locked: !selectedTable.editor?.locked })} style={{ marginTop: 14, flex: 1, padding: "8px 0", background: selectedTable.editor?.locked ? `${C.gold}15` : "transparent", border: `1px solid ${selectedTable.editor?.locked ? C.gold : C.borderDefault}`, color: selectedTable.editor?.locked ? C.gold : C.textSecondary, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
                 {selectedTable.editor?.locked ? <Lock size={11} /> : <Unlock size={11} />}
@@ -3496,11 +3533,21 @@ function InspectorPanel({
             <div style={{ display: "flex", gap: 8 }}>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Min Capacity</span>
-                {iInput({ type: "number", value: selectedTable.editor?.min_capacity ?? 0, onChange: e => updateTable("editor", { ...(selectedTable.editor || {}), min_capacity: Number(e.target.value) }) })}
+                {iInput({
+                  type: "number",
+                  value: typeof selectedTable.editor?.min_capacity === "number" ? selectedTable.editor.min_capacity : (selectedTable.editor?.min_capacity ?? ""),
+                  onChange: e => updateTable("editor", { ...(selectedTable.editor || {}), min_capacity: e.target.value === "" ? "" : Number(e.target.value) }),
+                  onBlur: e => { if (e.target.value === "") updateTable("editor", { ...(selectedTable.editor || {}), min_capacity: 0 }); }
+                })}
               </div>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Max Capacity</span>
-                {iInput({ type: "number", value: selectedTable.editor?.max_capacity ?? seatCount, onChange: e => updateTable("editor", { ...(selectedTable.editor || {}), max_capacity: Number(e.target.value) }) })}
+                {iInput({
+                  type: "number",
+                  value: typeof selectedTable.editor?.max_capacity === "number" ? selectedTable.editor.max_capacity : (selectedTable.editor?.max_capacity ?? ""),
+                  onChange: e => updateTable("editor", { ...(selectedTable.editor || {}), max_capacity: e.target.value === "" ? "" : Number(e.target.value) }),
+                  onBlur: e => { if (e.target.value === "") updateTable("editor", { ...(selectedTable.editor || {}), max_capacity: seatCount }); }
+                })}
               </div>
             </div>
 
@@ -3580,15 +3627,31 @@ function InspectorPanel({
             {iLabel("Seat Number")}
             {iInput({
               type: "number",
-              value: selectedSeatObj.num,
-              onChange: e => setTables(p => p.map(t =>
-                t.id !== selected.tableId ? t : {
-                  ...t,
-                  seats: (t.seats || []).map(s =>
-                    s.id === selected.seatId ? { ...s, num: Number(e.target.value) } : s
-                  ),
+              value: typeof selectedSeatObj.num === "number" ? selectedSeatObj.num : "",
+              onChange: e => {
+                const val = e.target.value === "" ? "" : Number(e.target.value);
+                setTables(p => p.map(t =>
+                  t.id !== selected.tableId ? t : {
+                    ...t,
+                    seats: (t.seats || []).map(s =>
+                      s.id === selected.seatId ? { ...s, num: val } : s
+                    ),
+                  }
+                ));
+              },
+              onBlur: e => {
+                if (e.target.value === "") {
+                  const idx = tables.find(t => t.id === selected.tableId)?.seats?.findIndex(s => s.id === selected.seatId) ?? 0;
+                  setTables(p => p.map(t =>
+                    t.id !== selected.tableId ? t : {
+                      ...t,
+                      seats: (t.seats || []).map(s =>
+                        s.id === selected.seatId ? { ...s, num: idx + 1 } : s
+                      ),
+                    }
+                  ));
                 }
-              )),
+              }
             })}
           </div>
 
@@ -3642,8 +3705,16 @@ function InspectorPanel({
             {iLabel("Seat Number")}
             {iInput({
               type: "number",
-              value: selectedStandaloneSeatObj.num,
-              onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, num: Number(e.target.value) } : s))
+              value: typeof selectedStandaloneSeatObj.num === "number" ? selectedStandaloneSeatObj.num : "",
+              onChange: e => {
+                const val = e.target.value === "" ? "" : Number(e.target.value);
+                setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, num: val } : s));
+              },
+              onBlur: e => {
+                if (e.target.value === "") {
+                  setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, num: 1 } : s));
+                }
+              }
             })}
           </div>
 
@@ -3665,29 +3736,56 @@ function InspectorPanel({
           <div style={{ display: "flex", gap: 8 }}>
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 8, color: C.textTertiary }}>Width (cm)</span>
-              {iInput({ type: "number", value: Math.round(selectedStandaloneSeatObj.editor?.width || 38), onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), width: Number(e.target.value) } } : s)) })}
+              {iInput({
+                type: "number",
+                value: typeof selectedStandaloneSeatObj.editor?.width === "number" ? Math.round(selectedStandaloneSeatObj.editor.width) : (selectedStandaloneSeatObj.editor?.width ?? ""),
+                onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), width: e.target.value === "" ? "" : Number(e.target.value) } } : s)),
+                onBlur: e => { if (e.target.value === "") setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), width: 38 } } : s)); }
+              })}
             </div>
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 8, color: C.textTertiary }}>Height (cm)</span>
-              {iInput({ type: "number", value: Math.round(selectedStandaloneSeatObj.editor?.height || 38), onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), height: Number(e.target.value) } } : s)) })}
+              {iInput({
+                type: "number",
+                value: typeof selectedStandaloneSeatObj.editor?.height === "number" ? Math.round(selectedStandaloneSeatObj.editor.height) : (selectedStandaloneSeatObj.editor?.height ?? ""),
+                onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), height: e.target.value === "" ? "" : Number(e.target.value) } } : s)),
+                onBlur: e => { if (e.target.value === "") setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), height: 38 } } : s)); }
+              })}
             </div>
           </div>
 
           <div style={{ display: "flex", gap: 8 }}>
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 8, color: C.textTertiary }}>Position X</span>
-              {iInput({ type: "number", value: Math.round(selectedStandaloneSeatObj.x || 0), onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, x: Number(e.target.value) } : s)) })}
+              {iInput({
+                type: "number",
+                value: typeof selectedStandaloneSeatObj.x === "number" ? Math.round(selectedStandaloneSeatObj.x) : selectedStandaloneSeatObj.x,
+                onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, x: e.target.value === "" ? "" : Number(e.target.value) } : s)),
+                onBlur: e => { if (e.target.value === "") setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, x: 0 } : s)); }
+              })}
             </div>
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 8, color: C.textTertiary }}>Position Y</span>
-              {iInput({ type: "number", value: Math.round(selectedStandaloneSeatObj.y || 0), onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, y: Number(e.target.value) } : s)) })}
+              {iInput({
+                type: "number",
+                value: typeof selectedStandaloneSeatObj.y === "number" ? Math.round(selectedStandaloneSeatObj.y) : selectedStandaloneSeatObj.y,
+                onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, y: e.target.value === "" ? "" : Number(e.target.value) } : s)),
+                onBlur: e => { if (e.target.value === "") setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, y: 0 } : s)); }
+              })}
             </div>
           </div>
 
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 8, color: C.textTertiary }}>Rotation (°)</span>
-              {iInput({ type: "number", min: 0, max: 360, value: selectedStandaloneSeatObj.editor?.rotation || 0, onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), rotation: Number(e.target.value) } } : s)) })}
+              {iInput({
+                type: "number",
+                min: 0,
+                max: 360,
+                value: typeof selectedStandaloneSeatObj.editor?.rotation === "number" ? selectedStandaloneSeatObj.editor.rotation : (selectedStandaloneSeatObj.editor?.rotation ?? ""),
+                onChange: e => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), rotation: e.target.value === "" ? "" : Number(e.target.value) } } : s)),
+                onBlur: e => { if (e.target.value === "") setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), rotation: 0 } } : s)); }
+              })}
             </div>
             <button onClick={() => setStandaloneSeats(p => p.map(s => s.id === selected.standaloneSeatId ? { ...s, editor: { ...(s.editor || {}), locked: !s.editor?.locked } } : s))} style={{ marginTop: 14, flex: 1, padding: "8px 0", background: selectedStandaloneSeatObj.editor?.locked ? `${C.gold}15` : "transparent", border: `1px solid ${selectedStandaloneSeatObj.editor?.locked ? C.gold : C.borderDefault}`, color: selectedStandaloneSeatObj.editor?.locked ? C.gold : C.textSecondary, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
               {selectedStandaloneSeatObj.editor?.locked ? <Lock size={11} /> : <Unlock size={11} />}
@@ -3760,29 +3858,56 @@ function InspectorPanel({
             <div style={{ display: "flex", gap: 8 }}>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Width (cm)</span>
-                {iInput({ type: "number", value: Math.round(selectedFixtureObj.width || 80), onChange: e => updateFixture("width", Number(e.target.value)) })}
+                {iInput({
+                  type: "number",
+                  value: typeof selectedFixtureObj.width === "number" ? Math.round(selectedFixtureObj.width) : selectedFixtureObj.width,
+                  onChange: e => updateFixture("width", e.target.value === "" ? "" : Number(e.target.value)),
+                  onBlur: e => { if (e.target.value === "") updateFixture("width", 80); }
+                })}
               </div>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Height (cm)</span>
-                {iInput({ type: "number", value: Math.round(selectedFixtureObj.height || 60), onChange: e => updateFixture("height", Number(e.target.value)) })}
+                {iInput({
+                  type: "number",
+                  value: typeof selectedFixtureObj.height === "number" ? Math.round(selectedFixtureObj.height) : selectedFixtureObj.height,
+                  onChange: e => updateFixture("height", e.target.value === "" ? "" : Number(e.target.value)),
+                  onBlur: e => { if (e.target.value === "") updateFixture("height", 60); }
+                })}
               </div>
             </div>
 
             <div style={{ display: "flex", gap: 8 }}>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Position X</span>
-                {iInput({ type: "number", value: Math.round(selectedFixtureObj.x || 0), onChange: e => updateFixture("x", Number(e.target.value)) })}
+                {iInput({
+                  type: "number",
+                  value: typeof selectedFixtureObj.x === "number" ? Math.round(selectedFixtureObj.x) : selectedFixtureObj.x,
+                  onChange: e => updateFixture("x", e.target.value === "" ? "" : Number(e.target.value)),
+                  onBlur: e => { if (e.target.value === "") updateFixture("x", 0); }
+                })}
               </div>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Position Y</span>
-                {iInput({ type: "number", value: Math.round(selectedFixtureObj.y || 0), onChange: e => updateFixture("y", Number(e.target.value)) })}
+                {iInput({
+                  type: "number",
+                  value: typeof selectedFixtureObj.y === "number" ? Math.round(selectedFixtureObj.y) : selectedFixtureObj.y,
+                  onChange: e => updateFixture("y", e.target.value === "" ? "" : Number(e.target.value)),
+                  onBlur: e => { if (e.target.value === "") updateFixture("y", 0); }
+                })}
               </div>
             </div>
 
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 8, color: C.textTertiary }}>Rotation (°)</span>
-                {iInput({ type: "number", min: 0, max: 360, value: selectedFixtureObj.editor?.rotation || 0, onChange: e => updateFixture("editor", { ...(selectedFixtureObj.editor || {}), rotation: Number(e.target.value) }) })}
+                {iInput({
+                  type: "number",
+                  min: 0,
+                  max: 360,
+                  value: typeof selectedFixtureObj.editor?.rotation === "number" ? selectedFixtureObj.editor.rotation : (selectedFixtureObj.editor?.rotation ?? ""),
+                  onChange: e => updateFixture("editor", { ...(selectedFixtureObj.editor || {}), rotation: e.target.value === "" ? "" : Number(e.target.value) }),
+                  onBlur: e => { if (e.target.value === "") updateFixture("editor", { ...(selectedFixtureObj.editor || {}), rotation: 0 }); }
+                })}
               </div>
               <button onClick={() => updateFixture("editor", { ...(selectedFixtureObj.editor || {}), locked: !selectedFixtureObj.editor?.locked })} style={{ marginTop: 14, flex: 1, padding: "8px 0", background: selectedFixtureObj.editor?.locked ? `${C.gold}15` : "transparent", border: `1px solid ${selectedFixtureObj.editor?.locked ? C.gold : C.borderDefault}`, color: selectedFixtureObj.editor?.locked ? C.gold : C.textSecondary, borderRadius: 6, fontFamily: F, fontWeight: 700, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
                 {selectedFixtureObj.editor?.locked ? <Lock size={11} /> : <Unlock size={11} />}
@@ -3854,11 +3979,21 @@ function InspectorPanel({
           <div style={{ display: "flex", gap: 8 }}>
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 8, color: C.textTertiary }}>Position X</span>
-              {iInput({ type: "number", value: Math.round(selectedLabelObj.x || 0), onChange: e => updateLabel("x", Number(e.target.value)) })}
+              {iInput({
+                type: "number",
+                value: typeof selectedLabelObj.x === "number" ? Math.round(selectedLabelObj.x) : selectedLabelObj.x,
+                onChange: e => updateLabel("x", e.target.value === "" ? "" : Number(e.target.value)),
+                onBlur: e => { if (e.target.value === "") updateLabel("x", 0); }
+              })}
             </div>
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: 8, color: C.textTertiary }}>Position Y</span>
-              {iInput({ type: "number", value: Math.round(selectedLabelObj.y || 0), onChange: e => updateLabel("y", Number(e.target.value)) })}
+              {iInput({
+                type: "number",
+                value: typeof selectedLabelObj.y === "number" ? Math.round(selectedLabelObj.y) : selectedLabelObj.y,
+                onChange: e => updateLabel("y", e.target.value === "" ? "" : Number(e.target.value)),
+                onBlur: e => { if (e.target.value === "") updateLabel("y", 0); }
+              })}
             </div>
           </div>
 
@@ -4062,12 +4197,12 @@ export default function SeatMap({
   const centerMap = useCallback(() => {
     if (viewportSize.width > 50 && viewportSize.height > 50) {
       const padding = 28;
-      const fitZoomW = (viewportSize.width - padding * 2) / roomWidth;
-      const fitZoomH = (viewportSize.height - padding * 2) / roomHeight;
+      const fitZoomW = (viewportSize.width - padding * 2) / (roomWidth || 1200);
+      const fitZoomH = (viewportSize.height - padding * 2) / (roomHeight || 800);
       const zoomLevel = Math.min(fitZoomW, fitZoomH, 1.2);
       const finalZoom = Math.max(0.15, zoomLevel);
-      const px = Math.round((viewportSize.width - roomWidth * finalZoom) / 2);
-      const py = Math.round((viewportSize.height - roomHeight * finalZoom) / 2);
+      const px = Math.round((viewportSize.width - (roomWidth || 1200) * finalZoom) / 2);
+      const py = Math.round((viewportSize.height - (roomHeight || 800) * finalZoom) / 2);
       setZoom(finalZoom);
       setPan({ x: px, y: py });
     }
@@ -4516,8 +4651,8 @@ export default function SeatMap({
           : d.type === "label"
             ? 30
             : 38;
-      newX = Math.max(0, Math.min(roomWidth - w, newX));
-      newY = Math.max(0, Math.min(roomHeight - h, newY));
+      newX = Math.max(0, Math.min((roomWidth || 1200) - w, newX));
+      newY = Math.max(0, Math.min((roomHeight || 800) - h, newY));
 
       // Alignment Guides calculations
       let alignX = null;
@@ -4688,8 +4823,8 @@ export default function SeatMap({
       ...fixture,
       id,
       label: `${fixture.label || fixture.id} (Copy)`,
-      x: Math.min(roomWidth - (fixture.width || 80), fixture.x + 30),
-      y: Math.min(roomHeight - (fixture.height || 60), fixture.y + 30),
+      x: Math.min((roomWidth || 1200) - (fixture.width || 80), fixture.x + 30),
+      y: Math.min((roomHeight || 800) - (fixture.height || 60), fixture.y + 30),
       editor: {
         ...(fixture.editor || {}),
         rotation: fixture.editor?.rotation || 0,
@@ -4780,8 +4915,8 @@ export default function SeatMap({
       cy = cy - h / 2;
 
       // Bound within the room canvas boundary limits
-      cx = Math.max(0, Math.min(roomWidth - w, cx));
-      cy = Math.max(0, Math.min(roomHeight - h, cy));
+      cx = Math.max(0, Math.min((roomWidth || 1200) - w, cx));
+      cy = Math.max(0, Math.min((roomHeight || 800) - h, cy));
 
       // Snap to grid if grid alignment is enabled
       if (snapToGrid) {
@@ -5005,8 +5140,8 @@ export default function SeatMap({
       ...table,
       id,
       label: `${table.label || table.id} (Copy)`,
-      x: Math.min(roomWidth - (table.width || 110), table.x + 30),
-      y: Math.min(roomHeight - (table.height || 70), table.y + 30),
+      x: Math.min((roomWidth || 1200) - (table.width || 110), table.x + 30),
+      y: Math.min((roomHeight || 800) - (table.height || 70), table.y + 30),
       seats: (table.seats || []).map((s, idx) => ({
         id: `${id}-S${idx + 1}-${Date.now()}`,
         num: idx + 1,
@@ -5053,8 +5188,8 @@ export default function SeatMap({
       num: n,
       label: `S${n}`,
       status: "available",
-      x: Math.min(roomWidth - 38, seat.x + 20),
-      y: Math.min(roomHeight - 38, seat.y + 20),
+      x: Math.min((roomWidth || 1200) - 38, seat.x + 20),
+      y: Math.min((roomHeight || 800) - 38, seat.y + 20),
       editor: {
         locked: false
       }
@@ -5070,8 +5205,8 @@ export default function SeatMap({
       labels,
       standaloneSeats,
       editor: {
-        room_width_cm: roomWidth,
-        room_height_cm: roomHeight,
+        room_width_cm: roomWidth || 1200,
+        room_height_cm: roomHeight || 800,
         grid_cm: gridSize,
         snap_enabled: snapToGrid,
         show_grid: showGrid,
@@ -5389,7 +5524,7 @@ export default function SeatMap({
     if (showRulers === false) return null;
     const ticks = [];
     const step = 10; // cm
-    for (let x = 0; x <= roomWidth; x += step) {
+    for (let x = 0; x <= (roomWidth || 1200); x += step) {
       const isMajor = x % 50 === 0;
       ticks.push(
         <g key={`h-tick-${x}`} transform={`translate(${x}, 0)`}>
@@ -5418,7 +5553,7 @@ export default function SeatMap({
     if (showRulers === false) return null;
     const ticks = [];
     const step = 10; // cm
-    for (let y = 0; y <= roomHeight; y += step) {
+    for (let y = 0; y <= (roomHeight || 800); y += step) {
       const isMajor = y % 50 === 0;
       ticks.push(
         <g key={`v-tick-${y}`} transform={`translate(0, ${y})`}>
@@ -5483,8 +5618,8 @@ export default function SeatMap({
               position: "absolute",
               left: 0,
               top: 0,
-              width: roomWidth,
-              height: roomHeight,
+              width: roomWidth || 1200,
+              height: roomHeight || 800,
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "top left",
               background: "#FFFFFF",
@@ -5738,8 +5873,8 @@ export default function SeatMap({
                   position: "absolute",
                   left: 0,
                   top: 0,
-                  width: roomWidth,
-                  height: roomHeight,
+                  width: roomWidth || 1200,
+                  height: roomHeight || 800,
                   transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                   transformOrigin: "top left",
                   background: "#FFFFFF", // Canvas sheet stays clean white
@@ -5756,12 +5891,12 @@ export default function SeatMap({
 
                 {/* Alignment Guides */}
                 {alignGuides && (
-                  <svg style={{ position: "absolute", inset: 0, width: roomWidth, height: roomHeight, pointerEvents: "none", zIndex: 20 }}>
+                  <svg style={{ position: "absolute", inset: 0, width: roomWidth || 1200, height: roomHeight || 800, pointerEvents: "none", zIndex: 20 }}>
                     {alignGuides.x !== null && (
-                      <line x1={alignGuides.x} y1={0} x2={alignGuides.x} y2={roomHeight} stroke={C.gold} strokeWidth={1} strokeDasharray="3 3" />
+                      <line x1={alignGuides.x} y1={0} x2={alignGuides.x} y2={roomHeight || 800} stroke={C.gold} strokeWidth={1} strokeDasharray="3 3" />
                     )}
                     {alignGuides.y !== null && (
-                      <line x1={0} y1={alignGuides.y} x2={roomWidth} y2={alignGuides.y} stroke={C.gold} strokeWidth={1} strokeDasharray="3 3" />
+                      <line x1={0} y1={alignGuides.y} x2={roomWidth || 1200} y2={alignGuides.y} stroke={C.gold} strokeWidth={1} strokeDasharray="3 3" />
                     )}
                   </svg>
                 )}
@@ -5770,7 +5905,7 @@ export default function SeatMap({
                 {tables.map(t => {
                   const tw = t.width || 110;
                   const th = t.height || 70;
-                  const outOfBounds = t.x < 0 || t.y < 0 || t.x + tw > roomWidth || t.y + th > roomHeight;
+                  const outOfBounds = t.x < 0 || t.y < 0 || t.x + tw > (roomWidth || 1200) || t.y + th > (roomHeight || 800);
                   if (!outOfBounds) return null;
                   return (
                     <div key={`out-bounds-${t.id}`} style={{ position: "absolute", left: t.x, top: t.y, width: tw, height: th, border: `2.5px dashed ${C.red}`, borderRadius: 8, pointerEvents: "none", zIndex: 1, animation: "sm-spin 4s linear infinite", opacity: 0.25 }} />
@@ -5779,7 +5914,7 @@ export default function SeatMap({
                 {fixtures.map(f => {
                   const fw = f.width || 80;
                   const fh = f.height || 60;
-                  const outOfBounds = f.x < 0 || f.y < 0 || f.x + fw > roomWidth || f.y + fh > roomHeight;
+                  const outOfBounds = f.x < 0 || f.y < 0 || f.x + fw > (roomWidth || 1200) || f.y + fh > (roomHeight || 800);
                   if (!outOfBounds) return null;
                   return (
                     <div key={`out-bounds-${f.id}`} style={{ position: "absolute", left: f.x, top: f.y, width: fw, height: fh, border: `2.5px dashed ${C.red}`, borderRadius: 4, pointerEvents: "none", zIndex: 1, animation: "sm-spin 4s linear infinite", opacity: 0.25 }} />
