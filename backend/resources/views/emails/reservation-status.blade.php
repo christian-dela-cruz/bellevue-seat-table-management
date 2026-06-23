@@ -47,7 +47,7 @@
         }
 
         .header-title {
-            font-family: 'Didot', 'Bodoni MT', 'Times New Roman', serif;
+            font-family: 'Inter', 'Bodoni MT', 'Times New Roman', serif;
             font-size: 24px;
             font-weight: 400;
             color: #1A1A1A;

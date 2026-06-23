@@ -349,13 +349,13 @@ export default function RolesAndPermissions() {
     setEditingPermissions(prev => {
       let next = prev.includes(slug) ? prev.filter(p => p !== slug) : [...prev, slug];
       
-      if (!prev.includes(slug) && slug !== "view_admin_panel") {
-        if (!next.includes("view_admin_panel")) {
-          next.push("view_admin_panel");
+      if (!prev.includes(slug) && slug !== "view_admin") {
+        if (!next.includes("view_admin")) {
+          next.push("view_admin");
         }
       }
       
-      if (prev.includes(slug) && slug === "view_admin_panel") {
+      if (prev.includes(slug) && slug === "view_admin") {
         if (next.length > 0) {
           setToast({ type: "error", message: "Cannot disable View Admin Panel while other permissions are active." });
           return prev;
@@ -379,15 +379,15 @@ export default function RolesAndPermissions() {
       let next = [...prev];
       if (activeInGroup.length === groupSlugs.length) {
         next = next.filter(s => !groupSlugs.includes(s));
-        if (groupSlugs.includes("view_admin_panel") && next.length > 0) {
+        if (groupSlugs.includes("view_admin") && next.length > 0) {
            setToast({ type: "error", message: "Cannot disable View Admin Panel while permissions in other groups are active." });
            return prev;
         }
       } else {
         const missing = groupSlugs.filter(s => !prev.includes(s));
         next = [...next, ...missing];
-        if (!next.includes("view_admin_panel") && groupSlugs.length > 0) {
-          next.push("view_admin_panel");
+        if (!next.includes("view_admin") && groupSlugs.length > 0) {
+          next.push("view_admin");
         }
       }
       

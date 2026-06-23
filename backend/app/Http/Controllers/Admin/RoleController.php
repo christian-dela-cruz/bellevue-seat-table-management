@@ -90,7 +90,11 @@ class RoleController extends Controller
 
         if (isset($validated['permissions'])) {
             if ($role->is_system) {
-                return response()->json(['message' => 'Cannot modify permissions of system roles'], 403);
+                $actor = $request->attributes->get('admin');
+                $isSuperAdmin = $actor && (($actor['role'] ?? null) === 'super_admin' || ($actor['id'] ?? null) === 0);
+                if (!$isSuperAdmin || $role->slug === 'super_admin') {
+                    return response()->json(['message' => 'Cannot modify permissions of system roles'], 403);
+                }
             }
             $permissionIds = Permission::whereIn('slug', $validated['permissions'])->pluck('id')->toArray();
             $role->permissions()->sync($permissionIds);

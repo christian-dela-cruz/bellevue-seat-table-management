@@ -317,11 +317,11 @@ export default function AccountWizard({
     updateEffectiveAccess(prev => {
       let next = grantAccess ? [...prev, perm.slug] : prev.filter(s => s !== perm.slug);
       
-      if (grantAccess && perm.slug !== "view_admin_panel") {
-        if (!next.includes("view_admin_panel")) next.push("view_admin_panel");
+      if (grantAccess && perm.slug !== "view_admin") {
+        if (!next.includes("view_admin")) next.push("view_admin");
       }
       
-      if (!grantAccess && perm.slug === "view_admin_panel") {
+      if (!grantAccess && perm.slug === "view_admin") {
         if (next.length > 0) return prev;
       }
       return next;
@@ -335,12 +335,12 @@ export default function AccountWizard({
       
       if (isGroupOn) {
         next = next.filter(s => !groupSlugs.includes(s));
-        if (groupSlugs.includes("view_admin_panel") && next.length > 0) return prev;
+        if (groupSlugs.includes("view_admin") && next.length > 0) return prev;
       } else {
         const missing = groupSlugs.filter(s => !prev.includes(s));
         next = [...next, ...missing];
-        if (!next.includes("view_admin_panel") && groupSlugs.length > 0) {
-          next.push("view_admin_panel");
+        if (!next.includes("view_admin") && groupSlugs.length > 0) {
+          next.push("view_admin");
         }
       }
       return next;
