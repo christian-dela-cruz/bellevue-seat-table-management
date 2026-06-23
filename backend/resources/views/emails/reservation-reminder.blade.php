@@ -4,57 +4,60 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reservation Reminder - The Bellevue Manila</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+         * {
+             box-sizing: border-box;
+             margin: 0;
+             padding: 0;
+         }
 
-        body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            background: #F4F4F4;
-            color: #333333;
-            line-height: 1.6;
-            padding: 40px 20px;
-            -webkit-font-smoothing: antialiased;
-        }
+         body {
+             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+             background: #F4F4F4;
+             color: #333333;
+             line-height: 1.6;
+             padding: 40px 20px;
+             -webkit-font-smoothing: antialiased;
+         }
 
-        .email-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: #FFFFFF;
-            border-top: 4px solid #8C6B2A;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-            overflow: hidden;
-        }
+         .email-container {
+             max-width: 600px;
+             margin: 0 auto;
+             background: #FFFFFF;
+             border-top: 4px solid #8C6B2A;
+             box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+             overflow: hidden;
+         }
 
-        /* ── Header ── */
-        .header {
-            background: #FFFFFF;
-            padding: 40px 40px 20px;
-            text-align: center;
-            border-bottom: 1px solid #EEEEEE;
-        }
+         /* ── Header ── */
+         .header {
+             background: #FFFFFF;
+             padding: 40px 40px 20px;
+             text-align: center;
+             border-bottom: 1px solid #EEEEEE;
+         }
 
-        .logo {
-            max-width: 140px;
-            height: auto;
-            margin-bottom: 20px;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-        }
+         .logo {
+             max-width: 140px;
+             height: auto;
+             margin-bottom: 20px;
+             display: block;
+             margin-left: auto;
+             margin-right: auto;
+         }
 
-        .header-title {
-            font-family: 'Didot', 'Bodoni MT', 'Times New Roman', serif;
-            font-size: 24px;
-            font-weight: 400;
-            color: #1A1A1A;
-            letter-spacing: 0.5px;
-            margin: 0;
-            text-transform: uppercase;
-        }
+         .header-title {
+             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+             font-size: 24px;
+             font-weight: 400;
+             color: #1A1A1A;
+             letter-spacing: 0.5px;
+             margin: 0;
+             text-transform: uppercase;
+         }
 
         /* ── Body ── */
         .content {
