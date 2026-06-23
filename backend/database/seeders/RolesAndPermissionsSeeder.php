@@ -23,6 +23,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'publish_seat_maps' => 'Publish Seat Maps',
             'restore_seat_maps' => 'Restore Seat Map Versions',
             'manage_venues' => 'Manage Venues',
+            'manage_events' => 'Manage Events',
             'view_outlet_reports' => 'View Outlet Reports',
             'view_global_reports' => 'View Global Reports',
             'view_transactions' => 'View Transactions',
@@ -54,7 +55,7 @@ class RolesAndPermissionsSeeder extends Seeder
                     'view_admin', 'manage_reservations', 'adjust_reservation_details',
                     'delete_reservations', 'acknowledge_notifications', 'manage_seat_maps',
                     'publish_seat_maps', 'restore_seat_maps',
-                    'manage_venues', 'view_outlet_reports', 'view_transactions', 'manage_accounts'
+                    'manage_venues', 'manage_events', 'view_outlet_reports', 'view_transactions', 'manage_accounts'
                 ],
             ],
             'fb_director' => [

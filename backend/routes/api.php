@@ -68,11 +68,11 @@ Route::prefix('admin/notifications')->group(function () {
 
 // Admin Event routes
 Route::prefix('admin/events')->group(function () {
-    Route::get('/', [EventController::class, 'index'])->middleware(AdminAccess::class . ':manage_venues');
-    Route::post('/', [EventController::class, 'store'])->middleware(AdminAccess::class . ':manage_venues');
-    Route::put('/{event}', [EventController::class, 'update'])->middleware(AdminAccess::class . ':manage_venues');
-    Route::post('/{event}/image', [EventController::class, 'uploadImage'])->middleware(AdminAccess::class . ':manage_venues');
-    Route::delete('/{event}', [EventController::class, 'destroy'])->middleware(AdminAccess::class . ':manage_venues');
+    Route::get('/', [EventController::class, 'index'])->middleware(AdminAccess::class . ':manage_events');
+    Route::post('/', [EventController::class, 'store'])->middleware(AdminAccess::class . ':manage_events');
+    Route::put('/{event}', [EventController::class, 'update'])->middleware(AdminAccess::class . ':manage_events');
+    Route::post('/{event}/image', [EventController::class, 'uploadImage'])->middleware(AdminAccess::class . ':manage_events');
+    Route::delete('/{event}', [EventController::class, 'destroy'])->middleware(AdminAccess::class . ':manage_events');
 });
 
 // Public Event routes

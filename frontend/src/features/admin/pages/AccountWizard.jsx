@@ -108,7 +108,7 @@ const OPERATIONAL_GROUPS = [
   {
     title: "Venue & Outlet Operations",
     description: "Controls outlet, venue, room, and subroom setup used by guest-facing reservation flows.",
-    permissions: ["Manage Venues"]
+    permissions: ["Manage Venues", "Manage Events"]
   },
   {
     title: "Reports & Analytics",
@@ -132,6 +132,7 @@ const PERMISSION_DESCRIPTIONS = {
   "Publish Seat Maps": "Allows the account to publish approved seat map layouts so they become visible on the guest reservation pages.",
   "Restore Seat Map Versions": "Allows the account to restore a previous published seat map version when a layout needs to be rolled back.",
   "Manage Venues": "Allows the account to create, edit, archive, activate, deactivate, and configure outlets, venues, rooms, and subrooms.",
+  "Manage Events": "Allows the account to create, edit, publish, and configure special events, including event dates, banners, and capacities.",
   "View Outlet Reports": "Allows the account to view outlet and venue performance reports, reservation summaries, and operational dashboards.",
   "View Global Reports": "Allows the account to view system-wide reports across all outlets, venues, and reservation areas.",
   "View Transactions": "Allows the account to view transaction-related records, reservation activity, and operational logs where available.",

@@ -176,7 +176,7 @@ export default function AppRoutes() {
         <Route
           path="/admin/events"
           element={
-            <RequireAdminAuth permission="manage_venues">
+            <RequireAdminAuth permission="manage_events">
               <EventManagement />
             </RequireAdminAuth>
           }
