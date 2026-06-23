@@ -93,6 +93,8 @@ class ClientReservationController extends Controller
 
         $this->resolveAndMergeVenueId($request);
 
+        $today = now()->timezone('Asia/Manila')->format('Y-m-d');
+
         $validated = $request->validate([
             'name'             => 'required|string|max:255',
             'email'            => 'required|email|max:255',
@@ -102,7 +104,7 @@ class ClientReservationController extends Controller
             'table_number'     => 'nullable|string|max:255',
             'seat_number'      => 'nullable|string|max:255',
             'guests_count'     => 'required|integer|min:1',
-            'event_date'       => 'required|date',
+            'event_date'       => 'required|date|after_or_equal:' . $today,
             'event_time'       => 'required|string|max:50',
             'event_area'       => 'nullable|string|max:255',
             'setup_tables'     => 'nullable|integer|min:0|max:999',
@@ -360,6 +362,8 @@ class ClientReservationController extends Controller
     {
         $reservation = Reservation::findOrFail($id);
         
+        $today = now()->timezone('Asia/Manila')->format('Y-m-d');
+
         $validated = $request->validate([
             'name'             => 'sometimes|required|string|max:255',
             'email'            => 'sometimes|required|email|max:255',
@@ -370,9 +374,9 @@ class ClientReservationController extends Controller
             'guests_count'     => 'sometimes|required|integer|min:1',
             'guests'           => 'sometimes|required|integer|min:1',
             'number_of_guests' => 'sometimes|required|integer|min:1',
-            'event_date'       => 'sometimes|required|date',
-            'eventDate'        => 'sometimes|required|date',
-            'date'             => 'sometimes|required|date',
+            'event_date'       => 'sometimes|required|date|after_or_equal:' . $today,
+            'eventDate'        => 'sometimes|required|date|after_or_equal:' . $today,
+            'date'             => 'sometimes|required|date|after_or_equal:' . $today,
             'event_time'       => 'sometimes|required|string|max:50',
             'eventTime'        => 'sometimes|required|string|max:50',
             'time'             => 'sometimes|required|string|max:50',

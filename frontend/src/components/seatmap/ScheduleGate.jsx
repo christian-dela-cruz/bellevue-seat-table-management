@@ -30,8 +30,13 @@ export function saveSeatmapSchedule(schedule = {}) {
 
 export function normalizeSchedule(schedule = {}) {
   const stored = loadSeatmapSchedule();
+  const today = new Date().toISOString().split("T")[0];
+  let eventDate = schedule.eventDate || stored.eventDate || "";
+  if (eventDate && eventDate < today) {
+    eventDate = "";
+  }
   return {
-    eventDate: schedule.eventDate || stored.eventDate || "",
+    eventDate,
     eventTime: schedule.eventTime || stored.eventTime || DEFAULT_EVENT_TIME,
   };
 }
@@ -191,6 +196,7 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
             <input
               type="date"
               value={draftSchedule.eventDate}
+              min={new Date().toISOString().split("T")[0]}
               onFocus={() => setDateFocused(true)}
               onBlur={() => setDateFocused(false)}
               onChange={(event) => setDraftSchedule({ ...draftSchedule, eventDate: event.target.value })}
@@ -278,6 +284,7 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
               <input
                 type="date"
                 value={draftSchedule.eventDate}
+                min={new Date().toISOString().split("T")[0]}
                 onChange={(event) => setDraftSchedule({ ...draftSchedule, eventDate: event.target.value })}
                 style={{
                   ...modalInputStyle(isDark),
