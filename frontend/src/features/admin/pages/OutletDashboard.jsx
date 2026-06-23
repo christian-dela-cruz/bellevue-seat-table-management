@@ -661,7 +661,7 @@ function LineChart({ rows, period = "monthly", chartMetric = "volume" }) {
         : "inset 0 1px 0 rgba(255,255,255,0.72)" 
     }}>
       <ResponsiveContainer width="100%" height={235}>
-        <ComposedChart data={data} margin={{ top: 12, right: 26, bottom: 20, left: -8 }}>
+        <ComposedChart data={data} margin={{ top: 12, right: 26, bottom: 20, left: 12 }}>
           <defs>
             <linearGradient id="outletReservationFill" x1="0" x2="0" y1="0" y2="1">
               <stop offset="0%" stopColor={C.blue} stopOpacity="0.22" />

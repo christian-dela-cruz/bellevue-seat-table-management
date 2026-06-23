@@ -548,10 +548,13 @@ function ReportCard({ children, style }) {
   );
 }
 
-function SummaryPanel({ title, children }) {
+function SummaryPanel({ title, children, extra }) {
   return (
     <ReportCard style={{ padding: 16, minWidth: 0 }}>
-      <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, marginBottom: 14 }}>{title}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>{title}</div>
+        {extra}
+      </div>
       {children}
     </ReportCard>
   );
@@ -574,15 +577,20 @@ function ChartTooltip({ active, payload, label }) {
     <div style={{ background: C.surface, border: "1px solid rgba(140,107,42,0.18)", borderRadius: 10, boxShadow: "0 2px 8px rgba(24,20,14,0.045)", padding: "10px 11px", minWidth: 160 }}>
       <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>{label}</div>
       <div style={{ display: "grid", gap: 6 }}>
-        {visiblePayload.map((item) => (
-          <div key={item.dataKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, fontSize: 12, color: C.muted }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-              <span style={{ width: 7, height: 7, borderRadius: 999, background: item.color }} />
-              {item.name}
-            </span>
-            <strong style={{ color: C.text, fontWeight: 700 }}>{item.value || 0}</strong>
-          </div>
-        ))}
+        {visiblePayload.map((item) => {
+          const isRevenue = String(item.name || "").toLowerCase().includes("revenue");
+          return (
+            <div key={item.dataKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, fontSize: 12, color: C.muted }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                <span style={{ width: 7, height: 7, borderRadius: 999, background: item.color }} />
+                {item.name}
+              </span>
+              <strong style={{ color: C.text, fontWeight: 700 }}>
+                {isRevenue ? formatCurrency(item.value) : item.value || 0}
+              </strong>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -902,7 +910,7 @@ function MonthlyLineChart({
           : "inset 0 1px 0 rgba(255,255,255,0.72)" 
       }}>
         <ResponsiveContainer width="100%" height={290}>
-          <ComposedChart data={data} margin={{ top: 12, right: 28, bottom: 8, left: -8 }}>
+          <ComposedChart data={data} margin={{ top: 12, right: 28, bottom: 8, left: 12 }}>
             <defs>
               <linearGradient id="reportsReservationFill" x1="0" x2="0" y1="0" y2="1">
                 <stop offset="0%" stopColor={C.blue} stopOpacity="0.22" />
@@ -917,10 +925,16 @@ function MonthlyLineChart({
             <XAxis
               dataKey={xAxisKey}
               interval={labelInterval}
+              tickFormatter={(val) => {
+                if (typeof val === "string" && val.includes(", ")) {
+                  return val.split(", ")[0];
+                }
+                return val;
+              }}
               tick={{ fill: C.muted, fontSize: 11 }}
               axisLine={false}
               tickLine={false}
-              minTickGap={10}
+              minTickGap={30}
               padding={{ left: 12, right: 16 }}
             />
             <YAxis
@@ -1046,7 +1060,7 @@ function WingRevenueChart({ data }) {
         : "inset 0 1px 0 rgba(255,255,255,0.72)" 
     }}>
       <ResponsiveContainer width="100%" height={250}>
-        <ComposedChart data={data} margin={{ top: 12, right: 28, bottom: 8, left: -8 }}>
+        <ComposedChart data={data} margin={{ top: 12, right: 28, bottom: 8, left: 12 }}>
           <CartesianGrid stroke={isDark ? "rgba(255,255,255,0.06)" : "rgba(24,20,14,0.07)"} vertical={false} />
           <XAxis dataKey="name" tick={{ fill: C.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
           <YAxis tickFormatter={(val) => `₱${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`} tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} width={45} />
@@ -1329,6 +1343,7 @@ export default function Reports() {
   const [roomViewMode, setRoomViewMode] = useState("list");
   const [outletViewMode, setOutletViewMode] = useState("grid");
   const [activeOutletDetails, setActiveOutletDetails] = useState(null);
+  const [chartMetricMode, setChartMetricMode] = useState("operations");
   const [outletMetricMode, setOutletMetricMode] = useState("reservations");
   const [showPrintConfig, setShowPrintConfig] = useState(false);
   const [printReportType, setPrintReportType] = useState("general");
@@ -1573,11 +1588,16 @@ export default function Reports() {
     filteredData.forEach((tx) => {
       const act = String(tx.action || "").toLowerCase();
       const status = String(tx.to_status || "").toLowerCase();
-      if (act === "approved" || status === "reserved" || status === "approved") {
+      const fromStatus = String(tx.from_status || "").toLowerCase();
+      const isApproval = act === "approved" || (fromStatus !== status && (status === "reserved" || status === "approved"));
+      const isRejection = act === "rejected" || (fromStatus !== status && status === "rejected");
+      const isRevert = act === "reverted" || (fromStatus !== status && status === "pending");
+
+      if (isApproval) {
         approvals += 1;
-      } else if (act === "rejected" || status === "rejected") {
+      } else if (isRejection) {
         rejections += 1;
-      } else if (act === "reverted" || status === "pending") {
+      } else if (isRevert) {
         reverts += 1;
       }
     });
@@ -1796,13 +1816,39 @@ export default function Reports() {
 
   const outletChartData = useMemo(() => {
     if (!activeOutletDetails) return [];
+    
+    const todayStr = new Date().toISOString().split("T")[0];
+    const start = startDate || todayStr;
+    const end = endDate || todayStr;
+    
     const countsByDate = {};
+    
+    // Generate all dates in the range
+    let current = new Date(`${start}T00:00:00`);
+    const stop = new Date(`${end}T00:00:00`);
+    let safeguard = 0;
+    while (current <= stop && safeguard < 366) {
+      const year = current.getFullYear();
+      const month = String(current.getMonth() + 1).padStart(2, "0");
+      const day = String(current.getDate()).padStart(2, "0");
+      const dateStr = `${year}-${month}-${day}`;
+      
+      countsByDate[dateStr] = {
+        bookings: 0,
+        audit_transactions: 0,
+        approvals: 0,
+        confirmed_revenue: 0,
+        projected_revenue: 0,
+      };
+      current.setDate(current.getDate() + 1);
+      safeguard++;
+    }
 
-    // 1. Group actual reservations (bookings) by event_date
     const canonicalSelected = canonicalOutletName(activeOutletDetails);
     const children = resolveOutletChildren(activeOutletDetails, venueRows);
     const childrenSet = new Set(children.map(canonicalOutletName));
 
+    // 1. Group actual reservations (bookings) & revenue by event_date (within range)
     reservations.forEach((r) => {
       const resRoom = r.internal_room_name || r.room || r.venue?.name || "";
       const canonicalResRoom = canonicalOutletName(resRoom);
@@ -1810,22 +1856,32 @@ export default function Reports() {
       if (!isMatch) return;
 
       const dateVal = r.event_date;
-      if (!dateVal) return;
-      if (!countsByDate[dateVal]) {
-        countsByDate[dateVal] = { bookings: 0, audit_transactions: 0, approvals: 0 };
-      }
+      if (!dateVal || !countsByDate[dateVal]) return;
+
       countsByDate[dateVal].bookings += 1;
+      
+      const status = String(r.status || "").toLowerCase();
+      const price = Number(r.final_price || r.calculated_price || 0);
+      if (status === "reserved" || status === "approved") {
+        countsByDate[dateVal].confirmed_revenue += price;
+      } else if (status === "pending") {
+        countsByDate[dateVal].projected_revenue += price;
+      }
     });
 
-    // 2. Group audit transactions and approvals by created_at date
+    // 2. Group audit transactions and approvals by created_at date (within range)
     outletTransactions.forEach((tx) => {
       const dateVal = tx.created_at ? tx.created_at.slice(0, 10) : null;
-      if (!dateVal) return;
-      if (!countsByDate[dateVal]) {
-        countsByDate[dateVal] = { bookings: 0, audit_transactions: 0, approvals: 0 };
-      }
+      if (!dateVal || !countsByDate[dateVal]) return;
+
       countsByDate[dateVal].audit_transactions += 1;
-      if (tx.to_status === "reserved" || tx.to_status === "approved") {
+      
+      const act = String(tx.action || "").toLowerCase();
+      const status = String(tx.to_status || "").toLowerCase();
+      const fromStatus = String(tx.from_status || "").toLowerCase();
+      const isApproval = act === "approved" || (fromStatus !== status && (status === "reserved" || status === "approved"));
+      
+      if (isApproval) {
         countsByDate[dateVal].approvals += 1;
       }
     });
@@ -1838,8 +1894,10 @@ export default function Reports() {
         bookings: countsByDate[date].bookings,
         audit_transactions: countsByDate[date].audit_transactions,
         approvals: countsByDate[date].approvals,
+        confirmed_revenue: countsByDate[date].confirmed_revenue,
+        projected_revenue: countsByDate[date].projected_revenue,
       }));
-  }, [activeOutletDetails, reservations, outletTransactions, venueRows]);
+  }, [activeOutletDetails, reservations, outletTransactions, venueRows, startDate, endDate]);
 
   const activeOutletRow = useMemo(() => {
     if (!activeOutletDetails) return null;
@@ -4613,105 +4671,212 @@ export default function Reports() {
               {/* Charts Section */}
               <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1.2fr) minmax(280px, 0.8fr)", gap: 14 }}>
                 {/* Daily Transaction Rhythm */}
-                <SummaryPanel title="Daily Transaction Rhythm">
-                  {outletChartData.length === 0 ? (
-                    <div style={{ display: "grid", placeItems: "center", height: 260, color: C.muted, fontSize: 12.5 }}>
-                      No active audit records found for this outlet in the selected date range.
-                    </div>
-                  ) : (
-                    <div style={{ 
-                      width: "100%", 
-                      minHeight: 260, 
-                      borderRadius: 14, 
-                      background: isDark 
-                        ? "linear-gradient(135deg, #111009 0%, #161410 58%, #201B12 100%)" 
-                        : "linear-gradient(135deg, #FFFFFF 0%, #FAF8F4 58%, #F1ECE1 100%)", 
-                      border: `1px solid ${C.divider}`, 
-                      padding: "16px 12px 8px",
-                      boxShadow: isDark 
-                        ? "inset 0 1px 0 rgba(255,255,255,0.05)" 
-                        : "inset 0 1px 0 rgba(255,255,255,0.72)"
-                    }}>
-                      <ResponsiveContainer width="100%" height={235}>
-                        <ComposedChart data={outletChartData} margin={{ top: 12, right: 26, bottom: 8, left: -8 }}>
-                          <defs>
-                            <linearGradient id="modalOutletReservationFill" x1="0" x2="0" y1="0" y2="1">
-                              <stop offset="0%" stopColor={C.blue} stopOpacity="0.22" />
-                              <stop offset="54%" stopColor={C.blue} stopOpacity="0.08" />
-                              <stop offset="100%" stopColor={C.blue} stopOpacity="0.01" />
-                            </linearGradient>
-                            <filter id="modalOutletLineShadow" x="-20%" y="-20%" width="140%" height="140%">
-                              <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#3B6FA8" floodOpacity="0.16" />
-                            </filter>
-                          </defs>
-                          <CartesianGrid stroke={isDark ? "rgba(255,255,255,0.06)" : "rgba(24,20,14,0.07)"} vertical={false} />
-                          <XAxis
-                            dataKey="label"
-                            tick={{ fill: C.muted, fontSize: 10 }}
-                            axisLine={false}
-                            tickLine={false}
-                          />
-                          <YAxis
-                            allowDecimals={false}
-                            tick={{ fill: C.faint, fontSize: 10 }}
-                            axisLine={false}
-                            tickLine={false}
-                            width={30}
-                          />
-                          <Tooltip content={<ChartTooltip />} cursor={{ stroke: "rgba(140,107,42,0.22)", strokeDasharray: "4 4" }} wrapperStyle={{ outline: "none" }} />
-                          <Legend
-                            verticalAlign="top"
-                            align="right"
-                            iconType="plainline"
-                            wrapperStyle={{ fontSize: 10, color: C.muted, paddingBottom: 8 }}
-                            payload={[
-                              { value: "Bookings", type: "plainline", color: C.blue },
-                              { value: "Audit transactions", type: "plainline", color: C.gold },
-                              { value: "Approvals", type: "plainline", color: C.green },
-                            ]}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="bookings"
-                            legendType="none"
-                            fill="url(#modalOutletReservationFill)"
-                            stroke="none"
-                            dot={false}
-                            activeDot={false}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="bookings"
-                            name="Bookings"
-                            stroke={C.blue}
-                            strokeWidth={3}
-                            dot={false}
-                            activeDot={{ r: 5, strokeWidth: 2, stroke: C.surface, fill: C.blue }}
-                            filter="url(#modalOutletLineShadow)"
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="audit_transactions"
-                            name="Audit transactions"
-                            stroke={C.gold}
-                            strokeWidth={2}
-                            dot={false}
-                            activeDot={{ r: 4, strokeWidth: 2, stroke: C.surface, fill: C.gold }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="approvals"
-                            name="Approvals"
-                            stroke={C.green}
-                            strokeWidth={2}
-                            dot={false}
-                            activeDot={{ r: 4, strokeWidth: 2, stroke: C.surface, fill: C.green }}
-                          />
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </SummaryPanel>
+                {(() => {
+                  const modalLabelInterval = outletChartData.length > 16 ? Math.ceil(outletChartData.length / 8) - 1 : 0;
+                  return (
+                    <SummaryPanel
+                      title="Daily Transaction Rhythm"
+                      extra={
+                        <div style={{ display: "inline-flex", border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden", background: C.surface, height: 28 }}>
+                          {[
+                            ["operations", "Operations"],
+                            ["revenue", "Revenue"],
+                          ].map(([mode, label]) => {
+                            const active = chartMetricMode === mode;
+                            return (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => setChartMetricMode(mode)}
+                                style={{
+                                  border: "none",
+                                  borderRight: mode === "operations" ? `1px solid ${C.border}` : "none",
+                                  background: active ? C.goldFaint : "transparent",
+                                  color: active ? C.gold : C.muted,
+                                  padding: "0 10px",
+                                  fontFamily: F.label,
+                                  fontSize: 9,
+                                  fontWeight: 750,
+                                  letterSpacing: "0.06em",
+                                  textTransform: "uppercase",
+                                  cursor: "pointer",
+                                  transition: "background 0.12s, color 0.12s",
+                                  outline: "none",
+                                }}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      }
+                    >
+                      {outletChartData.length === 0 ? (
+                        <div style={{ display: "grid", placeItems: "center", height: 260, color: C.muted, fontSize: 12.5 }}>
+                          No active audit records found for this outlet in the selected date range.
+                        </div>
+                      ) : (
+                        <div style={{ 
+                          width: "100%", 
+                          minHeight: 260, 
+                          borderRadius: 14, 
+                          background: isDark 
+                            ? "linear-gradient(135deg, #111009 0%, #161410 58%, #201B12 100%)" 
+                            : "linear-gradient(135deg, #FFFFFF 0%, #FAF8F4 58%, #F1ECE1 100%)", 
+                          border: `1px solid ${C.divider}`, 
+                          padding: "16px 12px 8px",
+                          boxShadow: isDark 
+                            ? "inset 0 1px 0 rgba(255,255,255,0.05)" 
+                            : "inset 0 1px 0 rgba(255,255,255,0.72)"
+                        }}>
+                          <ResponsiveContainer width="100%" height={235}>
+                            <ComposedChart data={outletChartData} margin={{ top: 12, right: 26, bottom: 8, left: 12 }}>
+                              <defs>
+                                <linearGradient id="modalOutletReservationFill" x1="0" x2="0" y1="0" y2="1">
+                                  <stop offset="0%" stopColor={C.blue} stopOpacity="0.22" />
+                                  <stop offset="54%" stopColor={C.blue} stopOpacity="0.08" />
+                                  <stop offset="100%" stopColor={C.blue} stopOpacity="0.01" />
+                                </linearGradient>
+                                <linearGradient id="modalOutletRevenueFill" x1="0" x2="0" y1="0" y2="1">
+                                  <stop offset="0%" stopColor={C.green} stopOpacity="0.22" />
+                                  <stop offset="54%" stopColor={C.green} stopOpacity="0.08" />
+                                  <stop offset="100%" stopColor={C.green} stopOpacity="0.01" />
+                                </linearGradient>
+                                <filter id="modalOutletLineShadow" x="-20%" y="-20%" width="140%" height="140%">
+                                  <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#3B6FA8" floodOpacity="0.16" />
+                                </filter>
+                                <filter id="modalOutletRevenueShadow" x="-20%" y="-20%" width="140%" height="140%">
+                                  <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#2D8A4E" floodOpacity="0.16" />
+                                </filter>
+                              </defs>
+                              <CartesianGrid stroke={isDark ? "rgba(255,255,255,0.06)" : "rgba(24,20,14,0.07)"} vertical={false} />
+                              <XAxis
+                                dataKey="label"
+                                interval={modalLabelInterval}
+                                tickFormatter={(val) => {
+                                  if (typeof val === "string" && val.includes(", ")) {
+                                    return val.split(", ")[0];
+                                  }
+                                  return val;
+                                }}
+                                minTickGap={35}
+                                tick={{ fill: C.muted, fontSize: 10 }}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              {chartMetricMode === "revenue" ? (
+                                <YAxis
+                                  tickFormatter={(val) => `₱${val >= 1000 ? (val / 1000) + 'k' : val}`}
+                                  tick={{ fill: C.faint, fontSize: 10 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  width={55}
+                                />
+                              ) : (
+                                <YAxis
+                                  allowDecimals={false}
+                                  tick={{ fill: C.faint, fontSize: 10 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  width={30}
+                                />
+                              )}
+                              <Tooltip content={<ChartTooltip />} cursor={{ stroke: "rgba(140,107,42,0.22)", strokeDasharray: "4 4" }} wrapperStyle={{ outline: "none" }} />
+                              <Legend
+                                verticalAlign="top"
+                                align="right"
+                                iconType="plainline"
+                                wrapperStyle={{ fontSize: 10, color: C.muted, paddingBottom: 8 }}
+                                payload={
+                                  chartMetricMode === "revenue" ? [
+                                    { value: "Confirmed Revenue", type: "plainline", color: C.green },
+                                    { value: "Projected Revenue", type: "plainline", color: C.gold },
+                                  ] : [
+                                    { value: "Bookings", type: "plainline", color: C.blue },
+                                    { value: "Audit transactions", type: "plainline", color: C.gold },
+                                    { value: "Reserved", type: "plainline", color: C.green },
+                                  ]
+                                }
+                              />
+                              {chartMetricMode === "revenue" ? (
+                                <>
+                                  <Area
+                                    type="monotone"
+                                    dataKey="confirmed_revenue"
+                                    legendType="none"
+                                    fill="url(#modalOutletRevenueFill)"
+                                    stroke="none"
+                                    dot={false}
+                                    activeDot={false}
+                                  />
+                                  <Line
+                                    type="monotone"
+                                    dataKey="confirmed_revenue"
+                                    name="Confirmed Revenue"
+                                    stroke={C.green}
+                                    strokeWidth={3}
+                                    dot={false}
+                                    activeDot={{ r: 5, strokeWidth: 2, stroke: C.surface, fill: C.green }}
+                                    filter="url(#modalOutletRevenueShadow)"
+                                  />
+                                  <Line
+                                    type="monotone"
+                                    dataKey="projected_revenue"
+                                    name="Projected Revenue"
+                                    stroke={C.gold}
+                                    strokeWidth={2}
+                                    dot={false}
+                                    activeDot={{ r: 4, strokeWidth: 2, stroke: C.surface, fill: C.gold }}
+                                  />
+                                </>
+                              ) : (
+                                <>
+                                  <Area
+                                    type="monotone"
+                                    dataKey="bookings"
+                                    legendType="none"
+                                    fill="url(#modalOutletReservationFill)"
+                                    stroke="none"
+                                    dot={false}
+                                    activeDot={false}
+                                  />
+                                  <Line
+                                    type="monotone"
+                                    dataKey="bookings"
+                                    name="Bookings"
+                                    stroke={C.blue}
+                                    strokeWidth={3}
+                                    dot={false}
+                                    activeDot={{ r: 5, strokeWidth: 2, stroke: C.surface, fill: C.blue }}
+                                    filter="url(#modalOutletLineShadow)"
+                                  />
+                                  <Line
+                                    type="monotone"
+                                    dataKey="audit_transactions"
+                                    name="Audit transactions"
+                                    stroke={C.gold}
+                                    strokeWidth={2}
+                                    dot={false}
+                                    activeDot={{ r: 4, strokeWidth: 2, stroke: C.surface, fill: C.gold }}
+                                  />
+                                  <Line
+                                    type="monotone"
+                                    dataKey="approvals"
+                                    name="Reserved"
+                                    stroke={C.green}
+                                    strokeWidth={2}
+                                    dot={false}
+                                    activeDot={{ r: 4, strokeWidth: 2, stroke: C.surface, fill: C.green }}
+                                  />
+                                </>
+                              )}
+                            </ComposedChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+                    </SummaryPanel>
+                  );
+                })()}
 
                 {/* Donut Chart breakdown */}
                 <SummaryPanel title="Status Distribution">
