@@ -335,6 +335,8 @@ export default function EventManagement() {
               eyebrow="Event Engine"
               title="Event Management" 
               description="Create and publish special events. Events inherit parent venue floor plans while having unique dates and capacities." 
+              C={C}
+              F={F}
               actions={
                 <button type="button" onClick={handleCreate} style={{ height: 40, padding: "0 14px", border: `1px solid rgba(140,107,42,0.20)`, borderRadius: 9, background: C.gold, color: "#fff", fontFamily: F.label, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: "0 2px 8px rgba(140,107,42,0.10)" }}>
                   <Plus size={14} /> New Event
