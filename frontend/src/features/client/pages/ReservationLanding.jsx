@@ -159,9 +159,19 @@ function resolveRoomImage(image) {
   if (!image) return businessCenterImg;
   if (/^(https?:|data:|blob:)/i.test(image)) return image;
 
-  const key = String(image).split("/").pop();
+  const key = String(image).split("/").pop().toLowerCase();
+  
+  // Try static mapping first (even if it's a custom path from database uploads)
+  if (key.includes("alabang")) return alabangImg;
+  if (key.includes("grand")) return grandBallroomImg;
+  if (key.includes("laguna")) return lagunaImg;
+  if (key.includes("20-20") || key.includes("2020")) return twentyTwentyImg;
+  if (key.includes("tower")) return towerBallroomImg;
+  if (key.includes("bc") || key.includes("business")) return businessCenterImg;
+
   const isCustomPath = String(image).includes("/");
-  if (!isCustomPath && roomImageMap[key]) return roomImageMap[key];
+  const originalKey = String(image).split("/").pop();
+  if (!isCustomPath && roomImageMap[originalKey]) return roomImageMap[originalKey];
 
   const apiRoot = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "");
 
@@ -434,7 +444,7 @@ function StableImage({ src, alt, className, style, decoding, loading, draggable,
       style={{
         ...style,
         opacity: loaded ? 1 : 0,
-        transition: "opacity 0.35s ease, filter 0.4s ease, transform 0.4s ease",
+        transition: "opacity 0.2s ease, filter 0.3s ease, transform 0.4s ease",
       }}
     />
   );
@@ -442,6 +452,20 @@ function StableImage({ src, alt, className, style, decoding, loading, draggable,
 
 export function VenueCard({ item, variant = "event", isInteractive = true, index = 0 }) {
   const navigate = useNavigate();
+
+  if (item?.placeholder) {
+    return (
+      <article
+        className={`reservation-card reservation-card--${variant} reservation-card--skeleton`}
+        style={{
+          animationDelay: `${0.3 + index * 0.06}s`
+        }}
+      >
+        <span className="reservation-card__brand-surface" aria-hidden="true" />
+      </article>
+    );
+  }
+
   const disabled = item.disabled || !item.route || !isInteractive;
 
   return (
@@ -449,70 +473,77 @@ export function VenueCard({ item, variant = "event", isInteractive = true, index
       className={`reservation-card reservation-card--${variant}${item.rooms?.length ? " reservation-card--has-rooms" : ""}${disabled ? " reservation-card--disabled" : ""}`}
       aria-disabled={disabled}
     >
-      {variant === "dining" && !item.image ? (
-        <span className="reservation-card__brand-surface" aria-hidden="true" />
-      ) : (
-        <>
-          {item.image && (
-            <StableImage
-              src={item.image}
-              alt=""
-              ariaHidden="true"
-              className="reservation-card__image"
-              decoding="async"
-              priority={variant === "dining" && index < 3}
-              style={item.imageFocus ? { objectPosition: item.imageFocus } : undefined}
-              draggable="false"
-            />
-          )}
-          <span className="reservation-card__shade" style={variant === "dining" ? { opacity: 0.85 } : undefined} />
-        </>
-      )}
-      <button
-        type="button"
-        className="reservation-card__hitarea"
-        onClick={() => {
-          if (!disabled) navigate(item.route);
+      <div
+        className="reservation-card__content"
+        style={{
+          animationDelay: `${index * 0.05}s`
         }}
-        disabled={disabled}
-        aria-label={disabled ? `${item.title} is currently unavailable` : `Reserve ${item.title}`}
-        tabIndex={disabled ? -1 : 0}
-      />
-
-      {variant === "dining" && (
-        <div className="reservation-card__brand" aria-hidden="true">
-          <span className="reservation-card__logo">
-            {item.logo ? (
-              <StableImage src={item.logo} alt="" decoding="async" draggable="false" priority={variant === "dining" && index < 3} />
-            ) : (
-              <span>{item.mark}</span>
+      >
+        {variant === "dining" && !item.image ? (
+          <span className="reservation-card__brand-surface" aria-hidden="true" />
+        ) : (
+          <>
+            {item.image && (
+              <StableImage
+                src={item.image}
+                alt=""
+                ariaHidden="true"
+                className="reservation-card__image"
+                decoding="async"
+                priority={index < 3}
+                style={item.imageFocus ? { objectPosition: item.imageFocus } : undefined}
+                draggable="false"
+              />
             )}
-          </span>
-        </div>
-      )}
+            <span className="reservation-card__shade" style={variant === "dining" ? { opacity: 0.85 } : undefined} />
+          </>
+        )}
+        <button
+          type="button"
+          className="reservation-card__hitarea"
+          onClick={() => {
+            if (!disabled) navigate(item.route);
+          }}
+          disabled={disabled}
+          aria-label={disabled ? `${item.title} is currently unavailable` : `Reserve ${item.title}`}
+          tabIndex={disabled ? -1 : 0}
+        />
 
-      {variant !== "dining" && (
-        <div className="reservation-card__meta">
-          <span className="reservation-card__title">{item.title}</span>
-
-          {item.rooms?.length > 0 && (
-            <span className="reservation-card__rooms" aria-label={`${item.title} rooms`}>
-              {item.rooms.map((room) => (
-                <button
-                  key={room.route}
-                  type="button"
-                  className="reservation-card__room"
-                  onClick={() => navigate(room.route)}
-                  aria-label={`Reserve ${item.title} ${room.label}`}
-                  tabIndex={disabled ? -1 : 0}
-                >
-                  {room.label}
-                </button>
-              ))}
+        {variant === "dining" && (
+          <div className="reservation-card__brand" aria-hidden="true">
+            <span className="reservation-card__logo">
+              {item.logo ? (
+                <StableImage src={item.logo} alt="" decoding="async" draggable="false" priority={variant === "dining" && index < 3} />
+              ) : (
+                <span>{item.mark}</span>
+              )}
             </span>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+
+        {variant !== "dining" && (
+          <div className="reservation-card__meta">
+            <span className="reservation-card__title">{item.title}</span>
+
+            {item.rooms?.length > 0 && (
+              <span className="reservation-card__rooms" aria-label={`${item.title} rooms`}>
+                {item.rooms.map((room) => (
+                  <button
+                    key={room.route}
+                    type="button"
+                    className="reservation-card__room"
+                    onClick={() => navigate(room.route)}
+                    aria-label={`Reserve ${item.title} ${room.label}`}
+                    tabIndex={disabled ? -1 : 0}
+                  >
+                    {room.label}
+                  </button>
+                ))}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </article>
   );
 }
@@ -526,7 +557,7 @@ export default function ReservationLanding() {
     } catch { }
     return (window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true) ? "dark" : "light";
   });
-  const [diningOutlets, setDiningOutlets] = useState(fallbackDiningOutlets);
+  const [diningOutlets, setDiningOutlets] = useState(null);
   const [eventVenues, setEventVenues] = useState(null);
   const [publishedEvents, setPublishedEvents] = useState([]);
   const [mixedEventItems, setMixedEventItems] = useState(null);
@@ -729,11 +760,11 @@ export default function ReservationLanding() {
             <div
               className="reservation-grid reservation-grid--dining"
               style={{
-                "--dining-cols": diningOutlets.length || 1
+                "--dining-cols": diningOutlets ? (diningOutlets.length || 1) : 6
               }}
             >
-              {diningOutlets.map((outlet) => (
-                <VenueCard key={outlet.title} item={outlet} variant="dining" />
+              {(diningOutlets || Array.from({ length: 6 }).map((_, i) => ({ placeholder: true }))).map((outlet, index) => (
+                <VenueCard key={`dining-slot-${index}`} item={outlet} variant="dining" index={index} />
               ))}
             </div>
           </div>
@@ -755,16 +786,21 @@ export default function ReservationLanding() {
               }
             >
               {mixedEventItems === null ? (
-                <div className="reservation-empty-state">
-                  <strong>Loading configured venues.</strong>
-                  <span>Preparing the current Bellevue function room availability.</span>
-                </div>
-              ) : mixedEventItems.length > 0 ? (
-                mixedEventItems.map((item) => (
+                Array.from({ length: 6 }).map((_, index) => (
                   <VenueCard
-                    key={`${item.type}:${item.id}`}
+                    key={`event-slot-${index}`}
+                    item={{ placeholder: true }}
+                    variant="event"
+                    index={index}
+                  />
+                ))
+              ) : mixedEventItems.length > 0 ? (
+                mixedEventItems.map((item, index) => (
+                  <VenueCard
+                    key={`event-slot-${index}`}
                     item={item}
                     variant={item.type === "event" ? "event" : "venue"}
+                    index={index}
                   />
                 ))
               ) : (
@@ -1270,7 +1306,7 @@ export default function ReservationLanding() {
           opacity: 0;
           transform: translateY(12px);
           animation: reservationCardIn 0.52s ease both;
-          transition: transform 0.26s ease, box-shadow 0.26s ease, filter 0.26s ease;
+          transition: transform 0.26s ease, box-shadow 0.26s ease, filter 0.26s ease, background 0.4s ease, border-color 0.4s ease;
         }
 
         .reservation-card:nth-child(1) { animation-delay: 0.3s; }
@@ -1710,6 +1746,58 @@ export default function ReservationLanding() {
           to {
             opacity: 1;
             transform: translateY(0);
+          }
+        }
+
+        .reservation-card--skeleton {
+          pointer-events: none;
+          background: rgba(255, 255, 255, 0.03) !important;
+          border-color: rgba(255, 250, 241, 0.05) !important;
+          box-shadow: none !important;
+        }
+
+        .reservation-launcher[data-theme="light"] .reservation-card--skeleton {
+          background: rgba(164, 120, 33, 0.04) !important;
+          border-color: rgba(164, 120, 33, 0.08) !important;
+        }
+
+        .reservation-card--skeleton::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+          transform: translateX(-100%);
+          animation: skeletonShimmer 1.6s infinite ease-in-out;
+        }
+
+        .reservation-launcher[data-theme="light"] .reservation-card--skeleton::before {
+          background: linear-gradient(90deg, transparent, rgba(164, 120, 33, 0.05), transparent);
+        }
+
+        @keyframes skeletonShimmer {
+          100% {
+            transform: translateX(100%);
+          }
+        }
+
+        .reservation-card__content {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          display: block;
+          opacity: 0;
+          animation: cardContentFadeIn 0.48s cubic-bezier(0.215, 0.61, 0.355, 1) both;
+        }
+
+        @keyframes cardContentFadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.97);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
           }
         }
 
