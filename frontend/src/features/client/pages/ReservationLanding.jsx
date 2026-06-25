@@ -1151,6 +1151,7 @@ export default function ReservationLanding() {
           justify-content: center;
           min-height: 48px;
           margin-top: clamp(18px, 2.4vh, 26px);
+          margin-bottom: clamp(20px, 2.5vh, 28px);
           border: 1px solid #c4a35a;
           border-radius: 14px;
           padding: 0 24px;
