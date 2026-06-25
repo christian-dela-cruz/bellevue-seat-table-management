@@ -423,7 +423,7 @@ export default function AccountSettings() {
       items: [
         { id: "security", label: "Security", icon: Shield },
         { id: "sessions", label: "Sessions", icon: Laptop },
-        { id: "audit-logs", label: "Audit Logs", icon: CheckCircle2 },
+        { id: "audit-logs", label: "Security Log", icon: KeyRound },
       ]
     }
   ];
@@ -1061,8 +1061,8 @@ export default function AccountSettings() {
                 <div id="settings-section-sessions" style={{ borderBottom: `1px solid ${C.divider}`, paddingBottom: 24, marginBottom: 24 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 14 }}>
                     <div>
-                      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text }}>Login Activity / Active Devices</h2>
-                      <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted }}>Monitor the browser sessions logged into your account and revoke any unauthorized device logins.</p>
+                      <h2 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: C.text }}>Device Sessions</h2>
+                      <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted, lineHeight: 1.4 }}>Monitor the browser sessions logged into your account and revoke any unauthorized device logins.</p>
                     </div>
                   </div>
 
@@ -1081,14 +1081,14 @@ export default function AccountSettings() {
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{sess.device}</div>
                               <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>
-                                IP: {sess.ip_address} • Last active: {sess.is_current ? "Active now" : sess.last_active_at ? new Date(sess.last_active_at).toLocaleString() : "Unknown"}
+                                IP: <span style={{ fontFamily: "monospace" }}>{sess.ip_address}</span> • Last active: {sess.is_current ? "Active now" : sess.last_active_at ? new Date(sess.last_active_at).toLocaleString() : "Unknown"}
                               </div>
                             </div>
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             {sess.is_current ? (
-                              <span style={{ padding: "4px 10px", borderRadius: 6, background: C.greenFaint, color: C.green, fontFamily: F.label, fontSize: 10, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                                Current Session
+                              <span style={{ padding: "4px 10px", borderRadius: 6, background: C.greenFaint, color: C.green, fontFamily: F.label, fontSize: 9, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                                Current
                               </span>
                             ) : (
                               <button
@@ -1115,7 +1115,24 @@ export default function AccountSettings() {
                         </div>
                       ))
                     ) : (
-                      <p style={{ margin: 0, fontSize: 12.5, color: C.muted }}>No active sessions recorded.</p>
+                      <div style={{
+                        border: `1.5px dashed ${C.border}`,
+                        borderRadius: 12,
+                        padding: "32px 24px",
+                        textAlign: "center",
+                        color: C.muted,
+                        background: C.surfaceSoft,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 8,
+                      }}>
+                        <Monitor size={24} style={{ color: C.goldSoft, opacity: 0.8 }} />
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>No other active sessions</div>
+                        <div style={{ fontSize: 11.5, color: C.muted, maxWidth: 300, lineHeight: 1.45 }}>
+                          You are currently not signed in on any other devices or browsers.
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1124,8 +1141,8 @@ export default function AccountSettings() {
                 <div id="settings-section-audit-logs">
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 14 }}>
                     <div>
-                      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text }}>Personal Security Logs</h2>
-                      <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted }}>Review the history of security changes and profile updates made to your account.</p>
+                      <h2 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: C.text }}>Security Log</h2>
+                      <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted, lineHeight: 1.4 }}>Review the history of security changes, sign-in logs, and profile updates made to your account.</p>
                     </div>
                   </div>
 
@@ -1135,35 +1152,71 @@ export default function AccountSettings() {
                         <Spinner color={C.gold} size={16} />
                       </div>
                     ) : auditLogs.length > 0 ? (
-                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", background: C.surfaceBase }}>
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, textAlign: "left" }}>
                           <thead>
                             <tr style={{ background: C.surfaceSoft, borderBottom: `1px solid ${C.border}` }}>
-                              <th style={{ padding: "10px 14px", fontWeight: 700, color: C.muted }}>Action</th>
-                              <th style={{ padding: "10px 14px", fontWeight: 700, color: C.muted }}>IP Address</th>
-                              <th style={{ padding: "10px 14px", fontWeight: 700, color: C.muted }}>Date / Time</th>
+                              <th style={{ padding: "12px 16px", fontFamily: F.label, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Action</th>
+                              <th style={{ padding: "12px 16px", fontFamily: F.label, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>IP Address</th>
+                              <th style={{ padding: "12px 16px", fontFamily: F.label, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Date / Time</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {auditLogs.map((log) => (
-                              <tr key={log.id} style={{ borderBottom: `1px solid ${C.borderFaint}`, background: C.surface }}>
-                                <td style={{ padding: "10px 14px", fontWeight: 600, color: C.text }}>
-                                  <span style={{
-                                    textTransform: "capitalize",
-                                    color: log.action.includes("2fa") ? C.gold : C.text
-                                  }}>
-                                    {log.action.replace(/_/g, " ")}
-                                  </span>
-                                </td>
-                                <td style={{ padding: "10px 14px", color: C.textSecondary }}>{log.ip_address}</td>
-                                <td style={{ padding: "10px 14px", color: C.muted }}>{new Date(log.created_at).toLocaleString()}</td>
-                              </tr>
-                            ))}
+                            {auditLogs.map((log) => {
+                              const is2FA = log.action.includes("2fa");
+                              const isEmail = log.action.includes("email");
+                              const bg = is2FA ? C.goldFaint : isEmail ? C.blueFaint : C.surfaceSoft;
+                              const textCol = is2FA ? C.gold : isEmail ? C.blue : C.textSecondary;
+                              const borderCol = is2FA ? C.borderAccent : isEmail ? C.blueBorder : C.border;
+                              
+                              return (
+                                <tr key={log.id} style={{ borderBottom: `1px solid ${C.borderFaint}`, background: C.surface }}>
+                                  <td style={{ padding: "12px 16px" }}>
+                                    <span style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      padding: "3px 8px",
+                                      borderRadius: 6,
+                                      background: bg,
+                                      color: textCol,
+                                      border: `1px solid ${borderCol}`,
+                                      fontFamily: F.label,
+                                      fontSize: 9,
+                                      fontWeight: 700,
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.04em",
+                                      whiteSpace: "nowrap"
+                                    }}>
+                                      {log.action.replace(/_/g, " ")}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: "12px 16px", fontFamily: "monospace", fontSize: 12, color: C.textSecondary }}>{log.ip_address}</td>
+                                  <td style={{ padding: "12px 16px", fontSize: 12, color: C.muted }}>{new Date(log.created_at).toLocaleString()}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
                     ) : (
-                      <p style={{ margin: 0, fontSize: 12.5, color: C.muted }}>No recent actions recorded.</p>
+                      <div style={{
+                        border: `1.5px dashed ${C.border}`,
+                        borderRadius: 12,
+                        padding: "32px 24px",
+                        textAlign: "center",
+                        color: C.muted,
+                        background: C.surfaceSoft,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 8,
+                      }}>
+                        <Shield size={24} style={{ color: C.goldSoft, opacity: 0.8 }} />
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>No recent events</div>
+                        <div style={{ fontSize: 11.5, color: C.muted, maxWidth: 300, lineHeight: 1.45 }}>
+                          No security events or settings updates have been performed on this account yet.
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
