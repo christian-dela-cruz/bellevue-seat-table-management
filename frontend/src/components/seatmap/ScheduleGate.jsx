@@ -64,6 +64,7 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
   const isReady = Boolean(normalized.eventDate && normalized.eventTime);
   const [draftSchedule, setDraftSchedule] = React.useState(normalized);
   const [slots, setSlots] = React.useState([]);
+  const [dateFocused, setDateFocused] = React.useState(false);
 
   if (locked && isReady) {
     const formattedDate = new Date(normalized.eventDate).toLocaleDateString(undefined, {
@@ -117,6 +118,19 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
   }, [normalized.eventDate, normalized.eventTime]);
 
   React.useEffect(() => {
+    if (isReady && draftSchedule.eventDate && draftSchedule.eventTime && !slotLoading) {
+      const selectedSlot = slots.find((slot) => slot.time === String(draftSchedule.eventTime || "").substring(0, 5));
+      const slotAvailable = slots.length === 0 ? !scheduleEnforced : Boolean(selectedSlot?.available);
+      
+      if (slotAvailable) {
+        if (draftSchedule.eventDate !== normalized.eventDate || draftSchedule.eventTime !== normalized.eventTime) {
+          onChange(saveSeatmapSchedule(draftSchedule));
+        }
+      }
+    }
+  }, [draftSchedule, slots, slotLoading, scheduleEnforced, isReady, onChange, normalized.eventDate, normalized.eventTime]);
+
+  React.useEffect(() => {
     if (!draftSchedule.eventDate || !roomLabel) {
       setSlots([]);
       setScheduleMessage("");
@@ -167,8 +181,6 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
     if (!isDraftValid) return;
     onChange(saveSeatmapSchedule(draftSchedule));
   };
-
-  const [dateFocused, setDateFocused] = useState(false);
 
   if (isReady) {
     return (
@@ -230,14 +242,6 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
             {selectedSlot?.reason || scheduleMessage || slotError}
           </div>
         )}
-        <button
-          type="button"
-          onClick={confirmSchedule}
-          disabled={!isDraftValid || !hasChanges}
-          style={confirmButtonStyle(isDark, isDraftValid && hasChanges)}
-        >
-          Confirm Schedule
-        </button>
       </div>
     );
   }
