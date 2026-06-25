@@ -2,7 +2,11 @@ import { createContext, useContext, useState, useEffect } from "react";
 
 const AdminThemeContext = createContext({
   isDark: false,
-  toggleTheme: () => {}
+  toggleTheme: () => {},
+  currentUser: null,
+  avatar: "",
+  updateUser: () => {},
+  updateAvatar: () => {}
 });
 
 export const useAdminTheme = () => useContext(AdminThemeContext);
@@ -55,7 +59,7 @@ export const C = {
   get green() { return isDarkTheme ? "#4A9E7E" : "#2E7A5A"; },
   get greenFaint() { return isDarkTheme ? "rgba(74,158,126,0.08)" : "rgba(46,122,90,0.07)"; },
   get greenBorder() { return isDarkTheme ? "rgba(74,158,126,0.20)" : "rgba(46,122,90,0.18)"; },
-
+ 
   // Cancellation Accents / Slate
   get accent() { return isDarkTheme ? "#9CA3AF" : "#6B7280"; },
   get accentLight() { return isDarkTheme ? "#D1D5DB" : "#9CA3AF"; },
@@ -141,6 +145,56 @@ export const AdminThemeProvider = ({ children }) => {
   
   isDarkTheme = isDark;
 
+  const [currentUser, setCurrentUserState] = useState(() => {
+    try {
+      const stored = localStorage.getItem("admin_user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const getAvatarKey = (user) => {
+    return `bellevue_account_avatar:${user?.id || user?.username || "current"}`;
+  };
+
+  const [avatar, setAvatarState] = useState(() => {
+    try {
+      const stored = localStorage.getItem("admin_user");
+      const user = stored ? JSON.parse(stored) : null;
+      return localStorage.getItem(getAvatarKey(user)) || "";
+    } catch {
+      return "";
+    }
+  });
+
+  const updateUser = (newUser) => {
+    setCurrentUserState(newUser);
+    try {
+      if (newUser) {
+        localStorage.setItem("admin_user", JSON.stringify(newUser));
+        const key = getAvatarKey(newUser);
+        setAvatarState(localStorage.getItem(key) || "");
+      } else {
+        localStorage.removeItem("admin_user");
+        setAvatarState("");
+      }
+    } catch {}
+  };
+
+  const updateAvatar = (newAvatar) => {
+    setAvatarState(newAvatar);
+    try {
+      const stored = localStorage.getItem("admin_user");
+      const user = stored ? JSON.parse(stored) : null;
+      const key = getAvatarKey(user);
+      if (newAvatar) {
+        localStorage.setItem(key, newAvatar);
+      } else {
+        localStorage.removeItem(key);
+      }
+    } catch {}
+  };
 
   const toggleTheme = () => {
     setIsDark((prev) => {
@@ -165,7 +219,7 @@ export const AdminThemeProvider = ({ children }) => {
   }, [isDark]);
 
   return (
-    <AdminThemeContext.Provider value={{ isDark, toggleTheme }}>
+    <AdminThemeContext.Provider value={{ isDark, toggleTheme, currentUser, avatar, updateUser, updateAvatar }}>
       {children}
     </AdminThemeContext.Provider>
   );

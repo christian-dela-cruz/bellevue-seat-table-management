@@ -62,6 +62,18 @@ class AuthService
 
         Cache::put('admin_token:' . hash('sha256', $token), $adminPayload, now()->addHours(8));
 
+        try {
+            \App\Models\AdminSession::create([
+                'admin_id' => $admin->id,
+                'token_hash' => hash('sha256', $token),
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'last_active_at' => now(),
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to log admin session: ' . $e->getMessage());
+        }
+
         return [
             'success' => true,
             'message' => 'Login successful',
@@ -76,7 +88,11 @@ class AuthService
     public function logout(?string $token = null): array
     {
         if ($token) {
-            Cache::forget('admin_token:' . hash('sha256', $token));
+            $hash = hash('sha256', $token);
+            Cache::forget('admin_token:' . $hash);
+            try {
+                \App\Models\AdminSession::where('token_hash', $hash)->delete();
+            } catch (\Exception $e) {}
         }
 
         return [
@@ -91,9 +107,16 @@ class AuthService
     public function getCurrentUser(?string $token = null): array
     {
         if ($token) {
-            $admin = Cache::get('admin_token:' . hash('sha256', $token));
+            $hash = hash('sha256', $token);
+            $admin = Cache::get('admin_token:' . $hash);
 
             if ($admin) {
+                try {
+                    \App\Models\AdminSession::where('token_hash', $hash)->update([
+                        'last_active_at' => now()
+                    ]);
+                } catch (\Exception $e) {}
+
                 return [
                     'success' => true,
                     'admin' => $admin,

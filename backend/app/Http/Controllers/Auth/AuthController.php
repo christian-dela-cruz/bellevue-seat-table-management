@@ -54,6 +54,27 @@ class AuthController extends Controller
                 'password' => 'required|string'
             ]);
 
+            // Check if 2FA is active for this admin
+            $admin = null;
+            if ($credentials['username'] !== 'super@admin.com') {
+                $admin = Admin::where('username', $credentials['username'])
+                    ->orWhere('email', $credentials['username'])
+                    ->first();
+            }
+
+            if ($admin && $admin->is_active && Hash::check($credentials['password'], $admin->password)) {
+                if ($admin->two_factor_enabled) {
+                    $tempToken = 'temp-2fa-' . \Illuminate\Support\Str::random(40);
+                    \Illuminate\Support\Facades\Cache::put('temp_2fa:' . $tempToken, $admin->id, now()->addMinutes(5));
+                    
+                    return response()->json([
+                        'success' => true,
+                        'requires_2fa' => true,
+                        'temp_token' => $tempToken,
+                    ]);
+                }
+            }
+
             $result = $this->authService->login($credentials['username'], $credentials['password']);
 
             if (!$result) {
@@ -68,6 +89,82 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Admin login failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Verify 2FA code during login
+     */
+    public function verify2FA(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'temp_token' => 'required|string',
+                'code' => 'required|string',
+            ]);
+
+            $adminId = \Illuminate\Support\Facades\Cache::get('temp_2fa:' . $validated['temp_token']);
+
+            if (!$adminId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Your login session has expired. Please log in again.'
+                ], 422);
+            }
+
+            $admin = Admin::findOrFail($adminId);
+            $code = str_replace(' ', '', $validated['code']);
+
+            $verified = \App\Services\Google2FAService::verifyCode($admin->two_factor_secret, $code);
+
+            // Check recovery codes if authenticator app verification fails
+            if (!$verified && is_array($admin->two_factor_recovery_codes)) {
+                $recoveryCodes = $admin->two_factor_recovery_codes;
+                if (in_array($code, $recoveryCodes, true)) {
+                    $verified = true;
+                    // Remove the used recovery code
+                    $updatedCodes = array_values(array_filter($recoveryCodes, fn($c) => $c !== $code));
+                    $admin->update(['two_factor_recovery_codes' => $updatedCodes]);
+                }
+            }
+
+            if (!$verified) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid verification code.'
+                ], 422);
+            }
+
+            \Illuminate\Support\Facades\Cache::forget('temp_2fa:' . $validated['temp_token']);
+
+            // Complete authenticating the session
+            $token = 'admin-token-' . \Illuminate\Support\Str::random(64);
+            $adminPayload = $this->authService->adminPayload($admin);
+
+            \Illuminate\Support\Facades\Cache::put('admin_token:' . hash('sha256', $token), $adminPayload, now()->addHours(8));
+
+            try {
+                \App\Models\AdminSession::create([
+                    'admin_id' => $admin->id,
+                    'token_hash' => hash('sha256', $token),
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'last_active_at' => now(),
+                ]);
+            } catch (\Exception $e) {}
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Login successful',
+                'token' => $token,
+                'admin' => $adminPayload,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => '2FA verification failed: ' . $e->getMessage()
             ], 500);
         }
     }

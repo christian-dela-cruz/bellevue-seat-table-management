@@ -81,12 +81,14 @@ function LoginScreen({ onLogin }) {
   const [loading, setLoading] = useState(false);
 
   // Light mode by default as requested
-  const [formMode, setFormMode] = useState("login"); // 'login' | 'forgot' | 'forgot_success'
+  const [formMode, setFormMode] = useState("login"); // 'login' | 'forgot' | 'forgot_success' | '2fa'
   const [resetEmail, setResetEmail] = useState("");
   const [resetMessage, setResetMessage] = useState("");
   const [isDark, setIsDark] = useState(false);
   const [focusedField, setFocusedField] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [temp2faToken, setTemp2faToken] = useState("");
+  const [twoFactorCode, setTwoFactorCode] = useState("");
   const [rememberMe, setRememberMe] = useState(() => {
     try {
       return localStorage.getItem("bellevue_remember_me") === "true";
@@ -154,6 +156,14 @@ function LoginScreen({ onLogin }) {
       const response = await authAPI.login({ username: user, password: pass });
 
       if (response.success) {
+        if (response.requires_2fa) {
+          setTemp2faToken(response.temp_token);
+          setFormMode("2fa");
+          setTwoFactorCode("");
+          setLoading(false);
+          return;
+        }
+
         try {
           if (rememberMe) {
             localStorage.setItem("bellevue_remember_username", user);
@@ -177,6 +187,44 @@ function LoginScreen({ onLogin }) {
     } catch (err) {
       console.error("Login error:", err);
       setError("Unable to connect to the authentication server. Please check your credentials.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handle2FA = async (event) => {
+    if (event) event.preventDefault();
+    if (loading) return;
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await authAPI.verify2FALogin(temp2faToken, twoFactorCode);
+
+      if (response.success) {
+        try {
+          if (rememberMe) {
+            localStorage.setItem("bellevue_remember_username", user);
+            localStorage.setItem("bellevue_remember_me", "true");
+          } else {
+            localStorage.removeItem("bellevue_remember_username");
+            localStorage.setItem("bellevue_remember_me", "false");
+          }
+        } catch (e) {
+          console.warn("Storage error in LoginScreen", e);
+        }
+
+        if (typeof onLogin === "function") {
+          onLogin(response.admin);
+        } else {
+          navigate("/admin/reservations", { replace: true });
+        }
+      } else {
+        setError(response.message || "Invalid verification code.");
+      }
+    } catch (err) {
+      console.error("2FA login error:", err);
+      setError("Verification failed. Please ensure the code is correct.");
     } finally {
       setLoading(false);
     }
@@ -450,11 +498,11 @@ function LoginScreen({ onLogin }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                   <span style={{ width: 18, height: 1, background: C.gold, opacity: 0.7 }} />
                   <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: "0.22em", color: C.gold, textTransform: "uppercase", fontFamily: F.label }}>
-                    {formMode === "login" ? "Admin Portal" : "Account Recovery"}
+                    {formMode === "login" || formMode === "2fa" ? "Admin Portal" : "Account Recovery"}
                   </span>
                 </div>
                 <h1 style={{
-                  margin: formMode === "login" ? "0" : "0 0 10px",
+                  margin: (formMode === "login" || formMode === "2fa") ? "0" : "0 0 10px",
                   fontSize: 32,
                   lineHeight: 1.1,
                   fontWeight: 600,
@@ -462,9 +510,14 @@ function LoginScreen({ onLogin }) {
                   color: C.textPrimary,
                   letterSpacing: "0.01em"
                 }}>
-                  {formMode === "login" ? "Sign In" : formMode === "forgot" ? "Reset Password" : "Check Your Email"}
+                  {formMode === "login" ? "Sign In" : formMode === "2fa" ? "Verify Identity" : formMode === "forgot" ? "Reset Password" : "Check Your Email"}
                 </h1>
-                {formMode !== "login" && (
+                {formMode === "2fa" && (
+                  <p style={{ margin: "6px 0 0", color: C.textSecondary, fontSize: 13, lineHeight: 1.5 }}>
+                    Two-factor authentication is enabled. Please enter the 6-digit code from your authenticator app or an unused emergency recovery code.
+                  </p>
+                )}
+                {(formMode === "forgot" || formMode === "forgot_success") && (
                   <p style={{ margin: 0, color: C.textSecondary, fontSize: 13, lineHeight: 1.62 }}>
                     {formMode === "forgot"
                       ? "Enter your registered email address below, and we will send you a secure link to reset your password."
@@ -706,6 +759,113 @@ function LoginScreen({ onLogin }) {
                       />
                     )}
                     {loading ? "Signing in..." : "Sign In"}
+                  </button>
+                </form>
+              )}
+
+              {formMode === "2fa" && (
+                <form onSubmit={handle2FA}>
+                  <div style={{ display: "grid", gap: 16, marginBottom: 20 }}>
+                    <label style={{ display: "block" }}>
+                      <span style={{
+                        display: "block",
+                        marginBottom: 7,
+                        fontSize: 9.5,
+                        fontWeight: 700,
+                        letterSpacing: "0.14em",
+                        textTransform: "uppercase",
+                        color: error ? C.errorText : focusedField === "otp" ? C.gold : C.textMuted
+                      }}>
+                        Verification Code / Recovery Code
+                      </span>
+                      <input
+                        style={inputStyle("otp")}
+                        type="text"
+                        disabled={loading}
+                        value={twoFactorCode}
+                        onFocus={() => setFocusedField("otp")}
+                        onBlur={() => setFocusedField("")}
+                        onChange={(event) => { setTwoFactorCode(event.target.value); setError(""); }}
+                        placeholder="Enter 6-digit code or recovery code"
+                        autoComplete="one-time-code"
+                        required
+                        autoFocus
+                      />
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    style={{
+                      width: "100%",
+                      padding: "13px 16px",
+                      border: "none",
+                      borderRadius: 8,
+                      background: loading ? C.goldDeep : C.gold,
+                      color: C.buttonText,
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      letterSpacing: "0.18em",
+                      textTransform: "uppercase",
+                      cursor: loading ? "not-allowed" : "pointer",
+                      transition: "all 0.20s ease",
+                      boxShadow: loading ? "none" : C.buttonShadow,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 10,
+                      outline: "none",
+                      marginBottom: 16
+                    }}
+                    onMouseEnter={(event) => { if (!loading) event.currentTarget.style.background = C.goldLight; }}
+                    onMouseLeave={(event) => { if (!loading) event.currentTarget.style.background = C.gold; }}
+                  >
+                    {loading && (
+                      <span
+                        style={{
+                          width: 13,
+                          height: 13,
+                          borderRadius: "50%",
+                          border: "1.5px solid rgba(255,255,255,0.2)",
+                          borderTopColor: C.buttonText,
+                          display: "inline-block",
+                          animation: "loginSpin 0.75s linear infinite",
+                        }}
+                      />
+                    )}
+                    {loading ? "Verifying..." : "Verify & Sign In"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormMode("login");
+                      setPass("");
+                      setError("");
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "13px 16px",
+                      border: `1.5px solid ${C.goldBorder}`,
+                      borderRadius: 8,
+                      background: "transparent",
+                      color: C.gold,
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      letterSpacing: "0.18em",
+                      textTransform: "uppercase",
+                      cursor: "pointer",
+                      transition: "all 0.20s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      outline: "none"
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(140, 107, 42, 0.05)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    Back to Login
                   </button>
                 </form>
               )}

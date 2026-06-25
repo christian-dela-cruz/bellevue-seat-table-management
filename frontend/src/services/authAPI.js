@@ -6,7 +6,7 @@ export const authAPI = {
     try {
       const response = await api.post('/auth/login', credentials);
       
-      if (response.success) {
+      if (response.success && response.token) {
         // Store token and user data
         localStorage.setItem('admin_token', response.token);
         localStorage.setItem('admin_user', JSON.stringify(response.admin));
@@ -104,6 +104,48 @@ export const authAPI = {
 
     return response;
   },
+
+  // Verify 2FA code during login
+  verify2FALogin: async (tempToken, code) => {
+    try {
+      const response = await api.post('/auth/2fa/verify', { temp_token: tempToken, code });
+      if (response.success && response.token) {
+        localStorage.setItem('admin_token', response.token);
+        localStorage.setItem('admin_user', JSON.stringify(response.admin));
+      }
+      return response;
+    } catch (error) {
+      console.error('2FA verification login error:', error);
+      throw error;
+    }
+  },
+
+  // Password verification
+  verifyPassword: (password) => api.post('/admin/accounts/verify-password', { password }),
+
+  // Request email change
+  requestEmailChange: (new_email, password) => api.post('/admin/accounts/request-email-change', { new_email, password }),
+
+  // Confirm email change
+  confirmEmailChange: (code) => api.post('/admin/accounts/confirm-email-change', { code }),
+
+  // 2FA Setup
+  setup2FA: () => api.post('/admin/accounts/2fa/setup'),
+
+  // Enable 2FA
+  enable2FA: (secret, code) => api.post('/admin/accounts/2fa/enable', { secret, code }),
+
+  // Disable 2FA
+  disable2FA: (password) => api.post('/admin/accounts/2fa/disable', { password }),
+
+  // Get audit logs
+  getAuditLogs: () => api.get('/admin/accounts/me/audit-logs'),
+
+  // Get active sessions
+  getActiveSessions: () => api.get('/admin/accounts/me/sessions'),
+
+  // Revoke session
+  revokeSession: (id) => api.delete(`/admin/accounts/me/sessions/${id}`),
 
   // Clear auth data
   clearAuth: () => {

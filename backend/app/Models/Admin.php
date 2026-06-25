@@ -20,11 +20,16 @@ class Admin extends Model
         'scope_type',
         'outlet_scope',
         'is_active',
+        'two_factor_enabled',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     protected $casts = [
@@ -34,6 +39,8 @@ class Admin extends Model
         'scope_type' => 'string',
         'outlet_scope' => 'array',
         'is_active' => 'boolean',
+        'two_factor_enabled' => 'boolean',
+        'two_factor_recovery_codes' => 'array',
     ];
 
     public function dbRole()
@@ -49,5 +56,10 @@ class Admin extends Model
     public function auditLogs()
     {
         return $this->hasMany(AuditLog::class);
+    }
+
+    public function sessions()
+    {
+        return $this->hasMany(AdminSession::class);
     }
 }

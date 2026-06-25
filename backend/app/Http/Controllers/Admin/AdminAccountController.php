@@ -5,13 +5,18 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\AdminAccess;
 use App\Models\Admin;
+use App\Models\AuditLog;
+use App\Models\AdminSession;
+use App\Models\AdminEmailChange;
+use App\Mail\AdminEmailChangeVerificationMail;
+use App\Mail\AdminActivationInviteMail;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\AdminActivationInviteMail;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\Rule;
 
 class AdminAccountController extends Controller
 {
@@ -237,28 +242,292 @@ class AdminAccountController extends Controller
 
         $updates = [
             'name' => $validated['name'],
-            'email' => $validated['email'],
-            'username' => $validated['username'],
         ];
 
-        if (!empty($validated['password'])) {
+        // Ensure username updates check the password first
+        $usernameChanged = $validated['username'] !== $admin->username;
+        if ($usernameChanged || !empty($validated['password'])) {
             if (empty($validated['current_password']) || !Hash::check($validated['current_password'], $admin->password)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Current password is incorrect.',
+                    'message' => 'Current password is required to change username or password.',
                 ], 422);
             }
+            if ($usernameChanged) {
+                $updates['username'] = $validated['username'];
+            }
+            if (!empty($validated['password'])) {
+                $updates['password'] = $validated['password'];
+            }
+        }
 
-            $updates['password'] = $validated['password'];
+        // We do NOT update email here if it changed. Direct email updates must go through verify OTP routes.
+        // We only allow it here if it matches the current email to avoid throwing validator errors.
+        if ($validated['email'] === $admin->email) {
+            $updates['email'] = $validated['email'];
+        } else {
+            // Log a warning or simply notify that email changes require verification
+            \Log::info("Ignoring direct email update request in updateProfile for admin ID: " . $admin->id);
         }
 
         $admin->update($updates);
-        $payload = $this->authService->adminPayload($admin->fresh());
+        
+        // Log to audit log
+        \App\Models\AuditLog::create([
+            'action' => 'updated_profile',
+            'model_type' => Admin::class,
+            'model_id' => $admin->id,
+            'admin_id' => $admin->id,
+            'ip_address' => $request->ip(),
+        ]);
+
+        // Sync admin payload in cache
+        $token = $request->bearerToken() ?: $request->header('X-Admin-Token');
+        if ($token) {
+            $payload = $this->authService->adminPayload($admin->fresh());
+            Cache::put('admin_token:' . hash('sha256', $token), $payload, now()->addHours(8));
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Profile updated successfully.',
-            'admin' => $payload,
+            'admin' => $this->authService->adminPayload($admin->fresh()),
+        ]);
+    }
+
+    public function myAuditLogs(Request $request): JsonResponse
+    {
+        $actor = $this->currentAdmin($request);
+        $logs = AuditLog::where('admin_id', $actor['id'])
+            ->orderBy('created_at', 'desc')
+            ->limit(15)
+            ->get()
+            ->map(function ($log) {
+                return [
+                    'id' => $log->id,
+                    'action' => $log->action,
+                    'model_type' => basename(str_replace('\\', '/', $log->model_type)),
+                    'ip_address' => $log->ip_address,
+                    'created_at' => $log->created_at->toISOString(),
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $logs,
+        ]);
+    }
+
+    public function activeSessions(Request $request): JsonResponse
+    {
+        $actor = $this->currentAdmin($request);
+        $token = $request->bearerToken() ?: $request->header('X-Admin-Token');
+        $currentTokenHash = hash('sha256', $token ?: '');
+
+        $sessions = AdminSession::where('admin_id', $actor['id'])
+            ->orderBy('last_active_at', 'desc')
+            ->get()
+            ->map(function ($session) use ($currentTokenHash) {
+                return [
+                    'id' => $session->id,
+                    'ip_address' => $session->ip_address,
+                    'device' => $this->parseUserAgent($session->user_agent),
+                    'last_active_at' => $session->last_active_at ? $session->last_active_at->toISOString() : null,
+                    'is_current' => $session->token_hash === $currentTokenHash,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $sessions,
+        ]);
+    }
+
+    private function parseUserAgent($userAgent): string
+    {
+        if (empty($userAgent)) return 'Unknown Device';
+        
+        $os = 'Unknown OS';
+        if (preg_match('/windows/i', $userAgent)) $os = 'Windows';
+        elseif (preg_match('/macintosh|mac os x/i', $userAgent)) $os = 'macOS';
+        elseif (preg_match('/iphone|ipad|ipod/i', $userAgent)) $os = 'iOS';
+        elseif (preg_match('/android/i', $userAgent)) $os = 'Android';
+        elseif (preg_match('/linux/i', $userAgent)) $os = 'Linux';
+        
+        $browser = 'Unknown Browser';
+        if (preg_match('/chrome/i', $userAgent) && !preg_match('/edge|edg/i', $userAgent)) $browser = 'Chrome';
+        elseif (preg_match('/safari/i', $userAgent) && !preg_match('/chrome/i', $userAgent)) $browser = 'Safari';
+        elseif (preg_match('/firefox/i', $userAgent)) $browser = 'Firefox';
+        elseif (preg_match('/edge|edg/i', $userAgent)) $browser = 'Edge';
+        elseif (preg_match('/msie|trident/i', $userAgent)) $browser = 'Internet Explorer';
+        
+        return "{$browser} on {$os}";
+    }
+
+    public function revokeSession(Request $request, $id): JsonResponse
+    {
+        $actor = $this->currentAdmin($request);
+        $session = AdminSession::where('admin_id', $actor['id'])->where('id', $id)->first();
+        
+        if (!$session) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Session not found.',
+            ], 404);
+        }
+
+        $token = $request->bearerToken() ?: $request->header('X-Admin-Token');
+        if ($session->token_hash === hash('sha256', $token ?: '')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot revoke your active current session.',
+            ], 400);
+        }
+
+        $session->delete();
+        Cache::forget('admin_token:' . $session->token_hash);
+
+        AuditLog::create([
+            'action' => 'revoked_session',
+            'model_type' => Admin::class,
+            'model_id' => $actor['id'],
+            'admin_id' => $actor['id'],
+            'ip_address' => $request->ip(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Session revoked successfully.',
+        ]);
+    }
+
+    public function verifyPassword(Request $request): JsonResponse
+    {
+        $actor = $this->currentAdmin($request);
+        $admin = Admin::findOrFail($actor['id']);
+
+        $request->validate([
+            'password' => ['required', 'string'],
+        ]);
+
+        if (!Hash::check($request->password, $admin->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Current password is incorrect.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password verified successfully.',
+        ]);
+    }
+
+    public function requestEmailChange(Request $request): JsonResponse
+    {
+        $actor = $this->currentAdmin($request);
+        $admin = Admin::findOrFail($actor['id']);
+
+        $request->validate([
+            'new_email' => ['required', 'email', 'max:255', 'unique:admins,email'],
+            'password' => ['required', 'string'],
+        ]);
+
+        if (!Hash::check($request->password, $admin->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Current password is incorrect.',
+            ], 422);
+        }
+
+        $code = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+
+        AdminEmailChange::updateOrCreate(
+            ['admin_id' => $admin->id],
+            [
+                'new_email' => $request->new_email,
+                'code' => Hash::make($code),
+                'expires_at' => now()->addMinutes(15),
+            ]
+        );
+
+        try {
+            Mail::to($request->new_email)->send(new AdminEmailChangeVerificationMail($code, $admin->name));
+        } catch (\Exception $e) {
+            \Log::error('Failed to send email verification code: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send verification email. Please check your mail settings.',
+            ], 500);
+        }
+
+        \Log::info("Email change verification code generated for admin ID {$admin->id} ({$request->new_email}): {$code}");
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Verification code sent successfully to your new email.',
+        ]);
+    }
+
+    public function confirmEmailChange(Request $request): JsonResponse
+    {
+        $actor = $this->currentAdmin($request);
+        $admin = Admin::findOrFail($actor['id']);
+
+        $request->validate([
+            'code' => ['required', 'string', 'size:6'],
+        ]);
+
+        $pendingChange = AdminEmailChange::where('admin_id', $admin->id)->first();
+
+        if (!$pendingChange) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No email change request found for this account.',
+            ], 404);
+        }
+
+        if ($pendingChange->expires_at->isPast()) {
+            $pendingChange->delete();
+            return response()->json([
+                'success' => false,
+                'message' => 'Verification code has expired. Please request a new code.',
+            ], 422);
+        }
+
+        if (!Hash::check($request->code, $pendingChange->code)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid verification code.',
+            ], 422);
+        }
+
+        $oldEmail = $admin->email;
+        $newEmail = $pendingChange->new_email;
+
+        $admin->update(['email' => $newEmail]);
+        $pendingChange->delete();
+
+        AuditLog::create([
+            'action' => 'updated_email',
+            'model_type' => Admin::class,
+            'model_id' => $admin->id,
+            'admin_id' => $admin->id,
+            'old_values' => ['email' => $oldEmail],
+            'new_values' => ['email' => $newEmail],
+            'ip_address' => $request->ip(),
+        ]);
+
+        $token = $request->bearerToken() ?: $request->header('X-Admin-Token');
+        if ($token) {
+            $payload = $this->authService->adminPayload($admin->fresh());
+            Cache::put('admin_token:' . hash('sha256', $token), $payload, now()->addHours(8));
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email address updated successfully.',
+            'admin' => $this->authService->adminPayload($admin->fresh()),
         ]);
     }
 
@@ -363,6 +632,103 @@ class AdminAccountController extends Controller
             'created_at' => optional($admin->created_at)->toISOString(),
             'updated_at' => optional($admin->updated_at)->toISOString(),
         ];
+    }
+
+    public function setup2FA(Request $request): JsonResponse
+    {
+        $actor = $this->currentAdmin($request);
+        $admin = Admin::findOrFail($actor['id']);
+
+        $secret = \App\Services\Google2FAService::generateSecret();
+        $provisioningUri = \App\Services\Google2FAService::getProvisioningUri($admin->username ?: $admin->email, $secret);
+        $qrUrl = 'https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=' . urlencode($provisioningUri);
+
+        return response()->json([
+            'success' => true,
+            'secret' => $secret,
+            'qr_url' => $qrUrl,
+        ]);
+    }
+
+    public function enable2FA(Request $request): JsonResponse
+    {
+        $actor = $this->currentAdmin($request);
+        $admin = Admin::findOrFail($actor['id']);
+
+        $validated = $request->validate([
+            'secret' => ['required', 'string', 'size:16'],
+            'code' => ['required', 'string', 'size:6'],
+        ]);
+
+        $verified = \App\Services\Google2FAService::verifyCode($validated['secret'], $validated['code']);
+
+        if (!$verified) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid verification code. Please check your authenticator app.',
+            ], 422);
+        }
+
+        $recoveryCodes = [];
+        for ($i = 0; $i < 8; $i++) {
+            $recoveryCodes[] = \Illuminate\Support\Str::random(10);
+        }
+
+        $admin->update([
+            'two_factor_enabled' => true,
+            'two_factor_secret' => $validated['secret'],
+            'two_factor_recovery_codes' => $recoveryCodes,
+        ]);
+
+        AuditLog::create([
+            'action' => 'enabled_2fa',
+            'model_type' => Admin::class,
+            'model_id' => $admin->id,
+            'admin_id' => $admin->id,
+            'ip_address' => $request->ip(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Two-factor authentication has been enabled.',
+            'recovery_codes' => $recoveryCodes,
+        ]);
+    }
+
+    public function disable2FA(Request $request): JsonResponse
+    {
+        $actor = $this->currentAdmin($request);
+        $admin = Admin::findOrFail($actor['id']);
+
+        $validated = $request->validate([
+            'password' => ['required', 'string'],
+        ]);
+
+        if (!Hash::check($validated['password'], $admin->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Incorrect password.',
+            ], 422);
+        }
+
+        $admin->update([
+            'two_factor_enabled' => false,
+            'two_factor_secret' => null,
+            'two_factor_recovery_codes' => null,
+        ]);
+
+        AuditLog::create([
+            'action' => 'disabled_2fa',
+            'model_type' => Admin::class,
+            'model_id' => $admin->id,
+            'admin_id' => $admin->id,
+            'ip_address' => $request->ip(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Two-factor authentication has been disabled.',
+        ]);
     }
 
     private function currentAdmin(Request $request): ?array

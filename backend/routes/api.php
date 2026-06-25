@@ -31,6 +31,7 @@ Route::prefix('auth')->group(function () {
     Route::get('/activate/{token}', [AuthController::class, 'showActivationDetails']);
     Route::post('/activate/{token}', [AuthController::class, 'activate']);
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/2fa/verify', [AuthController::class, 'verify2FA']);
 });
 
 // Admin authentication routes
@@ -42,6 +43,16 @@ Route::prefix('admin/accounts')->group(function () {
     Route::get('/', [AdminAccountController::class, 'index'])->middleware(AdminAccess::class . ':manage_accounts');
     Route::post('/', [AdminAccountController::class, 'store'])->middleware(AdminAccess::class . ':manage_accounts');
     Route::put('/me', [AdminAccountController::class, 'updateProfile'])->middleware(AdminAccess::class . ':view_admin');
+    Route::get('/me/audit-logs', [AdminAccountController::class, 'myAuditLogs'])->middleware(AdminAccess::class . ':view_admin');
+    Route::get('/me/sessions', [AdminAccountController::class, 'activeSessions'])->middleware(AdminAccess::class . ':view_admin');
+    Route::delete('/me/sessions/{id}', [AdminAccountController::class, 'revokeSession'])->middleware(AdminAccess::class . ':view_admin');
+    Route::post('/verify-password', [AdminAccountController::class, 'verifyPassword'])->middleware(AdminAccess::class . ':view_admin');
+    Route::post('/request-email-change', [AdminAccountController::class, 'requestEmailChange'])->middleware(AdminAccess::class . ':view_admin');
+    Route::post('/confirm-email-change', [AdminAccountController::class, 'confirmEmailChange'])->middleware(AdminAccess::class . ':view_admin');
+    Route::post('/2fa/setup', [AdminAccountController::class, 'setup2FA'])->middleware(AdminAccess::class . ':view_admin');
+    Route::post('/2fa/enable', [AdminAccountController::class, 'enable2FA'])->middleware(AdminAccess::class . ':view_admin');
+    Route::post('/2fa/disable', [AdminAccountController::class, 'disable2FA'])->middleware(AdminAccess::class . ':view_admin');
+    
     Route::put('/{admin}', [AdminAccountController::class, 'update'])->middleware(AdminAccess::class . ':manage_accounts');
     Route::patch('/{admin}/deactivate', [AdminAccountController::class, 'deactivate'])->middleware(AdminAccess::class . ':manage_accounts');
     Route::patch('/{admin}/reactivate', [AdminAccountController::class, 'reactivate'])->middleware(AdminAccess::class . ':manage_accounts');

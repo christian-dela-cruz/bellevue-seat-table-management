@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   AlertCircle,
   Bell,
@@ -15,14 +15,13 @@ import {
   UserCircle,
 } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
+import VerificationModal from "../components/VerificationModal";
+import TwoFactorSetupModal from "../components/TwoFactorSetupModal";
 import { AdminPageHeader } from "../../../components/layout/AdminPage";
 import Sidebar from "../../../components/layout/Sidebar";
 import { authAPI } from "../../../services/authAPI";
 import { roleAPI } from "../../../services/roleAPI";
-import { useEffect } from "react";
 import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
-
-
 
 const DEFAULT_PREFERENCES = {
   reservationAlerts: true,
@@ -71,12 +70,12 @@ function readStoredAvatar(user) {
 function inputStyle(extra = {}) {
   return {
     width: "100%",
-    minHeight: 42,
+    minHeight: 38,
     border: `1px solid ${C.border}`,
-    borderRadius: 10,
-    padding: "10px 14px",
+    borderRadius: 8,
+    padding: "8px 12px",
     fontFamily: F.body,
-    fontSize: 13.5,
+    fontSize: 12.8,
     color: C.text,
     background: C.surface,
     outline: "none",
@@ -89,24 +88,24 @@ function buttonStyle(kind = "primary", disabled = false) {
   const primary = kind === "primary";
   const ghost = kind === "ghost";
   return {
-    minHeight: 42,
-    padding: "0 16px",
+    minHeight: 36,
+    padding: "0 14px",
     border: ghost ? "1px solid transparent" : `1px solid ${primary ? "rgba(140,107,42,0.22)" : C.border}`,
-    borderRadius: 10,
+    borderRadius: 8,
     background: disabled ? "rgba(0,0,0,0.04)" : primary ? C.gold : ghost ? "transparent" : C.surface,
     color: disabled ? C.faint : primary ? "#FFFFFF" : ghost ? C.muted : C.gold,
     fontFamily: F.label,
     fontSize: 11,
-    fontWeight: 800,
-    letterSpacing: "0.12em",
+    fontWeight: 700,
+    letterSpacing: "0.06em",
     textTransform: "uppercase",
     cursor: disabled ? "not-allowed" : "pointer",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 6,
     whiteSpace: "nowrap",
-    boxShadow: primary && !disabled ? "0 4px 12px rgba(140,107,42,0.12)" : "none",
+    boxShadow: primary && !disabled ? "0 2px 6px rgba(140,107,42,0.08)" : "none",
     transition: "background 0.16s ease, border-color 0.16s ease, transform 0.16s ease",
   };
 }
@@ -129,33 +128,13 @@ function Spinner({ color = C.gold, size = 13 }) {
 
 function Field({ label, hint, children }) {
   return (
-    <label style={{ display: "grid", gap: 8, minWidth: 0, textAlign: "left" }}>
-      <span style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted }}>
+    <label style={{ display: "grid", gap: 6, minWidth: 0, textAlign: "left" }}>
+      <span style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>
         {label}
       </span>
       {children}
-      {hint && <span style={{ fontSize: 12, lineHeight: 1.45, color: C.muted, display: "block" }}>{hint}</span>}
+      {hint && <span style={{ fontSize: 11, lineHeight: 1.4, color: C.muted, display: "block", marginTop: 2 }}>{hint}</span>}
     </label>
-  );
-}
-
-function Panel({ eyebrow, title, description, children, actions }) {
-  return (
-    <section style={{ background: C.surface, border: `1px solid rgba(0,0,0,0.04)`, borderRadius: 16, boxShadow: "0 12px 36px rgba(24,20,14,0.02), 0 4px 12px rgba(24,20,14,0.02)", overflow: "hidden" }}>
-      <div style={{ padding: "24px 28px 20px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-        <div style={{ minWidth: 0 }}>
-          {eyebrow && (
-            <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>
-              {eyebrow}
-            </div>
-          )}
-          <h2 style={{ margin: 0, fontSize: 20, lineHeight: 1.25, color: C.text, fontWeight: 700 }}>{title}</h2>
-          {description && <p style={{ margin: "6px 0 0", fontSize: 13, lineHeight: 1.55, color: C.muted }}>{description}</p>}
-        </div>
-        {actions && <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>{actions}</div>}
-      </div>
-      <div style={{ padding: "0 28px 28px" }}>{children}</div>
-    </section>
   );
 }
 
@@ -165,8 +144,8 @@ function Notice({ type = "success", children }) {
   const bg = isError ? C.redFaint : C.greenFaint;
   const Icon = isError ? AlertCircle : CheckCircle2;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", background: bg, color, border: `1px solid ${color}2A`, borderRadius: 10, fontSize: 13, lineHeight: 1.45 }}>
-      <Icon size={18} />
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: bg, color, border: `1px solid ${color}2A`, borderRadius: 8, fontSize: 12.5, lineHeight: 1.45 }}>
+      <Icon size={16} />
       <span>{children}</span>
     </div>
   );
@@ -180,22 +159,21 @@ function SettingsNavButton({ section, active, onClick }) {
       onClick={onClick}
       style={{
         width: "100%",
-        minHeight: 48,
+        minHeight: 38,
         border: "none",
-        borderLeft: active ? `3px solid ${C.gold}` : "3px solid transparent",
         borderRadius: 8,
-        background: active ? C.surface : "transparent",
+        background: active ? C.goldFaint : "transparent",
         color: active ? C.gold : C.muted,
-        display: "grid",
-        gridTemplateColumns: "20px minmax(0,1fr)",
-        gap: 12,
+        display: "flex",
         alignItems: "center",
+        gap: 10,
         textAlign: "left",
-        padding: "12px 16px",
+        padding: "8px 12px",
         cursor: "pointer",
         fontFamily: F.body,
-        transition: "background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, border-left 0.16s ease",
-        boxShadow: active ? "0 4px 12px rgba(24,20,14,0.04)" : "none",
+        fontSize: 13,
+        fontWeight: active ? 600 : 500,
+        transition: "background 0.16s ease, color 0.16s ease",
       }}
       onMouseEnter={(event) => {
         if (!active) {
@@ -210,10 +188,9 @@ function SettingsNavButton({ section, active, onClick }) {
         }
       }}
     >
-      <Icon size={18} />
-      <span style={{ minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: 13, fontWeight: active ? 720 : 560 }}>{section.label}</span>
-        <span style={{ display: "block", marginTop: 2, fontSize: 11.5, lineHeight: 1.3, color: active ? C.goldSoft : C.faint }}>{section.description}</span>
+      <Icon size={16} style={{ flexShrink: 0 }} />
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {section.label}
       </span>
     </button>
   );
@@ -221,56 +198,52 @@ function SettingsNavButton({ section, active, onClick }) {
 
 function ToggleRow({ title, description, checked, onChange, disabled = false }) {
   return (
-    <button
-      type="button"
-      onClick={() => !disabled && onChange(!checked)}
-      disabled={disabled}
+    <div
       style={{
-        width: "100%",
-        border: `1px solid ${checked ? "rgba(46,122,90,0.18)" : C.border}`,
-        borderRadius: 10,
-        background: checked ? C.greenFaint : C.surfaceSoft,
-        padding: "16px 20px",
-        display: "grid",
-        gridTemplateColumns: "minmax(0,1fr) auto",
-        gap: 14,
+        display: "flex",
         alignItems: "center",
-        textAlign: "left",
-        cursor: disabled ? "not-allowed" : "pointer",
+        justifyContent: "space-between",
+        padding: "10px 0",
+        borderBottom: `1px solid ${C.divider}`,
         opacity: disabled ? 0.6 : 1,
       }}
     >
-      <span style={{ minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: C.text }}>{title}</span>
-        {description && <span style={{ display: "block", marginTop: 3, fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{description}</span>}
-      </span>
-      <span
-        aria-hidden="true"
+      <div style={{ minWidth: 0, paddingRight: 16 }}>
+        <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.text }}>{title}</span>
+        {description && <span style={{ display: "block", marginTop: 2, fontSize: 11.5, color: C.muted, lineHeight: 1.4 }}>{description}</span>}
+      </div>
+      <button
+        type="button"
+        onClick={() => !disabled && onChange(!checked)}
+        disabled={disabled}
         style={{
-          width: 42,
-          height: 24,
+          width: 38,
+          height: 20,
           borderRadius: 999,
           background: checked ? C.gold : "rgba(0,0,0,0.12)",
+          border: "none",
           position: "relative",
           transition: "background 0.16s ease",
+          cursor: "pointer",
           flexShrink: 0,
+          outline: "none",
         }}
       >
         <span
           style={{
             position: "absolute",
-            top: 3,
-            left: checked ? 21 : 3,
-            width: 18,
-            height: 18,
+            top: 2,
+            left: checked ? 20 : 2,
+            width: 16,
+            height: 16,
             borderRadius: "50%",
             background: "#FFFFFF",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.18)",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
             transition: "left 0.16s ease",
           }}
         />
-      </span>
-    </button>
+      </button>
+    </div>
   );
 }
 
@@ -293,21 +266,23 @@ function PasswordInput({ value, onChange, placeholder, visible, onToggle, requir
         style={{ position: "absolute", right: 7, top: "50%", transform: "translateY(-50%)", width: 30, height: 30, border: "none", borderRadius: 7, background: "transparent", color: C.faint, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         aria-label={visible ? "Hide password" : "Show password"}
       >
-        <Icon size={15} />
+        <Icon size={14} />
       </button>
     </div>
   );
 }
 
 export default function AccountSettings() {
-  const { isDark } = useAdminTheme();
+  const { isDark, updateUser, updateAvatar } = useAdminTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentUser, setCurrentUser] = useState(() => authAPI.getCurrentUser() || {});
   const [activeSection, setActiveSection] = useState("profile");
   const [message, setMessage] = useState(null);
+  
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingSecurity, setSavingSecurity] = useState(false);
   const [savingPreferences, setSavingPreferences] = useState(false);
+  
   const [savedAvatar, setSavedAvatar] = useState(() => readStoredAvatar(currentUser));
   const [avatarPreview, setAvatarPreview] = useState(() => readStoredAvatar(currentUser));
   const [showPasswords, setShowPasswords] = useState({
@@ -315,6 +290,64 @@ export default function AccountSettings() {
     next: false,
     confirm: false,
   });
+
+  const [sessions, setSessions] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+  
+  // Modals state
+  const [verificationModalOpen, setVerificationModalOpen] = useState(false);
+  const [verifTargetEmail, setVerifTargetEmail] = useState("");
+  const [verifTargetUsername, setVerifTargetUsername] = useState("");
+  
+  const [tfSetupModalOpen, setTfSetupModalOpen] = useState(false);
+  const [tfSetupMode, setTfSetupMode] = useState("setup");
+
+  const fetchSessions = async () => {
+    setLoadingSessions(true);
+    try {
+      const res = await authAPI.getActiveSessions();
+      if (res.success) {
+        setSessions(res.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to load sessions:", err);
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  const fetchAuditLogs = async () => {
+    setLoadingAuditLogs(true);
+    try {
+      const res = await authAPI.getAuditLogs();
+      if (res.success) {
+        setAuditLogs(res.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to load audit logs:", err);
+    } finally {
+      setLoadingAuditLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSessions();
+    fetchAuditLogs();
+  }, []);
+
+  const handleRevokeSession = async (id) => {
+    try {
+      const res = await authAPI.revokeSession(id);
+      if (res.success) {
+        showMessage({ type: "success", text: "Session revoked successfully." });
+        fetchSessions();
+      }
+    } catch (err) {
+      showMessage({ type: "error", text: err.message || "Failed to revoke session." });
+    }
+  };
   const [availableRoles, setAvailableRoles] = useState([]);
 
   useEffect(() => {
@@ -336,6 +369,7 @@ export default function AccountSettings() {
   });
 
   const [preferences, setPreferences] = useState(() => readStoredPreferences());
+  const [savedPreferences, setSavedPreferences] = useState(() => readStoredPreferences());
 
   const role = currentUser.role || "admin";
   const displayName = profile.name || currentUser.username || "Admin";
@@ -347,11 +381,21 @@ export default function AccountSettings() {
     [currentUser.outlet_scope]
   );
   const hasFullScope = currentUser.scope_type !== "assigned";
+  
   const profileTextDirty = profile.name !== (currentUser.name || "")
     || profile.email !== (currentUser.email || "")
     || profile.username !== (currentUser.username || "");
   const avatarDirty = avatarPreview !== savedAvatar;
   const profileDirty = profileTextDirty || avatarDirty;
+
+  const securityDirty = Boolean(security.current_password || security.password || security.password_confirmation);
+
+  const preferencesDirty = preferences.reservationAlerts !== savedPreferences.reservationAlerts
+    || preferences.cancellationAlerts !== savedPreferences.cancellationAlerts
+    || preferences.reportNotifications !== savedPreferences.reportNotifications
+    || preferences.systemUpdates !== savedPreferences.systemUpdates;
+
+  const isDirty = profileDirty || securityDirty || preferencesDirty;
 
   const passwordStrength = useMemo(() => {
     const value = security.password || "";
@@ -366,63 +410,27 @@ export default function AccountSettings() {
     return { label: "Strong", score, color: C.green };
   }, [security.password]);
 
-  const sections = [
-    { id: "profile", label: "Profile", description: "Identity and role", icon: UserCircle },
-    { id: "security", label: "Security", description: "Password access", icon: Shield },
-    { id: "notifications", label: "Notifications", description: "Operational alerts", icon: Bell },
-    { id: "sessions", label: "Sessions", description: "Login activity", icon: Laptop },
+  const groups = [
+    {
+      title: "General",
+      items: [
+        { id: "profile", label: "Profile", icon: UserCircle },
+        { id: "notifications", label: "Notifications", icon: Bell },
+      ]
+    },
+    {
+      title: "Security & Access",
+      items: [
+        { id: "security", label: "Security", icon: Shield },
+        { id: "sessions", label: "Sessions", icon: Laptop },
+        { id: "audit-logs", label: "Audit Logs", icon: CheckCircle2 },
+      ]
+    }
   ];
-
-  const scopedLabel = hasFullScope
-    ? "All venues and outlets"
-    : assignedVenues.length
-      ? `${assignedVenues.length} assigned venue${assignedVenues.length === 1 ? "" : "s"}`
-      : "No assigned venues listed";
 
   const showMessage = (nextMessage) => {
     setMessage(nextMessage);
     window.setTimeout(() => setMessage(null), 4200);
-  };
-
-  const saveProfile = async (event) => {
-    event.preventDefault();
-    setSavingProfile(true);
-    setMessage(null);
-
-    try {
-      const previousAvatarKey = avatarKeyFor(currentUser);
-      let nextUser = currentUser;
-
-      if (profileTextDirty) {
-        const response = await authAPI.updateProfile(profile);
-        nextUser = response?.admin || { ...currentUser, ...profile };
-      }
-
-      const nextAvatarKey = avatarKeyFor(nextUser);
-      try {
-        if (avatarPreview) {
-          localStorage.setItem(nextAvatarKey, avatarPreview);
-        } else {
-          localStorage.removeItem(nextAvatarKey);
-        }
-        if (previousAvatarKey !== nextAvatarKey) {
-          localStorage.removeItem(previousAvatarKey);
-        }
-      } catch {}
-
-      setCurrentUser(nextUser);
-      setProfile({
-        name: nextUser.name || "",
-        email: nextUser.email || "",
-        username: nextUser.username || "",
-      });
-      setSavedAvatar(avatarPreview);
-      showMessage({ type: "success", text: "Profile information updated." });
-    } catch (error) {
-      showMessage({ type: "error", text: error.message || "Profile update failed." });
-    } finally {
-      setSavingProfile(false);
-    }
   };
 
   const uploadAvatar = (event) => {
@@ -441,7 +449,8 @@ export default function AccountSettings() {
     reader.onload = () => {
       const result = String(reader.result || "");
       setAvatarPreview(result);
-      showMessage({ type: "success", text: "Profile photo ready. Save profile to apply it." });
+      updateAvatar(result);
+      showMessage({ type: "success", text: "Profile photo ready. Save changes to apply." });
     };
     reader.readAsDataURL(file);
     event.target.value = "";
@@ -449,53 +458,284 @@ export default function AccountSettings() {
 
   const removeAvatar = () => {
     setAvatarPreview("");
-    showMessage({ type: "success", text: "Profile photo removal ready. Save profile to apply it." });
+    updateAvatar("");
+    showMessage({ type: "success", text: "Profile photo removal ready. Save changes to apply." });
   };
 
-  const resetProfileDraft = () => {
+  const resetAllDrafts = () => {
+    // Revert profile inputs & avatar
     setProfile({
       name: currentUser.name || "",
       email: currentUser.email || "",
       username: currentUser.username || "",
     });
     setAvatarPreview(savedAvatar);
+    updateAvatar(savedAvatar);
+
+    // Revert password fields
+    setSecurity({
+      current_password: "",
+      password: "",
+      password_confirmation: "",
+    });
+
+    // Revert notification preferences
+    setPreferences(savedPreferences);
   };
 
-  const saveSecurity = async (event) => {
-    event.preventDefault();
-    setSavingSecurity(true);
+  const handleSaveSubmit = async (e) => {
+    if (e) e.preventDefault();
+    
+    // Check if sensitive profile fields changed
+    const emailChanged = profile.email !== (currentUser.email || "");
+    const usernameChanged = profile.username !== (currentUser.username || "");
+    
+    if (emailChanged) {
+      setVerifTargetEmail(profile.email);
+      setVerifTargetUsername("");
+      setVerificationModalOpen(true);
+      return;
+    }
+    
+    if (usernameChanged) {
+      setVerifTargetEmail("");
+      setVerifTargetUsername(profile.username);
+      setVerificationModalOpen(true);
+      return;
+    }
+    
+    // Default direct save for non-sensitive edits
+    saveAllChanges();
+  };
+
+  const handleVerificationSuccess = async (confirmedPassword) => {
+    setVerificationModalOpen(false);
     setMessage(null);
-
+    let successCount = 0;
+    let failMessage = null;
+    
+    setSavingProfile(true);
     try {
-      if (security.password !== security.password_confirmation) {
-        throw new Error("New password and confirmation do not match.");
+      const emailChanged = profile.email !== (currentUser.email || "");
+      const usernameChanged = profile.username !== (currentUser.username || "");
+      
+      let nextUser = currentUser;
+      const previousAvatarKey = avatarKeyFor(currentUser);
+      
+      const payload = {
+        name: profile.name,
+        username: profile.username,
+        email: profile.email,
+      };
+      
+      if (usernameChanged) {
+        payload.current_password = confirmedPassword;
       }
-      await authAPI.updateProfile({
-        ...profile,
-        current_password: security.current_password,
-        password: security.password,
-        password_confirmation: security.password_confirmation,
-      });
-      setSecurity({ current_password: "", password: "", password_confirmation: "" });
-      showMessage({ type: "success", text: "Password updated successfully." });
+      
+      const response = await authAPI.updateProfile(payload);
+      nextUser = response?.admin || { ...currentUser, ...profile };
+      
+      const nextAvatarKey = avatarKeyFor(nextUser);
+      try {
+        if (avatarPreview) {
+          localStorage.setItem(nextAvatarKey, avatarPreview);
+        } else {
+          localStorage.removeItem(nextAvatarKey);
+        }
+        if (previousAvatarKey !== nextAvatarKey) {
+          localStorage.removeItem(previousAvatarKey);
+        }
+      } catch {}
+      
+      setCurrentUser(nextUser);
+      updateUser(nextUser);
+      updateAvatar(avatarPreview);
+      setSavedAvatar(avatarPreview);
+      successCount++;
+      
+      fetchSessions();
+      fetchAuditLogs();
+      
+      // If there were security password changes, let's also update them now that we have confirmed password!
+      if (securityDirty) {
+        setSavingSecurity(true);
+        try {
+          if (security.password !== security.password_confirmation) {
+            throw new Error("New password and confirmation do not match.");
+          }
+          await authAPI.updateProfile({
+            ...profile,
+            current_password: confirmedPassword,
+            password: security.password,
+            password_confirmation: security.password_confirmation,
+          });
+          setSecurity({ current_password: "", password: "", password_confirmation: "" });
+          successCount++;
+        } catch (secError) {
+          failMessage = secError.message || "Password update failed.";
+        } finally {
+          setSavingSecurity(false);
+        }
+      }
+      
+      // Save preferences if dirty
+      if (preferencesDirty) {
+        setSavingPreferences(true);
+        try {
+          localStorage.setItem(PREFERENCE_KEY, JSON.stringify(preferences));
+          setSavedPreferences(preferences);
+          successCount++;
+        } catch {
+          failMessage = "Unable to save preferences on this device.";
+        } finally {
+          setSavingPreferences(false);
+        }
+      }
+      
+      if (failMessage) {
+        showMessage({ type: "error", text: failMessage });
+      } else {
+        showMessage({ type: "success", text: "All changes saved successfully." });
+      }
+      
     } catch (error) {
-      showMessage({ type: "error", text: error.message || "Password update failed." });
+      showMessage({ type: "error", text: error.message || "Profile update failed." });
     } finally {
-      setSavingSecurity(false);
+      setSavingProfile(false);
     }
   };
 
-  const savePreferences = () => {
-    setSavingPreferences(true);
-    try {
-      localStorage.setItem(PREFERENCE_KEY, JSON.stringify(preferences));
-      showMessage({ type: "success", text: "Notification preferences saved on this device." });
-    } catch {
-      showMessage({ type: "error", text: "Unable to save preferences on this device." });
-    } finally {
-      window.setTimeout(() => setSavingPreferences(false), 250);
+  const saveAllChanges = async () => {
+    setMessage(null);
+    let successCount = 0;
+    let failMessage = null;
+
+    // 1. Save profile
+    if (profileDirty) {
+      setSavingProfile(true);
+      try {
+        const previousAvatarKey = avatarKeyFor(currentUser);
+        let nextUser = currentUser;
+
+        if (profileTextDirty) {
+          const response = await authAPI.updateProfile(profile);
+          nextUser = response?.admin || { ...currentUser, ...profile };
+        }
+
+        const nextAvatarKey = avatarKeyFor(nextUser);
+        try {
+          if (avatarPreview) {
+            localStorage.setItem(nextAvatarKey, avatarPreview);
+          } else {
+            localStorage.removeItem(nextAvatarKey);
+          }
+          if (previousAvatarKey !== nextAvatarKey) {
+            localStorage.removeItem(previousAvatarKey);
+          }
+        } catch {}
+
+        setCurrentUser(nextUser);
+        updateUser(nextUser);
+        updateAvatar(avatarPreview);
+        setSavedAvatar(avatarPreview);
+        successCount++;
+      } catch (error) {
+        failMessage = error.message || "Profile update failed.";
+      } finally {
+        setSavingProfile(false);
+      }
+    }
+
+    // 2. Save security
+    if (securityDirty) {
+      setSavingSecurity(true);
+      try {
+        if (security.password !== security.password_confirmation) {
+          throw new Error("New password and confirmation do not match.");
+        }
+        await authAPI.updateProfile({
+          ...profile,
+          current_password: security.current_password,
+          password: security.password,
+          password_confirmation: security.password_confirmation,
+        });
+        setSecurity({ current_password: "", password: "", password_confirmation: "" });
+        successCount++;
+      } catch (error) {
+        failMessage = error.message || "Password update failed.";
+      } finally {
+        setSavingSecurity(false);
+      }
+    }
+
+    // 3. Save preferences
+    if (preferencesDirty) {
+      setSavingPreferences(true);
+      try {
+        localStorage.setItem(PREFERENCE_KEY, JSON.stringify(preferences));
+        setSavedPreferences(preferences);
+        successCount++;
+      } catch {
+        failMessage = "Unable to save preferences on this device.";
+      } finally {
+        setSavingPreferences(false);
+      }
+    }
+
+    if (failMessage) {
+      showMessage({ type: "error", text: failMessage });
+    } else if (successCount > 0) {
+      showMessage({ type: "success", text: "All changes saved successfully." });
     }
   };
+
+  const scrollToSection = (id) => {
+    const el = document.getElementById(`settings-section-${id}`);
+    if (el) {
+      const container = document.querySelector(".account-settings-shell");
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const scrollTop = container.scrollTop + elRect.top - containerRect.top - 20; // 20px offset
+        container.scrollTo({ top: scrollTop, behavior: "smooth" });
+      }
+    }
+  };
+
+  useEffect(() => {
+    const container = document.querySelector(".account-settings-shell");
+    if (!container) return;
+
+    const observerOptions = {
+      root: container,
+      rootMargin: "-20% 0px -60% 0px",
+      threshold: 0,
+    };
+
+    const observerCallback = (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const id = entry.target.id.replace("settings-section-", "");
+          setActiveSection(id);
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+    const targets = ["profile", "notifications", "security", "sessions", "audit-logs"].map((id) =>
+      document.getElementById(`settings-section-${id}`)
+    );
+
+    targets.forEach((target) => {
+      if (target) observer.observe(target);
+    });
+
+    return () => {
+      targets.forEach((target) => {
+        if (target) observer.unobserve(target);
+      });
+    };
+  }, []);
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", fontFamily: F.body, background: C.pageBg, color: C.text }}>
@@ -508,34 +748,22 @@ export default function AccountSettings() {
         }
         .account-settings-grid {
           display: grid;
-          grid-template-columns: 286px minmax(0, 1fr);
-          gap: 18px;
+          grid-template-columns: 220px minmax(0, 1fr);
+          gap: 28px;
           align-items: start;
         }
         .account-form-grid {
           display: grid;
-          grid-template-columns: repeat(2, minmax(230px, 1fr));
-          gap: 13px 16px;
+          grid-template-columns: repeat(2, minmax(200px, 1fr));
+          gap: 12px 16px;
           align-items: start;
-          max-width: 860px;
-        }
-        .account-preference-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px;
+          max-width: 800px;
         }
         .account-profile-form-grid {
           display: grid;
-          grid-template-columns: 190px minmax(0, 1fr);
-          gap: 22px;
+          grid-template-columns: 1fr;
+          gap: 16px;
           align-items: start;
-        }
-        .account-password-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(220px, 1fr));
-          gap: 13px 16px;
-          align-items: start;
-          max-width: 620px;
         }
         @media (max-width: 1100px) {
           .account-settings-grid { grid-template-columns: 1fr; }
@@ -544,10 +772,7 @@ export default function AccountSettings() {
         @media (max-width: 760px) {
           .account-form-grid,
           .account-profile-form-grid,
-          .account-password-grid,
-          .account-preference-grid,
           .account-settings-nav { grid-template-columns: 1fr !important; }
-          .account-profile-hero { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
@@ -556,12 +781,12 @@ export default function AccountSettings() {
       <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
         <AdminNavbar />
 
-        <main className="account-settings-shell" style={{ flex: 1, minWidth: 0, overflow: "auto", padding: "30px 32px 42px" }}>
-          <div style={{ maxWidth: 1320, display: "grid", gap: 18 }}>
+        <main className="account-settings-shell" style={{ flex: 1, minWidth: 0, overflow: "auto", padding: "30px 32px 42px", position: "relative" }}>
+          <div style={{ maxWidth: 1080, display: "grid", gap: 18 }}>
             <AdminPageHeader
               eyebrow="ACCOUNT"
               title="Account Settings"
-              description="Manage your profile, security, notification preferences, and account access from one consistent admin page."
+              description="Manage your profile settings, configure devices preferences, set passwords, and monitor login activity from a single consolidated page."
               C={C}
               F={F}
             />
@@ -569,131 +794,175 @@ export default function AccountSettings() {
             {message && <Notice type={message.type}>{message.text}</Notice>}
 
             <div className="account-settings-grid">
-              <aside className="account-settings-nav" style={{ position: "sticky", top: 18, display: "grid", gap: 4, alignSelf: "start" }}>
-                {sections.map((section) => (
-                  <SettingsNavButton
-                    key={section.id}
-                    section={section}
-                    active={activeSection === section.id}
-                    onClick={() => setActiveSection(section.id)}
-                  />
+              {/* Sticky TOC */}
+              <aside className="account-settings-nav" style={{ position: "sticky", top: 0, display: "grid", gap: 16, alignSelf: "start", zIndex: 10 }}>
+                {groups.map((group) => (
+                  <div key={group.title} style={{ display: "grid", gap: 4 }}>
+                    <div style={{ fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.faint, paddingLeft: 12, marginBottom: 2 }}>
+                      {group.title}
+                    </div>
+                    {group.items.map((section) => (
+                      <SettingsNavButton
+                        key={section.id}
+                        section={section}
+                        active={activeSection === section.id}
+                        onClick={() => {
+                          setActiveSection(section.id);
+                          scrollToSection(section.id);
+                        }}
+                      />
+                    ))}
+                  </div>
                 ))}
               </aside>
 
-              <div style={{ display: "grid", gap: 18, minWidth: 0 }}>
-                {activeSection === "profile" && (
-                  <Panel
-                    eyebrow="Profile"
-                    title="Profile Information"
-                    description="Keep your account identity clear for reservation actions, reports, approvals, and audit trails."
-                    actions={profileDirty && (
-                      <span style={{ padding: "5px 9px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" }}>
+              {/* Main settings container (Unified Card) */}
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "24px 28px", boxShadow: "0 4px 18px rgba(0,0,0,0.015)", display: "grid", gap: 0, minWidth: 0, paddingBottom: 100 }}>
+                
+                {/* 1. Profile Section */}
+                <div id="settings-section-profile" style={{ borderBottom: `1px solid ${C.divider}`, paddingBottom: 24, marginBottom: 24 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 18 }}>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text }}>Profile Information</h2>
+                      <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted }}>Keep your account identity clear for reservation actions and audit trails.</p>
+                    </div>
+                    {profileDirty && (
+                      <span style={{ padding: "4px 8px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" }}>
                         Unsaved changes
                       </span>
                     )}
-                  >
-                    <form onSubmit={saveProfile} style={{ display: "grid", gap: 18 }}>
-                      <div className="account-profile-form-grid">
-                        <div style={{ border: `1px solid rgba(0,0,0,0.04)`, borderRadius: 16, background: C.surfaceSoft, padding: 20, display: "grid", gap: 14, justifyItems: "center", textAlign: "center", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)" }}>
-                          <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: C.gold }}>
-                            Profile Photo
+                  </div>
+
+                  <form onSubmit={handleSaveSubmit} style={{ display: "grid", gap: 18 }}>
+                    {/* Compact Horizontal Profile Photo Selector */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, borderBottom: `1px solid ${C.divider}`, paddingBottom: 18, marginBottom: 4 }}>
+                      <div style={{ width: 56, height: 56, borderRadius: "50%", background: C.gold, color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 850, overflow: "hidden", flexShrink: 0, boxShadow: "0 4px 12px rgba(140,107,42,0.12)" }}>
+                        {avatarPreview ? (
+                          <img src={avatarPreview} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : initials}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Profile Picture</div>
+                        <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>PNG, JPG under 2 MB</div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <label style={{ ...buttonStyle("secondary"), minHeight: 32, padding: "0 12px", border: `1px solid ${C.border}`, background: "transparent", color: C.text }}>
+                          <Upload size={12} />
+                          Upload photo
+                          <input type="file" accept="image/*" onChange={uploadAvatar} style={{ display: "none" }} />
+                        </label>
+                        {avatarPreview && (
+                          <button type="button" onClick={removeAvatar} style={{ ...buttonStyle("ghost"), minHeight: 32, padding: "0 10px", color: C.red }}>
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="account-profile-form-grid">
+                      <div className="account-form-grid">
+                        <Field label="Full Name">
+                          <input value={profile.name} onChange={(event) => setProfile((prev) => ({ ...prev, name: event.target.value }))} required style={inputStyle()} />
+                        </Field>
+                        <Field label="Username / Login ID">
+                          <input value={profile.username} onChange={(event) => setProfile((prev) => ({ ...prev, username: event.target.value }))} required style={inputStyle()} />
+                        </Field>
+                        <Field label="Email Address">
+                          <input type="email" value={profile.email} onChange={(event) => setProfile((prev) => ({ ...prev, email: event.target.value }))} required style={inputStyle()} />
+                        </Field>
+                        <Field label="System Role" hint="Role changes are managed by authorized administrators.">
+                          <input value={formatRole(role, availableRoles)} disabled style={inputStyle({ background: C.surfaceSoft, color: C.muted })} />
+                        </Field>
+                      </div>
+
+                      {/* Venue Scopes */}
+                      <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 14, display: "grid", gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                          <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold }}>
+                            Assigned Venues & Outlets
                           </div>
-                          <div style={{ width: 96, height: 96, borderRadius: "50%", background: C.gold, color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 850, overflow: "hidden", boxShadow: "0 8px 24px rgba(140,107,42,0.18)" }}>
-                            {avatarPreview ? (
-                              <img src={avatarPreview} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            ) : initials}
-                          </div>
-                          <div style={{ width: "100%", display: "grid", gap: 8, marginTop: 4 }}>
-                            <label style={{ ...buttonStyle("secondary"), minHeight: 34, padding: "0 11px", width: "100%" }}>
-                              <Upload size={13} />
-                              Upload Photo
-                              <input type="file" accept="image/*" onChange={uploadAvatar} style={{ display: "none" }} />
-                            </label>
-                            {avatarPreview && (
-                              <button type="button" onClick={removeAvatar} style={{ ...buttonStyle("secondary"), minHeight: 34, padding: "0 11px", width: "100%" }}>
-                                Remove
-                              </button>
-                            )}
-                          </div>
-                          {avatarDirty && (
-                            <span style={{ padding: "5px 8px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" }}>
-                              Photo pending save
-                            </span>
-                          )}
-                          <span style={{ maxWidth: 150, fontSize: 11, lineHeight: 1.45, color: C.muted, marginTop: 12 }}>
-                            JPG or PNG, up to 2 MB. Save profile to apply changes.
+                          <span style={{ fontSize: 11.5, color: C.muted }}>
+                            {hasFullScope ? "Full access" : "Scoped access"}
                           </span>
                         </div>
-
-                        <div style={{ display: "grid", gap: 16, minWidth: 0, alignContent: "start" }}>
-                          <div className="account-form-grid">
-                            <Field label="Full Name">
-                              <input value={profile.name} onChange={(event) => setProfile((prev) => ({ ...prev, name: event.target.value }))} required style={inputStyle()} />
-                            </Field>
-                            <Field label="Email Address">
-                              <input type="email" value={profile.email} onChange={(event) => setProfile((prev) => ({ ...prev, email: event.target.value }))} required style={inputStyle()} />
-                            </Field>
-                            <Field label="Username / Login ID">
-                              <input value={profile.username} onChange={(event) => setProfile((prev) => ({ ...prev, username: event.target.value }))} required style={inputStyle()} />
-                            </Field>
-                            <Field label="System Role" hint="Role changes are managed from Account Manager by authorized administrators.">
-                              <input value={formatRole(role, availableRoles)} disabled style={inputStyle({ background: C.surfaceSoft, color: C.muted })} />
-                            </Field>
-                          </div>
-
-                          <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 18, display: "grid", gap: 12 }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                              <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: C.gold }}>
-                                Assigned Venues & Outlets
-                              </div>
-                              <span style={{ fontSize: 12, color: C.muted }}>
-                                {hasFullScope ? "Full access" : "Scoped access"}
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {hasFullScope ? (
+                            <span style={{ padding: "5px 10px", borderRadius: 6, background: C.surfaceSoft, border: `1px solid ${C.border}`, color: C.text, fontFamily: F.label, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                              All venues and outlets
+                            </span>
+                          ) : assignedVenues.length ? (
+                            assignedVenues.map((venue) => (
+                              <span key={venue} style={{ padding: "5px 10px", borderRadius: 6, background: C.surfaceSoft, border: `1px solid ${C.border}`, color: C.text, fontFamily: F.label, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                                {venue}
                               </span>
-                            </div>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                              {hasFullScope ? (
-                                <span style={{ padding: "6px 12px", borderRadius: 999, background: C.surfaceSoft, border: `1px solid rgba(0,0,0,0.06)`, color: C.text, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" }}>
-                                  All venues and outlets
-                                </span>
-                              ) : assignedVenues.length ? (
-                                assignedVenues.map((venue) => (
-                                  <span key={venue} style={{ padding: "6px 12px", borderRadius: 999, background: C.surfaceSoft, border: `1px solid rgba(0,0,0,0.06)`, color: C.text, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" }}>
-                                    {venue}
-                                  </span>
-                                ))
-                              ) : (
-                                <span style={{ fontSize: 12.3, color: C.muted }}>No venue or outlet assignments are listed for this account.</span>
-                              )}
-                            </div>
-                          </div>
+                            ))
+                          ) : (
+                            <span style={{ fontSize: 11.5, color: C.muted }}>No venue or outlet assignments listed for this account.</span>
+                          )}
                         </div>
                       </div>
+                    </div>
+                  </form>
+                </div>
 
-                      <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 16, display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
-                        <button
-                          type="button"
-                          disabled={!profileDirty || savingProfile}
-                          onClick={resetProfileDraft}
-                          style={buttonStyle("ghost", !profileDirty || savingProfile)}
-                        >
-                          Reset
-                        </button>
-                        <button type="submit" disabled={!profileDirty || savingProfile} style={buttonStyle("primary", !profileDirty || savingProfile)}>
-                          {savingProfile ? <Spinner color="#FFFFFF" /> : <Save size={14} />}
-                          Save Profile
-                        </button>
-                      </div>
-                    </form>
-                  </Panel>
-                )}
+                {/* 2. Notifications Section */}
+                <div id="settings-section-notifications" style={{ borderBottom: `1px solid ${C.divider}`, paddingBottom: 24, marginBottom: 24 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 14 }}>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text }}>Notification Preferences</h2>
+                      <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted }}>Choose which operational alerts should be emphasized for your current device.</p>
+                    </div>
+                    {preferencesDirty && (
+                      <span style={{ padding: "4px 8px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" }}>
+                        Unsaved changes
+                      </span>
+                    )}
+                  </div>
 
-                {activeSection === "security" && (
-                  <Panel
-                    eyebrow="Security"
-                    title="Password Management"
-                    description="Update your password using your current password. Stronger passwords help protect operational access."
-                  >
-                    <form onSubmit={saveSecurity} style={{ display: "grid", gap: 16, maxWidth: 540 }}>
+                  <div style={{ display: "grid", gap: 2 }}>
+                    <ToggleRow
+                      title="Reservation Alerts"
+                      description="Highlight newly submitted reservations and pending action reminders."
+                      checked={preferences.reservationAlerts}
+                      onChange={(value) => setPreferences((prev) => ({ ...prev, reservationAlerts: value }))}
+                    />
+                    <ToggleRow
+                      title="Cancellation Alerts"
+                      description="Surface guest cancellations and records that require customer-service review."
+                      checked={preferences.cancellationAlerts}
+                      onChange={(value) => setPreferences((prev) => ({ ...prev, cancellationAlerts: value }))}
+                    />
+                    <ToggleRow
+                      title="Report Notifications"
+                      description="Show reminders for operational reporting and analytics review."
+                      checked={preferences.reportNotifications}
+                      onChange={(value) => setPreferences((prev) => ({ ...prev, reportNotifications: value }))}
+                    />
+                    <ToggleRow
+                      title="System Updates"
+                      description="Keep maintenance, access, and platform messages visible."
+                      checked={preferences.systemUpdates}
+                      onChange={(value) => setPreferences((prev) => ({ ...prev, systemUpdates: value }))}
+                    />
+                  </div>
+                </div>
+
+                {/* 3. Security Section */}
+                <div id="settings-section-security" style={{ borderBottom: `1px solid ${C.divider}`, paddingBottom: 24, marginBottom: 24 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 18 }}>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text }}>Password Management</h2>
+                      <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted }}>Update your password using your current password to secure operational access.</p>
+                    </div>
+                    {securityDirty && (
+                      <span style={{ padding: "4px 8px", borderRadius: 999, background: C.goldFaint, color: C.gold, fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" }}>
+                        Unsaved changes
+                      </span>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleSaveSubmit} style={{ display: "grid", gap: 14 }}>
+                    <div className="account-form-grid">
                       <Field label="Current Password">
                         <PasswordInput
                           value={security.current_password}
@@ -703,7 +972,7 @@ export default function AccountSettings() {
                           onToggle={() => setShowPasswords((prev) => ({ ...prev, current: !prev.current }))}
                         />
                       </Field>
-                      <Field label="New Password" hint="Use at least 8 characters. Add uppercase letters, numbers, or symbols for a stronger password.">
+                      <Field label="New Password">
                         <PasswordInput
                           value={security.password}
                           onChange={(event) => setSecurity((prev) => ({ ...prev, password: event.target.value }))}
@@ -721,111 +990,275 @@ export default function AccountSettings() {
                           onToggle={() => setShowPasswords((prev) => ({ ...prev, confirm: !prev.confirm }))}
                         />
                       </Field>
-
-                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surfaceSoft, padding: 13, display: "grid", gap: 9 }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 8, color: C.text, fontSize: 13, fontWeight: 700 }}>
-                            <LockKeyhole size={15} color={passwordStrength.color} />
-                            Password Strength
-                          </span>
-                          <span style={{ fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: passwordStrength.color }}>
-                            {passwordStrength.label}
-                          </span>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 5 }}>
-                          {[1, 2, 3, 4].map((step) => (
-                            <span key={step} style={{ height: 5, borderRadius: 999, background: passwordStrength.score >= step ? passwordStrength.color : "rgba(0,0,0,0.08)" }} />
-                          ))}
-                        </div>
-                      </div>
-
-                      <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-start" }}>
-                        <button type="submit" disabled={savingSecurity} style={buttonStyle("primary", savingSecurity)}>
-                          {savingSecurity ? <Spinner color="#FFFFFF" /> : <KeyRound size={14} />}
-                          Change Password
-                        </button>
-                      </div>
-                    </form>
-                  </Panel>
-                )}
-
-                {activeSection === "notifications" && (
-                  <Panel
-                    eyebrow="Notifications"
-                    title="Notification Preferences"
-                    description="Choose which operational alerts should be emphasized for your current device."
-                  >
-                    <div className="account-preference-grid">
-                      <ToggleRow
-                        title="Reservation Alerts"
-                        description="Highlight newly submitted reservations and pending action reminders."
-                        checked={preferences.reservationAlerts}
-                        onChange={(value) => setPreferences((prev) => ({ ...prev, reservationAlerts: value }))}
-                      />
-                      <ToggleRow
-                        title="Cancellation Alerts"
-                        description="Surface guest cancellations and records that require customer-service review."
-                        checked={preferences.cancellationAlerts}
-                        onChange={(value) => setPreferences((prev) => ({ ...prev, cancellationAlerts: value }))}
-                      />
-                      <ToggleRow
-                        title="Report Notifications"
-                        description="Show reminders for operational reporting and analytics review."
-                        checked={preferences.reportNotifications}
-                        onChange={(value) => setPreferences((prev) => ({ ...prev, reportNotifications: value }))}
-                      />
-                      <ToggleRow
-                        title="System Updates"
-                        description="Keep maintenance, access, and platform messages visible."
-                        checked={preferences.systemUpdates}
-                        onChange={(value) => setPreferences((prev) => ({ ...prev, systemUpdates: value }))}
-                      />
-                    </div>
-                    <div style={{ borderTop: `1px solid ${C.divider}`, marginTop: 24, paddingTop: 16, display: "flex", justifyContent: "flex-end" }}>
-                      <button type="button" onClick={savePreferences} disabled={savingPreferences} style={buttonStyle("primary", savingPreferences)}>
-                        {savingPreferences ? <Spinner color="#FFFFFF" /> : <Save size={14} />}
-                        Save Preferences
-                      </button>
-                    </div>
-                  </Panel>
-                )}
-
-                {activeSection === "sessions" && (
-                  <Panel
-                    eyebrow="Sessions"
-                    title="Login Activity"
-                    description="Review the current browser session. Broader session controls can be connected when backend activity tracking is available."
-                  >
-                    <div style={{ display: "grid", gap: 12 }}>
-                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surfaceSoft, padding: 15, display: "grid", gridTemplateColumns: "42px minmax(0,1fr) auto", gap: 13, alignItems: "center" }}>
-                        <div style={{ width: 42, height: 42, borderRadius: 10, background: C.goldFaint, color: C.gold, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <Monitor size={18} />
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 13.5, fontWeight: 730, color: C.text }}>Current Browser Session</div>
-                          <div style={{ marginTop: 4, fontSize: 12, color: C.muted, lineHeight: 1.45 }}>
-                            Signed in as {currentUser.username || profile.username || "admin"} on {new Date().toLocaleString()}.
+                      <Field label="Password Strength">
+                        <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: C.surfaceSoft, padding: "8px 12px", display: "grid", gap: 6, minHeight: 38, boxSizing: "border-box" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: C.text, fontSize: 11.5, fontWeight: 700 }}>
+                              <LockKeyhole size={13} color={passwordStrength.color} />
+                              {passwordStrength.label}
+                            </span>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 4 }}>
+                            {[1, 2, 3, 4].map((step) => (
+                              <span key={step} style={{ height: 3, borderRadius: 999, background: passwordStrength.score >= step ? passwordStrength.color : "rgba(0,0,0,0.08)" }} />
+                            ))}
                           </div>
                         </div>
-                        <span style={{ padding: "5px 9px", borderRadius: 999, background: C.greenFaint, color: C.green, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                          Active
-                        </span>
-                      </div>
-
-                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surfaceSoft, padding: "14px 18px", display: "flex", gap: 12, alignItems: "flex-start", color: C.muted, fontSize: 13, lineHeight: 1.55 }}>
-                        <AlertCircle size={16} color={C.muted} style={{ flexShrink: 0, marginTop: 2 }} />
-                        <span style={{ minWidth: 0 }}>
-                          Session history and logout-from-all-devices can be added once the backend exposes stored login activity.
-                        </span>
-                      </div>
+                      </Field>
                     </div>
-                  </Panel>
-                )}
+                  </form>
+
+                  {/* 2FA Toggle Card */}
+                  <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 18, marginTop: 18, display: "grid", gap: 12 }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: C.text }}>Two-Factor Authentication (2FA)</h3>
+                      <p style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}>Add an extra layer of security to your account using TOTP code verification.</p>
+                    </div>
+                    
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "12px 14px", border: `1px solid ${currentUser.two_factor_enabled ? C.gold + "40" : C.border}`, borderRadius: 10, background: currentUser.two_factor_enabled ? C.goldFaint : C.surfaceSoft }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ width: 34, height: 34, borderRadius: 8, background: currentUser.two_factor_enabled ? C.gold : "rgba(0,0,0,0.06)", color: currentUser.two_factor_enabled ? "#FFFFFF" : C.muted, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Shield size={16} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>
+                            Status: {currentUser.two_factor_enabled ? "Enabled" : "Disabled"}
+                          </div>
+                          <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>
+                            {currentUser.two_factor_enabled 
+                              ? "Your account is secured with 2FA authenticator verification." 
+                              : "Authenticator protection is currently inactive."}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (currentUser.two_factor_enabled) {
+                            setTfSetupMode("disable");
+                          } else {
+                            setTfSetupMode("setup");
+                          }
+                          setTfSetupModalOpen(true);
+                        }}
+                        style={{
+                          ...buttonStyle(currentUser.two_factor_enabled ? "secondary" : "primary"),
+                          minHeight: 30,
+                          padding: "0 12px",
+                          fontSize: 10,
+                          border: currentUser.two_factor_enabled ? `1px solid ${C.red}30` : undefined,
+                          color: currentUser.two_factor_enabled ? C.red : undefined,
+                        }}
+                      >
+                        {currentUser.two_factor_enabled ? "Disable 2FA" : "Enable 2FA"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Sessions Section */}
+                <div id="settings-section-sessions" style={{ borderBottom: `1px solid ${C.divider}`, paddingBottom: 24, marginBottom: 24 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 14 }}>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text }}>Login Activity / Active Devices</h2>
+                      <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted }}>Monitor the browser sessions logged into your account and revoke any unauthorized device logins.</p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {loadingSessions ? (
+                      <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+                        <Spinner color={C.gold} size={16} />
+                      </div>
+                    ) : sessions.length > 0 ? (
+                      sessions.map((sess) => (
+                        <div key={sess.id} style={{ display: "flex", alignItems: "center", justifyItems: "center", justifyContent: "space-between", gap: 16, padding: "10px 0", borderBottom: `1px solid ${C.borderFaint}` }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: 8, background: sess.is_current ? C.goldFaint : C.surfaceSoft, color: sess.is_current ? C.gold : C.muted, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                              <Monitor size={16} />
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{sess.device}</div>
+                              <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>
+                                IP: {sess.ip_address} • Last active: {sess.is_current ? "Active now" : sess.last_active_at ? new Date(sess.last_active_at).toLocaleString() : "Unknown"}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            {sess.is_current ? (
+                              <span style={{ padding: "4px 10px", borderRadius: 6, background: C.greenFaint, color: C.green, fontFamily: F.label, fontSize: 10, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                                Current Session
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleRevokeSession(sess.id)}
+                                style={{
+                                  ...buttonStyle("ghost"),
+                                  minHeight: 28,
+                                  padding: "0 10px",
+                                  color: C.red,
+                                  border: `1px solid ${C.red}20`,
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = C.redFaint;
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = "transparent";
+                                }}
+                              >
+                                Revoke
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p style={{ margin: 0, fontSize: 12.5, color: C.muted }}>No active sessions recorded.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* 5. Audit Logs Section */}
+                <div id="settings-section-audit-logs">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 14 }}>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text }}>Personal Security Logs</h2>
+                      <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted }}>Review the history of security changes and profile updates made to your account.</p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {loadingAuditLogs ? (
+                      <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+                        <Spinner color={C.gold} size={16} />
+                      </div>
+                    ) : auditLogs.length > 0 ? (
+                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, textAlign: "left" }}>
+                          <thead>
+                            <tr style={{ background: C.surfaceSoft, borderBottom: `1px solid ${C.border}` }}>
+                              <th style={{ padding: "10px 14px", fontWeight: 700, color: C.muted }}>Action</th>
+                              <th style={{ padding: "10px 14px", fontWeight: 700, color: C.muted }}>IP Address</th>
+                              <th style={{ padding: "10px 14px", fontWeight: 700, color: C.muted }}>Date / Time</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {auditLogs.map((log) => (
+                              <tr key={log.id} style={{ borderBottom: `1px solid ${C.borderFaint}`, background: C.surface }}>
+                                <td style={{ padding: "10px 14px", fontWeight: 600, color: C.text }}>
+                                  <span style={{
+                                    textTransform: "capitalize",
+                                    color: log.action.includes("2fa") ? C.gold : C.text
+                                  }}>
+                                    {log.action.replace(/_/g, " ")}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "10px 14px", color: C.textSecondary }}>{log.ip_address}</td>
+                                <td style={{ padding: "10px 14px", color: C.muted }}>{new Date(log.created_at).toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p style={{ margin: 0, fontSize: 12.5, color: C.muted }}>No recent actions recorded.</p>
+                    )}
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>
         </main>
       </div>
+
+      {/* Global Action Bar */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: isDirty ? 24 : -100,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "calc(100% - 64px)",
+          maxWidth: 800,
+          background: isDark ? "rgba(17, 16, 9, 0.95)" : "rgba(255, 255, 255, 0.95)",
+          backdropFilter: "blur(12px)",
+          border: `1px solid ${C.gold}`,
+          borderRadius: 16,
+          padding: "14px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          boxShadow: "0 20px 48px rgba(0,0,0,0.15), 0 8px 20px rgba(140,107,42,0.1)",
+          zIndex: 1000,
+          opacity: isDirty ? 1 : 0,
+          transition: "bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+          pointerEvents: isDirty ? "auto" : "none",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+            You have unsaved changes
+          </span>
+          <span style={{ fontSize: 11.5, color: C.muted }}>
+            Please save or reset your changes before leaving this page.
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button
+            type="button"
+            onClick={resetAllDrafts}
+            disabled={savingProfile || savingSecurity || savingPreferences}
+            style={buttonStyle("ghost")}
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveSubmit}
+            disabled={savingProfile || savingSecurity || savingPreferences}
+            style={buttonStyle("primary")}
+          >
+            {savingProfile || savingSecurity || savingPreferences ? (
+              <Spinner color="#FFFFFF" />
+            ) : (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <Save size={14} />
+                Save Changes
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <VerificationModal
+        isOpen={verificationModalOpen}
+        onClose={() => setVerificationModalOpen(false)}
+        targetEmail={verifTargetEmail}
+        targetUsername={verifTargetUsername}
+        onVerificationSuccess={handleVerificationSuccess}
+      />
+      
+      <TwoFactorSetupModal
+        isOpen={tfSetupModalOpen}
+        onClose={() => setTfSetupModalOpen(false)}
+        mode={tfSetupMode}
+        onSuccess={() => {
+          setTfSetupModalOpen(false);
+          const updatedUser = { ...currentUser, two_factor_enabled: tfSetupMode === "setup" };
+          setCurrentUser(updatedUser);
+          updateUser(updatedUser);
+          showMessage({
+            type: "success",
+            text: tfSetupMode === "setup"
+              ? "Two-Factor Authentication enabled successfully."
+              : "Two-Factor Authentication disabled successfully."
+          });
+          fetchAuditLogs();
+        }}
+      />
     </div>
   );
 }

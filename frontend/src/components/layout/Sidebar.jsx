@@ -407,7 +407,7 @@ export default function Sidebar({
   isOpen = true,
   onToggle = () => { },
 }) {
-  const { isDark } = useAdminTheme();
+  const { isDark, currentUser, avatar } = useAdminTheme();
   const navigate = useNavigate();
   const [pinnedOpen, setPinnedOpen] = useState(() => {
     try {
@@ -425,9 +425,9 @@ export default function Sidebar({
     ...group,
     items: group.items.filter((item) => !item.permission || authAPI.hasPermission(item.permission)),
   })).filter((group) => group.items.length > 0);
-  const currentUser = authAPI.getCurrentUser();
-  const displayName = String(currentUser?.name || currentUser?.username || "Admin User");
-  const roleLabel = String(currentUser?.role || "Administrator").replace(/_/g, " ");
+  const user = currentUser || authAPI.getCurrentUser();
+  const displayName = String(user?.name || user?.username || "Admin User");
+  const roleLabel = String(user?.role || "Administrator").replace(/_/g, " ");
   const initials = displayName
     .split(/\s+/)
     .filter(Boolean)
@@ -711,9 +711,12 @@ export default function Sidebar({
               fontWeight: 850,
               letterSpacing: "0.05em",
               position: "relative",
+              overflow: "hidden",
             }}
           >
-            {initials}
+            {avatar ? (
+              <img src={avatar} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : initials}
             <i
               aria-hidden="true"
               style={{
@@ -725,6 +728,7 @@ export default function Sidebar({
                 borderRadius: "50%",
                 background: "#4CAF79",
                 border: `2px solid ${isDark ? "#111009" : "#F7F0E5"}`,
+                zIndex: 2,
               }}
             />
           </span>
