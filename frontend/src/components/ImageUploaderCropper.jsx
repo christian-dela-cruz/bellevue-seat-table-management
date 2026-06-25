@@ -3,7 +3,7 @@ import Cropper from "react-easy-crop";
 import { Upload, X, Check, Image as ImageIcon } from "lucide-react";
 import { C } from "../context/AdminThemeContext";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:8000/api" : `${window.location.protocol}//${window.location.host}/api`);
 const IMAGE_BASE_URL = API_BASE.replace("/api", "");
 
 // Utility to create a file from a blob

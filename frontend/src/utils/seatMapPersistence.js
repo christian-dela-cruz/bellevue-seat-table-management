@@ -1,7 +1,7 @@
 // src/utils/seatMapPersistence.js
 // Modified for Staged Publishing Workflow
 const STORAGE_PREFIX = "seatmap";
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8000/api' : `${window.location.protocol}//${window.location.host}/api`);
 
 function getHeaders() {
   const token = localStorage.getItem("admin_token") || localStorage.getItem("auth_token") || "";

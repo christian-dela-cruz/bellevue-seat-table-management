@@ -9,7 +9,7 @@ import grandBallroomShowcase from "../../../assets/grand-ballroom-hires.jpg";
 import diningShowcase from "../../../assets/hanakazu-dining-hires.jpg";
 import towerShowcase from "../../../assets/tower-ballroom-hires.jpg";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+const API_BASE = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:8000/api" : `${window.location.protocol}//${window.location.host}/api`);
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const ThemeContext = createContext({ isDark: true, toggle: () => {} });

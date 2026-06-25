@@ -472,7 +472,8 @@ function slugify(value) {
 function imageUrl(image) {
   if (!image) return "";
   if (/^(https?:|data:|blob:)/i.test(image)) return image;
-  const apiRoot = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "");
+  const defaultApiUrl = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:8000/api" : `${window.location.protocol}//${window.location.host}/api`;
+  const apiRoot = (import.meta.env.VITE_API_BASE_URL || defaultApiUrl).replace(/\/api\/?$/, "");
   let cleanPath = String(image).replace(/\\/g, "/").replace(/^\/+/, "");
 
   if (!cleanPath.includes("/")) {

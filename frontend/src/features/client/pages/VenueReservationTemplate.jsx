@@ -1,6 +1,7 @@
 // src/features/client/pages/VenueReservationTemplate.jsx
 import { useState, useEffect, useRef, useCallback, createContext, useContext, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import QRCode from "qrcode";
 import SharedNavbar from "../../../components/SharedNavbar.jsx";
 import SeatMap, { STATUS_COLORS } from "../../../components/seatmap/SeatMap";
 import ScheduleGate, { normalizeSchedule, withSeatmapSchedule } from "../../../components/seatmap/ScheduleGate";
@@ -59,7 +60,7 @@ function getActualWingForRoom(room) {
   return "Main Wing";
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:8000/api" : `${window.location.protocol}//${window.location.host}/api`);
 
 function imageUrl(image) {
   if (!image) return "";
@@ -928,6 +929,16 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
     return `${url}/manage-booking?code=${String(refCode).trim()}`;
   }, [refCode]);
 
+  const [localQrDataUrl, setLocalQrDataUrl] = useState("");
+
+  useEffect(() => {
+    if (qrValue) {
+      QRCode.toDataURL(qrValue, { margin: 1, width: 260 })
+        .then(url => setLocalQrDataUrl(url))
+        .catch(err => console.error("Local QR generation failed", err));
+    }
+  }, [qrValue]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (showLightbox && e.key === "Escape") {
@@ -1061,7 +1072,7 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
                 }}
               >
                 <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(qrValue)}`}
+                  src={localQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(qrValue)}`}
                   alt="QR Code"
                   style={{ display: "block", width: 110, height: 110 }}
                 />
@@ -1119,7 +1130,7 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
             }}
           >
             <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(qrValue)}`}
+              src={localQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(qrValue)}`}
               alt="Enlarged QR Code"
               style={{ display: "block", width: 260, height: 260, imageRendering: "crisp-edges" }}
             />

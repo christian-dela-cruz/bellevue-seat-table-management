@@ -9,7 +9,7 @@ import { buildOutletGroupsFromVenues, buildDynamicOutletTree, resolveOutletChild
 import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
 import RoomFilterDropdown from "../components/RoomFilterDropdown";
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:8000/api" : `${window.location.protocol}//${window.location.host}/api`);
 
 
 

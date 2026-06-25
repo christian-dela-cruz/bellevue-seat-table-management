@@ -85,7 +85,7 @@ const F = {
   label: "'Inter', 'Helvetica Neue', Arial, sans-serif",
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:8000/api" : `${window.location.protocol}//${window.location.host}/api`);
 
 // ─── Parsing helpers ──────────────────────────────────────────────────────────
 function parseLookup(raw) {

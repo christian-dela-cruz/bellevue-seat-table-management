@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Shield, QrCode, Download, Copy, CheckCircle2, AlertCircle } from "lucide-react";
+import QRCode from "qrcode";
 import { authAPI } from "../../../services/authAPI";
 import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 
@@ -25,7 +26,7 @@ export default function TwoFactorSetupModal({
   mode = "setup", // "setup" | "disable"
   onSuccess,
 }) {
-  const { isDark } = useAdminTheme();
+  const { isDark, currentUser } = useAdminTheme();
   const [step, setStep] = useState(1); // For setup: 1 = QR & Scan, 2 = Recovery Codes
   const [secret, setSecret] = useState("");
   const [qrUrl, setQrUrl] = useState("");
@@ -59,7 +60,22 @@ export default function TwoFactorSetupModal({
       const res = await authAPI.setup2FA();
       if (res.success) {
         setSecret(res.secret);
-        setQrUrl(res.qr_url);
+        
+        // Generate QR code locally
+        const userObj = currentUser || authAPI.getCurrentUser() || {};
+        const username = encodeURIComponent(userObj.username || userObj.email || "Admin");
+        const provisioningUri = `otpauth://totp/Bellevue%20Seat%20%26%20Table%3A${username}?secret=${res.secret}&issuer=Bellevue%20Seat%20%26%20Table`;
+        
+        try {
+          const localQrUrl = await QRCode.toDataURL(provisioningUri, {
+            margin: 1,
+            width: 200,
+          });
+          setQrUrl(localQrUrl);
+        } catch (qrErr) {
+          console.error("Local QR generation failed, falling back to Google Charts API", qrErr);
+          setQrUrl(res.qr_url);
+        }
       } else {
         setError(res.message || "Failed to generate 2FA credentials.");
       }
