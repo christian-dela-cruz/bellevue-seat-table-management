@@ -349,13 +349,23 @@ function GhostBtn({ children, onClick, disabled = false, C, style = {} }) {
 
 function StepIndicator({ step, C }) {
   const steps = ["Guest Count", "Details", "Confirm"];
+  const isMobile = window.innerWidth < 640;
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 18, width: "100%", maxWidth: 440, margin: "18px auto 0" }}>
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: isMobile ? "center" : "space-between",
+      marginTop: isMobile ? 12 : 18,
+      width: "100%",
+      maxWidth: isMobile ? 240 : 440,
+      margin: `${isMobile ? 12 : 18}px auto 0`,
+      gap: isMobile ? 8 : 0,
+    }}>
       {steps.map((label, i) => {
         const idx = i + 1; const done = step > idx; const active = step === idx;
         return (
           <div key={label} style={{ display: "flex", alignItems: "center", flex: i < steps.length - 1 ? 1 : "none" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 0 : 10 }}>
               <div style={{
                 width: 28,
                 height: 28,
@@ -379,25 +389,27 @@ function StepIndicator({ step, C }) {
                   </span>
                 )}
               </div>
-              <span style={{
-                fontFamily: F.label,
-                fontSize: 9.5,
-                fontWeight: 700,
-                letterSpacing: "0.12em",
-                color: done ? C.gold : active ? C.textPrimary : C.textSecondary,
-                opacity: done || active ? 1 : 0.60,
-                whiteSpace: "nowrap",
-                textTransform: "uppercase",
-                transition: "all 0.25s ease"
-              }}>{label}</span>
+              {!isMobile && (
+                <span style={{
+                  fontFamily: F.label,
+                  fontSize: 9.5,
+                  fontWeight: 700,
+                  letterSpacing: "0.12em",
+                  color: done ? C.gold : active ? C.textPrimary : C.textSecondary,
+                  opacity: done || active ? 1 : 0.60,
+                  whiteSpace: "nowrap",
+                  textTransform: "uppercase",
+                  transition: "all 0.25s ease"
+                }}>{label}</span>
+              )}
             </div>
             {i < steps.length - 1 && (
               <div style={{
                 flex: 1,
                 height: 1.5,
-                minWidth: 40,
-                marginLeft: 12,
-                marginRight: 12,
+                minWidth: isMobile ? 30 : 40,
+                marginLeft: isMobile ? 8 : 12,
+                marginRight: isMobile ? 8 : 12,
                 background: done ? `linear-gradient(90deg, ${C.gold}, ${C.gold})` : `linear-gradient(90deg, ${C.borderDefault}, ${C.borderDefault})`,
                 borderRadius: 2,
                 transition: "background 0.25s ease"
@@ -524,7 +536,7 @@ function ModalGuestCount({ seatData, tableData, mode, isStandalone, onContinue, 
     return (
       <ModalShell onClose={onCancel} C={C}>
         <ModalHeader eyebrow="Seat Reservation" title="Reserve This Seat" onClose={onCancel} C={C} meta={<StepIndicator step={1} C={C} />} />
-        <div style={{ padding: "22px 24px 26px", flex: 1, minHeight: 0, overflowY: "auto" }}>
+        <div style={{ padding: window.innerWidth < 640 ? "16px 16px 20px" : "22px 24px 26px", flex: 1, minHeight: 0, overflowY: "auto" }}>
           <div style={{ background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 10, overflow: "hidden", marginBottom: 22 }}>
             {[
               ["Room", ROOM, null],
@@ -553,7 +565,7 @@ function ModalGuestCount({ seatData, tableData, mode, isStandalone, onContinue, 
         onClose={onCancel} C={C}
         meta={<StepIndicator step={1} C={C} />}
       />
-      <div style={{ padding: "22px 24px 26px", flex: 1, minHeight: 0, overflowY: "auto" }}>
+      <div style={{ padding: window.innerWidth < 640 ? "16px 16px 20px" : "22px 24px 26px", flex: 1, minHeight: 0, overflowY: "auto" }}>
         {mode === "individual" && (
           <div style={{ background: C.goldFaintest, border: `1px solid ${C.borderAccent}`, borderRadius: 10, overflow: "hidden", marginBottom: 22 }}>
             {infoRows.map(([key, val, color], i) => (
@@ -613,6 +625,8 @@ function ModalGuestCount({ seatData, tableData, mode, isStandalone, onContinue, 
 // ─── Modal 2: Details ─────────────────────────────────────────────────────────
 function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onReview, onCancel, prefill, C, isDark, secondsLeft, onTimerExpired, ROOM, WING, venueType }) {
   const today = new Date().toISOString().split("T")[0];
+  const isTablet = window.innerWidth < 1024;
+  const isMobile = window.innerWidth < 640;
 
   const [form, setForm] = useState({
     firstName: prefill?.firstName || "", lastName: prefill?.lastName || "",
@@ -709,21 +723,36 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
   return (
     <ModalShell onClose={onCancel} C={C} maxWidth={920}>
       <ModalHeader eyebrow={isStandalone ? "Standalone Seat Reservation" : mode === "individual" ? "Seat Reservation" : "Table Reservation"} title="Your Information" onClose={onCancel} C={C} meta={<StepIndicator step={2} C={C} />} />
-      <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: window.innerWidth < 820 ? "1fr" : "minmax(0,1fr) 300px", gap: 0, overflow: "hidden" }}>
-        <div style={{ padding: "24px 28px 28px", overflowY: "auto", WebkitOverflowScrolling: "touch", minHeight: 0 }}>
+      <div style={{
+        flex: 1,
+        minHeight: 0,
+        display: isTablet ? "flex" : "grid",
+        flexDirection: isTablet ? "column" : undefined,
+        gridTemplateColumns: isTablet ? undefined : "minmax(0,1fr) 300px",
+        gap: 0,
+        overflowY: isTablet ? "auto" : "hidden",
+        WebkitOverflowScrolling: isTablet ? "touch" : undefined,
+      }}>
+        <div style={{
+          padding: isMobile ? "20px 16px" : "24px 28px 28px",
+          overflowY: isTablet ? undefined : "auto",
+          WebkitOverflowScrolling: isTablet ? undefined : "touch",
+          minHeight: 0,
+          flexShrink: isTablet ? 0 : undefined,
+        }}>
 
           <SectionLabel C={C}>1. Guest Information</SectionLabel>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,minmax(0,1fr))", gap: isMobile ? 0 : 12 }}>
             <Field label="First Name" value={form.firstName} onChange={set("firstName")} onBlur={handleBlur("firstName")} error={errors.firstName} isValid={!errors.firstName} touched={touched.firstName} C={C} isDark={isDark} required />
             <Field label="Last Name" value={form.lastName} onChange={set("lastName")} onBlur={handleBlur("lastName")} error={errors.lastName} isValid={!errors.lastName} touched={touched.lastName} C={C} isDark={isDark} required />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,0.8fr)", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1.2fr) minmax(0,0.8fr)", gap: isMobile ? 0 : 12 }}>
             <Field label="Email Address" value={form.email} onChange={set("email")} onBlur={handleBlur("email")} error={errors.email} isValid={!errors.email} touched={touched.email} type="email" C={C} isDark={isDark} required />
             <Field label="Phone Number" value={form.phone} onChange={set("phone")} onBlur={handleBlur("phone")} error={errors.phone} isValid={!errors.phone} touched={touched.phone} type="tel" C={C} isDark={isDark} required placeholder="+63 9XX XXX XXXX" />
           </div>
 
           <SectionLabel C={C} style={{ marginTop: 14 }}>2. Reservation Details</SectionLabel>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,minmax(0,1fr))", gap: isMobile ? 0 : 12 }}>
             <Field label="Date" value={form.eventDate} onChange={set("eventDate")} onBlur={handleBlur("eventDate")} error={errors.eventDate} isValid={!errors.eventDate} touched={touched.eventDate} type="date" min={today} C={C} isDark={isDark} required />
             <Field label="Time" value={form.eventTime} onChange={set("eventTime")} type="time" C={C} isDark={isDark} />
           </div>
@@ -732,7 +761,15 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
           <Field label="Special Requests (Optional)" value={form.specialRequests} onChange={set("specialRequests")} type="textarea" rows={3} C={C} isDark={isDark} placeholder="Optional requests, preferences, dietary restrictions, or notes for the reservation." />
         </div>
 
-        <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "20px 20px 20px", overflowY: "auto", minHeight: 0 }}>
+        <aside style={{
+          borderLeft: isTablet ? "none" : `1px solid ${C.divider}`,
+          borderTop: isTablet ? `1px solid ${C.divider}` : "none",
+          background: C.goldFaintest,
+          padding: isMobile ? "20px 16px" : "20px 20px 20px",
+          overflowY: isTablet ? undefined : "auto",
+          minHeight: 0,
+          flexShrink: isTablet ? 0 : undefined,
+        }}>
           <div style={{ display: "grid", gap: 12, paddingBottom: 16 }}>
 
             {/* Elegant Seat Hold Timer Card */}
@@ -789,6 +826,8 @@ function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onRevie
 
 // ─── Modal 3: Review ──────────────────────────────────────────────────────────
 function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, onSubmit, onEdit, submitting, isRebook, rebookFrom, C, ROOM, WING }) {
+  const isTablet = window.innerWidth < 1024;
+  const isMobile = window.innerWidth < 640;
   const [consentAccepted, setConsentAccepted] = useState(false);
   const fmt = t => { if (!t) return null; const [h, m] = t.split(":"); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr >= 12 ? "PM" : "AM"}`; };
   const seatDisplay = mode === "whole" ? getWholeSeatLabel(guests, tableData) : (seatData ? formatSeatLabel(seatData) : "-");
@@ -820,15 +859,31 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
   return (
     <ModalShell onClose={onEdit} disabled={submitting} C={C} maxWidth={920}>
       <ModalHeader eyebrow={isRebook ? "Rebook / Move Seat" : isStandalone ? "Standalone Seat Reservation" : mode === "individual" ? "Seat Reservation" : "Table Reservation"} title="Review Your Booking" onClose={onEdit} disabled={submitting} C={C} meta={<StepIndicator step={3} C={C} />} />
-      <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: window.innerWidth < 820 ? "1fr" : "minmax(0,1fr) 300px", gap: 0, overflow: "hidden" }}>
-        <div style={{ padding: "24px 28px 28px", overflowY: "auto", display: "grid", gap: 20, minHeight: 0 }}>
+      <div style={{
+        flex: 1,
+        minHeight: 0,
+        display: isTablet ? "flex" : "grid",
+        flexDirection: isTablet ? "column" : undefined,
+        gridTemplateColumns: isTablet ? undefined : "minmax(0,1fr) 300px",
+        gap: 0,
+        overflowY: isTablet ? "auto" : "hidden",
+        WebkitOverflowScrolling: isTablet ? "touch" : undefined,
+      }}>
+        <div style={{
+          padding: isMobile ? "20px 16px" : "24px 28px 28px",
+          overflowY: isTablet ? undefined : "auto",
+          minHeight: 0,
+          display: "grid",
+          gap: 20,
+          flexShrink: isTablet ? 0 : undefined,
+        }}>
           {isRebook && rebookFrom && (
-            <div style={{ padding: "12px 14px", borderRadius: 8, background: C.statusNote?.pending || C.goldFaintest, border: `1px solid ${C.statusNoteBorder?.pending || C.borderAccent}`, fontSize: 12, color: C.gold, lineHeight: 1.65 }}>
+            <div style={{ padding: "12px 14px", borderRadius: 8, background: C.statusNote?.pending || C.goldFaint, border: `1px solid ${C.statusNoteBorder?.pending || C.borderAccent}`, fontSize: 12, color: C.gold, lineHeight: 1.65 }}>
               <strong style={{ color: C.gold }}>Rebooking Notice:</strong> Previous reservation <strong>{rebookFrom.reference_code || rebookFrom.id}</strong> will be cancelled automatically on submission.
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: window.innerWidth < 820 ? "1fr" : "repeat(2,minmax(0,1fr))", gap: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,minmax(0,1fr))", gap: 20 }}>
             {/* Reservation Details Card */}
             <div style={{ background: C.surfaceRaised, border: `1px solid ${C.borderDefault}`, borderRadius: 12, padding: "18px 20px" }}>
               <SectionLabel C={C} style={{ marginBottom: 12 }}>Reservation Details</SectionLabel>
@@ -847,7 +902,15 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
           </div>
         </div>
 
-        <aside style={{ borderLeft: `1px solid ${C.divider}`, background: C.goldFaintest, padding: "20px 20px 20px", overflowY: "auto", minHeight: 0 }}>
+        <aside style={{
+          borderLeft: isTablet ? "none" : `1px solid ${C.divider}`,
+          borderTop: isTablet ? `1px solid ${C.divider}` : "none",
+          background: C.goldFaintest,
+          padding: isMobile ? "20px 16px" : "20px 20px 20px",
+          overflowY: isTablet ? undefined : "auto",
+          minHeight: 0,
+          flexShrink: isTablet ? 0 : undefined,
+        }}>
           <div style={{ display: "grid", gap: 12, paddingBottom: 16 }}>
             <div style={{ padding: "10px 14px", borderRadius: 12, background: C.surfaceInput, border: `1px solid ${C.borderAccent}`, boxShadow: `0 0 10px ${C.gold}08` }}>
               <div style={{ fontFamily: F.label, fontSize: 8.5, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, fontWeight: 800, marginBottom: 8 }}>Final Review</div>
@@ -919,6 +982,7 @@ function ModalReview({ form, guests, tableData, seatData, mode, isStandalone, on
 
 // ─── Modal: Success ───────────────────────────────────────────────────────────
 function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails, C, isDark, ROOM }) {
+  const isMobile = window.innerWidth < 640;
   const [copied, setCopied] = useState(false);
   const [showLightbox, setShowLightbox] = useState(false);
 
@@ -965,7 +1029,7 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
           <CloseBtn onClick={onBack} C={C} />
         </div>
 
-        <div style={{ padding: "40px 32px 34px", textAlign: "center", display: "grid", gap: 24, flex: 1, minHeight: 0, overflowY: "auto" }}>
+        <div style={{ padding: isMobile ? "32px 20px 24px" : "40px 32px 34px", textAlign: "center", display: "grid", gap: isMobile ? 18 : 24, flex: 1, minHeight: 0, overflowY: "auto" }}>
           <div>
             <div style={{
               width: 56,
@@ -976,14 +1040,14 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              margin: "0 auto 16px",
+              margin: isMobile ? "0 auto 12px" : "0 auto 16px",
               boxShadow: `0 0 15px ${C.green}30`,
               animation: "fadeUp 0.3s ease"
             }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
             </div>
-            <h3 style={{ fontFamily: F.display, fontSize: 24, fontWeight: 600, color: C.textPrimary, margin: 0 }}>Request Submitted</h3>
-            <p style={{ fontSize: 13, color: C.textSecondary, marginTop: 8, lineHeight: 1.6 }}>
+            <h3 style={{ fontFamily: F.display, fontSize: isMobile ? 20 : 24, fontWeight: 600, color: C.textPrimary, margin: 0 }}>Request Submitted</h3>
+            <p style={{ fontSize: isMobile ? 12 : 13, color: C.textSecondary, marginTop: isMobile ? 6 : 8, lineHeight: 1.6 }}>
               {isRebook ? "Your rebooking request has been submitted successfully." : "Your reservation has been submitted successfully."}<br />
               Our hospitality team will review your booking details and contact you shortly.
             </p>
@@ -994,14 +1058,14 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
             background: C.goldFaintest,
             border: `1.5px solid ${C.borderAccent}`,
             borderRadius: 12,
-            padding: "18px 20px",
+            padding: isMobile ? "12px 14px" : "18px 20px",
             position: "relative",
             boxShadow: `0 0 10px ${C.gold}05`
           }}>
-            <div style={{ fontSize: 8.5, letterSpacing: "0.18em", textTransform: "uppercase", color: C.textTertiary, fontWeight: 800, marginBottom: 6 }}>Booking Reference Code</div>
+            <div style={{ fontSize: 8.5, letterSpacing: "0.18em", textTransform: "uppercase", color: C.textTertiary, fontWeight: 800, marginBottom: isMobile ? 4 : 6 }}>Booking Reference Code</div>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
-              <div style={{ fontFamily: F.mono, fontSize: 28, color: C.gold, fontWeight: 700, letterSpacing: "0.08em" }}>{refCode || "PENDING"}</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: isMobile ? 10 : 12, flexWrap: "wrap" }}>
+              <div style={{ fontFamily: F.mono, fontSize: isMobile ? 22 : 28, color: C.gold, fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{refCode || "PENDING"}</div>
               {refCode && (
                 <button
                   onClick={handleCopy}
@@ -1012,15 +1076,16 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
                     background: "transparent",
                     border: `1px solid ${copied ? C.green : C.borderAccent}`,
                     borderRadius: 6,
-                    padding: "4px 10px",
+                    padding: isMobile ? "3px 8px" : "4px 10px",
                     fontFamily: F.label,
-                    fontSize: 9.5,
+                    fontSize: isMobile ? 8.5 : 9.5,
                     fontWeight: 700,
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
                     color: copied ? C.green : C.gold,
                     cursor: "pointer",
-                    transition: "all 0.2s ease"
+                    transition: "all 0.2s ease",
+                    flexShrink: 0
                   }}
                 >
                   {copied ? (
@@ -1038,14 +1103,14 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
               )}
             </div>
 
-            <div style={{ fontSize: 11, color: C.textSecondary, marginTop: 10, lineHeight: 1.5 }}>
+            <div style={{ fontSize: isMobile ? 10.5 : 11, color: C.textSecondary, marginTop: isMobile ? 6 : 10, lineHeight: 1.5 }}>
               Use this code to check your status or update details under the <strong>Manage Booking</strong> page.
             </div>
           </div>
 
           {/* Scannable, Clickable Interactive QR Code */}
           {refCode && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: isMobile ? 8 : 10 }}>
               <div
                 tabIndex={0}
                 role="button"
@@ -1061,8 +1126,8 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
                 onMouseLeave={() => setQrHovered(false)}
                 style={{
                   background: "#FFFFFF",
-                  padding: 14,
-                  borderRadius: 14,
+                  padding: isMobile ? 10 : 14,
+                  borderRadius: 12,
                   border: `1.5px solid ${qrHovered ? C.gold : C.borderDefault}`,
                   cursor: "pointer",
                   boxShadow: qrHovered ? `0 0 15px ${C.gold}30` : "none",
@@ -1074,17 +1139,17 @@ function ModalSuccess({ refCode, onBack, mode, guests, isRebook, bookingDetails,
                 <img
                   src={localQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(qrValue)}`}
                   alt="QR Code"
-                  style={{ display: "block", width: 110, height: 110 }}
+                  style={{ display: "block", width: isMobile ? 90 : 110, height: isMobile ? 90 : 110 }}
                 />
               </div>
-              <span style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, letterSpacing: "0.02em" }}>
+              <span style={{ fontSize: isMobile ? 10.5 : 11, color: C.textTertiary, fontWeight: 500, letterSpacing: "0.02em" }}>
                 Click or scan code to view booking instantly
               </span>
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-            <button onClick={onBack} style={{ flex: 1, padding: "14px", background: C.gold, border: "none", borderRadius: 8, fontFamily: F.label, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.textOnAccent, cursor: "pointer", transition: "all 0.18s ease" }} onMouseEnter={e => e.currentTarget.style.background = C.goldLight} onMouseLeave={e => e.currentTarget.style.background = C.gold}>Done</button>
+          <div style={{ display: "flex", gap: 10, marginTop: isMobile ? 4 : 8 }}>
+            <button onClick={onBack} style={{ flex: 1, padding: isMobile ? "11px" : "14px", background: C.gold, border: "none", borderRadius: 8, fontFamily: F.label, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.textOnAccent, cursor: "pointer", transition: "all 0.18s ease" }} onMouseEnter={e => e.currentTarget.style.background = C.goldLight} onMouseLeave={e => e.currentTarget.style.background = C.gold}>Done</button>
           </div>
         </div>
       </ModalShell>
