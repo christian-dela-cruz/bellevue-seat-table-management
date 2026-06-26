@@ -14,7 +14,7 @@ class LocalWebSocket {
   
   connect() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = import.meta.env.VITE_PUSHER_HOST || 'localhost';
+    const host = import.meta.env.VITE_PUSHER_HOST || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname);
     const port = import.meta.env.VITE_PUSHER_PORT || '6001';
     const wsUrl = `${protocol}//${host}:${port}`;
     

@@ -5,6 +5,227 @@ import { useAdminTheme, C, F } from "../../context/AdminThemeContext";
 import { reservationAPI } from "../../services/reservationAPI";
 import { canAccessOutlet, canonicalOutletName } from "../../constants/outletCatalog";
 
+// ─── Sound / Voice Notifications ─────────────────────────────────────────────
+let _alertId = null;
+function stopAlert() { if (_alertId) { clearInterval(_alertId); _alertId = null; } }
+
+// Preload voices to prevent getVoices() returning empty array on initial calls
+if (typeof window !== "undefined" && window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => {
+    window.speechSynthesis.getVoices();
+  };
+}
+
+// Persistent global AudioContext with user-gesture auto-unlocking
+let globalAudioCtx = null;
+const unlockAudio = () => {
+  try {
+    if (!globalAudioCtx) {
+      globalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (globalAudioCtx.state === "suspended") {
+      globalAudioCtx.resume();
+    }
+  } catch {}
+};
+if (typeof window !== "undefined") {
+  window.addEventListener("click", unlockAudio, { once: true });
+  window.addEventListener("keydown", unlockAudio, { once: true });
+}
+
+function _beep(notes, onDone) {
+  try {
+    if (!globalAudioCtx) {
+      globalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    const playNext = (index) => {
+      if (index >= notes.length) {
+        if (onDone) onDone();
+        return;
+      }
+
+      const { f, d, w = "sine" } = notes[index];
+
+      const playNote = () => {
+        try {
+          const o = globalAudioCtx.createOscillator();
+          const g = globalAudioCtx.createGain();
+
+          o.connect(g);
+          g.connect(globalAudioCtx.destination);
+
+          o.type = w;
+          o.frequency.value = f;
+          g.gain.value = 0.18;
+
+          o.start();
+
+          const ref = { o, g };
+
+          setTimeout(() => {
+            try {
+              o.stop();
+              o.disconnect();
+              g.disconnect();
+            } catch (e) {}
+            ref.o = null;
+            ref.g = null;
+            playNext(index + 1);
+          }, d * 1000);
+        } catch (e) {
+          console.error("[Audio] Note play error:", e);
+          playNext(index + 1);
+        }
+      };
+
+      if (globalAudioCtx.state === "suspended") {
+        globalAudioCtx.resume().then(playNote).catch(() => {
+          if (onDone) onDone();
+        });
+      } else {
+        playNote();
+      }
+    };
+
+    playNext(0);
+  } catch (err) {
+    console.error("[Audio] Beep error:", err);
+    if (onDone) onDone();
+  }
+}
+
+function playPendingChime(onDone) {
+  _beep([{ f: 1046, d: .13 }, { f: 784, d: .13 }, { f: 523, d: .22 }], onDone);
+}
+
+function playApproveSound(onDone) {
+  _beep([{ f: 523, d: .08 }, { f: 659, d: .08 }, { f: 784, d: .08 }, { f: 1047, d: .20 }], onDone);
+}
+
+function speakText(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 0.88; // Slower rate for much higher intelligibility on phone/tablet speakers
+  u.pitch = 1.0;
+  u.volume = 1;
+  const v = window.speechSynthesis.getVoices();
+  const eng = v.find(x => x.lang.startsWith("en") && /google|natural|premium/i.test(x.name)) ||
+              v.find(x => x.lang.startsWith("en") && /female|zira|samantha/i.test(x.name)) ||
+              v.find(x => x.lang.startsWith("en"));
+  if (eng) u.voice = eng;
+  window.speechSynthesis.speak(u);
+}
+
+// Check sessionStorage for already alerted ids
+const ALERTED_STORAGE_KEY = "bellevue_alerted_reservations";
+function getAlertedIds() {
+  try {
+    return new Set(JSON.parse(sessionStorage.getItem(ALERTED_STORAGE_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+function markAsAlerted(id) {
+  try {
+    const set = getAlertedIds();
+    set.add(String(id));
+    sessionStorage.setItem(ALERTED_STORAGE_KEY, JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
+function normaliseRow(r) {
+  const isWS = !r.room && !r.eventDate && (r.event_date || r.eventDate);
+  if (isWS) {
+    return {
+      ...r,
+      db_id: Number(r.db_id ?? r.id),
+      id: r.reference_code ?? String(r.id),
+      room: r.room || r.venue?.name || r.venue || "Alabang Function Room",
+      table: r.table_number || r.table,
+      seat: r.seat_number || r.seat,
+      guests: r.guests_count || r.guests || r.guests_number,
+      eventDate: r.event_date || r.eventDate,
+      eventTime: r.event_time || r.eventTime,
+      specialRequests: r.special_requests || r.specialRequests || r.notes || r.remarks,
+      submittedTimestamp: r.submitted_timestamp || r.submittedTimestamp,
+      guest_name: r.name || r.guest_name,
+      status: r.status || r.reservationStatus || r.reservation_status || 'pending'
+    };
+  }
+  return {
+    ...r,
+    db_id: Number(r.db_id ?? r.id),
+    id: r.reference_code ?? String(r.id),
+    guests: r.guests_count || r.guests || r.guests_number || r.guests,
+    specialRequests: r.special_requests || r.specialRequests || r.notes || r.remarks,
+    guest_name: r.name || r.guest_name,
+    status: r.status || r.reservationStatus || r.reservation_status || 'pending'
+  };
+}
+
+function isPending(r) {
+  const s = (r.status || "").toLowerCase().trim();
+  return s === "pending" || s === "awaiting" || s === "under review";
+}
+
+function isApproved(r) {
+  const s = (r.status || "").toLowerCase().trim();
+  return ["reserved","approved","confirmed","done","completed","accepted"].includes(s);
+}
+
+const REMINDED_STORAGE_KEY = "bellevue_reminded_reservations";
+function getRemindedKeys() {
+  try {
+    return new Set(JSON.parse(sessionStorage.getItem(REMINDED_STORAGE_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+function markAsReminded(key) {
+  try {
+    const set = getRemindedKeys();
+    set.add(String(key));
+    sessionStorage.setItem(REMINDED_STORAGE_KEY, JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
+function parseEventDate(d, t) {
+  if (!d) return null;
+  let b = new Date(d);
+  if (isNaN(b)) {
+    const cleanDate = String(d).trim().replace(/[^\d\-\/]/g, '');
+    b = new Date(cleanDate);
+    if (isNaN(b)) return null;
+  }
+  if (t) {
+    const m = t.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+    if (m) {
+      let h = +m[1];
+      if (m[3] && m[3].toUpperCase() === "PM" && h !== 12) h += 12;
+      if (m[3] && m[3].toUpperCase() === "AM" && h === 12) h = 0;
+      b.setHours(h, +m[2], 0, 0);
+    }
+  }
+  return b;
+}
+
+function relLabel(ms) {
+  if (ms <= 0) return "now";
+  const m = Math.round(ms / 60000);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60), r = m % 60;
+  return r === 0 ? `${h} hr` : `${h} hr ${r} min`;
+}
+
+function playAlertThenSpeak(text) {
+  stopAlert();
+  _beep([{ f: 880, d: .12, w: "square" }, { f: 880, d: .12, w: "square" }, { f: 1100, d: .24, w: "square" }], () => speakText(text));
+  _alertId = setInterval(() => _beep([{ f: 880, d: .12, w: "square" }, { f: 880, d: .12, w: "square" }, { f: 1100, d: .24, w: "square" }]), 4000);
+}
+
 function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
   const { isDark, toggleTheme } = useAdminTheme();
   const navigate = useNavigate();
@@ -69,6 +290,40 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
     return !!res.seen_by[key];
   };
 
+  const checkNavbarAlerts = (list) => {
+    const activeAlerts = list.filter(isApproved).map(res => {
+      const id = res.id ?? res.db_id;
+      const key = `${id}-alert`;
+      const storedAck = JSON.parse(localStorage.getItem("notification_acknowledgments") || "{}");
+      if (storedAck[String(id)]) return null;
+      
+      const remindedSet = getRemindedKeys();
+      if (remindedSet.has(key)) return null;
+
+      const dt = parseEventDate(res.event_date || res.eventDate || res.reservationDate, res.event_time || res.eventTime || res.reservationTime);
+      if (!dt) return null;
+      
+      const diff = dt.getTime() - Date.now();
+      if (diff > 0 && diff <= 2 * 3600000) {
+        return { res, id, key, diff };
+      }
+      return null;
+    }).filter(Boolean).sort((a, b) => a.diff - b.diff);
+
+    if (!activeAlerts.length) return;
+    
+    activeAlerts.forEach(({ key }) => markAsReminded(key));
+    
+    const first = activeAlerts[0].res;
+    const rel = relLabel(activeAlerts[0].diff);
+    
+    if (activeAlerts.length === 1) {
+      playAlertThenSpeak(`Reminder. ${first.guest_name || first.name || "A guest"}'s reservation starts in ${rel}.`);
+    } else {
+      playAlertThenSpeak(`Reminder. ${activeAlerts.length} reservations coming up. Earliest in ${rel}.`);
+    }
+  };
+
   // Fetch notifications
   const fetchNotifications = async () => {
     try {
@@ -87,6 +342,9 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
       const unreadCount = scoped.filter(r => !isRead(r)).length;
       setPending(unreadCount);
       localStorage.setItem("bellevue_pending_count", unreadCount);
+
+      // Check upcoming reminders globally
+      checkNavbarAlerts(scoped);
     } catch (err) {
       console.warn("Failed to fetch notifications in AdminNavbar", err);
     } finally {
@@ -348,6 +606,98 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
       window.removeEventListener("bellevue:notifications-changed", handleNotificationsChanged);
     };
   }, []);
+
+  // Real-time WebSocket connection for global audio & voice alerts
+  useEffect(() => {
+    let ws = null;
+    let isMounted = true;
+    let reconnectTimer = null;
+
+    const wsHost = import.meta.env.VITE_WS_HOST || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname);
+    const wsPort = import.meta.env.VITE_WS_PORT || "6001";
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${wsHost}:${wsPort}`;
+
+    const connect = () => {
+      if (!isMounted) return;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+
+      try {
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          console.log("[Navbar WS] Connected successfully");
+        };
+
+        ws.onclose = () => {
+          ws = null;
+          if (!isMounted) return;
+          reconnectTimer = setTimeout(connect, 5000);
+        };
+
+        ws.onerror = () => {
+          if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            const eventName = data?.event;
+            if (eventName === "connected") return;
+            if (eventName === "ReservationCreated" || eventName === "ReservationUpdated" || eventName === "updated") {
+              const payload = data?.payload?.reservation ?? data?.payload;
+              if (payload && typeof payload === "object") {
+                const res = normaliseRow(payload);
+                const resId = String(res.id ?? res.db_id);
+
+                const alertedSet = getAlertedIds();
+                if (!alertedSet.has(resId)) {
+                  markAsAlerted(resId);
+
+                  const outlet = canonicalOutletName(res.room || res.venue?.name || res.venue || "Unassigned Outlet");
+                  const hasAccess = canAccessOutlet(currentUser, outlet);
+
+                  if (hasAccess) {
+                    const guestName = res.guest_name || "A guest";
+                    const outletDisplay = res.room || res.venue?.name || res.venue || "";
+
+                    if (isPending(res)) {
+                      playPendingChime(() => {
+                        speakText(`New reservation received from ${guestName} ${outletDisplay ? `for ${outletDisplay}` : ""}`);
+                      });
+                    } else if (isApproved(res)) {
+                      playApproveSound(() => {
+                        speakText(`Reservation approved for ${guestName} ${outletDisplay ? `for ${outletDisplay}` : ""}`);
+                      });
+                    }
+                  }
+                }
+
+                // Trigger sync across components
+                window.dispatchEvent(new CustomEvent("bellevue:notifications-changed"));
+              }
+            }
+          } catch (err) {
+            console.error("[Navbar WS] Parse error:", err);
+          }
+        };
+      } catch (err) {
+        console.error("[Navbar WS] Connection failed:", err);
+      }
+    };
+
+    connect();
+
+    return () => {
+      isMounted = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
+      stopAlert();
+    };
+  }, [currentUser]);
 
   // Keep badge in sync if parent passes pendingCount prop
   useEffect(() => {

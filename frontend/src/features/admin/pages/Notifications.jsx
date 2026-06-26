@@ -288,20 +288,12 @@ function normalizeAcknowledgments(items) {
   }, {});
 }
 
-// ─── Audio ────────────────────────────────────────────────────────────────────
-let _alertId = null;
-function stopAlert() { if (_alertId) { clearInterval(_alertId); _alertId = null; } }
-function _beep(notes, onDone) {
-  try {
-    const ctx = new (window.AudioContext||window.webkitAudioContext)();
-    const end = notes.reduce((t,{f,d,w="sine"}) => { const o=ctx.createOscillator(),g=ctx.createGain(); o.connect(g);g.connect(ctx.destination);o.type=w;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(0.18,t);g.gain.exponentialRampToValueAtTime(0.001,t+d);o.start(t);o.stop(t+d);return t+d+0.05; }, ctx.currentTime+0.05);
-    if (onDone) setTimeout(onDone, (end-ctx.currentTime)*1000+400);
-  } catch { if (onDone) onDone(); }
-}
-function playAlertThenSpeak(text) { stopAlert(); _beep([{f:880,d:.12,w:"square"},{f:880,d:.12,w:"square"},{f:1100,d:.24,w:"square"}],()=>speakText(text)); _alertId=setInterval(()=>_beep([{f:880,d:.12,w:"square"},{f:880,d:.12,w:"square"},{f:1100,d:.24,w:"square"}]),4000); }
-function playPendingChime() { _beep([{f:1046,d:.13},{f:784,d:.13},{f:523,d:.22}]); }
-function playApproveSound() { _beep([{f:523,d:.08},{f:659,d:.08},{f:784,d:.08},{f:1047,d:.20}]); }
-function speakText(text) { if (!window.speechSynthesis) return; window.speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.rate=0.95;u.pitch=1.05;u.volume=1; const v=window.speechSynthesis.getVoices(); const eng=v.find(x=>x.lang.startsWith("en")&&/female|zira|samantha/i.test(x.name))||v.find(x=>x.lang.startsWith("en")); if(eng)u.voice=eng; window.speechSynthesis.speak(u); }
+// ─── Audio (Muted on this page, handled globally by AdminNavbar) ───────────────
+function stopAlert() {}
+function playAlertThenSpeak(text) {}
+function playPendingChime() {}
+function playApproveSound() {}
+function speakText(text) {}
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 function Spinner({ size=13, C }) {
@@ -1518,7 +1510,8 @@ function NotificationDashboard() {
   }, [syncReservations]);
 
   useEffect(()=>{
-    const wsHost=import.meta.env.VITE_WS_HOST||"localhost",wsPort=import.meta.env.VITE_WS_PORT||"6001";
+    const wsHost=import.meta.env.VITE_WS_HOST||(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname);
+    const wsPort=import.meta.env.VITE_WS_PORT||"6001";
     const protocol=window.location.protocol==="https:"?"wss:":"ws:";
     const wsUrl=`${protocol}//${wsHost}:${wsPort}`;
 

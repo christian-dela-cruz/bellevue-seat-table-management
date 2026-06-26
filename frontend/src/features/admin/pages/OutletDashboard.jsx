@@ -965,7 +965,7 @@ function OutletDashboard() {
   useEffect(() => {
     if (!canViewReports) return undefined;
 
-    const wsHost = import.meta.env.VITE_WS_HOST || "localhost";
+    const wsHost = import.meta.env.VITE_WS_HOST || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname);
     const wsPort = import.meta.env.VITE_WS_PORT || "6001";
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${wsHost}:${wsPort}`;
