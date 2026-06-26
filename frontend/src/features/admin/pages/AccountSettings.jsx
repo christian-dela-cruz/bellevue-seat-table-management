@@ -14,6 +14,9 @@ import {
   Upload,
   UserCircle,
   Volume2,
+  X,
+  Camera,
+  Info,
 } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import VerificationModal from "../components/VerificationModal";
@@ -297,6 +300,42 @@ function PasswordInput({ value, onChange, placeholder, visible, onToggle, requir
   );
 }
 
+function InfoTooltip({ title, content }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div 
+      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      onFocus={() => setShow(true)}
+      onBlur={() => setShow(false)}
+    >
+      <Info size={13.5} style={{ color: C.muted, cursor: "help", opacity: 0.7, outline: "none" }} tabIndex={0} />
+      {show && (
+        <div style={{
+          position: "absolute",
+          left: 24,
+          top: "50%",
+          transform: "translateY(-50%)",
+          background: C.surfaceSoft,
+          border: `1px solid ${C.border}`,
+          borderRadius: 8,
+          boxShadow: C.shadow,
+          width: 240,
+          padding: "12px 14px",
+          zIndex: 100,
+          pointerEvents: "none",
+          whiteSpace: "normal",
+          boxSizing: "border-box"
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 4 }}>{title}</div>
+          <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.45 }}>{content}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AccountSettings() {
   const { isDark, updateUser, updateAvatar } = useAdminTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -310,6 +349,7 @@ export default function AccountSettings() {
   
   const [savedAvatar, setSavedAvatar] = useState(() => readStoredAvatar(currentUser));
   const [avatarPreview, setAvatarPreview] = useState(() => readStoredAvatar(currentUser));
+  const [photoHovered, setPhotoHovered] = useState(false);
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     next: false,
@@ -320,6 +360,16 @@ export default function AccountSettings() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+  const [auditLogPage, setAuditLogPage] = useState(1);
+
+  const auditLogsPerPage = 5;
+  const totalAuditLogPages = Math.ceil(auditLogs.length / auditLogsPerPage) || 1;
+  const currentAuditLogPage = Math.min(auditLogPage, totalAuditLogPages);
+  
+  const paginatedAuditLogs = useMemo(() => {
+    const start = (currentAuditLogPage - 1) * auditLogsPerPage;
+    return auditLogs.slice(start, start + auditLogsPerPage);
+  }, [auditLogs, currentAuditLogPage, auditLogsPerPage]);
 
   // Available voices for speech synthesis
   const [voices, setVoices] = useState([]);
@@ -774,7 +824,7 @@ export default function AccountSettings() {
         const previousAvatarKey = avatarKeyFor(currentUser);
         let nextUser = currentUser;
 
-        if (profileTextDirty) {
+        if (profileTextDirty || avatarDirty) {
           const response = await authAPI.updateProfile(profile);
           nextUser = response?.admin || { ...currentUser, ...profile };
         }
@@ -796,6 +846,8 @@ export default function AccountSettings() {
         updateAvatar(avatarPreview);
         setSavedAvatar(avatarPreview);
         successCount++;
+        fetchSessions();
+        fetchAuditLogs();
       } catch (error) {
         failMessage = error.message || "Profile update failed.";
       } finally {
@@ -993,26 +1045,88 @@ export default function AccountSettings() {
                   <form onSubmit={handleSaveSubmit} style={{ display: "grid", gap: 18 }}>
                     {/* Compact Horizontal Profile Photo Selector */}
                     <div style={{ display: "flex", alignItems: "center", gap: 16, borderBottom: `1px solid ${C.divider}`, paddingBottom: 18, marginBottom: 4 }}>
-                      <div style={{ width: 56, height: 56, borderRadius: "50%", background: C.gold, color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 850, overflow: "hidden", flexShrink: 0, boxShadow: "0 4px 12px rgba(140,107,42,0.12)" }}>
-                        {avatarPreview ? (
-                          <img src={avatarPreview} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        ) : initials}
+                      <div 
+                        onMouseEnter={() => setPhotoHovered(true)}
+                        onMouseLeave={() => setPhotoHovered(false)}
+                        style={{ 
+                          position: "relative", 
+                          width: 80, 
+                          height: 80, 
+                          borderRadius: "50%", 
+                          background: C.gold, 
+                          color: "#FFFFFF", 
+                          display: "flex", 
+                          alignItems: "center", 
+                          justifyContent: "center", 
+                          fontSize: 24, 
+                          fontWeight: 850, 
+                          overflow: "visible", 
+                          flexShrink: 0, 
+                          boxShadow: "0 4px 14px rgba(140,107,42,0.16)" 
+                        }}
+                      >
+                        {/* Circular Avatar Clip wrapper */}
+                        <div style={{ width: "100%", height: "100%", borderRadius: "50%", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {avatarPreview ? (
+                            <img src={avatarPreview} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          ) : initials}
+                        </div>
+
+                        {/* Hover Camera/Upload Overlay */}
+                        {photoHovered && (
+                          <label 
+                            style={{ 
+                              position: "absolute", 
+                              top: 0, 
+                              left: 0, 
+                              width: "100%", 
+                              height: "100%", 
+                              borderRadius: "50%", 
+                              background: "rgba(0, 0, 0, 0.45)", 
+                              display: "flex", 
+                              alignItems: "center", 
+                              justifyContent: "center", 
+                              cursor: "pointer",
+                              transition: "background 0.2s ease"
+                            }}
+                          >
+                            <Camera size={22} color="#FFFFFF" />
+                            <input type="file" accept="image/*" onChange={uploadAvatar} style={{ display: "none" }} />
+                          </label>
+                        )}
+
+                        {/* Red "X" delete button at top-right (only when custom avatar exists and photo is hovered) */}
+                        {photoHovered && avatarPreview && (
+                          <button 
+                            type="button" 
+                            onClick={removeAvatar} 
+                            style={{ 
+                              position: "absolute", 
+                              top: -2, 
+                              right: -2, 
+                              width: 22, 
+                              height: 22, 
+                              borderRadius: "50%", 
+                              background: C.red || "#dc3545", 
+                              color: "#FFFFFF", 
+                              border: "2px solid #FFFFFF", 
+                              display: "flex", 
+                              alignItems: "center", 
+                              justifyContent: "center", 
+                              cursor: "pointer", 
+                              padding: 0,
+                              boxShadow: "0 2px 6px rgba(0,0,0,0.22)",
+                              zIndex: 10
+                            }}
+                            title="Delete photo"
+                          >
+                            <X size={12} color="#FFFFFF" strokeWidth={3} />
+                          </button>
+                        )}
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Profile Picture</div>
                         <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>PNG, JPG under 2 MB</div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <label style={{ ...buttonStyle("secondary"), minHeight: 32, padding: "0 12px", border: `1px solid ${C.border}`, background: "transparent", color: C.text }}>
-                          <Upload size={12} />
-                          Upload photo
-                          <input type="file" accept="image/*" onChange={uploadAvatar} style={{ display: "none" }} />
-                        </label>
-                        {avatarPreview && (
-                          <button type="button" onClick={removeAvatar} style={{ ...buttonStyle("ghost"), minHeight: 32, padding: "0 10px", color: C.red }}>
-                            Delete
-                          </button>
-                        )}
                       </div>
                     </div>
 
@@ -1292,7 +1406,10 @@ export default function AccountSettings() {
                   {/* 2FA Toggle Card */}
                   <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 18, marginTop: 18, display: "grid", gap: 12 }}>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: C.text }}>Two-Factor Authentication (2FA)</h3>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: C.text }}>Two-Factor Authentication (2FA)</h3>
+                        <InfoTooltip title="Two-Factor Authentication" content="Two-factor authentication adds an extra layer of protection by requiring a temporary verification code from an authenticator app (like Google Authenticator or 1Password) whenever you log in." />
+                      </div>
                       <p style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}>Add an extra layer of security to your account using TOTP code verification.</p>
                     </div>
                     
@@ -1329,7 +1446,7 @@ export default function AccountSettings() {
                           padding: "0 12px",
                           fontSize: 10,
                           border: currentUser.two_factor_enabled ? `1px solid ${C.red}30` : undefined,
-                          color: currentUser.two_factor_enabled ? C.red : undefined,
+                          color: currentUser.two_factor_enabled ? C.red : "#FFFFFF",
                         }}
                       >
                         {currentUser.two_factor_enabled ? "Disable 2FA" : "Enable 2FA"}
@@ -1342,7 +1459,10 @@ export default function AccountSettings() {
                 <div id="settings-section-sessions" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "24px 28px", boxShadow: "0 4px 18px rgba(0,0,0,0.015)", display: "grid", gap: 12, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 14 }}>
                     <div>
-                      <h2 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: C.text }}>Device Sessions</h2>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <h2 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: C.text }}>Device Sessions</h2>
+                        <InfoTooltip title="Device Sessions" content="This section shows all web browsers and devices currently logged into your account. If you see a device you do not recognize, click 'Revoke' to instantly log it out." />
+                      </div>
                       <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted, lineHeight: 1.4 }}>Monitor the browser sessions logged into your account and revoke any unauthorized device logins.</p>
                     </div>
                   </div>
@@ -1376,11 +1496,21 @@ export default function AccountSettings() {
                                 type="button"
                                 onClick={() => handleRevokeSession(sess.id)}
                                 style={{
-                                  ...buttonStyle("ghost"),
-                                  minHeight: 28,
-                                  padding: "0 10px",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  padding: "4px 10px",
+                                  borderRadius: 6,
+                                  background: "transparent",
                                   color: C.red,
                                   border: `1px solid ${C.red}20`,
+                                  fontFamily: F.label,
+                                  fontSize: 9,
+                                  fontWeight: 700,
+                                  textTransform: "uppercase",
+                                  whiteSpace: "nowrap",
+                                  cursor: "pointer",
+                                  transition: "background 0.16s ease",
                                 }}
                                 onMouseEnter={(e) => {
                                   e.currentTarget.style.background = C.redFaint;
@@ -1422,7 +1552,10 @@ export default function AccountSettings() {
                 <div id="settings-section-audit-logs" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "24px 28px", boxShadow: "0 4px 18px rgba(0,0,0,0.015)", display: "grid", gap: 10, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 14 }}>
                     <div>
-                      <h2 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: C.text }}>Security Log</h2>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <h2 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: C.text }}>Security Log</h2>
+                        <InfoTooltip title="Security Log" content="The security log is a read-only audit trail tracking important security actions (like password changes, 2FA setup, and profile updates) along with the IP address of the device that performed them." />
+                      </div>
                       <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted, lineHeight: 1.4 }}>Review the history of security changes, sign-in logs, and profile updates made to your account.</p>
                     </div>
                   </div>
@@ -1443,9 +1576,22 @@ export default function AccountSettings() {
                             </tr>
                           </thead>
                           <tbody>
-                            {auditLogs.map((log) => {
+                            {paginatedAuditLogs.map((log) => {
                               const is2FA = log.action.includes("2fa");
                               const isEmail = log.action.includes("email");
+                              
+                              // Translate actions to clear, user-friendly labels
+                              const getActionLabel = (action, modelType) => {
+                                const act = String(action).toLowerCase();
+                                if (act === "created" && modelType === "Admin") return "Account Created";
+                                if (act === "updated" && modelType === "Admin") return "Profile Updated";
+                                if (act === "password_updated") return "Password Changed";
+                                if (act === "2fa_enabled") return "2FA Enabled";
+                                if (act === "2fa_disabled") return "2FA Disabled";
+                                if (act === "session_revoked") return "Session Revoked";
+                                return action.replace(/_/g, " ");
+                              };
+
                               const bg = is2FA ? C.goldFaint : isEmail ? C.blueFaint : C.surfaceSoft;
                               const textCol = is2FA ? C.gold : isEmail ? C.blue : C.textSecondary;
                               const borderCol = is2FA ? C.borderAccent : isEmail ? C.blueBorder : C.border;
@@ -1468,16 +1614,53 @@ export default function AccountSettings() {
                                       letterSpacing: "0.04em",
                                       whiteSpace: "nowrap"
                                     }}>
-                                      {log.action.replace(/_/g, " ")}
+                                      {getActionLabel(log.action, log.model_type)}
                                     </span>
                                   </td>
-                                  <td style={{ padding: "12px 16px", fontFamily: "monospace", fontSize: 12, color: C.textSecondary }}>{log.ip_address}</td>
+                                  <td style={{ padding: "12px 16px", fontFamily: "monospace", fontSize: 12, color: C.textSecondary }}>{log.ip_address || "—"}</td>
                                   <td style={{ padding: "12px 16px", fontSize: 12, color: C.muted }}>{new Date(log.created_at).toLocaleString()}</td>
                                 </tr>
                               );
                             })}
                           </tbody>
                         </table>
+                        {totalAuditLogPages > 1 && (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderTop: `1px solid ${C.border}`, background: C.surfaceSoft }}>
+                            <span style={{ fontSize: 11, color: C.muted }}>
+                              Showing {((currentAuditLogPage - 1) * auditLogsPerPage) + 1} to {Math.min(currentAuditLogPage * auditLogsPerPage, auditLogs.length)} of {auditLogs.length} entries
+                            </span>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button
+                                type="button"
+                                disabled={currentAuditLogPage === 1}
+                                onClick={() => setAuditLogPage(p => Math.max(1, p - 1))}
+                                style={{
+                                  ...buttonStyle("ghost", currentAuditLogPage === 1),
+                                  minHeight: 26,
+                                  padding: "0 10px",
+                                  fontSize: 10,
+                                  border: `1px solid ${C.border}`,
+                                }}
+                              >
+                                Prev
+                              </button>
+                              <button
+                                type="button"
+                                disabled={currentAuditLogPage === totalAuditLogPages}
+                                onClick={() => setAuditLogPage(p => Math.min(totalAuditLogPages, p + 1))}
+                                style={{
+                                  ...buttonStyle("ghost", currentAuditLogPage === totalAuditLogPages),
+                                  minHeight: 26,
+                                  padding: "0 10px",
+                                  fontSize: 10,
+                                  border: `1px solid ${C.border}`,
+                                }}
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div style={{

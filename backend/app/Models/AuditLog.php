@@ -24,6 +24,19 @@ class AuditLog extends Model
         'new_values' => 'array',
     ];
 
+    protected static function booted()
+    {
+        static::creating(function ($model) {
+            try {
+                if (empty($model->ip_address) && app()->has('request') && request()) {
+                    $model->ip_address = request()->ip();
+                }
+            } catch (\Throwable $e) {
+                // Safe fallback for console/testing environments where request is not available
+            }
+        });
+    }
+
     public function admin()
     {
         return $this->belongsTo(Admin::class);
