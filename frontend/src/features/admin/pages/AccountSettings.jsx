@@ -991,7 +991,7 @@ export default function AccountSettings() {
         <AdminNavbar />
 
         <main className="account-settings-shell" style={{ flex: 1, minWidth: 0, overflow: "auto", padding: "30px 32px 42px", position: "relative" }}>
-          <div style={{ maxWidth: 1080, display: "grid", gap: 18 }}>
+          <div style={{ maxWidth: 1440, margin: "0 auto", display: "grid", gap: 18, width: "100%" }}>
             <AdminPageHeader
               eyebrow="ACCOUNT"
               title="Account Settings"
