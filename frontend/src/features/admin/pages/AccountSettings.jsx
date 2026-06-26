@@ -13,6 +13,7 @@ import {
   Shield,
   Upload,
   UserCircle,
+  Volume2,
 } from "lucide-react";
 import AdminNavbar from "../../../components/layout/AdminNavbar";
 import VerificationModal from "../components/VerificationModal";
@@ -28,6 +29,17 @@ const DEFAULT_PREFERENCES = {
   cancellationAlerts: true,
   reportNotifications: false,
   systemUpdates: true,
+  // Notification Audio & Voice settings
+  enableChimeAlerts: true,
+  enableVoiceAlerts: true,
+  voiceAnnouncePending: true,
+  voiceAnnounceApproved: true,
+  voiceAnnounceReminders: true,
+  voiceGender: "female",
+  voiceAccent: "default",
+  voiceTone: "standard",
+  voiceRate: 0.88,
+  voicePitch: 1.0,
 };
 
 const PREFERENCE_KEY = "bellevue_account_preferences";
@@ -35,7 +47,20 @@ const PREFERENCE_KEY = "bellevue_account_preferences";
 function readStoredPreferences() {
   try {
     const raw = localStorage.getItem(PREFERENCE_KEY);
-    return raw ? { ...DEFAULT_PREFERENCES, ...JSON.parse(raw) } : DEFAULT_PREFERENCES;
+    if (!raw) return DEFAULT_PREFERENCES;
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULT_PREFERENCES,
+      ...parsed,
+      voiceAnnouncePending: parsed.voiceAnnouncePending ?? true,
+      voiceAnnounceApproved: parsed.voiceAnnounceApproved ?? true,
+      voiceAnnounceReminders: parsed.voiceAnnounceReminders ?? true,
+      enableChimeAlerts: parsed.enableChimeAlerts ?? true,
+      enableVoiceAlerts: parsed.enableVoiceAlerts ?? true,
+      voiceGender: parsed.voiceGender ?? "female",
+      voiceAccent: parsed.voiceAccent ?? "default",
+      voiceTone: parsed.voiceTone ?? "standard",
+    };
   } catch {
     return DEFAULT_PREFERENCES;
   }
@@ -295,6 +320,142 @@ export default function AccountSettings() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+
+  // Available voices for speech synthesis
+  const [voices, setVoices] = useState([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    const loadVoices = () => {
+      const allVoices = window.speechSynthesis.getVoices() || [];
+      const englishVoices = allVoices.filter(v => v.lang.startsWith("en"));
+      setVoices(englishVoices);
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, []);
+
+  const getVoiceConfiguration = (gender = "female", accent = "default", tone = "standard", voicesList, baseRate = 0.88, basePitch = 1.0) => {
+    const result = {
+      voice: null,
+      rate: baseRate,
+      pitch: basePitch
+    };
+
+    const list = (voicesList && voicesList.length > 0)
+      ? voicesList
+      : (typeof window !== "undefined" && window.speechSynthesis
+         ? window.speechSynthesis.getVoices().filter(v => v.lang.startsWith("en"))
+         : []);
+
+    if (list.length === 0) return result;
+
+    // 1. Filter by accent
+    let accentFiltered = list;
+    if (accent === "us") {
+      accentFiltered = list.filter(v => v.lang.startsWith("en-US") || v.lang.includes("US") || v.lang.includes("United States"));
+    } else if (accent === "gb") {
+      accentFiltered = list.filter(v => v.lang.startsWith("en-GB") || v.lang.includes("GB") || v.lang.includes("United Kingdom") || v.lang.includes("Great Britain"));
+    } else if (accent === "au") {
+      accentFiltered = list.filter(v => v.lang.startsWith("en-AU") || v.lang.includes("AU") || v.lang.includes("Australia"));
+    } else if (accent === "in") {
+      accentFiltered = list.filter(v => v.lang.startsWith("en-IN") || v.lang.includes("IN") || v.lang.includes("India"));
+    }
+
+    if (accentFiltered.length === 0) {
+      accentFiltered = list;
+    }
+
+    // 2. Filter by gender
+    const isMalePref = gender === "male";
+    let genderFiltered = [];
+    if (isMalePref) {
+      genderFiltered = accentFiltered.filter(v => 
+        /david|george|mark|ravi|daniel|richard|steve|alex|fred|male/i.test(v.name)
+      );
+    } else {
+      genderFiltered = accentFiltered.filter(v => 
+        /zira|samantha|susan|hazel|heather|karen|moira|tessa|veena|siri|female/i.test(v.name)
+      );
+    }
+
+    if (genderFiltered.length === 0) {
+      if (isMalePref) {
+        genderFiltered = list.filter(v => /david|george|mark|ravi|daniel|richard|steve|alex|fred|male/i.test(v.name));
+      } else {
+        genderFiltered = list.filter(v => /zira|samantha|susan|hazel|heather|karen|moira|tessa|veena|siri|female/i.test(v.name));
+      }
+    }
+
+    const finalSelectionList = genderFiltered.length > 0 ? genderFiltered : (accentFiltered.length > 0 ? accentFiltered : list);
+
+    // 3. Map tone parameters
+    let selectedVoice = null;
+    let pitchMultiplier = 1.0;
+    let rateMultiplier = 1.0;
+
+    let genderPitchAdjustment = isMalePref ? 0.90 : 1.05;
+
+    if (tone === "standard") {
+      selectedVoice = finalSelectionList[0];
+      pitchMultiplier = 1.0;
+      rateMultiplier = 1.0;
+    } else if (tone === "natural") {
+      selectedVoice = finalSelectionList.find(v => /google|natural|premium|neural/i.test(v.name)) || finalSelectionList[1] || finalSelectionList[0];
+      pitchMultiplier = 0.94;
+      rateMultiplier = 0.94;
+    } else if (tone === "clear") {
+      selectedVoice = finalSelectionList[2] || finalSelectionList[0];
+      pitchMultiplier = 1.14;
+      rateMultiplier = 1.05;
+    } else if (tone === "warm") {
+      selectedVoice = finalSelectionList[3] || finalSelectionList[1] || finalSelectionList[0];
+      pitchMultiplier = 0.86;
+      rateMultiplier = 0.88;
+    }
+
+    result.voice = selectedVoice || list[0];
+    result.pitch = Math.max(0.5, Math.min(2.0, basePitch * pitchMultiplier * genderPitchAdjustment));
+    result.rate = Math.max(0.5, Math.min(2.0, baseRate * rateMultiplier));
+
+    return result;
+  };
+
+  const handleTestVoice = () => {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      showMessage({ type: "error", text: "Speech synthesis not supported on this device." });
+      return;
+    }
+    
+    window.speechSynthesis.cancel();
+    
+    const config = getVoiceConfiguration(
+      preferences.voiceGender || "female",
+      preferences.voiceAccent || "default",
+      preferences.voiceTone || "standard",
+      voices,
+      parseFloat(preferences.voiceRate || 0.88),
+      parseFloat(preferences.voicePitch || 1.0)
+    );
+
+    const textToSpeak = `Test announcement. This is a preview of your selected ${preferences.voiceGender} voice, using the ${preferences.voiceAccent === "default" ? "default system" : preferences.voiceAccent.toUpperCase()} accent and a ${preferences.voiceTone} tone.`;
+    const u = new SpeechSynthesisUtterance(textToSpeak);
+    
+    u.rate = config.rate;
+    u.pitch = config.pitch;
+    u.volume = 1;
+    if (config.voice) u.voice = config.voice;
+    
+    window.speechSynthesis.speak(u);
+  };
   
   // Modals state
   const [verificationModalOpen, setVerificationModalOpen] = useState(false);
@@ -393,7 +554,17 @@ export default function AccountSettings() {
   const preferencesDirty = preferences.reservationAlerts !== savedPreferences.reservationAlerts
     || preferences.cancellationAlerts !== savedPreferences.cancellationAlerts
     || preferences.reportNotifications !== savedPreferences.reportNotifications
-    || preferences.systemUpdates !== savedPreferences.systemUpdates;
+    || preferences.systemUpdates !== savedPreferences.systemUpdates
+    || preferences.enableChimeAlerts !== savedPreferences.enableChimeAlerts
+    || preferences.enableVoiceAlerts !== savedPreferences.enableVoiceAlerts
+    || preferences.voiceAnnouncePending !== savedPreferences.voiceAnnouncePending
+    || preferences.voiceAnnounceApproved !== savedPreferences.voiceAnnounceApproved
+    || preferences.voiceAnnounceReminders !== savedPreferences.voiceAnnounceReminders
+    || preferences.voiceGender !== savedPreferences.voiceGender
+    || preferences.voiceAccent !== savedPreferences.voiceAccent
+    || preferences.voiceTone !== savedPreferences.voiceTone
+    || preferences.voiceRate !== savedPreferences.voiceRate
+    || preferences.voicePitch !== savedPreferences.voicePitch;
 
   const isDirty = profileDirty || securityDirty || preferencesDirty;
 
@@ -816,11 +987,11 @@ export default function AccountSettings() {
                 ))}
               </aside>
 
-              {/* Main settings container (Unified Card) */}
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "24px 28px", boxShadow: "0 4px 18px rgba(0,0,0,0.015)", display: "grid", gap: 0, minWidth: 0, paddingBottom: 100 }}>
+              {/* Main settings container (Multiple Cards Layout) */}
+              <div style={{ display: "grid", gap: 24, minWidth: 0 }}>
                 
-                {/* 1. Profile Section */}
-                <div id="settings-section-profile" style={{ borderBottom: `1px solid ${C.divider}`, paddingBottom: 24, marginBottom: 24 }}>
+                {/* 1. Profile Section Card */}
+                <div id="settings-section-profile" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "24px 28px", boxShadow: "0 4px 18px rgba(0,0,0,0.015)", display: "grid", gap: 18, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 18 }}>
                     <div>
                       <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text }}>Profile Information</h2>
@@ -905,8 +1076,8 @@ export default function AccountSettings() {
                   </form>
                 </div>
 
-                {/* 2. Notifications Section */}
-                <div id="settings-section-notifications" style={{ borderBottom: `1px solid ${C.divider}`, paddingBottom: 24, marginBottom: 24 }}>
+                {/* 2. Notifications Section Card */}
+                <div id="settings-section-notifications" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "24px 28px", boxShadow: "0 4px 18px rgba(0,0,0,0.015)", display: "grid", gap: 0, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 14 }}>
                     <div>
                       <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text }}>Notification Preferences</h2>
@@ -945,10 +1116,148 @@ export default function AccountSettings() {
                       onChange={(value) => setPreferences((prev) => ({ ...prev, systemUpdates: value }))}
                     />
                   </div>
+
+                  {/* Sound & Voice Settings Subsection */}
+                  <div style={{ marginTop: 24, paddingTop: 20, borderTop: `1px solid ${C.divider}` }}>
+                    <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: C.text }}>Audio & Voice Alerts</h3>
+                    <p style={{ margin: "2px 0 14px", fontSize: 11.5, color: C.muted }}>Customize real-time chime sounds and text-to-speech voice parameters.</p>
+
+                    <div style={{ display: "grid", gap: 14 }}>
+                      <ToggleRow
+                        title="Enable Sound Chimes"
+                        description="Play an attention-grabbing beep chime when a notification is triggered."
+                        checked={preferences.enableChimeAlerts}
+                        onChange={(value) => setPreferences((prev) => ({ ...prev, enableChimeAlerts: value }))}
+                      />
+                      <ToggleRow
+                        title="Enable Voice Announcements"
+                        description="Announce guest and outlet details aloud using text-to-speech."
+                        checked={preferences.enableVoiceAlerts}
+                        onChange={(value) => setPreferences((prev) => ({ ...prev, enableVoiceAlerts: value }))}
+                      />
+                      
+                      {preferences.enableVoiceAlerts && (
+                        <div style={{ paddingLeft: 20, borderLeft: `2px solid ${C.gold}24`, display: "grid", gap: 8, marginTop: 2, marginBottom: 8 }}>
+                          <ToggleRow
+                            title="New Reservation Requests"
+                            description="Speak details when a new pending reservation is received."
+                            checked={preferences.voiceAnnouncePending}
+                            onChange={(value) => setPreferences((prev) => ({ ...prev, voiceAnnouncePending: value }))}
+                          />
+                          <ToggleRow
+                            title="Approved Bookings"
+                            description="Speak details when a reservation is approved or confirmed."
+                            checked={preferences.voiceAnnounceApproved}
+                            onChange={(value) => setPreferences((prev) => ({ ...prev, voiceAnnounceApproved: value }))}
+                          />
+                          <ToggleRow
+                            title="Upcoming Event Reminders"
+                            description="Speak reminder alerts for upcoming events."
+                            checked={preferences.voiceAnnounceReminders}
+                            onChange={(value) => setPreferences((prev) => ({ ...prev, voiceAnnounceReminders: value }))}
+                          />
+                        </div>
+                      )}
+
+                      {preferences.enableVoiceAlerts && (
+                        <div style={{ display: "grid", gap: 14, padding: "14px 16px", background: C.surfaceSoft, border: `1px solid ${C.border}`, borderRadius: 10, marginTop: 6 }}>
+                          {/* Voice Persona Selectors */}
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                            <Field label="Voice Gender" hint="Select the announcer's voice gender.">
+                              <select
+                                value={preferences.voiceGender}
+                                onChange={(e) => setPreferences(prev => ({ ...prev, voiceGender: e.target.value }))}
+                                style={inputStyle()}
+                              >
+                                <option value="female">Female Voice</option>
+                                <option value="male">Male Voice</option>
+                              </select>
+                            </Field>
+
+                            <Field label="Speaker Accent" hint="Select regional pronunciation accent.">
+                              <select
+                                value={preferences.voiceAccent}
+                                onChange={(e) => setPreferences(prev => ({ ...prev, voiceAccent: e.target.value }))}
+                                style={inputStyle()}
+                              >
+                                <option value="default">Default System Accent</option>
+                                <option value="us">United States (US)</option>
+                                <option value="gb">United Kingdom (UK)</option>
+                                <option value="au">Australia (AU)</option>
+                                <option value="in">India (IN)</option>
+                              </select>
+                            </Field>
+
+                            <Field label="Voice Tone / Character" hint="Choose sound profile or personality.">
+                              <select
+                                value={preferences.voiceTone}
+                                onChange={(e) => setPreferences(prev => ({ ...prev, voiceTone: e.target.value }))}
+                                style={inputStyle()}
+                              >
+                                <option value="standard">Standard Tone</option>
+                                <option value="natural">Natural Tone</option>
+                                <option value="clear">Clear Tone</option>
+                                <option value="warm">Warm Tone</option>
+                              </select>
+                            </Field>
+                          </div>
+
+                          {/* Sliders Grid */}
+                          <div className="account-form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                            <Field label={`Speech Speed: ${preferences.voiceRate}x`} hint="Adjust how fast the announcer speaks.">
+                              <div style={{ display: "flex", alignItems: "center", gap: 10, height: 38 }}>
+                                <input
+                                  type="range"
+                                  min="0.5"
+                                  max="1.5"
+                                  step="0.05"
+                                  value={preferences.voiceRate}
+                                  onChange={(e) => setPreferences(prev => ({ ...prev, voiceRate: parseFloat(e.target.value) }))}
+                                  style={{ flex: 1, accentColor: C.gold }}
+                                />
+                              </div>
+                            </Field>
+                            <Field label={`Speech Pitch: ${preferences.voicePitch}`} hint="Adjust the pitch/tone of the voice.">
+                              <div style={{ display: "flex", alignItems: "center", gap: 10, height: 38 }}>
+                                <input
+                                  type="range"
+                                  min="0.5"
+                                  max="1.5"
+                                  step="0.05"
+                                  value={preferences.voicePitch}
+                                  onChange={(e) => setPreferences(prev => ({ ...prev, voicePitch: parseFloat(e.target.value) }))}
+                                  style={{ flex: 1, accentColor: C.gold }}
+                                />
+                              </div>
+                            </Field>
+                          </div>
+
+                          {/* Preview / Test Voice */}
+                          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+                            <button
+                              type="button"
+                              onClick={handleTestVoice}
+                              style={{
+                                ...buttonStyle("ghost"),
+                                fontSize: 10,
+                                padding: "6px 12px",
+                                border: `1px solid ${C.gold}20`,
+                                color: C.gold,
+                                background: C.goldFaint,
+                              }}
+                            >
+                              <Volume2 size={13} />
+                              Test Voice Settings
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {/* 3. Security Section */}
-                <div id="settings-section-security" style={{ borderBottom: `1px solid ${C.divider}`, paddingBottom: 24, marginBottom: 24 }}>
+                {/* 3. Security Section Card */}
+                <div id="settings-section-security" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "24px 28px", boxShadow: "0 4px 18px rgba(0,0,0,0.015)", display: "grid", gap: 14, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 18 }}>
                     <div>
                       <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text }}>Password Management</h2>
@@ -1057,8 +1366,8 @@ export default function AccountSettings() {
                   </div>
                 </div>
 
-                {/* 4. Sessions Section */}
-                <div id="settings-section-sessions" style={{ borderBottom: `1px solid ${C.divider}`, paddingBottom: 24, marginBottom: 24 }}>
+                {/* 4. Sessions Section Card */}
+                <div id="settings-section-sessions" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "24px 28px", boxShadow: "0 4px 18px rgba(0,0,0,0.015)", display: "grid", gap: 12, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 14 }}>
                     <div>
                       <h2 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: C.text }}>Device Sessions</h2>
@@ -1137,8 +1446,8 @@ export default function AccountSettings() {
                   </div>
                 </div>
 
-                {/* 5. Audit Logs Section */}
-                <div id="settings-section-audit-logs">
+                {/* 5. Audit Logs Section Card */}
+                <div id="settings-section-audit-logs" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "24px 28px", boxShadow: "0 4px 18px rgba(0,0,0,0.015)", display: "grid", gap: 10, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 14 }}>
                     <div>
                       <h2 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: C.text }}>Security Log</h2>

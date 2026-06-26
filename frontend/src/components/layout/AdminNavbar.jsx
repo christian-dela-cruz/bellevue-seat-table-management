@@ -96,26 +96,175 @@ function _beep(notes, onDone) {
   }
 }
 
+const DEFAULT_PREFERENCES = {
+  reservationAlerts: true,
+  cancellationAlerts: true,
+  reportNotifications: false,
+  systemUpdates: true,
+  // Notification Audio & Voice settings
+  enableChimeAlerts: true,
+  enableVoiceAlerts: true,
+  voiceAnnouncePending: true,
+  voiceAnnounceApproved: true,
+  voiceAnnounceReminders: true,
+  voiceGender: "female",
+  voiceAccent: "default",
+  voiceTone: "standard",
+  voiceRate: 0.88,
+  voicePitch: 1.0,
+};
+
+const PREFERENCE_KEY = "bellevue_account_preferences";
+
+function readStoredPreferences() {
+  try {
+    const raw = localStorage.getItem(PREFERENCE_KEY);
+    if (!raw) return DEFAULT_PREFERENCES;
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULT_PREFERENCES,
+      ...parsed,
+      voiceAnnouncePending: parsed.voiceAnnouncePending ?? true,
+      voiceAnnounceApproved: parsed.voiceAnnounceApproved ?? true,
+      voiceAnnounceReminders: parsed.voiceAnnounceReminders ?? true,
+      enableChimeAlerts: parsed.enableChimeAlerts ?? true,
+      enableVoiceAlerts: parsed.enableVoiceAlerts ?? true,
+      voiceGender: parsed.voiceGender ?? "female",
+      voiceAccent: parsed.voiceAccent ?? "default",
+      voiceTone: parsed.voiceTone ?? "standard",
+    };
+  } catch {
+    return DEFAULT_PREFERENCES;
+  }
+}
+
+function getVoiceConfiguration(gender = "female", accent = "default", tone = "standard", voicesList, baseRate = 0.88, basePitch = 1.0) {
+  const result = {
+    voice: null,
+    rate: baseRate,
+    pitch: basePitch
+  };
+
+  const list = (voicesList && voicesList.length > 0)
+    ? voicesList
+    : (typeof window !== "undefined" && window.speechSynthesis
+       ? window.speechSynthesis.getVoices().filter(v => v.lang.startsWith("en"))
+       : []);
+
+  if (list.length === 0) return result;
+
+  // 1. Filter by accent
+  let accentFiltered = list;
+  if (accent === "us") {
+    accentFiltered = list.filter(v => v.lang.startsWith("en-US") || v.lang.includes("US") || v.lang.includes("United States"));
+  } else if (accent === "gb") {
+    accentFiltered = list.filter(v => v.lang.startsWith("en-GB") || v.lang.includes("GB") || v.lang.includes("United Kingdom") || v.lang.includes("Great Britain"));
+  } else if (accent === "au") {
+    accentFiltered = list.filter(v => v.lang.startsWith("en-AU") || v.lang.includes("AU") || v.lang.includes("Australia"));
+  } else if (accent === "in") {
+    accentFiltered = list.filter(v => v.lang.startsWith("en-IN") || v.lang.includes("IN") || v.lang.includes("India"));
+  }
+
+  if (accentFiltered.length === 0) {
+    accentFiltered = list;
+  }
+
+  // 2. Filter by gender
+  const isMalePref = gender === "male";
+  let genderFiltered = [];
+  if (isMalePref) {
+    genderFiltered = accentFiltered.filter(v => 
+      /david|george|mark|ravi|daniel|richard|steve|alex|fred|male/i.test(v.name)
+    );
+  } else {
+    genderFiltered = accentFiltered.filter(v => 
+      /zira|samantha|susan|hazel|heather|karen|moira|tessa|veena|siri|female/i.test(v.name)
+    );
+  }
+
+  if (genderFiltered.length === 0) {
+    if (isMalePref) {
+      genderFiltered = list.filter(v => /david|george|mark|ravi|daniel|richard|steve|alex|fred|male/i.test(v.name));
+    } else {
+      genderFiltered = list.filter(v => /zira|samantha|susan|hazel|heather|karen|moira|tessa|veena|siri|female/i.test(v.name));
+    }
+  }
+
+  const finalSelectionList = genderFiltered.length > 0 ? genderFiltered : (accentFiltered.length > 0 ? accentFiltered : list);
+
+  // 3. Map tone parameters
+  let selectedVoice = null;
+  let pitchMultiplier = 1.0;
+  let rateMultiplier = 1.0;
+
+  let genderPitchAdjustment = isMalePref ? 0.90 : 1.05;
+
+  if (tone === "standard") {
+    selectedVoice = finalSelectionList[0];
+    pitchMultiplier = 1.0;
+    rateMultiplier = 1.0;
+  } else if (tone === "natural") {
+    selectedVoice = finalSelectionList.find(v => /google|natural|premium|neural/i.test(v.name)) || finalSelectionList[1] || finalSelectionList[0];
+    pitchMultiplier = 0.94;
+    rateMultiplier = 0.94;
+  } else if (tone === "clear") {
+    selectedVoice = finalSelectionList[2] || finalSelectionList[0];
+    pitchMultiplier = 1.14;
+    rateMultiplier = 1.05;
+  } else if (tone === "warm") {
+    selectedVoice = finalSelectionList[3] || finalSelectionList[1] || finalSelectionList[0];
+    pitchMultiplier = 0.86;
+    rateMultiplier = 0.88;
+  }
+
+  result.voice = selectedVoice || list[0];
+  result.pitch = Math.max(0.5, Math.min(2.0, basePitch * pitchMultiplier * genderPitchAdjustment));
+  result.rate = Math.max(0.5, Math.min(2.0, baseRate * rateMultiplier));
+
+  return result;
+}
+
 function playPendingChime(onDone) {
-  _beep([{ f: 1046, d: .13 }, { f: 784, d: .13 }, { f: 523, d: .22 }], onDone);
+  const prefs = readStoredPreferences();
+  if (prefs.enableChimeAlerts) {
+    _beep([{ f: 1046, d: .13 }, { f: 784, d: .13 }, { f: 523, d: .22 }], onDone);
+  } else {
+    if (onDone) onDone();
+  }
 }
 
 function playApproveSound(onDone) {
-  _beep([{ f: 523, d: .08 }, { f: 659, d: .08 }, { f: 784, d: .08 }, { f: 1047, d: .20 }], onDone);
+  const prefs = readStoredPreferences();
+  if (prefs.enableChimeAlerts) {
+    _beep([{ f: 523, d: .08 }, { f: 659, d: .08 }, { f: 784, d: .08 }, { f: 1047, d: .20 }], onDone);
+  } else {
+    if (onDone) onDone();
+  }
 }
 
 function speakText(text) {
   if (!window.speechSynthesis) return;
+  const prefs = readStoredPreferences();
+  if (!prefs.enableVoiceAlerts) return;
+
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.rate = 0.88; // Slower rate for much higher intelligibility on phone/tablet speakers
-  u.pitch = 1.0;
-  u.volume = 1;
+  
   const v = window.speechSynthesis.getVoices();
-  const eng = v.find(x => x.lang.startsWith("en") && /google|natural|premium/i.test(x.name)) ||
-              v.find(x => x.lang.startsWith("en") && /female|zira|samantha/i.test(x.name)) ||
-              v.find(x => x.lang.startsWith("en"));
-  if (eng) u.voice = eng;
+  const config = getVoiceConfiguration(
+    prefs.voiceGender || "female",
+    prefs.voiceAccent || "default",
+    prefs.voiceTone || "standard",
+    v,
+    parseFloat(prefs.voiceRate ?? 0.88),
+    parseFloat(prefs.voicePitch ?? 1.0)
+  );
+
+  u.rate = config.rate;
+  u.pitch = config.pitch;
+  u.volume = 1;
+  if (config.voice) u.voice = config.voice;
+
   window.speechSynthesis.speak(u);
 }
 
@@ -222,8 +371,24 @@ function relLabel(ms) {
 
 function playAlertThenSpeak(text) {
   stopAlert();
-  _beep([{ f: 880, d: .12, w: "square" }, { f: 880, d: .12, w: "square" }, { f: 1100, d: .24, w: "square" }], () => speakText(text));
-  _alertId = setInterval(() => _beep([{ f: 880, d: .12, w: "square" }, { f: 880, d: .12, w: "square" }, { f: 1100, d: .24, w: "square" }]), 4000);
+  const prefs = readStoredPreferences();
+  if (prefs.enableChimeAlerts) {
+    _beep([{ f: 880, d: .12, w: "square" }, { f: 880, d: .12, w: "square" }, { f: 1100, d: .24, w: "square" }], () => {
+      if (prefs.voiceAnnounceReminders) {
+        speakText(text);
+      }
+    });
+    _alertId = setInterval(() => {
+      const livePrefs = readStoredPreferences();
+      if (livePrefs.enableChimeAlerts) {
+        _beep([{ f: 880, d: .12, w: "square" }, { f: 880, d: .12, w: "square" }, { f: 1100, d: .24, w: "square" }]);
+      }
+    }, 4000);
+  } else {
+    if (prefs.voiceAnnounceReminders) {
+      speakText(text);
+    }
+  }
 }
 
 function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
@@ -663,11 +828,17 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
 
                     if (isPending(res)) {
                       playPendingChime(() => {
-                        speakText(`New reservation received from ${guestName} ${outletDisplay ? `for ${outletDisplay}` : ""}`);
+                        const prefs = readStoredPreferences();
+                        if (prefs.voiceAnnouncePending) {
+                          speakText(`New reservation received from ${guestName} ${outletDisplay ? `for ${outletDisplay}` : ""}`);
+                        }
                       });
                     } else if (isApproved(res)) {
                       playApproveSound(() => {
-                        speakText(`Reservation approved for ${guestName} ${outletDisplay ? `for ${outletDisplay}` : ""}`);
+                        const prefs = readStoredPreferences();
+                        if (prefs.voiceAnnounceApproved) {
+                          speakText(`Reservation approved for ${guestName} ${outletDisplay ? `for ${outletDisplay}` : ""}`);
+                        }
                       });
                     }
                   }
