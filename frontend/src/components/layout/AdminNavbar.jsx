@@ -138,7 +138,7 @@ function readStoredPreferences() {
   }
 }
 
-function getVoiceConfiguration(gender = "female", accent = "default", tone = "standard", voicesList, baseRate = 0.88, basePitch = 1.0) {
+function getVoiceConfiguration(gender = "female", tone = "standard", voicesList, baseRate = 0.88, basePitch = 1.0) {
   const result = {
     voice: null,
     rate: baseRate,
@@ -148,36 +148,20 @@ function getVoiceConfiguration(gender = "female", accent = "default", tone = "st
   const list = (voicesList && voicesList.length > 0)
     ? voicesList
     : (typeof window !== "undefined" && window.speechSynthesis
-       ? window.speechSynthesis.getVoices().filter(v => v.lang.startsWith("en"))
+       ? window.speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().startsWith("en"))
        : []);
 
   if (list.length === 0) return result;
 
-  // 1. Filter by accent
-  let accentFiltered = list;
-  if (accent === "us") {
-    accentFiltered = list.filter(v => v.lang.startsWith("en-US") || v.lang.includes("US") || v.lang.includes("United States"));
-  } else if (accent === "gb") {
-    accentFiltered = list.filter(v => v.lang.startsWith("en-GB") || v.lang.includes("GB") || v.lang.includes("United Kingdom") || v.lang.includes("Great Britain"));
-  } else if (accent === "au") {
-    accentFiltered = list.filter(v => v.lang.startsWith("en-AU") || v.lang.includes("AU") || v.lang.includes("Australia"));
-  } else if (accent === "in") {
-    accentFiltered = list.filter(v => v.lang.startsWith("en-IN") || v.lang.includes("IN") || v.lang.includes("India"));
-  }
-
-  if (accentFiltered.length === 0) {
-    accentFiltered = list;
-  }
-
-  // 2. Filter by gender
+  // 1. Filter by gender
   const isMalePref = gender === "male";
   let genderFiltered = [];
   if (isMalePref) {
-    genderFiltered = accentFiltered.filter(v => 
+    genderFiltered = list.filter(v => 
       /david|george|mark|ravi|daniel|richard|steve|alex|fred|male/i.test(v.name)
     );
   } else {
-    genderFiltered = accentFiltered.filter(v => 
+    genderFiltered = list.filter(v => 
       /zira|samantha|susan|hazel|heather|karen|moira|tessa|veena|siri|female/i.test(v.name)
     );
   }
@@ -190,9 +174,9 @@ function getVoiceConfiguration(gender = "female", accent = "default", tone = "st
     }
   }
 
-  const finalSelectionList = genderFiltered.length > 0 ? genderFiltered : (accentFiltered.length > 0 ? accentFiltered : list);
+  const finalSelectionList = genderFiltered.length > 0 ? genderFiltered : list;
 
-  // 3. Map tone parameters
+  // 2. Map tone parameters and choose different index voices if available to make them uniquely distinct
   let selectedVoice = null;
   let pitchMultiplier = 1.0;
   let rateMultiplier = 1.0;
@@ -204,17 +188,20 @@ function getVoiceConfiguration(gender = "female", accent = "default", tone = "st
     pitchMultiplier = 1.0;
     rateMultiplier = 1.0;
   } else if (tone === "natural") {
+    // Natural / Casual: slightly lower pitch, slower rate for a relaxed conversational cadence
     selectedVoice = finalSelectionList.find(v => /google|natural|premium|neural/i.test(v.name)) || finalSelectionList[1] || finalSelectionList[0];
-    pitchMultiplier = 0.94;
-    rateMultiplier = 0.94;
+    pitchMultiplier = 0.90;
+    rateMultiplier = 0.85;
   } else if (tone === "clear") {
+    // Energetic / Clear: higher pitch, faster rate to sound alert, energetic and crisp
     selectedVoice = finalSelectionList[2] || finalSelectionList[0];
-    pitchMultiplier = 1.14;
-    rateMultiplier = 1.05;
+    pitchMultiplier = 1.20;
+    rateMultiplier = 1.15;
   } else if (tone === "warm") {
+    // Deep / Warm: significantly lower pitch, slower speed for a warm, soothing character
     selectedVoice = finalSelectionList[3] || finalSelectionList[1] || finalSelectionList[0];
-    pitchMultiplier = 0.86;
-    rateMultiplier = 0.88;
+    pitchMultiplier = 0.75;
+    rateMultiplier = 0.80;
   }
 
   result.voice = selectedVoice || list[0];
@@ -253,7 +240,6 @@ function speakText(text) {
   const v = window.speechSynthesis.getVoices();
   const config = getVoiceConfiguration(
     prefs.voiceGender || "female",
-    prefs.voiceAccent || "default",
     prefs.voiceTone || "standard",
     v,
     parseFloat(prefs.voiceRate ?? 0.88),
@@ -814,32 +800,40 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
               if (payload && typeof payload === "object") {
                 const res = normaliseRow(payload);
                 const resId = String(res.id ?? res.db_id);
+                const statusKey = (res.status || "").toLowerCase().trim();
+                const alertKey = `${resId}-${statusKey}`;
 
+                const isSeenUpdate = data?.payload?.seen === true || data?.seen === true;
                 const alertedSet = getAlertedIds();
-                if (!alertedSet.has(resId)) {
-                  markAsAlerted(resId);
+                if (!alertedSet.has(alertKey) && !isSeenUpdate) {
+                  const isNewPending = eventName === "ReservationCreated" && isPending(res);
+                  const isTransitionedApproved = isApproved(res);
 
-                  const outlet = canonicalOutletName(res.room || res.venue?.name || res.venue || "Unassigned Outlet");
-                  const hasAccess = canAccessOutlet(currentUser, outlet);
+                  if (isNewPending || isTransitionedApproved) {
+                    markAsAlerted(alertKey);
 
-                  if (hasAccess) {
-                    const guestName = res.guest_name || "A guest";
-                    const outletDisplay = res.room || res.venue?.name || res.venue || "";
+                    const outlet = canonicalOutletName(res.room || res.venue?.name || res.venue || "Unassigned Outlet");
+                    const hasAccess = canAccessOutlet(currentUser, outlet);
 
-                    if (isPending(res)) {
-                      playPendingChime(() => {
-                        const prefs = readStoredPreferences();
-                        if (prefs.voiceAnnouncePending) {
-                          speakText(`New reservation received from ${guestName} ${outletDisplay ? `for ${outletDisplay}` : ""}`);
-                        }
-                      });
-                    } else if (isApproved(res)) {
-                      playApproveSound(() => {
-                        const prefs = readStoredPreferences();
-                        if (prefs.voiceAnnounceApproved) {
-                          speakText(`Reservation approved for ${guestName} ${outletDisplay ? `for ${outletDisplay}` : ""}`);
-                        }
-                      });
+                    if (hasAccess) {
+                      const guestName = res.guest_name || "A guest";
+                      const outletDisplay = res.room || res.venue?.name || res.venue || "";
+
+                      if (isNewPending) {
+                        playPendingChime(() => {
+                          const prefs = readStoredPreferences();
+                          if (prefs.voiceAnnouncePending) {
+                            speakText(`New reservation received from ${guestName} ${outletDisplay ? `for ${outletDisplay}` : ""}`);
+                          }
+                        });
+                      } else if (isTransitionedApproved) {
+                        playApproveSound(() => {
+                          const prefs = readStoredPreferences();
+                          if (prefs.voiceAnnounceApproved) {
+                            speakText(`Reservation approved for ${guestName} ${outletDisplay ? `for ${outletDisplay}` : ""}`);
+                          }
+                        });
+                      }
                     }
                   }
                 }

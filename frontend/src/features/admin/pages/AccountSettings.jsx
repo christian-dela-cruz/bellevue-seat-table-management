@@ -343,7 +343,7 @@ export default function AccountSettings() {
     };
   }, []);
 
-  const getVoiceConfiguration = (gender = "female", accent = "default", tone = "standard", voicesList, baseRate = 0.88, basePitch = 1.0) => {
+  const getVoiceConfiguration = (gender = "female", tone = "standard", voicesList, baseRate = 0.88, basePitch = 1.0) => {
     const result = {
       voice: null,
       rate: baseRate,
@@ -353,36 +353,20 @@ export default function AccountSettings() {
     const list = (voicesList && voicesList.length > 0)
       ? voicesList
       : (typeof window !== "undefined" && window.speechSynthesis
-         ? window.speechSynthesis.getVoices().filter(v => v.lang.startsWith("en"))
+         ? window.speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().startsWith("en"))
          : []);
 
     if (list.length === 0) return result;
 
-    // 1. Filter by accent
-    let accentFiltered = list;
-    if (accent === "us") {
-      accentFiltered = list.filter(v => v.lang.startsWith("en-US") || v.lang.includes("US") || v.lang.includes("United States"));
-    } else if (accent === "gb") {
-      accentFiltered = list.filter(v => v.lang.startsWith("en-GB") || v.lang.includes("GB") || v.lang.includes("United Kingdom") || v.lang.includes("Great Britain"));
-    } else if (accent === "au") {
-      accentFiltered = list.filter(v => v.lang.startsWith("en-AU") || v.lang.includes("AU") || v.lang.includes("Australia"));
-    } else if (accent === "in") {
-      accentFiltered = list.filter(v => v.lang.startsWith("en-IN") || v.lang.includes("IN") || v.lang.includes("India"));
-    }
-
-    if (accentFiltered.length === 0) {
-      accentFiltered = list;
-    }
-
-    // 2. Filter by gender
+    // 1. Filter by gender
     const isMalePref = gender === "male";
     let genderFiltered = [];
     if (isMalePref) {
-      genderFiltered = accentFiltered.filter(v => 
+      genderFiltered = list.filter(v => 
         /david|george|mark|ravi|daniel|richard|steve|alex|fred|male/i.test(v.name)
       );
     } else {
-      genderFiltered = accentFiltered.filter(v => 
+      genderFiltered = list.filter(v => 
         /zira|samantha|susan|hazel|heather|karen|moira|tessa|veena|siri|female/i.test(v.name)
       );
     }
@@ -395,9 +379,9 @@ export default function AccountSettings() {
       }
     }
 
-    const finalSelectionList = genderFiltered.length > 0 ? genderFiltered : (accentFiltered.length > 0 ? accentFiltered : list);
+    const finalSelectionList = genderFiltered.length > 0 ? genderFiltered : list;
 
-    // 3. Map tone parameters
+    // 2. Map tone parameters and choose different index voices if available to make them uniquely distinct
     let selectedVoice = null;
     let pitchMultiplier = 1.0;
     let rateMultiplier = 1.0;
@@ -409,17 +393,20 @@ export default function AccountSettings() {
       pitchMultiplier = 1.0;
       rateMultiplier = 1.0;
     } else if (tone === "natural") {
+      // Natural / Casual: slightly lower pitch, slower rate for a relaxed conversational cadence
       selectedVoice = finalSelectionList.find(v => /google|natural|premium|neural/i.test(v.name)) || finalSelectionList[1] || finalSelectionList[0];
-      pitchMultiplier = 0.94;
-      rateMultiplier = 0.94;
+      pitchMultiplier = 0.90;
+      rateMultiplier = 0.85;
     } else if (tone === "clear") {
+      // Energetic / Clear: higher pitch, faster rate to sound alert, energetic and crisp
       selectedVoice = finalSelectionList[2] || finalSelectionList[0];
-      pitchMultiplier = 1.14;
-      rateMultiplier = 1.05;
+      pitchMultiplier = 1.20;
+      rateMultiplier = 1.15;
     } else if (tone === "warm") {
+      // Deep / Warm: significantly lower pitch, slower speed for a warm, soothing character
       selectedVoice = finalSelectionList[3] || finalSelectionList[1] || finalSelectionList[0];
-      pitchMultiplier = 0.86;
-      rateMultiplier = 0.88;
+      pitchMultiplier = 0.75;
+      rateMultiplier = 0.80;
     }
 
     result.voice = selectedVoice || list[0];
@@ -439,14 +426,13 @@ export default function AccountSettings() {
     
     const config = getVoiceConfiguration(
       preferences.voiceGender || "female",
-      preferences.voiceAccent || "default",
       preferences.voiceTone || "standard",
       voices,
       parseFloat(preferences.voiceRate || 0.88),
       parseFloat(preferences.voicePitch || 1.0)
     );
 
-    const textToSpeak = `Test announcement. This is a preview of your selected ${preferences.voiceGender} voice, using the ${preferences.voiceAccent === "default" ? "default system" : preferences.voiceAccent.toUpperCase()} accent and a ${preferences.voiceTone} tone.`;
+    const textToSpeak = `Test announcement. This is a preview of your selected ${preferences.voiceGender} voice, using the ${preferences.voiceTone} tone settings.`;
     const u = new SpeechSynthesisUtterance(textToSpeak);
     
     u.rate = config.rate;
@@ -1161,8 +1147,8 @@ export default function AccountSettings() {
 
                       {preferences.enableVoiceAlerts && (
                         <div style={{ display: "grid", gap: 14, padding: "14px 16px", background: C.surfaceSoft, border: `1px solid ${C.border}`, borderRadius: 10, marginTop: 6 }}>
-                          {/* Voice Persona Selectors */}
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                           {/* Voice Persona Selectors */}
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                             <Field label="Voice Gender" hint="Select the announcer's voice gender.">
                               <select
                                 value={preferences.voiceGender}
@@ -1174,20 +1160,6 @@ export default function AccountSettings() {
                               </select>
                             </Field>
 
-                            <Field label="Speaker Accent" hint="Select regional pronunciation accent.">
-                              <select
-                                value={preferences.voiceAccent}
-                                onChange={(e) => setPreferences(prev => ({ ...prev, voiceAccent: e.target.value }))}
-                                style={inputStyle()}
-                              >
-                                <option value="default">Default System Accent</option>
-                                <option value="us">United States (US)</option>
-                                <option value="gb">United Kingdom (UK)</option>
-                                <option value="au">Australia (AU)</option>
-                                <option value="in">India (IN)</option>
-                              </select>
-                            </Field>
-
                             <Field label="Voice Tone / Character" hint="Choose sound profile or personality.">
                               <select
                                 value={preferences.voiceTone}
@@ -1195,9 +1167,9 @@ export default function AccountSettings() {
                                 style={inputStyle()}
                               >
                                 <option value="standard">Standard Tone</option>
-                                <option value="natural">Natural Tone</option>
-                                <option value="clear">Clear Tone</option>
-                                <option value="warm">Warm Tone</option>
+                                <option value="natural">Casual / Natural Tone</option>
+                                <option value="clear">Energetic / Clear Tone</option>
+                                <option value="warm">Deep / Warm Tone</option>
                               </select>
                             </Field>
                           </div>
