@@ -1714,7 +1714,7 @@ function NotificationDashboard() {
           }} />
         )}
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <div className="notif-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{
               fontFamily: F.label,
@@ -1730,49 +1730,7 @@ function NotificationDashboard() {
               {timeAgo(res.created_at || res.submitted_timestamp)}
             </span>
           </div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }} onClick={e => e.stopPropagation()}>
-            {item.needsAck && (
-              <button
-                onClick={(e) => handleAcknowledge(res, e)}
-                style={{
-                  padding: "4px 8px",
-                  background: C.gold,
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 6,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  fontFamily: F.label,
-                  textTransform: "uppercase",
-                  cursor: "pointer",
-                }}
-              >
-                Acknowledge
-              </button>
-            )}
-            {!read && (
-              <button
-                onClick={(e) => markAsRead(db_id, e)}
-                title="Mark as Read"
-                style={{
-                  background: "transparent",
-                  border: `1px solid ${C.borderDefault}`,
-                  color: C.textSecondary,
-                  borderRadius: 6,
-                  padding: "3px 6px",
-                  fontSize: 10,
-                  fontWeight: 500,
-                  fontFamily: F.label,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <Check size={11} />
-                Mark Read
-              </button>
-            )}
+          <div>
             <StatusBadge status={res.status} C={C} />
           </div>
         </div>
@@ -1804,57 +1762,113 @@ function NotificationDashboard() {
           <span>Schedule: <strong>{fmtDate(item.eventDate)} at {fmtTime(item.eventTime)}</strong></span>
         </div>
 
-        {/* Action Button for Pending reservations */}
-        {res.status === "pending" && canManageReservations && (
+        {/* Actions Footer */}
+        {(item.needsAck || !read || (res.status === "pending" && canManageReservations)) && (
           <div
+            className="notif-card-footer"
             style={{
               marginTop: 12,
               paddingTop: 10,
               borderTop: `1px solid ${C.divider}`,
               display: "flex",
               justifyContent: "flex-end",
+              alignItems: "center",
               gap: 8,
+              flexWrap: "wrap",
             }}
             onClick={e => e.stopPropagation()}
           >
-            <button
-              onClick={() => handleDeclineRequest(res)}
-              disabled={isApprovingThis || isDecliningThis}
-              style={{
-                padding: "6px 12px",
-                background: "transparent",
-                border: `1px solid ${C.redBorder}`,
-                borderRadius: 8,
-                fontFamily: F.label,
-                fontSize: 9.5,
-                fontWeight: 700,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: C.red,
-                cursor: "pointer",
-              }}
-            >
-              Decline
-            </button>
-            <button
-              onClick={() => handleApproveRequest(res)}
-              disabled={isApprovingThis || isDecliningThis}
-              style={{
-                padding: "6px 12px",
-                background: C.green,
-                border: "none",
-                borderRadius: 8,
-                fontFamily: F.label,
-                fontSize: 9.5,
-                fontWeight: 700,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: "#fff",
-                cursor: "pointer",
-              }}
-            >
-              Approve
-            </button>
+            {/* Mark Read button */}
+            {!read && (
+              <button
+                onClick={(e) => markAsRead(db_id, e)}
+                title="Mark as Read"
+                style={{
+                  background: "transparent",
+                  border: `1px solid ${C.borderDefault}`,
+                  color: C.textSecondary,
+                  borderRadius: 6,
+                  padding: "5px 10px",
+                  fontSize: 10,
+                  fontWeight: 500,
+                  fontFamily: F.label,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  height: 30,
+                }}
+              >
+                <Check size={11} />
+                Mark Read
+              </button>
+            )}
+
+            {/* Acknowledge button */}
+            {item.needsAck && (
+              <button
+                onClick={(e) => handleAcknowledge(res, e)}
+                style={{
+                  padding: "5px 10px",
+                  background: C.gold,
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  fontFamily: F.label,
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                  height: 30,
+                }}
+              >
+                Acknowledge
+              </button>
+            )}
+
+            {/* Pending actions (Decline / Approve) */}
+            {res.status === "pending" && canManageReservations && (
+              <>
+                <button
+                  onClick={() => handleDeclineRequest(res)}
+                  disabled={isApprovingThis || isDecliningThis}
+                  style={{
+                    padding: "5px 10px",
+                    background: "transparent",
+                    border: `1px solid ${C.redBorder}`,
+                    borderRadius: 6,
+                    fontFamily: F.label,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    color: C.red,
+                    cursor: "pointer",
+                    height: 30,
+                  }}
+                >
+                  Decline
+                </button>
+                <button
+                  onClick={() => handleApproveRequest(res)}
+                  disabled={isApprovingThis || isDecliningThis}
+                  style={{
+                    padding: "5px 10px",
+                    background: C.green,
+                    border: "none",
+                    borderRadius: 6,
+                    fontFamily: F.label,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    color: "#fff",
+                    cursor: "pointer",
+                    height: 30,
+                  }}
+                >
+                  Approve
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -1875,9 +1889,12 @@ function NotificationDashboard() {
         .notif-card { transition: all 0.2s ease; cursor: pointer; }
         .notif-card:hover { border-color: ${C.borderAccent} !important; background: ${C.goldFaintest} !important; }
         ::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.10);border-radius:4px;}
-        @media (max-width: 768px) {
+        @media (max-width: 960px) {
           .nd-grid { grid-template-columns: 1fr !important; }
+          .nd-main { padding: 16px 12px 24px !important; }
+          .nd-toolbar-grid { grid-template-columns: 1fr !important; }
         }
+
       `}</style>
 
       <Sidebar activeNav="" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
@@ -1885,7 +1902,7 @@ function NotificationDashboard() {
       <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
         <AdminNavbar />
         
-        <main style={{ flex: 1, padding: "30px 32px 42px", overflow: "auto", position: "relative" }}>
+        <main className="nd-main" style={{ flex: 1, padding: "30px 32px 42px", overflow: "auto", position: "relative" }}>
           <div style={{ maxWidth: 1440, display: "grid", gap: 18, animation: "fadeUp 0.32s ease" }}>
             
             {/* Page Header */}
@@ -1993,7 +2010,7 @@ function NotificationDashboard() {
                       )}
                     </div>
                     
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                    <div className="nd-toolbar-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
                       
                       {/* Search */}
                       <div style={{ display: "grid", gap: 4 }}>

@@ -79,6 +79,7 @@ function SidebarCollapseBtn({ onClick, isOpen }) {
   const Icon = isOpen ? ChevronLeft : ChevronRight;
   return (
     <button
+      className="sidebar-collapse-btn"
       type="button"
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
@@ -417,6 +418,27 @@ export default function Sidebar({
       return Boolean(isOpen);
     }
   });
+
+  useEffect(() => {
+    if (isOpen !== undefined) {
+      setPinnedOpen(isOpen);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleToggle = () => {
+      setPinnedOpen(prev => {
+        const next = !prev;
+        try {
+          localStorage.setItem("bellevue_admin_sidebar_open", String(next));
+        } catch {}
+        onToggle?.(next);
+        return next;
+      });
+    };
+    window.addEventListener("bellevue:toggle-sidebar", handleToggle);
+    return () => window.removeEventListener("bellevue:toggle-sidebar", handleToggle);
+  }, [onToggle]);
   const [hoverPreview, setHoverPreview] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
@@ -473,48 +495,90 @@ export default function Sidebar({
   };
 
   return (
-    <aside
-      onMouseEnter={() => {
-        if (!pinnedOpen) setHoverPreview(true);
-      }}
-      onMouseLeave={() => {
-        if (!pinnedOpen) {
-          setHoverPreview(false);
-          setAccountMenuOpen(false);
-        }
-      }}
-      style={{
-        width: effectiveOpen ? 228 : 58,
-        height: "100vh",
-        background: isDark ? "linear-gradient(180deg, #111009 0%, #0A0908 100%)" : "linear-gradient(180deg, #FFFCF8 0%, #F7F1E8 100%)",
-        borderRight: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(140,107,42,0.12)",
-        display: "flex",
-        flexDirection: "column",
-        flexShrink: 0,
-        transition: "width 0.26s cubic-bezier(.2,.8,.2,1)",
-        overflow: "visible",
-        boxShadow: isDark ? "4px 0 18px rgba(0,0,0,0.4)" : "4px 0 18px rgba(55,39,17,0.026)",
-        position: "relative",
-        zIndex: 3100,
-      }}
-    >
-      <style>{`
-        @keyframes sidebarAccountMenuIn {
-          from { opacity: 0; transform: translateY(8px) scale(0.98); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .bellevue-sidebar-nav {
-          scrollbar-width: thin;
-          scrollbar-color: rgba(140,107,42,0.22) transparent;
-        }
-        .bellevue-sidebar-nav::-webkit-scrollbar {
-          width: 6px;
-        }
-        .bellevue-sidebar-nav::-webkit-scrollbar-thumb {
-          background: rgba(140,107,42,0.18);
-          border-radius: 999px;
-        }
-      `}</style>
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {effectiveOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={togglePinnedOpen}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0,0,0,0.45)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+            zIndex: 3050,
+          }}
+        />
+      )}
+      <aside
+        onMouseEnter={() => {
+          if (!pinnedOpen) setHoverPreview(true);
+        }}
+        onMouseLeave={() => {
+          if (!pinnedOpen) {
+            setHoverPreview(false);
+            setAccountMenuOpen(false);
+          }
+        }}
+        className="bellevue-sidebar"
+        style={{
+          width: effectiveOpen ? 228 : 58,
+          height: "100vh",
+          background: isDark ? "linear-gradient(180deg, #111009 0%, #0A0908 100%)" : "linear-gradient(180deg, #FFFCF8 0%, #F7F1E8 100%)",
+          borderRight: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(140,107,42,0.12)",
+          display: "flex",
+          flexDirection: "column",
+          flexShrink: 0,
+          transition: "width 0.26s cubic-bezier(.2,.8,.2,1)",
+          overflow: "visible",
+          boxShadow: isDark ? "4px 0 18px rgba(0,0,0,0.4)" : "4px 0 18px rgba(55,39,17,0.026)",
+          position: "relative",
+          zIndex: 3100,
+        }}
+      >
+        <style>{`
+          @keyframes sidebarAccountMenuIn {
+            from { opacity: 0; transform: translateY(8px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          .bellevue-sidebar-nav {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(140,107,42,0.22) transparent;
+          }
+          .bellevue-sidebar-nav::-webkit-scrollbar {
+            width: 6px;
+          }
+          .bellevue-sidebar-nav::-webkit-scrollbar-thumb {
+            background: rgba(140,107,42,0.18);
+            border-radius: 999px;
+          }
+          .sidebar-backdrop {
+            display: none !important;
+          }
+          @media (max-width: 960px) {
+            .sidebar-backdrop {
+              display: block !important;
+            }
+            .bellevue-sidebar {
+              position: ${effectiveOpen ? "fixed" : "relative"} !important;
+              top: 0 !important;
+              left: 0 !important;
+              height: 100vh !important;
+              width: ${effectiveOpen ? "228px" : "58px"} !important;
+              transform: none !important;
+              transition: width 0.24s cubic-bezier(0.4, 0, 0.2, 1) !important;
+              box-shadow: ${effectiveOpen ? "4px 0 24px rgba(0,0,0,0.3)" : "none"} !important;
+              z-index: ${effectiveOpen ? 3100 : 1} !important;
+            }
+            .sidebar-collapse-btn {
+              display: none !important;
+            }
+          }
+        `}</style>
 
       {/* Floating Collapse/Expand Arrow Toggle */}
       <SidebarCollapseBtn isOpen={effectiveOpen} onClick={togglePinnedOpen} />
@@ -749,6 +813,7 @@ export default function Sidebar({
         </button>
       </div>
     </aside>
+    </>
   );
 }
 

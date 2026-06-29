@@ -405,7 +405,7 @@ function queueTone(tone) {
   return { color: C.gold, bg: C.goldFaint, border: C.borderAccent };
 }
 
-function QueueMetric({ label, value, helper, tone = "gold", active = false, onClick, isMobile }) {
+function QueueMetric({ label, value, helper, tone = "gold", active = false, onClick, isMobile, style = {} }) {
   const palette = queueTone(tone);
   return (
     <button
@@ -424,6 +424,7 @@ function QueueMetric({ label, value, helper, tone = "gold", active = false, onCl
         cursor:onClick ? "pointer" : "default",
         boxShadow:active ? `0 1px 5px ${palette.color}10` : "0 1px 3px rgba(24,20,14,0.025)",
         transition:"border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease",
+        ...style,
       }}
       onMouseEnter={(e)=>{e.currentTarget.style.borderColor=palette.border;e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow=`0 2px 7px ${palette.color}10`;}}
       onMouseLeave={(e)=>{e.currentTarget.style.borderColor=active ? palette.border : C.cardBorder;e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow=active ? `0 1px 5px ${palette.color}10` : "0 1px 3px rgba(24,20,14,0.025)";}}
@@ -2085,6 +2086,38 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
 
   return (
     <>
+      <style>{`
+        .modal-layout-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 300px;
+          gap: 20px;
+          align-items: start;
+        }
+        .modal-edit-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 280px;
+          gap: 18px;
+          align-items: start;
+        }
+        .modal-scroll-body {
+          padding: 18px 22px 24px;
+          overflow-y: auto;
+          flex: 1;
+        }
+        @media (max-width: 960px) {
+          .modal-layout-grid {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
+          .modal-edit-grid {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
+          .modal-scroll-body {
+            padding: 14px 14px 20px !important;
+          }
+        }
+      `}</style>
       <div
         style={{
           position:"fixed",inset:0,
@@ -2157,9 +2190,9 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
             </button>
           </div>
 
-          <div style={{padding:"18px 22px 24px",overflowY:"auto",flex:1}}>
+          <div className="modal-scroll-body">
             {isEditing ? (
-              <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 280px",gap:18,alignItems:"start"}}>
+              <div className="modal-edit-grid">
                 <div>
                   <SectionLabel>Update Reservation Details</SectionLabel>
                   <ReservationEditForm
@@ -2208,7 +2241,7 @@ function DetailModal({ reservation, onClose, onApprove, onReject, onRevert, onCa
                 </aside>
               </div>
             ) : (
-              <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 300px",gap:20,alignItems:"start"}}>
+              <div className="modal-layout-grid">
                 {/* Left Column: Core Data cards */}
                 <div style={{display:"flex",flexDirection:"column",gap:16}}>
                   
@@ -3557,6 +3590,64 @@ export default function ReservationDashboard() {
         ::-webkit-scrollbar { width:4px; }
         ::-webkit-scrollbar-track { background:transparent; }
         ::-webkit-scrollbar-thumb { background:rgba(0,0,0,0.12); border-radius:4px; }
+
+        .admin-page-content-container {
+          padding: 30px 32px 42px;
+          animation: fadeUp 0.28s ease;
+        }
+        .res-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 10px;
+          flex-wrap: nowrap;
+          width: 100%;
+        }
+        .res-card-badges {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          justify-content: flex-end;
+          gap: 7px;
+          flex-shrink: 0;
+        }
+        .res-card-grid {
+          display: grid;
+          grid-template-columns: repeat(6, minmax(100px, 1fr));
+          gap: 8px;
+          margin-top: 10px;
+          padding-top: 10px;
+          border-top: 1px solid ${C.divider};
+        }
+        .res-card-grid-item-last {
+          grid-column: auto;
+        }
+
+        @media (max-width: 960px) {
+          .admin-page-content-container {
+            padding: 16px 12px 24px !important;
+          }
+          .res-card-header {
+            flex-wrap: wrap !important;
+          }
+          .res-card-badges {
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            width: 100% !important;
+            border-top: 1px solid ${C.divider} !important;
+            padding-top: 10px !important;
+            margin-top: 8px !important;
+            flex-wrap: wrap !important;
+            gap: 6px 8px !important;
+          }
+          .res-card-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+          .res-card-grid-item-last {
+            grid-column: span 2 !important;
+          }
+        }
       `}</style>
 
       <div style={{display:"flex",height:"100vh",overflow:"hidden",fontFamily:F.body,background:C.pageBg,color:C.textPrimary}}>
@@ -3628,7 +3719,7 @@ export default function ReservationDashboard() {
               </div>
             </div>
 
-            <div style={{padding:isMobile?"22px 16px 30px":isTablet?"26px 22px 36px":"30px 32px 42px",animation:"fadeUp 0.28s ease"}}>
+            <div className="admin-page-content-container">
 
               <AdminPageHeader
                 eyebrow="Reservations"
@@ -3668,12 +3759,12 @@ export default function ReservationDashboard() {
                   </div>
                 </div>
 
-                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":isTablet?"repeat(2,1fr)":"repeat(5,minmax(0,1fr))",gap:10}}>
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":isTablet?"repeat(2,1fr)":"repeat(5,minmax(0,1fr))",gap:10}}>
                   <QueueMetric label="Pending" value={loading?"--":stats.pending} helper="awaiting action" tone="gold" active={filterStatus==="PENDING"} onClick={()=>handleFocusClick("PENDING")} isMobile={isMobile} />
                   <QueueMetric label="Urgent" value={loading?"--":operationalStats.urgent} helper="within 24h" tone="red" active={quickFilter==="urgent"} onClick={()=>handleFocusClick("urgent")} isMobile={isMobile} />
                   <QueueMetric label="Overdue" value={loading?"--":operationalStats.overdue} helper="pending over 24h" tone="red" active={filterPriority==="overdue"} onClick={()=>handleFocusClick("overdue")} isMobile={isMobile} />
                   <QueueMetric label="Today" value={loading?"--":operationalStats.today} helper="events today" tone="green" active={quickFilter==="today"} onClick={()=>handleFocusClick("today")} isMobile={isMobile} />
-                  <QueueMetric label="Reserved" value={loading?"--":stats.approved} helper="confirmed" tone="green" active={filterStatus==="APPROVED"} onClick={()=>handleFocusClick("APPROVED")} isMobile={isMobile} />
+                  <QueueMetric label="Reserved" value={loading?"--":stats.approved} helper="confirmed" tone="green" active={filterStatus==="APPROVED"} onClick={()=>handleFocusClick("APPROVED")} isMobile={isMobile} style={{ gridColumn: isMobile ? "span 2" : "auto" }} />
                 </div>
               </div>
 
@@ -3861,7 +3952,7 @@ export default function ReservationDashboard() {
                     </label>
                     <label style={{display:"grid",gap:5}}>
                       <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Status</span>
-                      <select value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)} style={{padding:"8px 10px",height:36,boxSizing:"border-box",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
+                      <select value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)} style={{width:"100%",padding:"8px 10px",height:36,boxSizing:"border-box",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
                         <option value="ALL">All statuses</option>
                         <option value="PENDING">Pending</option>
                         <option value="APPROVED">Reserved</option>
@@ -3872,7 +3963,7 @@ export default function ReservationDashboard() {
                     </label>
                     <label style={{display:"grid",gap:5}}>
                       <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Priority</span>
-                      <select value={filterPriority} onChange={(e)=>setFilterPriority(e.target.value)} style={{padding:"8px 10px",height:36,boxSizing:"border-box",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
+                      <select value={filterPriority} onChange={(e)=>setFilterPriority(e.target.value)} style={{width:"100%",padding:"8px 10px",height:36,boxSizing:"border-box",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
                         <option value="ALL">All priorities</option>
                         <option value="overdue">Overdue response</option>
                         <option value="urgent">Urgent</option>
@@ -3885,7 +3976,7 @@ export default function ReservationDashboard() {
                     </label>
                     <label style={{display:"grid",gap:5}}>
                       <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Type</span>
-                      <select value={filterType} onChange={(e)=>setFilterType(e.target.value)} style={{padding:"8px 10px",height:36,boxSizing:"border-box",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
+                      <select value={filterType} onChange={(e)=>setFilterType(e.target.value)} style={{width:"100%",padding:"8px 10px",height:36,boxSizing:"border-box",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
                         <option value="ALL">All types</option>
                         <option value="whole">Whole table</option>
                         <option value="individual">Individual seat</option>
@@ -3894,7 +3985,7 @@ export default function ReservationDashboard() {
                     </label>
                     <label style={{display:"grid",gap:5}}>
                       <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Queue Sort</span>
-                      <select value={sortBy} onChange={(e)=>setSortBy(e.target.value)} style={{padding:"8px 10px",height:36,boxSizing:"border-box",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
+                      <select value={sortBy} onChange={(e)=>setSortBy(e.target.value)} style={{width:"100%",padding:"8px 10px",height:36,boxSizing:"border-box",border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceInput,color:C.textPrimary,fontSize:12}}>
                         <option value="smart">Smart priority</option>
                         <option value="event_asc">Event soonest</option>
                         <option value="oldest_waiting">Oldest request</option>
@@ -3905,7 +3996,7 @@ export default function ReservationDashboard() {
                     <button
                       type="button"
                       onClick={()=>{setFilterStatus("ALL");setFilterRoom("ALL");setFilterPriority("ALL");setFilterType("ALL");setQuickFilter("ALL");setSearch("");setSortBy("smart");}}
-                      style={{alignSelf:"end",minHeight:37,border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceBase,color:C.textSecondary,fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer"}}
+                      style={{width:"100%",alignSelf:"end",minHeight:37,border:`1px solid ${C.borderDefault}`,borderRadius:8,background:C.surfaceBase,color:C.textSecondary,fontFamily:F.label,fontSize:9,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer"}}
                     >
                       Reset Queue
                     </button>
@@ -3969,8 +4060,7 @@ export default function ReservationDashboard() {
                           onMouseEnter={(e)=>{e.currentTarget.style.borderColor=C.borderAccent;e.currentTarget.style.boxShadow=`0 3px 12px rgba(140,107,42,0.10)`;e.currentTarget.style.transform="translateY(-1px)";}}
                           onMouseLeave={(e)=>{e.currentTarget.style.borderColor=C.borderDefault;e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="translateY(0)";}}
                         >
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:isMobile?"wrap":"nowrap"}}>
-                            <div style={{display:"flex",alignItems:"flex-start",gap:10,flex:1,minWidth:0}}>
+                          <div className="res-card-header">
 
                               <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{setSelectedReservation(reservation);setShowModal(true);}}>
                                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
@@ -4059,7 +4149,7 @@ export default function ReservationDashboard() {
                                     </>
                                   )}
                                 </div>
-                                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(6,minmax(90px,1fr))",gap:8,marginTop:10,paddingTop:10,borderTop:`1px solid ${C.divider}`}}>
+                                <div className="res-card-grid">
                                   {[
                                     ["Time Until", reservation._timeUntil],
                                     ["Request Age", reservation._requestAge],
@@ -4067,15 +4157,27 @@ export default function ReservationDashboard() {
                                     ["Type", String(reservation.type || "whole").replace(/_/g," ")],
                                     ["Last Action", lastActionSummary(reservation)],
                                     ["Notify", reservation._notificationStatus],
-                                  ].map(([label,value])=>(
-                                    <div key={label} style={{minWidth:0}}>
-                                      <div style={{fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.13em",textTransform:"uppercase",color:C.textTertiary,marginBottom:3}}>{label}</div>
-                                      <div style={{fontSize:11.5,color:C.textSecondary,fontWeight:label==="Time Until"&&reservation._priority?.key==="urgent"?700:520,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textTransform:label==="Type"?"capitalize":"none"}}>{value}</div>
-                                    </div>
-                                  ))}
+                                  ].map(([label,value])=>{
+                                    const isLastAction = label === "Last Action";
+                                    return (
+                                      <div key={label} style={{minWidth:0}} className={isLastAction ? "res-card-grid-item-last" : ""}>
+                                        <div style={{fontFamily:F.label,fontSize:8,fontWeight:800,letterSpacing:"0.13em",textTransform:"uppercase",color:C.textTertiary,marginBottom:3}}>{label}</div>
+                                        <div style={{
+                                          fontSize:11.5,
+                                          color:C.textSecondary,
+                                          fontWeight:label==="Time Until"&&reservation._priority?.key==="urgent"?700:520,
+                                          whiteSpace:isLastAction?"normal":"nowrap",
+                                          overflow:isLastAction?"visible":"hidden",
+                                          textOverflow:isLastAction?"clip":"ellipsis",
+                                          textTransform:label==="Type"?"capitalize":"none"
+                                        }}>{value}</div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
-                              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:7,flexShrink:0}}>
+                              
+                              <div className="res-card-badges">
                                 <PriorityBadge priority={reservation._priority}/>
                                 <StatusBadge status={reservation.status}/>
                                 <StateBadge state={getReservationState(reservation)}/>
@@ -4089,8 +4191,7 @@ export default function ReservationDashboard() {
                               </div>
                             </div>
                           </div>
-                        </div>
-                      );
+                        );
                     })
                   )}
                 </div>

@@ -4,6 +4,7 @@ import { authAPI } from "../../services/authAPI";
 import { useAdminTheme, C, F } from "../../context/AdminThemeContext";
 import { reservationAPI } from "../../services/reservationAPI";
 import { canAccessOutlet, canonicalOutletName } from "../../constants/outletCatalog";
+import bellevueLogo from "../../assets/bellevue-logo.png";
 
 // ─── Sound / Voice Notifications ─────────────────────────────────────────────
 let _alertId = null;
@@ -943,7 +944,7 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
   };
 
   return (
-    <nav style={{
+    <nav className="admin-navbar-nav" style={{
       height: 63,
       background: isDark ? "#111009" : "#FFFFFF",
       borderBottom: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #E1E4E8",
@@ -955,8 +956,58 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
       top: 0,
       zIndex: 3000,
     }}>
-      {/* Logo */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <style>{`
+        .admin-hamburger-btn { display: flex !important; }
+        @media (max-width: 960px) {
+          .admin-navbar-nav {
+            padding: 0 16px !important;
+          }
+        }
+        @keyframes popoverFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 640px) {
+          .admin-notif-popover {
+            width: calc(100vw - 82px) !important;
+            right: -12px !important;
+          }
+        }
+      `}</style>
+
+      {/* Logo & Hamburger */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <button
+          className="admin-hamburger-btn"
+          onClick={() => window.dispatchEvent(new CustomEvent("bellevue:toggle-sidebar"))}
+          title="Toggle Navigation Menu"
+          style={{
+            width: 38, height: 38,
+            border: "none",
+            background: "transparent",
+            borderRadius: 8,
+            cursor: "pointer",
+            alignItems: "center",
+            justifyContent: "center",
+            color: isDark ? "#EDE8DF" : "#374151",
+            transition: "background 0.15s",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.08)" : "rgba(107,114,128,0.08)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = "transparent";
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+
+
+
         {leftContent}
       </div>
 
@@ -1071,6 +1122,7 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
           {dropdownOpen && (
             <div
               ref={popoverRef}
+              className="admin-notif-popover"
               style={{
                 position: "absolute",
                 top: "calc(100% + 8px)",
@@ -1085,7 +1137,7 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
                 flexDirection: "column",
                 zIndex: 3500,
                 overflow: "hidden",
-                animation: "dropdownFadeIn 0.15s ease",
+                animation: "popoverFadeIn 0.15s ease",
               }}
             >
               <style>{`
@@ -1207,7 +1259,7 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
                         onClick={() => handleViewDetails(res)}
                         className="notif-item"
                         style={{
-                          padding: `12px ${needsAck ? "136px" : (hoveredNotifId === id || !read ? "48px" : "16px")} 12px 14px`,
+                          padding: "12px 14px",
                           borderBottom: isDark ? "1px solid rgba(255,255,255,0.05)" : "1px solid #F0F2F5",
                           borderLeft: read ? "4px solid transparent" : "4px solid #C9A84C",
                           cursor: "pointer",
@@ -1215,7 +1267,7 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
                           position: "relative",
                           display: "flex",
                           flexDirection: "column",
-                          gap: 5,
+                          gap: 6,
                           background: read
                             ? (hoveredNotifId === id 
                                 ? (isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.015)")
@@ -1285,12 +1337,14 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
                           {metadataStr}
                         </div>
 
-                        {/* Bottom Row: Ref Code & Time Received */}
+                        {/* Bottom Row: Ref Code & Actions */}
                         <div style={{
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
-                          marginTop: 2
+                          marginTop: 4,
+                          gap: 10,
+                          flexWrap: "wrap"
                         }}>
                           <span style={{
                             fontFamily: "Inter, sans-serif",
@@ -1299,129 +1353,78 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
                             background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.045)",
                             padding: "1px 5px",
                             borderRadius: 4,
-                            fontWeight: 500
+                            fontWeight: 500,
+                            flexShrink: 0
                           }}>
                             Ref {res.reference_code || res.id}
                           </span>
-                          {timeAgo(res.created_at || res.submitted_timestamp) && (
-                            <span style={{
-                              fontFamily: "Inter, sans-serif",
-                              fontSize: 10.5,
-                              color: isDark ? "#8A8278" : "#7A7060"
-                            }}>
-                              {timeAgo(res.created_at || res.submitted_timestamp)}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Right Side Actions / Indicator */}
-                        <div 
-                          style={{ 
-                            position: "absolute",
-                            right: 12,
-                            top: "50%",
-                            transform: "translateY(-50%)",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            zIndex: 10
-                          }} 
-                          onClick={e => e.stopPropagation()}
-                        >
-                          {needsAck && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAcknowledge(res, e);
-                              }}
-                              title="Acknowledge reservation alert"
-                              style={{
-                                padding: "4px 8px",
-                                background: "#C9A84C",
-                                color: "#FFF",
-                                border: "none",
-                                borderRadius: 4,
-                                fontSize: 9.5,
-                                fontWeight: 700,
-                                fontFamily: "Inter, sans-serif",
-                                cursor: "pointer",
-                                boxShadow: "0 2px 6px rgba(201, 168, 76, 0.2)"
-                              }}
-                            >
-                              Acknowledge
-                            </button>
-                          )}
                           
-                          {/* Read/Unread State Action or Indicator */}
-                          {hoveredNotifId === id ? (
-                            !read ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                            {timeAgo(res.created_at || res.submitted_timestamp) && (
+                              <span style={{
+                                fontFamily: "Inter, sans-serif",
+                                fontSize: 10,
+                                color: isDark ? "#8A8278" : "#7A7060",
+                                marginRight: 2
+                              }}>
+                                {timeAgo(res.created_at || res.submitted_timestamp)}
+                              </span>
+                            )}
+                            
+                            {needsAck && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAcknowledge(res, e);
+                                }}
+                                title="Acknowledge reservation alert"
+                                style={{
+                                  padding: "3px 6px",
+                                  background: "#C9A84C",
+                                  color: "#FFF",
+                                  border: "none",
+                                  borderRadius: 4,
+                                  fontSize: 9,
+                                  fontWeight: 700,
+                                  fontFamily: "Inter, sans-serif",
+                                  cursor: "pointer",
+                                  boxShadow: "0 2px 6px rgba(201, 168, 76, 0.2)"
+                                }}
+                              >
+                                Acknowledge
+                              </button>
+                            )}
+
+                            {!read && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   markAsRead(db_id, e);
                                 }}
-                                className="mark-read-btn"
                                 title="Mark as Read"
                                 style={{
                                   background: isDark ? "#1C1B12" : "#FFFFFF",
                                   border: `1px solid ${isDark ? "rgba(255,255,255,0.15)" : "#E1E4E8"}`,
                                   color: "#C9A84C",
-                                  borderRadius: 6,
-                                  width: 26,
-                                  height: 26,
+                                  borderRadius: 4,
+                                  padding: "2px 6px",
+                                  fontSize: 9,
+                                  fontWeight: 600,
+                                  fontFamily: "Inter, sans-serif",
                                   cursor: "pointer",
-                                  padding: 0,
                                   display: "flex",
                                   alignItems: "center",
-                                  justifyContent: "center",
-                                  boxShadow: "0 2px 8px rgba(0,0,0,0.12)"
+                                  gap: 2,
+                                  boxShadow: "0 2px 6px rgba(0,0,0,0.05)"
                                 }}
                               >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
                                   <polyline points="20 6 9 17 4 12" />
                                 </svg>
+                                Read
                               </button>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewDetails(res);
-                                }}
-                                title="Open reservation"
-                                style={{
-                                  background: "transparent",
-                                  border: "none",
-                                  color: isDark ? "#8A8278" : "#7A7060",
-                                  width: 26,
-                                  height: 26,
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  padding: 0
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.color = "#C9A84C"}
-                                onMouseLeave={e => e.currentTarget.style.color = isDark ? "#8A8278" : "#7A7060"}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                  <polyline points="15 3 21 3 21 9" />
-                                  <line x1="10" y1="14" x2="21" y2="3" />
-                                </svg>
-                              </button>
-                            )
-                          ) : (
-                            !read && (
-                              <span style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: "50%",
-                                background: "#C9A84C",
-                                marginRight: 9,
-                                display: "inline-block"
-                              }} />
-                            )
-                          )}
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
