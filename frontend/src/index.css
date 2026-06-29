@@ -107,3 +107,46 @@ body.bellevue-admin-page.bellevue-admin-dark * {
   scrollbar-color: rgba(196, 163, 90, 0.55) transparent !important;
 }
 
+/* Responsive Admin Page Header */
+.admin-page-header {
+  display: flex !important;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.admin-page-header > div:first-child {
+  flex: 1;
+  min-width: 280px;
+}
+.admin-page-header__actions {
+  flex-shrink: 0;
+}
+@media (max-width: 960px) {
+  .admin-page-header {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  .admin-page-header > div:first-child {
+    min-width: 100% !important;
+  }
+  .admin-page-header__actions {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    margin-top: 4px;
+  }
+}
+
+
+.admin-page-content-container {
+  flex: 1;
+  overflow: auto;
+  padding: 30px 32px 42px;
+}
+@media (max-width: 960px) {
+  .admin-page-content-container {
+    padding: 16px 12px 24px !important;
+  }
+}
+

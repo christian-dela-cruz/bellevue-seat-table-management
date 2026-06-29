@@ -1391,6 +1391,11 @@ function OutletDashboard() {
           padding: 13px 15px;
           border-bottom: 1px solid ${C.divider};
         }
+        .od-chart-controls {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
         @media (max-width: 960px) {
           .admin-page-content-container {
             padding: 16px 12px 24px !important;
@@ -1425,6 +1430,11 @@ function OutletDashboard() {
             flex-direction: column !important;
             align-items: flex-start !important;
             gap: 10px !important;
+          }
+          .od-chart-controls {
+            flex-wrap: wrap !important;
+            gap: 8px 6px !important;
+            width: 100% !important;
           }
         }
       `}</style>
@@ -1601,7 +1611,7 @@ function OutletDashboard() {
                   title={chartMetric === "revenue" ? "Revenue Seasonality Trend" : "Reservation Trend"}
                   subtitle={analyticsPeriod === "yearly" ? `Monthly activity for ${startDate?.slice(0, 4) || new Date().getFullYear()}.` : "Scheduled activity for the selected date range."}
                   right={
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div className="od-chart-controls">
                       <div style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: 3, border: `1px solid ${C.border}`, borderRadius: 999, background: C.soft }}>
                         {[
                           ["volume", "Volume"],

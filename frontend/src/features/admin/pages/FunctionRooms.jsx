@@ -937,7 +937,7 @@ function VenueLandingPreview({ form, preview, childRooms = [], rooms = [], editi
         <div style={{ color: "#C9A84C", fontSize: 6.8, fontWeight: 850, letterSpacing: "0.22em", textTransform: "uppercase" }}>{label}</div>
         <strong style={{ display: "block", marginTop: 2, color: "#F8F3E8", fontSize: 14, lineHeight: 1.05 }}>{title}</strong>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: title === "Dining Outlets" ? "repeat(6, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))", gap: PAGE_PREVIEW_CARD.gap }}>
+      <div className={title === "Dining Outlets" ? "venue-preview-grid-dining" : "venue-preview-grid-events"}>
         {items.length ? items.map((room) => (
           <VenuePreviewCard
             key={room.id || room.slug || room.name}
@@ -981,7 +981,7 @@ function VenueLandingPreview({ form, preview, childRooms = [], rooms = [], editi
             </span>
           </div>
           <div style={{ borderRadius: 16, padding: 10, background: "#100D09", border: "1px solid rgba(201,168,76,0.22)", boxShadow: "0 16px 36px rgba(24,20,14,0.18)", overflow: "hidden" }}>
-            <div style={{ minHeight: 460, borderRadius: 13, background: "radial-gradient(circle at 18% 14%, rgba(201,168,76,0.12), transparent 34%), #17120C", display: "grid", gridTemplateColumns: "30% 1fr", gap: 12, padding: 14 }}>
+            <div className="venue-preview-container" style={{ minHeight: 460, borderRadius: 13, background: "radial-gradient(circle at 18% 14%, rgba(201,168,76,0.12), transparent 34%), #17120C" }}>
               <aside style={{ borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.035)", padding: 13, display: "flex", flexDirection: "column", justifyContent: "space-between", minWidth: 0 }}>
                 <div>
                   <div style={{ width: 30, height: 30, borderRadius: 9, border: "1px solid rgba(201,168,76,0.34)", color: "#C9A84C", display: "grid", placeItems: "center", fontSize: 14, fontFamily: "serif" }}>B</div>
@@ -2126,27 +2126,186 @@ export default function FunctionRooms() {
         }
         .function-room-confirm-backdrop { animation: confirmFade 180ms ease both; }
         .function-room-confirm { animation: confirmIn 220ms cubic-bezier(0.22,1,0.36,1) both; }
+        .function-room-table {
+          min-width: 1040px;
+        }
         @keyframes drawerFadeIn { from { opacity: 0; backdrop-filter: blur(0); } to { opacity: 1; backdrop-filter: blur(2px); } }
         @keyframes drawerSlideIn { from { opacity: 0; transform: translate3d(34px,0,0); } to { opacity: 1; transform: translate3d(0,0,0); } }
         @keyframes confirmFade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes confirmIn { from { opacity: 0; transform: translateY(8px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @media (max-width: 920px) {
-          .function-room-stats, .function-room-toolbar { grid-template-columns: 1fr !important; }
-          .function-room-table-wrap { overflow-x: auto; }
+          .function-room-stats {
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 10px !important;
+          }
+          .function-room-toolbar {
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 10px 8px !important;
+          }
+          .function-room-toolbar > div:first-child {
+            grid-column: span 3 !important;
+          }
+          .function-room-table-wrap { overflow-x: visible !important; }
+          .function-room-table-wrap .function-room-table {
+            min-width: 100% !important;
+            display: block !important;
+            border: none !important;
+          }
+          .function-room-table-wrap table thead {
+            display: none !important;
+          }
+          .function-room-table-wrap table tbody {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 12px !important;
+          }
+          .function-room-table-wrap table tr {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            gap: 10px !important;
+            padding: 12px !important;
+            background: ${C.surface} !important;
+            border: 1px solid ${C.border} !important;
+            border-radius: 12px !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.02) !important;
+          }
+          .function-room-table-wrap table td {
+            display: block !important;
+            width: 100% !important;
+            padding: 0 !important;
+            border: none !important;
+            text-align: left !important;
+          }
+          .function-room-table-wrap table td:nth-child(2) {
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+          }
+          .function-room-table-wrap table td:nth-child(2)::before {
+            content: "Status" !important;
+            font-size: 8px !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.12em;
+            text-transform: uppercase !important;
+            color: ${C.faint} !important;
+            width: 72px !important;
+            flex-shrink: 0 !important;
+          }
+          .function-room-table-wrap table td:nth-child(3) {
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            flex-wrap: wrap !important;
+          }
+          .function-room-table-wrap table td:nth-child(3)::before {
+            content: "Settings" !important;
+            font-size: 8px !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.12em;
+            text-transform: uppercase !important;
+            color: ${C.faint} !important;
+            width: 72px !important;
+            flex-shrink: 0 !important;
+          }
+          .function-room-table-wrap table td:nth-child(4) {
+            border-top: 1px solid ${C.divider} !important;
+            padding-top: 8px !important;
+            display: flex !important;
+            justify-content: flex-end !important;
+          }
           .function-room-drawer { width: 100vw !important; }
           .venue-editor-body { grid-template-columns: 1fr !important; }
           .venue-preview-panel { position: relative !important; top: auto !important; }
         }
+        @media (max-width: 640px) {
+          .function-room-stats {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+          }
+          .function-room-stats > div:last-child {
+            grid-column: span 2 !important;
+          }
+          .function-room-toolbar {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px 6px !important;
+          }
+          .function-room-toolbar > div:first-child {
+            grid-column: span 2 !important;
+          }
+          .function-room-table-wrap table tbody {
+            grid-template-columns: 1fr !important;
+          }
+        }
         @media (max-width: 1180px) {
           .venue-editor-body { grid-template-columns: 1fr !important; }
           .venue-preview-panel { position: relative !important; top: auto !important; }
+        }
+
+        .venue-title-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
+          width: 100%;
+        }
+        .venue-title-row strong {
+          flex: 1;
+          min-width: 0;
+        }
+        @media (max-width: 640px) {
+          .venue-title-row {
+            flex-wrap: wrap !important;
+            gap: 4px 8px !important;
+          }
+          .venue-title-row strong {
+            flex: none !important;
+            max-width: 100% !important;
+          }
+        }
+
+        .venue-preview-container {
+          display: grid;
+          grid-template-columns: 30% 1fr;
+          gap: 12px;
+          padding: 14px;
+        }
+        .venue-preview-grid-dining {
+          display: grid;
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+          gap: 11px;
+        }
+        .venue-preview-grid-events {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 11px;
+        }
+
+        @media (max-width: 920px) {
+          .venue-preview-container {
+            grid-template-columns: 1fr !important;
+          }
+          .venue-preview-grid-dining {
+            grid-template-columns: repeat(3, 1fr) !important;
+          }
+          .venue-preview-grid-events {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .venue-preview-grid-dining {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+          .venue-preview-grid-events {
+            grid-template-columns: repeat(1, 1fr) !important;
+          }
         }
       `}</style>
       <div style={{ display: "flex", height: "100vh", minHeight: 0, overflow: "hidden", background: C.page }}>
         <Sidebar activeNav="function-rooms" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
         <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, height: "100vh", overflow: "hidden" }}>
           <AdminNavbar />
-          <main style={{ flex: 1, overflow: "auto", padding: "30px 32px 42px" }}>
+          <main className="admin-page-content-container">
             <AdminPageHeader
               eyebrow="Venue Configuration"
               title="Venue Management"
@@ -2269,7 +2428,7 @@ export default function FunctionRooms() {
                   </div>
 
                   <div className="function-room-table-wrap">
-                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1040, tableLayout: "fixed" }}>
+                    <table className="function-room-table" style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
                       <thead>
                         <tr style={{ background: C.surface }}>
                           {[
@@ -2329,7 +2488,7 @@ export default function FunctionRooms() {
                                   ) : <Camera size={17} style={{ color: C.faint }} />}
                                 </div>
                                 <div style={{ minWidth: 0 }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                  <div className="venue-title-row">
                                     <strong style={{ color: C.text, fontSize: level ? 12.5 : 13.5, fontWeight: level ? 560 : 640, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                       <span style={{ color: C.gold, opacity: 0.8, marginRight: 6, fontSize: '0.9em' }}>#{room.id}</span>
                                       {room.display_name || room.name}
