@@ -415,11 +415,11 @@ function QueueMetric({ label, value, helper, tone = "gold", active = false, onCl
         border:`1px solid ${active ? palette.border : C.cardBorder}`,
         borderRadius:10,
         background:active ? palette.bg : C.surfaceBase,
-        padding:isMobile ? "10px 11px" : "12px 14px",
-        minHeight:isMobile ? 68 : 76,
+        padding:isMobile ? "12px 14px" : "16px 18px",
+        minHeight:isMobile ? 76 : 84,
         display:"grid",
         alignContent:"center",
-        gap:5,
+        gap:6,
         textAlign:"left",
         cursor:onClick ? "pointer" : "default",
         boxShadow:active ? `0 1px 5px ${palette.color}10` : "0 1px 3px rgba(24,20,14,0.025)",
@@ -429,14 +429,14 @@ function QueueMetric({ label, value, helper, tone = "gold", active = false, onCl
       onMouseEnter={(e)=>{e.currentTarget.style.borderColor=palette.border;e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow=`0 2px 7px ${palette.color}10`;}}
       onMouseLeave={(e)=>{e.currentTarget.style.borderColor=active ? palette.border : C.cardBorder;e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow=active ? `0 1px 5px ${palette.color}10` : "0 1px 3px rgba(24,20,14,0.025)";}}
     >
-      <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:active ? palette.color : C.textTertiary}}>
+      <span style={{fontFamily:F.label,fontSize:isMobile ? 8 : 8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:active ? palette.color : C.textTertiary}}>
         {label}
       </span>
       <span style={{display:"flex",alignItems:"baseline",gap:8}}>
-        <span style={{fontFamily:F.display,fontSize:isMobile?24:28,fontWeight:760,lineHeight:1,color:palette.color}}>
+        <span style={{fontFamily:F.display,fontSize:isMobile?22:28,fontWeight:760,lineHeight:1,color:palette.color}}>
           {value}
         </span>
-        <span style={{fontSize:11.5,color:C.textSecondary,lineHeight:1.25,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+        <span style={{fontSize:isMobile ? 10.5 : 11.5,color:C.textSecondary,lineHeight:1.25,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
           {helper}
         </span>
       </span>
@@ -3939,7 +3939,7 @@ export default function ReservationDashboard() {
                       />
                     </div>
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":isTablet?"repeat(2,1fr)":"repeat(6, minmax(140px,1fr))",gap:10,alignItems:"end"}}>
+                  <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2, 1fr)":isTablet?"repeat(2,1fr)":"repeat(6, minmax(140px,1fr))",gap:10,alignItems:"end"}}>
                     <label style={{display:"grid",gap:5}}>
                       <span style={{fontFamily:F.label,fontSize:8.5,fontWeight:800,letterSpacing:"0.14em",textTransform:"uppercase",color:C.textTertiary}}>Room</span>
                       <RoomFilterDropdown

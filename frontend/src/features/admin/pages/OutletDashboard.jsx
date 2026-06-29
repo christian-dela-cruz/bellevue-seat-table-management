@@ -493,7 +493,7 @@ function Panel({ title, subtitle, right, children, style = {} }) {
   return (
     <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", ...style }}>
       {(title || right) && (
-        <div style={{ padding: "13px 15px", borderBottom: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+        <div className="od-panel-header">
           <div>
             {title && <div style={{ fontFamily: F.label, fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>{title}</div>}
             {subtitle && <div style={{ marginTop: 4, fontSize: 12, color: C.muted }}>{subtitle}</div>}
@@ -819,7 +819,7 @@ function DonutChart({ counts, total }) {
   const circumference = 100;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "130px minmax(0,1fr)", gap: 16, alignItems: "center", padding: 16 }}>
+    <div className="donut-chart-container">
       <svg viewBox="0 0 42 42" style={{ width: 130, height: 130, transform: "rotate(-90deg)" }}>
         <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="rgba(0,0,0,0.06)" strokeWidth="5" />
         {items.map(([label, value, color]) => {
@@ -853,7 +853,7 @@ function BarChart({ rows }) {
   return (
     <div style={{ padding: 16, display: "grid", gap: 12 }}>
       {rows.map((row) => (
-        <div key={row.label} onMouseEnter={() => setHovered(row.label)} onMouseLeave={() => setHovered(null)} style={{ display: "grid", gridTemplateColumns: "120px minmax(0,1fr) 34px", gap: 10, alignItems: "center" }}>
+        <div key={row.label} onMouseEnter={() => setHovered(row.label)} onMouseLeave={() => setHovered(null)} className="bar-chart-row">
           <span style={{ fontSize: 12, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.label}</span>
           <div style={{ height: 9, borderRadius: 999, background: "rgba(0,0,0,0.05)", overflow: "hidden" }}>
             <div className="od-bar" title={`${row.label}: ${row.value}`} style={{ height: "100%", width: `${(row.value / max) * 100}%`, borderRadius: 999, background: row.color, boxShadow: hovered === row.label ? `0 0 0 3px ${row.color}22` : "none", filter: hovered === row.label ? "saturate(1.15)" : "none", transition: "box-shadow 0.16s, filter 0.16s" }} />
@@ -880,22 +880,47 @@ function ReservationRow({ reservation, showPriority = false }) {
   return (
     <div
       onClick={() => navigate(`/admin/reservations?id=${reservation.id}`)}
-      style={{ padding: "11px 12px", borderBottom: `1px solid ${C.divider}`, display: "grid", gridTemplateColumns: showPriority ? "minmax(180px,1fr) 120px 88px 116px 92px" : "minmax(180px,1fr) 120px 88px 92px", gap: 12, alignItems: "center" }}
       className="od-row"
+      style={{
+        padding: "12px 14px",
+        borderBottom: `1px solid ${C.divider}`,
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        cursor: "pointer",
+      }}
     >
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reservation.name || reservation.guest_name || "Guest"}</div>
-        <div style={{ marginTop: 3, fontSize: 11.5, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reservation.reference_code || reservation.reference || "-"} - {outlet}</div>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{reservation.name || reservation.guest_name || "Guest"}</span>
+          {showPriority && <PriorityBadge reservation={reservation} />}
+        </div>
+        
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 11.5, color: C.muted }}>
+          <span style={{ fontFamily: F.mono, fontWeight: 600, color: C.gold }}>{reservation.reference_code || reservation.reference || "-"}</span>
+          <span>·</span>
+          <span>{outlet}</span>
+          <span>·</span>
+          <span>{reservation.guests_count || reservation.guests || 0} guests</span>
+        </div>
+
+        <div style={{ fontSize: 11.5, color: C.muted }}>
+          {readableDate(reservation.event_date)} at {readableTime(reservation.event_time)}
+        </div>
+
         {(reservation.last_handled_by_name || reservation.assigned_handler_name || reservation.last_operational_action) && (
-          <div style={{ marginTop: 4, fontSize: 10.5, color: C.faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 10.5, color: C.faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {reservation.last_operational_action || "Coordination"}{reservation.last_handled_by_name || reservation.assigned_handler_name ? ` by ${reservation.last_handled_by_name || reservation.assigned_handler_name}` : ""}
           </div>
         )}
       </div>
-      <div style={{ fontSize: 12, color: C.muted }}>{readableDate(reservation.event_date)}<br /><span style={{ color: C.faint }}>{readableTime(reservation.event_time)}</span></div>
-      <div style={{ fontSize: 12, color: C.muted }}>{reservation.guests_count || reservation.guests || 0} guests</div>
-      {showPriority && <PriorityBadge reservation={reservation} />}
-      <StatusPill status={reservation.status} />
+
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+        <StatusPill status={reservation.status} />
+        <span style={{ fontSize: 9, fontFamily: F.label, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>View &rarr;</span>
+      </div>
     </div>
   );
 }
@@ -1335,9 +1360,72 @@ function OutletDashboard() {
         }
         @keyframes odPulseSync { 0% { opacity: 0.35; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.05); } 100% { opacity: 0.35; transform: scale(0.95); } }
         .od-pulse-sync { animation: odPulseSync 1.2s infinite ease-in-out; }
-        @media (max-width: 980px) {
-          .od-top, .od-two, .od-filters { grid-template-columns: 1fr !important; }
-          .od-row { grid-template-columns: 1fr !important; }
+        .admin-page-content-container {
+          flex: 1;
+          overflow: auto;
+          padding: 30px 32px 42px;
+        }
+        .od-metrics-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+          gap: 12px;
+        }
+        .donut-chart-container {
+          display: grid;
+          grid-template-columns: 130px minmax(0, 1fr);
+          gap: 16px;
+          align-items: center;
+          padding: 16px;
+        }
+        .bar-chart-row {
+          display: grid;
+          grid-template-columns: 120px minmax(0, 1fr) 34px;
+          gap: 10px;
+          align-items: center;
+        }
+        .od-panel-header {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: center;
+          padding: 13px 15px;
+          border-bottom: 1px solid ${C.divider};
+        }
+        @media (max-width: 960px) {
+          .admin-page-content-container {
+            padding: 16px 12px 24px !important;
+          }
+          .od-two {
+            grid-template-columns: 1fr !important;
+          }
+          .od-filters {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 12px 10px !important;
+          }
+          .od-filter-outlet, .od-filter-search {
+            grid-column: span 2 !important;
+          }
+          .od-metrics-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 10px !important;
+          }
+          .od-metric-span-2 {
+            grid-column: span 2 !important;
+          }
+          .donut-chart-container {
+            grid-template-columns: 1fr !important;
+            justify-items: center !important;
+            text-align: center !important;
+            gap: 12px !important;
+          }
+          .bar-chart-row {
+            grid-template-columns: 80px minmax(0, 1fr) 30px !important;
+          }
+          .od-panel-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 10px !important;
+          }
         }
       `}</style>
       <Sidebar
@@ -1351,7 +1439,7 @@ function OutletDashboard() {
       />
       <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
         <AdminNavbar />
-        <main style={{ flex: 1, overflow: "auto", padding: "30px 32px 42px" }}>
+        <main className="admin-page-content-container">
           <AdminPageHeader
             eyebrow="Outlet Operations"
             title={selectedOutlet?.name || "Outlet Dashboard"}
@@ -1430,9 +1518,11 @@ function OutletDashboard() {
             <div style={{ display: "grid", gap: 16 }}>
               <Panel style={{ overflow: "visible", position: "relative", zIndex: 5 }}>
                 <div className="od-filters" style={{ padding: 13, display: "grid", gridTemplateColumns: "minmax(260px,1.5fr) 130px 130px 130px 130px 1fr 130px auto", gap: 9, alignItems: "end" }}>
-                  <Field label="Outlet">
-                    <OutletSelector outlets={selectableOutlets} selectedOutlet={selectedOutlet} onSelect={(outlet) => navigate(`/admin/outlets/${slugify(outlet.name)}`)} dynamicOutletTree={dynamicOutletTree} />
-                  </Field>
+                  <div className="od-filter-outlet">
+                    <Field label="Outlet">
+                      <OutletSelector outlets={selectableOutlets} selectedOutlet={selectedOutlet} onSelect={(outlet) => navigate(`/admin/outlets/${slugify(outlet.name)}`)} dynamicOutletTree={dynamicOutletTree} />
+                    </Field>
+                  </div>
                   <Field label="Start"><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} style={inputStyle()} /></Field>
                   <Field label="End"><input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} style={inputStyle()} /></Field>
                   <Field label="Status">
@@ -1453,12 +1543,14 @@ function OutletDashboard() {
                       <option value="dine-in">Dine-in</option>
                     </select>
                   </Field>
-                  <Field label="Search">
-                    <div style={{ ...inputStyle({ display: "flex", alignItems: "center", gap: 8 }) }}>
-                      <Search size={14} color={C.faint} />
-                      <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Guest, email, reference" style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontSize: 12, color: C.text }} />
-                    </div>
-                  </Field>
+                  <div className="od-filter-search">
+                    <Field label="Search">
+                      <div style={{ ...inputStyle({ display: "flex", alignItems: "center", gap: 8 }) }}>
+                        <Search size={14} color={C.faint} />
+                        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Guest, email, reference" style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontSize: 12, color: C.text }} />
+                      </div>
+                    </Field>
+                  </div>
                   <Field label="Sort">
                     <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} style={inputStyle()}>
                       <option value="date_asc">Earliest first</option>
@@ -1483,7 +1575,8 @@ function OutletDashboard() {
                       letterSpacing: "0.14em", 
                       textTransform: "uppercase", 
                       cursor: loading ? "not-allowed" : "pointer",
-                      transition: "opacity 0.16s ease, background 0.16s ease"
+                      transition: "opacity 0.16s ease, background 0.16s ease",
+                      width: "100%"
                     }}
                   >
                     {loading ? "Applying..." : "Apply"}
@@ -1491,14 +1584,16 @@ function OutletDashboard() {
                 </div>
               </Panel>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 12 }}>
+              <div className="od-metrics-grid">
                 <MetricCard icon={DollarSign} label="Confirmed Revenue" value={formatCurrency(selectedOutletMetrics.confirmed_revenue)} detail="approved spend" color={C.green} bg={C.greenFaint} />
                 <MetricCard icon={TrendingUp} label="Projected Revenue" value={formatCurrency(selectedOutletMetrics.projected_revenue)} detail="pending/expected" color={C.gold} bg={C.goldFaint} />
                 <MetricCard icon={CalendarDays} label="Reservations" value={total} detail="in range" color={C.blue} bg={C.blueFaint} />
                 <MetricCard icon={Users} label="Guests" value={guests} detail="expected" color={C.slate} bg={C.slateFaint} />
                 <MetricCard icon={Activity} label="Today" value={todayCount} detail="scheduled" color={C.blue} bg={C.blueFaint} />
                 <MetricCard icon={CheckCircle} label="Approved" value={reserved.length} detail={`${acceptanceRate}% rate`} color={C.green} bg={C.greenFaint} />
-                <MetricCard icon={Clock} label="Pending Actions" value={pending.length} detail={urgentPending.length ? `${urgentPending.length} overdue` : "awaiting review"} color={urgentPending.length ? C.red : C.gold} bg={urgentPending.length ? C.redFaint : C.goldFaint} />
+                <div className="od-metric-span-2">
+                  <MetricCard icon={Clock} label="Pending Actions" value={pending.length} detail={urgentPending.length ? `${urgentPending.length} overdue` : "awaiting review"} color={urgentPending.length ? C.red : C.gold} bg={urgentPending.length ? C.redFaint : C.goldFaint} />
+                </div>
               </div>
 
               <div className="od-two" style={{ display: "grid", gridTemplateColumns: "minmax(360px,1.35fr) minmax(300px,0.8fr)", gap: 14 }}>

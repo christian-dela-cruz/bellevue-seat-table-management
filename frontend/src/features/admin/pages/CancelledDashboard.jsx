@@ -63,20 +63,21 @@ function metricTone(tone) {
   return { color: C.gold, bg: C.goldFaint, border: C.borderAccent };
 }
 
-function ReviewMetric({ label, value, helper, tone = "slate", active = false, onClick, isMobile }) {
+function ReviewMetric({ label, value, helper, tone = "slate", active = false, onClick, isMobile, style = {} }) {
   const palette = metricTone(tone);
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
+        ...style,
         border: `1px solid ${active ? palette.border : C.cardBorder}`,
         borderRadius: 10,
         background: active ? palette.bg : C.surfaceBase,
-        padding: isMobile ? "10px 11px" : "12px 14px",
-        minHeight: isMobile ? 66 : 74,
+        padding: isMobile ? "12px 14px" : "16px 18px",
+        minHeight: isMobile ? 76 : 84,
         display: "grid",
-        gap: 5,
+        gap: 6,
         alignContent: "center",
         textAlign: "left",
         cursor: onClick ? "pointer" : "default",
@@ -94,14 +95,14 @@ function ReviewMetric({ label, value, helper, tone = "slate", active = false, on
         e.currentTarget.style.boxShadow = active ? `0 1px 5px ${palette.color}10` : "0 1px 3px rgba(24,20,14,0.025)";
       }}
     >
-      <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: active ? palette.color : C.textTertiary }}>
+      <span style={{ fontFamily: F.label, fontSize: isMobile ? 8 : 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: active ? palette.color : C.textTertiary }}>
         {label}
       </span>
       <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <span style={{ fontFamily: F.display, fontSize: isMobile ? 24 : 28, fontWeight: 760, lineHeight: 1, color: palette.color }}>
+        <span style={{ fontFamily: F.display, fontSize: isMobile ? 22 : 28, fontWeight: 760, lineHeight: 1, color: palette.color }}>
           {value}
         </span>
-        <span style={{ fontSize: 11.5, color: C.textSecondary, lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <span style={{ fontSize: isMobile ? 10.5 : 11.5, color: C.textSecondary, lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {helper}
         </span>
       </span>
@@ -384,7 +385,30 @@ function DetailModal({ reservation, onClose }) {
   ];
 
   return (
-    <div
+    <>
+      <style>{`
+        .modal-layout-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 300px;
+          gap: 20px;
+          align-items: start;
+        }
+        .modal-scroll-body {
+          padding: 18px 22px 24px;
+          overflow-y: auto;
+          flex: 1;
+        }
+        @media (max-width: 960px) {
+          .modal-layout-grid {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
+          .modal-scroll-body {
+            padding: 14px 14px 20px !important;
+          }
+        }
+      `}</style>
+      <div
       style={{
         position: "fixed", inset: 0,
         background: C.modalOverlay,
@@ -441,8 +465,8 @@ function DetailModal({ reservation, onClose }) {
         </div>
 
         {/* Body */}
-        <div style={{ padding: "18px 22px 24px", overflowY: "auto", flex: 1 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 300px", gap: 20, alignItems: "start" }}>
+        <div className="modal-scroll-body">
+          <div className="modal-layout-grid">
             
             {/* Left Column: Core Data cards */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -598,6 +622,7 @@ function DetailModal({ reservation, onClose }) {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -909,6 +934,51 @@ export default function CancelledDashboard() {
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 4px; }
+        
+        .admin-page-content-container {
+          padding: 30px 32px 42px;
+          animation: fadeUp 0.28s ease;
+        }
+        .cancelled-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 10px;
+          flex-wrap: nowrap;
+          width: 100%;
+        }
+        .cancelled-card-badges {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          justify-content: flex-end;
+          gap: 7px;
+          flex-shrink: 0;
+        }
+        @media (max-width: 960px) {
+          .admin-page-content-container {
+            padding: 16px 12px 24px !important;
+          }
+          .cancelled-card-header {
+            flex-wrap: wrap !important;
+          }
+          .cancelled-card-header > div:first-child {
+            width: 100% !important;
+            flex: none !important;
+            padding-left: 0 !important;
+          }
+          .cancelled-card-badges {
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            width: 100% !important;
+            border-top: 1px solid ${C.divider} !important;
+            padding-top: 10px !important;
+            margin-top: 8px !important;
+            flex-wrap: wrap !important;
+            gap: 6px 8px !important;
+          }
+        }
       `}</style>
 
       <div style={{ display: "flex", height: "100vh", overflow: "hidden", fontFamily: F.body, background: C.pageBg, color: C.textPrimary }}>
@@ -992,7 +1062,7 @@ export default function CancelledDashboard() {
             </div>
 
             {/* Content */}
-            <div style={{ padding: isMobile ? "22px 16px 30px" : isTablet ? "26px 22px 36px" : "30px 32px 42px", animation: "fadeUp 0.28s ease" }}>
+            <div className="admin-page-content-container">
 
               <AdminPageHeader
                 eyebrow="Cancellation Review"
@@ -1043,10 +1113,10 @@ export default function CancelledDashboard() {
                     <InlineMetric label="No Reason" value={loading ? "--" : stats.missingReason} tone="slate" />
                   </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : isTablet ? "repeat(2,1fr)" : "repeat(3,minmax(0,1fr))", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : isTablet ? "repeat(2,1fr)" : "repeat(3,minmax(0,1fr))", gap: 10 }}>
                   <ReviewMetric label="Total Cancelled" value={loading ? "--" : stats.total} helper="guest cancellations" tone="slate" active={reasonFilter === "ALL"} onClick={() => setReasonFilter("ALL")} isMobile={isMobile} />
                   <ReviewMetric label="Cancelled Today" value={loading ? "--" : stats.today} helper="new reviews" tone="gold" isMobile={isMobile} />
-                  <ReviewMetric label="Missing Reason" value={loading ? "--" : stats.missingReason} helper="needs follow-up" tone="slate" active={reasonFilter === "NO_REASON"} onClick={() => setReasonFilter("NO_REASON")} isMobile={isMobile} />
+                  <ReviewMetric label="Missing Reason" value={loading ? "--" : stats.missingReason} helper="needs follow-up" tone="slate" active={reasonFilter === "NO_REASON"} onClick={() => setReasonFilter("NO_REASON")} isMobile={isMobile} style={{ gridColumn: isMobile ? "span 2" : "auto" }} />
                 </div>
               </div>
 
@@ -1192,7 +1262,7 @@ export default function CancelledDashboard() {
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(140px,200px) minmax(140px,200px) minmax(120px,160px) auto", gap: 10, alignItems: "end" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "minmax(140px,200px) minmax(140px,200px) minmax(120px,160px) auto", gap: 10, alignItems: "end" }}>
                     <label style={{ display: "grid", gap: 5 }}>
                       <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.textTertiary }}>Room / Outlet</span>
                       <RoomFilterDropdown
@@ -1209,18 +1279,18 @@ export default function CancelledDashboard() {
                         <option value="cancelled_desc">Latest cancelled</option>
                         <option value="cancelled_asc">Oldest cancelled</option>
                         <option value="event_asc">Event soonest</option>
-                        <option value="event_desc">Event latest</option>
+                        <option value="event_latest">Event latest</option>
                         <option value="guest_az">Guest A-Z</option>
                       </select>
                     </label>
                     <button
                       type="button"
                       onClick={() => { setReasonFilter("ALL"); setSearch(""); setSortBy("cancelled_desc"); setRoomFilter("ALL"); }}
-                      style={{ height: 36, boxSizing: "border-box", border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: C.surfaceBase, color: C.textSecondary, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      style={{ gridColumn: isMobile ? "span 2" : "auto", height: 36, boxSizing: "border-box", border: `1px solid ${C.borderDefault}`, borderRadius: 8, background: C.surfaceBase, color: C.textSecondary, fontFamily: F.label, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                     >
                       Reset Review
                     </button>
-                    <div style={{ fontFamily: F.body, fontSize: 11.5, color: C.textSecondary, lineHeight: 1.5 }}>
+                    <div style={{ gridColumn: isMobile ? "span 2" : "auto", fontFamily: F.body, fontSize: 11.5, color: C.textSecondary, lineHeight: 1.5 }}>
                       Cancelled records are read-only and kept for customer-service review.
                     </div>
                   </div>
@@ -1273,7 +1343,7 @@ export default function CancelledDashboard() {
                         {/* Left accent strip */}
                         <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 3, background: C.accent, opacity: 0.25, borderRadius: "0 2px 2px 0" }} />
 
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+                        <div className="cancelled-card-header">
                           <div style={{ flex: 1, minWidth: 0, paddingLeft: 10 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
                               <div style={{ fontFamily: F.body, fontSize: 14, fontWeight: 600, color: C.textPrimary }}>{reservation.name || "—"}</div>
@@ -1324,7 +1394,7 @@ export default function CancelledDashboard() {
                             </div>
                           </div>
 
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 7, flexShrink: 0 }}>
+                          <div className="cancelled-card-badges">
                             <CancelledBadge />
                             <div style={{ display: "flex", alignItems: "center", gap: 3, fontFamily: F.label, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.textTertiary }}>
                               View
