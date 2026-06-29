@@ -1,6 +1,37 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { venueAPI } from "../../services/venueAPI";
 import BellevueDropdown from "../BellevueDropdown";
+
+export function getLocalTodayString() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export function formatDisplayDate(dateStr) {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return dateStr;
+  const date = new Date(parts[0], parts[1] - 1, parts[2]);
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function formatDisplayTime(timeStr) {
+  if (!timeStr) return "";
+  const parts = timeStr.split(":");
+  const hr = parseInt(parts[0], 10);
+  const min = parts[1] || "00";
+  if (isNaN(hr)) return timeStr;
+  const ampm = hr >= 12 ? "PM" : "AM";
+  const formattedHr = hr % 12 || 12;
+  return `${formattedHr}:${min} ${ampm}`;
+}
 
 export const DEFAULT_EVENT_TIME = "19:00";
 const STORAGE_KEY = "seatmap:selected_schedule";
@@ -30,7 +61,7 @@ export function saveSeatmapSchedule(schedule = {}) {
 
 export function normalizeSchedule(schedule = {}) {
   const stored = loadSeatmapSchedule();
-  const today = new Date().toISOString().split("T")[0];
+  const today = getLocalTodayString();
   let eventDate = schedule.eventDate || stored.eventDate || "";
   if (eventDate && eventDate < today) {
     eventDate = "";
@@ -64,7 +95,13 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
   const isReady = Boolean(normalized.eventDate && normalized.eventTime);
   const [draftSchedule, setDraftSchedule] = React.useState(normalized);
   const [slots, setSlots] = React.useState([]);
-  const [dateFocused, setDateFocused] = React.useState(false);
+
+  const lastPropRef = React.useRef({ eventDate: normalized.eventDate, eventTime: normalized.eventTime });
+  if (normalized.eventDate !== lastPropRef.current.eventDate || 
+      normalized.eventTime !== lastPropRef.current.eventTime) {
+    lastPropRef.current = { eventDate: normalized.eventDate, eventTime: normalized.eventTime };
+    setDraftSchedule(normalized);
+  }
 
   if (locked && isReady) {
     const formattedDate = new Date(normalized.eventDate).toLocaleDateString(undefined, {
@@ -108,14 +145,11 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
   const [scheduleEnforced, setScheduleEnforced] = React.useState(false);
   const selectedSlot = slots.find((slot) => slot.time === String(draftSchedule.eventTime || "").substring(0, 5));
   const slotAvailable = slots.length === 0 ? !scheduleEnforced : Boolean(selectedSlot?.available);
-  const isDraftValid = Boolean(draftSchedule.eventDate && draftSchedule.eventTime && slotAvailable);
+  const localToday = getLocalTodayString();
+  const isDraftValid = Boolean(draftSchedule.eventDate && draftSchedule.eventDate >= localToday && draftSchedule.eventTime && slotAvailable);
   const hasChanges =
     draftSchedule.eventDate !== normalized.eventDate ||
     draftSchedule.eventTime !== normalized.eventTime;
-
-  React.useEffect(() => {
-    setDraftSchedule(normalized);
-  }, [normalized.eventDate, normalized.eventTime]);
 
   React.useEffect(() => {
     if (isReady && draftSchedule.eventDate && draftSchedule.eventTime && !slotLoading) {
@@ -205,20 +239,20 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
         <div style={{ display: "grid", gap: 12 }}>
           <label style={{ ...labelStyle, color: isDark ? "#8A8278" : "rgba(24,20,14,0.48)" }}>
             Date
-            <input
-              type="date"
+            <CustomDateInput
               value={draftSchedule.eventDate}
-              min={new Date().toISOString().split("T")[0]}
-              onFocus={() => setDateFocused(true)}
-              onBlur={() => setDateFocused(false)}
-              onChange={(event) => setDraftSchedule({ ...draftSchedule, eventDate: event.target.value })}
-              style={{
-                ...controlStyle(isDark),
-                border: dateFocused
-                  ? (isDark ? "1.5px solid rgba(196,163,90,0.35)" : "1.5px solid rgba(140,107,42,0.32)")
-                  : (isDark ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid rgba(0,0,0,0.08)"),
-                boxShadow: dateFocused ? (isDark ? "0 0 0 3px rgba(196,163,90,0.12)" : "0 0 0 3px rgba(140,107,42,0.10)") : "none",
+              min={getLocalTodayString()}
+              onChange={(event) => {
+                const selectedDate = event.target.value;
+                const today = getLocalTodayString();
+                if (selectedDate && selectedDate < today) {
+                  setDraftSchedule({ ...draftSchedule, eventDate: today });
+                } else {
+                  setDraftSchedule({ ...draftSchedule, eventDate: selectedDate });
+                }
               }}
+              isDark={isDark}
+              style={controlStyle(isDark)}
             />
           </label>
           
@@ -285,15 +319,20 @@ export default function ScheduleGate({ schedule, onChange, roomLabel = "this roo
           <div style={{ display: "grid", gap: 12 }}>
             <label style={{ ...labelStyle, color: isDark ? "#8A8278" : "rgba(24,20,14,0.48)" }}>
               Date
-              <input
-                type="date"
+              <CustomDateInput
                 value={draftSchedule.eventDate}
-                min={new Date().toISOString().split("T")[0]}
-                onChange={(event) => setDraftSchedule({ ...draftSchedule, eventDate: event.target.value })}
-                style={{
-                  ...modalInputStyle(isDark),
-                  border: isDark ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid rgba(0,0,0,0.10)",
+                min={getLocalTodayString()}
+                onChange={(event) => {
+                  const selectedDate = event.target.value;
+                  const today = getLocalTodayString();
+                  if (selectedDate && selectedDate < today) {
+                    setDraftSchedule({ ...draftSchedule, eventDate: today });
+                  } else {
+                    setDraftSchedule({ ...draftSchedule, eventDate: selectedDate });
+                  }
                 }}
+                isDark={isDark}
+                style={modalInputStyle(isDark)}
               />
             </label>
             <label style={{ ...labelStyle, color: isDark ? "#8A8278" : "rgba(24,20,14,0.48)" }}>
@@ -345,14 +384,11 @@ function TimeSlotControl({ value, slots, loading, scheduleEnforced = false, empt
     }
 
     return (
-      <input
-        type="time"
+      <CustomTimeInput
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        style={{
-          ...style,
-          colorScheme: isDark ? "dark" : "light"
-        }}
+        onChange={(val) => onChange(val)}
+        isDark={isDark}
+        style={style}
       />
     );
   }
@@ -428,4 +464,239 @@ function modalInputStyle(isDark) {
     outline: "none",
     colorScheme: isDark ? "dark" : "light"
   };
+}
+
+export function CustomDateInput({ value, min, onChange, onFocus, onBlur, isDark, placeholder = "Select Date", style = {} }) {
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleClick = () => {
+    if (inputRef.current && typeof inputRef.current.showPicker === "function") {
+      try {
+        inputRef.current.showPicker();
+      } catch (err) {}
+    }
+  };
+
+  const {
+    width,
+    height,
+    margin,
+    marginTop,
+    marginRight,
+    marginBottom,
+    marginLeft,
+    flex,
+    gridArea,
+    padding,
+    ...visualStyles
+  } = style || {};
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: width || "100%",
+        margin,
+        marginTop,
+        marginRight,
+        marginBottom,
+        marginLeft,
+        flex,
+        gridArea,
+        display: "flex",
+        alignItems: "center",
+      }}
+      onClick={handleClick}
+    >
+      <div
+        style={{
+          width: "100%",
+          height: 40,
+          boxSizing: "border-box",
+          padding: "0 14px",
+          border: focused
+            ? (isDark ? "1.5px solid rgba(196,163,90,0.35)" : "1.5px solid rgba(140,107,42,0.32)")
+            : (isDark ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid rgba(0,0,0,0.08)"),
+          borderRadius: 8,
+          background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
+          color: value 
+            ? (isDark ? "#EDE8DF" : "#18140E") 
+            : (isDark ? "#8A8278" : "rgba(24,20,14,0.48)"),
+          fontSize: 13,
+          fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          boxShadow: focused ? (isDark ? "0 0 0 3px rgba(196,163,90,0.12)" : "0 0 0 3px rgba(140,107,42,0.10)") : "none",
+          transition: "border-color 0.18s, box-shadow 0.18s",
+          cursor: "pointer",
+          ...visualStyles,
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {value ? formatDisplayDate(value) : placeholder}
+        </span>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={isDark ? "#C4A35A" : "#8C6B2A"}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ flexShrink: 0, marginLeft: 8 }}
+        >
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      </div>
+      <input
+        ref={inputRef}
+        type="date"
+        value={value}
+        min={min}
+        onFocus={(e) => {
+          setFocused(true);
+          if (onFocus) onFocus(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          if (onBlur) onBlur(e);
+        }}
+        onChange={onChange}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          opacity: 0,
+          cursor: "pointer",
+          zIndex: 2,
+          WebkitAppearance: "none",
+          appearance: "none",
+        }}
+      />
+    </div>
+  );
+}
+
+export function CustomTimeInput({ value, onChange, onFocus, onBlur, isDark, placeholder = "Select Time", style = {} }) {
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleClick = () => {
+    if (inputRef.current && typeof inputRef.current.showPicker === "function") {
+      try {
+        inputRef.current.showPicker();
+      } catch (err) {}
+    }
+  };
+
+  const {
+    width,
+    height,
+    margin,
+    marginTop,
+    marginRight,
+    marginBottom,
+    marginLeft,
+    flex,
+    gridArea,
+    padding,
+    ...visualStyles
+  } = style || {};
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: width || "100%",
+        margin,
+        marginTop,
+        marginRight,
+        marginBottom,
+        marginLeft,
+        flex,
+        gridArea,
+        display: "flex",
+        alignItems: "center",
+      }}
+      onClick={handleClick}
+    >
+      <div
+        style={{
+          width: "100%",
+          height: 40,
+          boxSizing: "border-box",
+          padding: "0 14px",
+          border: focused
+            ? (isDark ? "1.5px solid rgba(196,163,90,0.35)" : "1.5px solid rgba(140,107,42,0.32)")
+            : (isDark ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid rgba(0,0,0,0.08)"),
+          borderRadius: 8,
+          background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
+          color: value 
+            ? (isDark ? "#EDE8DF" : "#18140E") 
+            : (isDark ? "#8A8278" : "rgba(24,20,14,0.48)"),
+          fontSize: 13,
+          fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          boxShadow: focused ? (isDark ? "0 0 0 3px rgba(196,163,90,0.12)" : "0 0 0 3px rgba(140,107,42,0.10)") : "none",
+          transition: "border-color 0.18s, box-shadow 0.18s",
+          cursor: "pointer",
+          ...visualStyles,
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {value ? formatDisplayTime(value) : placeholder}
+        </span>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={isDark ? "#C4A35A" : "#8C6B2A"}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ flexShrink: 0, marginLeft: 8 }}
+        >
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      </div>
+      <input
+        ref={inputRef}
+        type="time"
+        value={value}
+        onFocus={(e) => {
+          setFocused(true);
+          if (onFocus) onFocus(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          if (onBlur) onBlur(e);
+        }}
+        onChange={(event) => onChange(event.target.value)}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          opacity: 0,
+          cursor: "pointer",
+          zIndex: 2,
+          WebkitAppearance: "none",
+          appearance: "none",
+        }}
+      />
+    </div>
+  );
 }

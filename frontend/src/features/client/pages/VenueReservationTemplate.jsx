@@ -4,7 +4,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import QRCode from "qrcode";
 import SharedNavbar from "../../../components/SharedNavbar.jsx";
 import SeatMap, { STATUS_COLORS } from "../../../components/seatmap/SeatMap";
-import ScheduleGate, { normalizeSchedule, withSeatmapSchedule } from "../../../components/seatmap/ScheduleGate";
+import ScheduleGate, { normalizeSchedule, withSeatmapSchedule, CustomDateInput, CustomTimeInput } from "../../../components/seatmap/ScheduleGate";
 import { mergeReservationStatusIntoLayout } from "../../../utils/seatmapAvailability";
 import Echo from "../../../utils/websocket.js";
 import bellevueLogo from "../../../assets/bellevue-logo.png";
@@ -465,15 +465,65 @@ function Field({ label, value, onChange, onBlur, type = "text", placeholder = ""
     if (onBlur) onBlur(e);
   };
 
+  const renderInput = () => {
+    if (isTextarea) {
+      return (
+        <textarea
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          rows={rows || 3}
+          onFocus={() => setFocused(true)}
+          onBlur={handleBlur}
+          style={inputStyle}
+        />
+      );
+    }
+    if (type === "date") {
+      return (
+        <CustomDateInput
+          value={value}
+          min={min}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={handleBlur}
+          isDark={isDark}
+          style={inputStyle}
+        />
+      );
+    }
+    if (type === "time") {
+      return (
+        <CustomTimeInput
+          value={value}
+          onChange={(val) => onChange(val)}
+          onFocus={() => setFocused(true)}
+          onBlur={handleBlur}
+          isDark={isDark}
+          style={inputStyle}
+        />
+      );
+    }
+    return (
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        min={min}
+        onFocus={() => setFocused(true)}
+        onBlur={handleBlur}
+        style={inputStyle}
+      />
+    );
+  };
+
   return (
     <div style={{ marginBottom: 14 }}>
       <label style={{ display: "block", fontFamily: F.label, fontSize: 9.5, letterSpacing: "0.14em", color: labelColor, fontWeight: 700, textTransform: "uppercase", marginBottom: 7, transition: "color 0.18s" }}>
         {label}{required && <span style={{ color: C.red, marginLeft: 3 }}>*</span>}
       </label>
-      {isTextarea
-        ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows || 3} onFocus={() => setFocused(true)} onBlur={handleBlur} style={inputStyle} />
-        : <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} min={min} onFocus={() => setFocused(true)} onBlur={handleBlur} style={inputStyle} />
-      }
+      {renderInput()}
       {touched && error && (
         <div style={{ color: C.red, fontFamily: F.body, fontSize: 11, marginTop: 5, display: "flex", alignItems: "center", gap: 5, animation: "fadeUp 0.15s ease" }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
@@ -624,7 +674,13 @@ function ModalGuestCount({ seatData, tableData, mode, isStandalone, onContinue, 
 
 // ─── Modal 2: Details ─────────────────────────────────────────────────────────
 function ModalDetails({ tableData, seatData, mode, guests, isStandalone, onReview, onCancel, prefill, C, isDark, secondsLeft, onTimerExpired, ROOM, WING, venueType }) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = (() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  })();
   const isTablet = window.innerWidth < 1024;
   const isMobile = window.innerWidth < 640;
 
@@ -1464,7 +1520,13 @@ export default function VenueReservationTemplate({ roomName = null, wingName = n
   }, []);
 
   // Load classic slots if seatmap is not published
-  const todayDate = new Date().toISOString().split("T")[0];
+  const todayDate = (() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  })();
   const [classicDate, setClassicDate] = useState(preselectedSchedule?.date || todayDate);
   const [classicGuests, setClassicGuests] = useState(2);
   const [classicConsentAccepted, setClassicConsentAccepted] = useState(false);
