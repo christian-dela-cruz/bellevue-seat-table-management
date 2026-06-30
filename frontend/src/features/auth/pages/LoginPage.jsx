@@ -315,7 +315,7 @@ function LoginScreen({ onLogin }) {
 
         .login-grid {
           display: grid;
-          grid-template-columns: 65% 35%;
+          grid-template-columns: 60% 40%;
           min-height: 100vh;
           width: 100%;
         }
