@@ -1048,6 +1048,7 @@ export default function ReservationLanding() {
           box-shadow: 0 30px 82px rgba(16, 10, 4, 0.34), inset 0 1px 0 rgba(255, 250, 241, 0.045);
           isolation: isolate;
           animation: reservationPanelIn 0.7s ease 0.18s both;
+          container-type: inline-size;
         }
 
         .reservation-launcher[data-theme="light"] .reservation-hero {
@@ -1128,7 +1129,7 @@ export default function ReservationLanding() {
         .reservation-hero h1 {
           margin: 0;
           font-family: "Inter", sans-serif;
-          font-size: clamp(46px, 4vw, 72px);
+          font-size: clamp(38px, 12.5cqw, 56px);
           line-height: 1;
           letter-spacing: 0;
           font-weight: 600;
@@ -1140,7 +1141,7 @@ export default function ReservationLanding() {
           margin: clamp(18px, 2.4vh, 28px) 0 0;
           max-width: 360px;
           color: rgba(255, 248, 236, 0.86);
-          font-size: clamp(14px, 0.9vw, 16px);
+          font-size: clamp(13px, 3.2cqw, 15px);
           line-height: 1.78;
           font-weight: 450;
         }
@@ -1187,7 +1188,7 @@ export default function ReservationLanding() {
 
         .reservation-hero__footer strong {
           font-family: "Inter", sans-serif;
-          font-size: clamp(18px, 1.35vw, 23px);
+          font-size: clamp(16px, 5cqw, 22px);
           font-weight: 620;
           color: #fffaf1;
         }
