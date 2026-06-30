@@ -24,6 +24,7 @@ import { venueAPI } from "../../../services/venueAPI";
 import { authAPI } from "../../../services/authAPI";
 import { useAdminTheme, C, F } from "../../../context/AdminThemeContext";
 import ImageUploaderCropper from "../../../components/ImageUploaderCropper";
+import BellevueDateTimePicker from "../../../components/BellevueDateTimePicker";
 
 
 
@@ -469,11 +470,21 @@ export default function EventManagement() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label className="form-label">Start Date & Time</label>
-                  <input required type="datetime-local" className="form-input" value={form.start_datetime} onChange={e => setForm(f => ({ ...f, start_datetime: e.target.value }))} />
+                  <BellevueDateTimePicker
+                    required
+                    value={form.start_datetime}
+                    onChange={(val) => setForm((f) => ({ ...f, start_datetime: val }))}
+                    placeholder="Select start date & time"
+                  />
                 </div>
                 <div>
                   <label className="form-label">End Date & Time</label>
-                  <input required type="datetime-local" className="form-input" value={form.end_datetime} onChange={e => setForm(f => ({ ...f, end_datetime: e.target.value }))} />
+                  <BellevueDateTimePicker
+                    required
+                    value={form.end_datetime}
+                    onChange={(val) => setForm((f) => ({ ...f, end_datetime: val }))}
+                    placeholder="Select end date & time"
+                  />
                 </div>
               </div>
 

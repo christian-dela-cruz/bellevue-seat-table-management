@@ -419,7 +419,12 @@ export default function Sidebar({
     }
   });
 
+  const isFirstMount = useRef(true);
   useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     if (isOpen !== undefined) {
       setPinnedOpen(isOpen);
     }

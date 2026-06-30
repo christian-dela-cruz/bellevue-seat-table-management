@@ -1114,6 +1114,13 @@ export default function FunctionRooms() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Auto-dismiss validation errors after 5 seconds
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(""), 5000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
   const diningParsedVenues = useMemo(() => buildDiningOutletsFromConfig(rooms, { ignoreVisibility: true }), [rooms]);
   const eventParsedVenues = useMemo(() => buildEventVenuesFromConfig(rooms, { ignoreVisibility: true }), [rooms]);
 
@@ -2207,6 +2214,10 @@ export default function FunctionRooms() {
         @keyframes drawerSlideIn { from { opacity: 0; transform: translate3d(34px,0,0); } to { opacity: 1; transform: translate3d(0,0,0); } }
         @keyframes confirmFade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes confirmIn { from { opacity: 0; transform: translateY(8px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes toastSlideDown {
+          from { opacity: 0; transform: translate3d(-50%, -16px, 0); }
+          to { opacity: 1; transform: translate3d(-50%, 0, 0); }
+        }
         .function-room-filters-scroll {
           display: contents;
         }
@@ -2984,7 +2995,34 @@ export default function FunctionRooms() {
         {drawerVisible && createPortal((
           <DrawerErrorBoundary>
             <div className={`function-room-drawer-backdrop${drawerClosing ? " is-closing" : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDrawer(); }} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(24,20,14,0.28)", display: "flex", justifyContent: "flex-end", backdropFilter: "blur(2px)" }}>
-              <aside className="function-room-drawer" role="dialog" aria-modal="true" aria-label={editing ? "Edit venue" : "Create venue"} style={{ width: "min(920px, calc(100vw - 28px))", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column" }}>
+              <aside className="function-room-drawer" role="dialog" aria-modal="true" aria-label={editing ? "Edit venue" : "Create venue"} style={{ position: "relative", width: "min(920px, calc(100vw - 28px))", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column" }}>
+                {error && (
+                  <div className="drawer-error-toast" style={{
+                    position: "absolute",
+                    top: 76,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    zIndex: 10050,
+                    background: "#FEF2F2",
+                    border: "1px solid #FCA5A5",
+                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+                    borderRadius: 12,
+                    padding: "10px 16px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    width: "calc(100% - 32px)",
+                    maxWidth: 420,
+                    color: "#991B1B",
+                    fontSize: 12.5,
+                    fontWeight: 550,
+                    animation: "toastSlideDown 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                  }}>
+                    <span style={{ fontSize: 16 }}>⚠️</span>
+                    <span style={{ flex: 1, lineHeight: 1.4 }}>{error}</span>
+                    <button type="button" onClick={() => setError("")} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", padding: "2px 6px", display: "inline-flex", alignItems: "center" }}><X size={14} /></button>
+                  </div>
+                )}
                 <div style={{ padding: "18px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <div>
                     <div style={{ color: C.gold, fontSize: 8.5, fontWeight: 750, letterSpacing: "0.16em", textTransform: "uppercase" }}>Configuration</div>
@@ -3622,26 +3660,7 @@ export default function FunctionRooms() {
                   </div>
 
                   <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 9 }}>
-                    <div style={{ display: "flex", gap: 8, flex: 1 }}>
-                      {error && (
-                        <div style={{
-                          padding: "8px 12px",
-                          background: "rgba(160, 56, 56, 0.08)",
-                          border: `1px solid rgba(160, 56, 56, 0.20)`,
-                          borderRadius: 8,
-                          color: C.red,
-                          fontSize: 12.5,
-                          fontWeight: 560,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          animation: "fadeIn 0.2s ease",
-                        }}>
-                          <span style={{ fontSize: 13 }}>⚠️</span>
-                          <span>{error}</span>
-                        </div>
-                      )}
-                    </div>
+                    <div style={{ display: "flex", gap: 8, flex: 1 }} />
                     <div style={{ display: "flex", gap: 9, flexShrink: 0 }}>
                       <button type="button" onClick={closeDrawer} disabled={saving} style={buttonBase()}>Cancel</button>
 
