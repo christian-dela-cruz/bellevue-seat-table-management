@@ -144,7 +144,7 @@ function DonutChart({ counts, total }) {
   const circumference = 100;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "130px minmax(0,1fr)", gap: 16, alignItems: "center", padding: 16 }}>
+    <div className="reports-donut-grid" style={{ display: "grid", gridTemplateColumns: "130px minmax(0,1fr)", gap: 16, alignItems: "center", padding: 16 }}>
       <svg viewBox="0 0 42 42" style={{ width: 130, height: 130, transform: "rotate(-90deg)" }}>
         <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="rgba(0,0,0,0.06)" strokeWidth="5" />
         {items.map(([label, value, color]) => {
@@ -797,7 +797,7 @@ function TransactionMonitor({ transactionReport, isGlobal, sort, onSort }) {
             </div>
           </div>
 
-          <div style={{ overflowX: "auto" }}>
+          <div className="desktop-table-view" style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
               <thead>
                 <tr style={{ background: C.soft, color: C.faint, textTransform: "uppercase", letterSpacing: "0.10em", fontSize: 10 }}>
@@ -844,6 +844,51 @@ function TransactionMonitor({ transactionReport, isGlobal, sort, onSort }) {
                 })}
               </tbody>
             </table>
+          </div>
+
+          <div className="mobile-cards-view" style={{ display: "none" }}>
+            {rows.length === 0 ? (
+              <div style={{ padding: "16px 12px", color: C.muted, textAlign: "center" }}>No transactions found for this date range.</div>
+            ) : (
+              <div style={{ display: "grid", gap: 12, padding: 12 }}>
+                {visibleRows.map((row) => {
+                  const reservation = row.reservation || {};
+                  const venue = row.venue || {};
+                  return (
+                    <div key={row.id} style={{ background: C.soft, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12, display: "grid", gap: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                        <span style={{ fontSize: 11, color: C.muted }}>{readableDateTime(row.created_at)}</span>
+                        <span style={{ fontSize: 11, color: C.muted }}>{actionLabel(row.action)}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 13, fontWeight: 650, color: C.text }}>{reservation.name || "System"}</span>
+                        <span style={{ fontSize: 12, fontFamily: "monospace", color: C.gold }}>{reservation.reference_code || "-"}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: C.muted }}>
+                        {venue.name || reservation.room || "-"}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                        {row.from_status && row.to_status && row.from_status !== row.to_status ? (
+                          <>
+                            <StatusPill value={row.from_status} />
+                            <span style={{ color: C.faint }}>to</span>
+                            <StatusPill value={row.to_status} />
+                          </>
+                        ) : (
+                          <StatusPill value={row.to_status || row.from_status || reservation.status} />
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: C.text, borderTop: `1px solid ${C.divider}`, paddingTop: 6, marginTop: 4 }}>
+                        <strong>Notes:</strong> {row.notes || "-"}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: C.faint, textAlign: "right" }}>
+                        By: {getPerformedBy(row)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div style={{ padding: "11px 14px", borderTop: `1px solid ${C.divider}`, background: C.soft, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", color: C.muted, fontSize: 12 }}>
@@ -1094,7 +1139,7 @@ function MonthlyReports({ monthlyReport, granularity = "daily", monthLabelText }
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+      <div className="reports-metrics-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
         <MetricCard label="Month Total" value={reservations} detail={`${activeDays} active day${activeDays === 1 ? "" : "s"}`} tone="blue" />
         <MetricCard label="Approval Rate" value={`${approvalRate}%`} detail={`${reserved} approved`} tone="green" />
         <MetricCard label={granularity === "weekly" ? "Peak Week" : "Peak Date"} value={peakPeriod} tone="gold" />
@@ -1171,7 +1216,7 @@ function YearlyReports({ monthlyReport, transactionSummary }) {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+      <div className="reports-metrics-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
         <MetricCard label="Year Total" value={reservations} detail={`${activeMonths} active months`} tone="blue" />
         <MetricCard label="Approval Rate" value={`${approvalRate}%`} detail={`${reserved} approved`} tone="green" />
         <MetricCard label="Peak Month" value={peakMonth} tone="gold" />
@@ -2824,6 +2869,50 @@ export default function Reports() {
           .reports-top, .reports-grid, .reports-toolbar, .reports-nav-grid { grid-template-columns: 1fr !important; }
           .reports-filter-panel { min-width: 0 !important; }
         }
+        @media (max-width: 768px) {
+          .reports-main-content {
+            padding: 16px 12px 24px !important;
+          }
+          .reports-toolbar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            width: 100% !important;
+            gap: 12px !important;
+          }
+          .reports-toolbar > div {
+            width: 100% !important;
+          }
+          .reports-toolbar select, .reports-toolbar input {
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+          .reports-metrics-grid {
+            grid-template-columns: 1fr 1fr !important;
+          }
+          .desktop-table-view {
+            display: none !important;
+          }
+          .mobile-cards-view {
+            display: block !important;
+          }
+        }
+        @media (max-width: 540px) {
+          .reports-donut-grid {
+            grid-template-columns: 1fr !important;
+            justify-items: center !important;
+            text-align: center !important;
+            gap: 12px !important;
+          }
+          .reports-donut-grid > div {
+            width: 100% !important;
+            justify-content: center !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .reports-metrics-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
       `}</style>
       <style>{printStyles}</style>
       <div className="print-exclude" style={{ display: "flex", height: "100vh", width: "100%", minWidth: 0, overflow: "hidden" }}>
@@ -2831,6 +2920,7 @@ export default function Reports() {
         <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
           <AdminNavbar />
           <main
+            className="reports-main-content"
             style={{
               flex: 1,
               display: "flex",
@@ -4082,7 +4172,7 @@ export default function Reports() {
                     <>
                       <div className="print-overview">
                         <Section title="Overview" subtitle="High-level submission activity for the selected date range.">
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+                          <div className="reports-metrics-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
                             <MetricCard label="Reservations" value={filteredSummary.reservations || 0} tone="blue" />
                             <MetricCard label="Guests" value={filteredSummary.guests || 0} tone="green" />
                             <MetricCard label="Outlets" value={selectedOutlet === "ALL" ? (summary.outlets || 0) : filteredOutlets.length} tone="gold" />
@@ -4115,7 +4205,7 @@ export default function Reports() {
                     <>
                       <div>
                         <Section title="Revenue Overview" subtitle="Key financial performance figures for the selected date range.">
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+                          <div className="reports-metrics-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
                             <MetricCard label="Confirmed Revenue" value={formatCurrency(filteredRevenueSummary.confirmed_revenue)} tone="green" detail="approved bookings" />
                             <MetricCard label="Projected Revenue" value={formatCurrency(filteredRevenueSummary.projected_revenue)} tone="gold" detail="pending bookings" />
                             <MetricCard label="Avg Guest Spend" value={formatCurrency(filteredRevenueSummary.avg_guest_spend)} tone="blue" detail="per guest" />
@@ -4659,7 +4749,7 @@ export default function Reports() {
             {/* Content */}
             <div style={{ padding: 24, overflowY: "auto", display: "grid", gap: 20 }}>
               {/* KPI Mini Grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12 }}>
+              <div className="reports-metrics-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12 }}>
                 <MetricCard label="Total Bookings" value={activeOutletRow?.total_reservations || activeOutletRow?.reservations || outletTransactions.length} tone="blue" />
                 <MetricCard label="Approval Rate" value={`${activeOutletRow?.acceptance_rate || 0}%`} detail={`${activeOutletRow?.reserved || 0} reserved`} tone="green" />
                 <MetricCard label="Total Guests" value={activeOutletRow?.guests || 0} tone="gold" />
@@ -4669,7 +4759,7 @@ export default function Reports() {
               </div>
 
               {/* Charts Section */}
-              <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1.2fr) minmax(280px, 0.8fr)", gap: 14 }}>
+              <div className="reports-grid" style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1.2fr) minmax(280px, 0.8fr)", gap: 14 }}>
                 {/* Daily Transaction Rhythm */}
                 {(() => {
                   const modalLabelInterval = outletChartData.length > 16 ? Math.ceil(outletChartData.length / 8) - 1 : 0;

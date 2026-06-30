@@ -1437,6 +1437,25 @@ function OutletDashboard() {
             width: 100% !important;
           }
         }
+        @media (max-width: 540px) {
+          .od-filters {
+            grid-template-columns: 1fr !important;
+          }
+          .od-filter-outlet, .od-filter-search {
+            grid-column: span 1 !important;
+          }
+          .od-filters button {
+            width: 100% !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .od-metrics-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .od-metric-span-2 {
+            grid-column: span 1 !important;
+          }
+        }
       `}</style>
       <Sidebar
         activeNav="outlets"
