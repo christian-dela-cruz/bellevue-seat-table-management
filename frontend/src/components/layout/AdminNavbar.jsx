@@ -957,10 +957,13 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
       zIndex: 3000,
     }}>
       <style>{`
-        .admin-hamburger-btn { display: flex !important; }
+        .admin-hamburger-btn { display: none !important; }
         @media (max-width: 960px) {
           .admin-navbar-nav {
             padding: 0 16px !important;
+          }
+          .admin-hamburger-btn {
+            display: flex !important;
           }
         }
         @keyframes popoverFadeIn {
@@ -984,13 +987,17 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
           style={{
             width: 38, height: 38,
             border: "none",
-            background: "transparent",
+            background: "none",
             borderRadius: 8,
             cursor: "pointer",
+            display: "flex",
             alignItems: "center",
             justifyContent: "center",
             color: isDark ? "#EDE8DF" : "#374151",
             transition: "background 0.15s",
+            WebkitAppearance: "none",
+            appearance: "none",
+            outline: "none",
           }}
           onMouseEnter={e => {
             e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.08)" : "rgba(107,114,128,0.08)";
@@ -999,7 +1006,17 @@ function AdminNavbar({ pendingCount: pendingProp, leftContent = null }) {
             e.currentTarget.style.background = "transparent";
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ pointerEvents: "none", display: "block", flexShrink: 0 }}
+          >
             <line x1="3" y1="12" x2="21" y2="12" />
             <line x1="3" y1="6" x2="21" y2="6" />
             <line x1="3" y1="18" x2="21" y2="18" />

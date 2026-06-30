@@ -1760,6 +1760,80 @@ export default function FunctionRooms() {
     return "";
   };
 
+  const validateStep = (tabKey) => {
+    if (tabKey === "details") {
+      if (!form.name.trim()) return "Venue name is required.";
+      if (!form.slug.trim()) return "Venue slug/code is required.";
+      const duplicateSlug = uniqueRooms.find((room) => String(room.slug || "").toLowerCase() === form.slug.toLowerCase() && (!editing || Number(room.id) !== Number(editing.id)));
+      if (duplicateSlug) return "Venue slug/code must be unique.";
+      if (form.reservation_route && !String(form.reservation_route).startsWith("/")) return "Reservation route must start with /.";
+      const duplicateRoute = form.reservation_route
+        ? uniqueRooms.find((room) => String(room.reservation_route || "").toLowerCase() === form.reservation_route.toLowerCase() && (!editing || Number(room.id) !== Number(editing.id)))
+        : null;
+      if (duplicateRoute) return "Reservation route must be unique.";
+      if (form.parent_id && editing && String(form.parent_id) === String(editing.id)) return "A venue cannot be assigned as its own parent.";
+      if (Number.isNaN(Number(form.display_order))) return "Display order must be numeric.";
+    }
+
+    if (tabKey === "availability") {
+      if (Number(form.availability_interval_minutes) < 15) return "Reservation interval must be at least 15 minutes.";
+      if (form.availability_start_time && form.availability_end_time && form.availability_start_time === form.availability_end_time) return "Opening and closing time cannot be the same.";
+    }
+
+    if (tabKey === "schedule") {
+      const periods = normalizeSchedulePeriods(form.availability_periods, form);
+      if (periods.length === 0) return "At least one reservation period is required.";
+      for (const period of periods) {
+        if (!period.days.length) return `${period.label || "A schedule period"} needs at least one day.`;
+        if (!period.start_time || !period.end_time) return `${period.label || "A schedule period"} needs start and end times.`;
+        if (period.start_time === period.end_time) return `${period.label || "A schedule period"} cannot start and end at the same time.`;
+        if (!isEarlierTime(period.start_time, period.end_time)) return `${period.label || "A schedule period"} start and end times cannot be the same.`;
+        if (Number(period.interval_minutes) < 15) return `${period.label || "A schedule period"} interval must be at least 15 minutes.`;
+      }
+    }
+
+    if (tabKey === "exceptions") {
+      for (const override of normalizeScheduleOverrides(form.availability_overrides)) {
+        if (!override.date) return `${overrideTitle(override)} needs a calendar date.`;
+        if (["block_time", "special_hours"].includes(override.type)) {
+          if (!override.start_time || !override.end_time) return `${overrideTitle(override)} needs start and end times.`;
+          if (!isEarlierTime(override.start_time, override.end_time)) return `${overrideTitle(override)} start and end times cannot be the same.`;
+        }
+        if (override.type === "capacity" && Number(override.slot_capacity || 0) <= 0 && Number(override.max_reservations_per_slot || 0) <= 0) {
+          return "Capacity adjustment needs a slot capacity or max bookings value.";
+        }
+        if (override.type === "capacity" && override.start_time && override.end_time && !isEarlierTime(override.start_time, override.end_time)) {
+          return "Capacity adjustment start and end times cannot be the same.";
+        }
+      }
+    }
+
+    if (imageFile && !["image/jpeg", "image/png", "image/webp"].includes(imageFile.type)) return "Image must be JPG, PNG, or WEBP.";
+    return "";
+  };
+
+  const handleNextStep = () => {
+    const errorMsg = validateStep(editorTab);
+    if (errorMsg) {
+      setError(errorMsg);
+      return;
+    }
+    setError("");
+
+    const currentIndex = EDITOR_TABS.findIndex(([key]) => key === editorTab);
+    if (currentIndex < EDITOR_TABS.length - 1) {
+      setEditorTab(EDITOR_TABS[currentIndex + 1][0]);
+    }
+  };
+
+  const handlePrevStep = () => {
+    setError("");
+    const currentIndex = EDITOR_TABS.findIndex(([key]) => key === editorTab);
+    if (currentIndex > 0) {
+      setEditorTab(EDITOR_TABS[currentIndex - 1][0]);
+    }
+  };
+
   const requestSaveDraft = (event) => {
     if (event) event.preventDefault();
     if (!canManage) return;
@@ -2133,21 +2207,49 @@ export default function FunctionRooms() {
         @keyframes drawerSlideIn { from { opacity: 0; transform: translate3d(34px,0,0); } to { opacity: 1; transform: translate3d(0,0,0); } }
         @keyframes confirmFade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes confirmIn { from { opacity: 0; transform: translateY(8px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .function-room-filters-scroll {
+          display: contents;
+        }
+
         @media (max-width: 920px) {
           .function-room-stats {
             grid-template-columns: repeat(3, 1fr) !important;
             gap: 10px !important;
           }
           .function-room-toolbar {
-            grid-template-columns: repeat(3, 1fr) !important;
-            gap: 10px 8px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
           }
           .function-room-toolbar > div:first-child {
-            grid-column: span 3 !important;
+            width: 100% !important;
           }
-          .function-room-table-wrap { overflow-x: visible !important; }
+          .function-room-filters-scroll {
+            display: flex !important;
+            overflow-x: auto !important;
+            gap: 8px !important;
+            width: 100% !important;
+            padding: 4px 0 8px !important;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+          .function-room-filters-scroll::-webkit-scrollbar {
+            display: none;
+          }
+          .function-room-filters-scroll select {
+            flex: 0 0 auto !important;
+            width: auto !important;
+            min-width: 128px !important;
+          }
+          .function-room-table-wrap {
+            overflow-x: hidden !important;
+            width: 100% !important;
+          }
           .function-room-table-wrap .function-room-table {
-            min-width: 100% !important;
+            min-width: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
             display: block !important;
             border: none !important;
           }
@@ -2158,17 +2260,21 @@ export default function FunctionRooms() {
             display: grid !important;
             grid-template-columns: repeat(2, 1fr) !important;
             gap: 12px !important;
+            width: 100% !important;
           }
           .function-room-table-wrap table tr {
             display: flex !important;
             flex-direction: column !important;
             justify-content: space-between !important;
             gap: 10px !important;
-            padding: 12px !important;
+            padding: 16px 18px !important;
             background: ${C.surface} !important;
             border: 1px solid ${C.border} !important;
             border-radius: 12px !important;
             box-shadow: 0 4px 12px rgba(0,0,0,0.02) !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
           }
           .function-room-table-wrap table td {
             display: block !important;
@@ -2189,7 +2295,8 @@ export default function FunctionRooms() {
             letter-spacing: 0.12em;
             text-transform: uppercase !important;
             color: ${C.faint} !important;
-            width: 72px !important;
+            width: 88px !important;
+            margin-right: 12px !important;
             flex-shrink: 0 !important;
           }
           .function-room-table-wrap table td:nth-child(3) {
@@ -2205,7 +2312,8 @@ export default function FunctionRooms() {
             letter-spacing: 0.12em;
             text-transform: uppercase !important;
             color: ${C.faint} !important;
-            width: 72px !important;
+            width: 88px !important;
+            margin-right: 12px !important;
             flex-shrink: 0 !important;
           }
           .function-room-table-wrap table td:nth-child(4) {
@@ -2214,9 +2322,25 @@ export default function FunctionRooms() {
             display: flex !important;
             justify-content: flex-end !important;
           }
+          .function-room-table-wrap table td:nth-child(4) > div {
+            min-width: auto !important;
+            width: 100% !important;
+            display: flex !important;
+            justify-content: flex-end !important;
+          }
           .function-room-drawer { width: 100vw !important; }
           .venue-editor-body { grid-template-columns: 1fr !important; }
           .venue-preview-panel { position: relative !important; top: auto !important; }
+          .venue-editor-tabs-scroll {
+            overflow-x: auto !important;
+            padding-bottom: 8px !important;
+            margin-bottom: -6px !important;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+          .venue-editor-tabs-scroll::-webkit-scrollbar {
+            display: none !important;
+          }
         }
         @media (max-width: 640px) {
           .function-room-stats {
@@ -2224,13 +2348,6 @@ export default function FunctionRooms() {
             gap: 8px !important;
           }
           .function-room-stats > div:last-child {
-            grid-column: span 2 !important;
-          }
-          .function-room-toolbar {
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 8px 6px !important;
-          }
-          .function-room-toolbar > div:first-child {
             grid-column: span 2 !important;
           }
           .function-room-table-wrap table tbody {
@@ -2390,41 +2507,43 @@ export default function FunctionRooms() {
                       <Search size={15} style={{ position: "absolute", left: 11, top: 12, color: C.faint }} />
                       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search venues, slugs, wings" style={{ ...inputStyle(), paddingLeft: 34 }} />
                     </div>
-                    <select value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))} style={inputStyle()}>
-                      <option value="all">All types</option>
-                      <option value="dining">Dining outlets</option>
-                      <option value="function_room">Function rooms</option>
-                      <option value="sub_room">Sub-rooms</option>
-                    </select>
-                    <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} style={inputStyle()}>
-                      <option value="all">All status</option>
-                      <option value="enabled">Enabled</option>
-                      <option value="disabled">Disabled</option>
-                    </select>
-                    <select value={filters.visibility} onChange={(e) => setFilters((f) => ({ ...f, visibility: e.target.value }))} style={inputStyle()}>
-                      <option value="all">All visibility</option>
-                      <option value="visible">Visible</option>
-                      <option value="hidden">Hidden</option>
-                    </select>
-                    <select value={filters.landing} onChange={(e) => setFilters((f) => ({ ...f, landing: e.target.value }))} style={inputStyle()}>
-                      <option value="all">All landing</option>
-                      <option value="shown">Shown</option>
-                      <option value="hidden">Not shown</option>
-                    </select>
-                    <select value={filters.wing} onChange={(e) => setFilters((f) => ({ ...f, wing: e.target.value }))} style={inputStyle()}>
-                      <option value="all">All wings</option>
-                      <option value="Dining">Dining</option>
-                      <option value="Main Wing">Main Wing</option>
-                      <option value="Tower Wing">Tower Wing</option>
-                    </select>
-                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={inputStyle()}>
-                      <option value="display_order">Display order</option>
-                      <option value="parent_first">Parents first</option>
-                      <option value="name">Alphabetical</option>
-                      <option value="newest">Newest</option>
-                      <option value="oldest">Oldest</option>
-                      <option value="status">Enabled first</option>
-                    </select>
+                    <div className="function-room-filters-scroll">
+                      <select value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))} style={inputStyle()}>
+                        <option value="all">All types</option>
+                        <option value="dining">Dining outlets</option>
+                        <option value="function_room">Function rooms</option>
+                        <option value="sub_room">Sub-rooms</option>
+                      </select>
+                      <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} style={inputStyle()}>
+                        <option value="all">All status</option>
+                        <option value="enabled">Enabled</option>
+                        <option value="disabled">Disabled</option>
+                      </select>
+                      <select value={filters.visibility} onChange={(e) => setFilters((f) => ({ ...f, visibility: e.target.value }))} style={inputStyle()}>
+                        <option value="all">All visibility</option>
+                        <option value="visible">Visible</option>
+                        <option value="hidden">Hidden</option>
+                      </select>
+                      <select value={filters.landing} onChange={(e) => setFilters((f) => ({ ...f, landing: e.target.value }))} style={inputStyle()}>
+                        <option value="all">All landing</option>
+                        <option value="shown">Shown</option>
+                        <option value="hidden">Not shown</option>
+                      </select>
+                      <select value={filters.wing} onChange={(e) => setFilters((f) => ({ ...f, wing: e.target.value }))} style={inputStyle()}>
+                        <option value="all">All wings</option>
+                        <option value="Dining">Dining</option>
+                        <option value="Main Wing">Main Wing</option>
+                        <option value="Tower Wing">Tower Wing</option>
+                      </select>
+                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={inputStyle()}>
+                        <option value="display_order">Display order</option>
+                        <option value="parent_first">Parents first</option>
+                        <option value="name">Alphabetical</option>
+                        <option value="newest">Newest</option>
+                        <option value="oldest">Oldest</option>
+                        <option value="status">Enabled first</option>
+                      </select>
+                    </div>
                   </div>
 
                   <div className="function-room-table-wrap">
@@ -2456,7 +2575,7 @@ export default function FunctionRooms() {
                             }}
                           >
                             <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: level ? 26 : 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: level ? 26 : 0, minWidth: 0, width: "100%" }}>
                                 {level ? (
                                   <span style={{ width: 14, color: C.faint, display: "inline-flex", justifyContent: "center" }}><ChevronRight size={14} /></span>
                                 ) : childCount ? (
@@ -2883,8 +3002,8 @@ export default function FunctionRooms() {
 
                 <form onSubmit={saveRoom} style={{ minHeight: 0, flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
 
-                  <div style={{ padding: "12px 20px", borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
-                    <div style={{ display: "flex", alignItems: "center", paddingBottom: 2 }}>
+                  <div style={{ padding: "12px 20px", borderBottom: `1px solid ${C.divider}`, background: C.soft, overflow: "hidden" }}>
+                    <div className="venue-editor-tabs-scroll" style={{ display: "flex", alignItems: "center", paddingBottom: 2 }}>
                       {EDITOR_TABS.map(([key, label], index) => {
                         const active = editorTab === key;
                         const completed = isStepCompleted(key);
@@ -2948,6 +3067,8 @@ export default function FunctionRooms() {
                                   background: lineBackground,
                                   borderRadius: 2,
                                   margin: "0 10px",
+                                  minWidth: 20,
+                                  flexShrink: 0,
                                   transition: "background 0.25s ease"
                                 }}
                               />
@@ -3536,9 +3657,21 @@ export default function FunctionRooms() {
                         </button>
                       )}
 
-                      <button type="submit" disabled={!canManage || saving} style={{ ...buttonBase(), minWidth: 150, border: "none", background: canManage ? C.gold : C.faint, color: "#fff", cursor: canManage && !saving ? "pointer" : "not-allowed" }}>
-                        {saving ? "Working..." : editing && !form.is_draft ? "Save Changes" : "Publish Venue"}
-                      </button>
+                      {editorTab !== "details" && (
+                        <button type="button" onClick={handlePrevStep} disabled={saving} style={{ ...buttonBase(), background: C.soft, color: C.text, border: `1px solid ${C.border}` }}>
+                          Back
+                        </button>
+                      )}
+
+                      {editorTab !== "preview" ? (
+                        <button type="button" onClick={handleNextStep} disabled={saving} style={{ ...buttonBase(), minWidth: 100, border: "none", background: C.gold, color: "#fff" }}>
+                          Next
+                        </button>
+                      ) : (
+                        <button type="submit" disabled={!canManage || saving} style={{ ...buttonBase(), minWidth: 150, border: "none", background: canManage ? C.gold : C.faint, color: "#fff", cursor: canManage && !saving ? "pointer" : "not-allowed" }}>
+                          {saving ? "Working..." : editing && !form.is_draft ? "Save Changes" : "Publish Venue"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </form>

@@ -564,15 +564,15 @@ export default function Sidebar({
               display: block !important;
             }
             .bellevue-sidebar {
-              position: ${effectiveOpen ? "fixed" : "relative"} !important;
+              position: fixed !important;
               top: 0 !important;
               left: 0 !important;
               height: 100vh !important;
-              width: ${effectiveOpen ? "228px" : "58px"} !important;
-              transform: none !important;
-              transition: width 0.24s cubic-bezier(0.4, 0, 0.2, 1) !important;
+              width: ${effectiveOpen ? "228px" : "0px"} !important;
+              transform: ${effectiveOpen ? "translateX(0)" : "translateX(-228px)"} !important;
+              transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1), width 0s !important;
               box-shadow: ${effectiveOpen ? "4px 0 24px rgba(0,0,0,0.3)" : "none"} !important;
-              z-index: ${effectiveOpen ? 3100 : 1} !important;
+              z-index: 3100 !important;
             }
             .sidebar-collapse-btn {
               display: none !important;
