@@ -133,6 +133,9 @@ function NavItem({ item, isActive, isOpen, onClick, nested = false }) {
   const handleClick = () => {
     navigate(NAV_ROUTES[item.id] || "/admin/dashboard");
     onClick?.(item.id);
+    if (window.innerWidth <= 960) {
+      window.dispatchEvent(new CustomEvent("bellevue:toggle-sidebar"));
+    }
   };
 
   const LucideIcon = ({ icon: Icon }) => (
@@ -411,6 +414,7 @@ export default function Sidebar({
   const { isDark, currentUser, avatar } = useAdminTheme();
   const navigate = useNavigate();
   const [pinnedOpen, setPinnedOpen] = useState(() => {
+    if (window.innerWidth <= 960) return false;
     try {
       const stored = localStorage.getItem("bellevue_admin_sidebar_open");
       return stored === null ? Boolean(isOpen) : stored === "true";

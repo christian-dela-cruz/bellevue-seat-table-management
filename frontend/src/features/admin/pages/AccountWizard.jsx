@@ -53,29 +53,41 @@ function Switch({ checked, onChange, disabled }) {
     <div
       onClick={() => !disabled && onChange(!checked)}
       style={{
-        width: 36,
-        height: 20,
-        borderRadius: 20,
-        background: checked ? C.gold : C.border,
         position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 44,
+        height: 44,
         cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.6 : 1,
-        transition: "background 0.2s ease"
+        margin: "-12px -4px",
       }}
     >
       <div
         style={{
-          width: 16,
-          height: 16,
-          borderRadius: "50%",
-          background: "#fff",
-          position: "absolute",
-          top: 2,
-          left: checked ? 18 : 2,
-          transition: "left 0.2s ease",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+          width: 36,
+          height: 20,
+          borderRadius: 20,
+          background: checked ? C.gold : C.border,
+          position: "relative",
+          opacity: disabled ? 0.6 : 1,
+          transition: "background 0.2s ease"
         }}
-      />
+      >
+        <div
+          style={{
+            width: 16,
+            height: 16,
+            borderRadius: "50%",
+            background: "#fff",
+            position: "absolute",
+            top: 2,
+            left: checked ? 18 : 2,
+            transition: "left 0.2s ease",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -503,7 +515,39 @@ export default function AccountWizard({
 
   return (
     <div className={`account-drawer-backdrop${isClosing ? " is-closing" : ""}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }} style={{ position: "fixed", inset: 0, zIndex: 7000, background: "rgba(24,20,14,0.28)", display: "flex", justifyContent: "flex-end", backdropFilter: "blur(2px)" }}>
-      <aside style={{ width: "min(500px, 100vw)", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column" }}>
+      <style>{`
+        @media (max-width: 720px) {
+          .account-form-two-col {
+            grid-template-columns: 1fr !important;
+          }
+          .review-account-left-pane {
+            border-right: none !important;
+            border-bottom: 1px solid ${C.divider} !important;
+          }
+          .account-drawer {
+            border-left: none !important;
+            border-radius: 0 !important;
+          }
+          .account-drawer > div:first-child {
+            padding: 14px 16px !important;
+          }
+          .account-drawer > div:nth-child(2) {
+            padding: 10px 16px !important;
+          }
+          .account-drawer > div:nth-child(3) {
+            padding: 16px !important;
+          }
+          .account-drawer > div:last-child {
+            padding: 12px 16px !important;
+          }
+          .account-drawer > div:last-child button {
+            min-width: 60px !important;
+            padding: 0 10px !important;
+            font-size: 10px !important;
+          }
+        }
+      `}</style>
+      <aside className="account-drawer" style={{ width: "min(500px, 100vw)", height: "100%", background: C.surface, borderLeft: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(24,20,14,0.22)", display: "flex", flexDirection: "column" }}>
 
         {/* Header (Fixed) */}
         <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
@@ -565,7 +609,7 @@ export default function AccountWizard({
               </div>
 
               <div style={{ display: "grid", gap: 14 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+                <div className="account-form-two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
                   <Field label="Full Name">
                     <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={inputStyle(!form.name)} />
                   </Field>
@@ -575,7 +619,7 @@ export default function AccountWizard({
                 </div>
                 {editingAccount ? (
                   <>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+                    <div className="account-form-two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
                       <Field label="Username">
                         <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} style={inputStyle(!form.username)} />
                       </Field>
@@ -810,8 +854,8 @@ export default function AccountWizard({
               </div>
 
               <div style={{ border: `1px solid ${C.divider}`, borderRadius: 10, overflow: "hidden" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: `1px solid ${C.divider}` }}>
-                  <div style={{ padding: 14, borderRight: `1px solid ${C.divider}` }}>
+                <div className="account-form-two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: `1px solid ${C.divider}` }}>
+                  <div className="review-account-left-pane" style={{ padding: 14, borderRight: `1px solid ${C.divider}` }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Account</div>
                     <div style={{ fontSize: 14, fontWeight: 650 }}>{form.name}</div>
                     <div style={{ fontSize: 12, color: C.muted }}>{form.email}</div>

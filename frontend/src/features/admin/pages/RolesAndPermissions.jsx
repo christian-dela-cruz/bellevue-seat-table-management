@@ -17,29 +17,41 @@ function Switch({ checked, indeterminate, onChange, disabled }) {
         if (!disabled) onChange(!checked);
       }}
       style={{
-        width: 36,
-        height: 20,
-        borderRadius: 20,
-        background: indeterminate ? C.gold : checked ? C.gold : C.border,
         position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 44,
+        height: 44,
         cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.6 : 1,
-        transition: "background 0.2s ease"
+        margin: "-12px -4px",
       }}
     >
       <div
         style={{
-          width: indeterminate ? 10 : 16,
-          height: indeterminate ? 4 : 16,
-          borderRadius: indeterminate ? 2 : "50%",
-          background: "#fff",
-          position: "absolute",
-          top: indeterminate ? 8 : 2,
-          left: indeterminate ? 13 : checked ? 18 : 2,
-          transition: "all 0.2s ease",
-          boxShadow: indeterminate ? "none" : "0 1px 3px rgba(0,0,0,0.2)"
+          width: 36,
+          height: 20,
+          borderRadius: 20,
+          background: indeterminate ? C.gold : checked ? C.gold : C.border,
+          position: "relative",
+          opacity: disabled ? 0.6 : 1,
+          transition: "background 0.2s ease"
         }}
-      />
+      >
+        <div
+          style={{
+            width: indeterminate ? 10 : 16,
+            height: indeterminate ? 4 : 16,
+            borderRadius: indeterminate ? 2 : "50%",
+            background: "#fff",
+            position: "absolute",
+            top: indeterminate ? 8 : 2,
+            left: indeterminate ? 13 : checked ? 18 : 2,
+            transition: "all 0.2s ease",
+            boxShadow: indeterminate ? "none" : "0 1px 3px rgba(0,0,0,0.2)"
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -445,12 +457,69 @@ export default function RolesAndPermissions() {
 
   return (
     <div style={{ display: "flex", height: "100vh", minHeight: 0, overflow: "hidden", background: C.pageBg, fontFamily: F.body }}>
-      <style>{`
+       <style>{`
         @keyframes rolesSpin { to { transform: rotate(360deg); } }
         @keyframes rolesSlideIn { from { opacity: 0; transform: translate3d(34px,0,0); } to { opacity: 1; transform: translate3d(0,0,0); } }
         @keyframes rolesFadeIn { from { opacity: 0; } to { opacity: 1; } }
         .role-card:hover { border-color: ${C.gold} !important; background: ${C.goldFaint} !important; }
         .perm-row:hover { background: rgba(140,107,42,0.024) !important; }
+        .roles-split-layout {
+          display: grid;
+          grid-template-columns: 340px 1fr;
+          gap: 20px;
+          align-items: start;
+        }
+        @media (max-width: 768px) {
+          .roles-split-layout {
+            grid-template-columns: 1fr !important;
+          }
+          .role-drawer {
+            width: 100% !important;
+            max-width: 100vw !important;
+          }
+          .perm-group-header {
+            flex-wrap: wrap !important;
+            gap: 12px !important;
+            padding: 14px 16px !important;
+          }
+          .perm-group-header-left {
+            flex: 1 1 100% !important;
+            min-width: 0 !important;
+            padding-right: 0 !important;
+          }
+          .perm-group-toggle {
+            width: 100% !important;
+            justify-content: space-between !important;
+            padding-left: 28px !important;
+          }
+          .perm-row {
+            padding: 12px 16px !important;
+            gap: 12px !important;
+          }
+          .perm-row-label {
+            min-width: 0 !important;
+            flex: 1 !important;
+          }
+          .perm-panel-header {
+            padding: 14px 16px !important;
+            flex-wrap: wrap !important;
+            gap: 10px !important;
+          }
+          .perm-panel-header h3 {
+            font-size: 16px !important;
+          }
+          .perm-panel-body {
+            padding: 16px !important;
+            gap: 16px !important;
+          }
+          .perm-save-actions {
+            flex-wrap: wrap !important;
+          }
+          .perm-save-actions button {
+            font-size: 10px !important;
+            padding: 6px 10px !important;
+          }
+        }
       `}</style>
 
       <Sidebar activeNav="roles" isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
@@ -487,7 +556,7 @@ export default function RolesAndPermissions() {
             {loading && roles.length === 0 ? (
               <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={24} /></div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 20, alignItems: "start" }}>
+              <div className="roles-split-layout">
                 
                 {/* Master: Role List */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -576,8 +645,8 @@ export default function RolesAndPermissions() {
                 {/* Detail: Permissions */}
                 {selectedRole ? (
                   <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", boxShadow: C.shadowSoft, display: "flex", flexDirection: "column" }}>
-                    <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.divider}`, background: C.surfaceSoft, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
+                  <div className="perm-panel-header" style={{ padding: "18px 24px", borderBottom: `1px solid ${C.divider}`, background: C.surfaceSoft, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
                         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 760 }}>{selectedRole.name} Permissions</h3>
                         {selectedRole.is_system && (
                           <div style={{ fontSize: 12, color: !canEditRolePerms ? C.red : C.gold, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
@@ -592,7 +661,7 @@ export default function RolesAndPermissions() {
                         )}
                       </div>
                       {hasUnsavedPerms && (
-                        <div style={{ display: "flex", gap: 10 }}>
+                        <div className="perm-save-actions" style={{ display: "flex", gap: 10 }}>
                           <button type="button" onClick={() => { setEditingPermissions((selectedRole.permissions || []).map(p => p.slug)); setHasUnsavedPerms(false); }} style={{ padding: "8px 14px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, color: C.muted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>Discard</button>
                           <button type="button" onClick={() => setImpactModalOpen(true)} style={{ padding: "8px 16px", border: "none", borderRadius: 8, background: C.gold, color: "#fff", fontSize: 11, fontWeight: 700, textTransform: "uppercase", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                             Save Changes
@@ -601,7 +670,7 @@ export default function RolesAndPermissions() {
                       )}
                     </div>
                     
-                    <div style={{ padding: 24, display: "grid", gap: 20 }}>
+                    <div className="perm-panel-body" style={{ padding: 24, display: "grid", gap: 20 }}>
                       {operationalGroupings.map(group => {
                         const activeInGroupCount = group.perms.filter(p => editingPermissions?.includes(p.slug)).length;
                         const isGroupOn = activeInGroupCount === group.perms.length;
@@ -612,22 +681,23 @@ export default function RolesAndPermissions() {
                           <div key={group.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadowSoft, overflow: "hidden", display: "flex", flexDirection: "column", transition: "box-shadow 0.2s ease" }}>
                             {/* Card Header */}
                             <div 
+                              className="perm-group-header"
                               style={{ padding: "16px 20px", background: C.surfaceSoft, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}
                               onClick={() => toggleCollapse(group.title)}
                             >
-                              <div style={{ display: "flex", alignItems: "center", gap: 12, paddingRight: 20 }}>
-                                <button type="button" style={{ background: "transparent", border: "none", color: C.muted, display: "flex", alignItems: "center", padding: 0, cursor: "pointer", outline: "none" }}>
+                              <div className="perm-group-header-left" style={{ display: "flex", alignItems: "center", gap: 12, paddingRight: 20, flex: 1, minWidth: 0 }}>
+                                <button type="button" style={{ background: "transparent", border: "none", color: C.muted, display: "flex", alignItems: "center", padding: 0, cursor: "pointer", outline: "none", flexShrink: 0 }}>
                                   {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                                 </button>
-                                <div>
-                                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                                     {group.title}
                                     <span style={{ fontSize: 10, background: C.divider, padding: "2px 6px", borderRadius: 10, color: C.muted, fontWeight: 650 }}>{group.perms.length}</span>
                                   </div>
                                   <div style={{ fontSize: 12, color: C.muted, marginTop: 4, lineHeight: 1.4 }}>{group.description}</div>
                                 </div>
                               </div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 14 }} onClick={e => e.stopPropagation()}>
+                              <div className="perm-group-toggle" style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                                 <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
                                   {isGroupPartial ? "PARTIAL" : isGroupOn ? "ALL ENABLED" : "DISABLED"} ({activeInGroupCount}/{group.perms.length})
                                 </span>
@@ -646,14 +716,14 @@ export default function RolesAndPermissions() {
                                 {group.perms.map((perm, idx) => {
                                   const isChecked = editingPermissions?.includes(perm.slug);
                                   return (
-                                    <div key={perm.slug} className="perm-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: idx < group.perms.length - 1 ? `1px solid ${C.divider}` : "none" }}>
-                                      <div>
+                                    <div key={perm.slug} className="perm-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: idx < group.perms.length - 1 ? `1px solid ${C.divider}` : "none", gap: 16 }}>
+                                      <div className="perm-row-label" style={{ minWidth: 0, flex: 1 }}>
                                         <div style={{ fontSize: 13, fontWeight: 600, color: C.text, display: "flex", alignItems: "center", gap: 6 }}>
                                           {perm.name}
                                           <PermissionTooltip perm={perm} />
                                         </div>
                                       </div>
-                                      <div style={{ display: "flex", alignItems: "center" }}>
+                                      <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                                         <Switch 
                                           checked={isChecked} 
                                           disabled={!canEditRolePerms}
@@ -758,7 +828,7 @@ export default function RolesAndPermissions() {
           onMouseDown={(e) => { if (e.target === e.currentTarget) setDrawerOpen(false); }}
           style={{ position: "fixed", inset: 0, zIndex: 7000, background: "rgba(24,20,14,0.28)", backdropFilter: "blur(2px)", display: "flex", justifyContent: "flex-end", animation: "rolesFadeIn 220ms ease both" }}
         >
-          <aside style={{ width: "min(480px, calc(100vw - 28px))", background: C.surface, height: "100%", borderLeft: `1px solid ${C.border}`, display: "flex", flexDirection: "column", boxShadow: "0 24px 70px rgba(24,20,14,0.22)", animation: "rolesSlideIn 320ms cubic-bezier(0.22,1,0.36,1) both" }}>
+          <aside className="role-drawer" style={{ width: "min(480px, calc(100vw - 28px))", background: C.surface, height: "100%", borderLeft: `1px solid ${C.border}`, display: "flex", flexDirection: "column", boxShadow: "0 24px 70px rgba(24,20,14,0.22)", animation: "rolesSlideIn 320ms cubic-bezier(0.22,1,0.36,1) both" }}>
             <div style={{ padding: "18px 20px", borderBottom: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
               <div>
                 <div style={{ color: C.gold, fontSize: 8.5, fontWeight: 750, letterSpacing: "0.16em", textTransform: "uppercase" }}>Administration</div>

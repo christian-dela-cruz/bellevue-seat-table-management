@@ -966,8 +966,30 @@ export default function Accounts() {
         @media (max-width: 720px) {
           .account-filter-grid { grid-template-columns: 1fr !important; }
           .account-form-two-col { grid-template-columns: 1fr !important; }
-          .account-pagination { align-items: flex-start !important; flex-direction: column !important; }
-          .account-pagination-controls { flex-wrap: wrap !important; }
+          .account-pagination {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+            padding: 12px 14px !important;
+          }
+          .account-pagination-info {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            width: 100% !important;
+          }
+          .account-pagination-controls {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            width: 100% !important;
+            gap: 8px !important;
+          }
+          .account-pagination-page-label {
+            min-width: auto !important;
+            flex: 1 !important;
+            text-align: center !important;
+          }
         }
       `}</style>
       
@@ -1114,18 +1136,20 @@ export default function Accounts() {
                   </div>
                   {sortedAccounts.length > 0 && (
                     <div className="account-pagination" style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"14px 20px",borderTop:`1px solid ${C.divider}`,background:C.surfaceSoft }}>
-                      <span style={{ fontSize:12,color:C.muted }}>
-                        Showing {pageStart}-{pageEnd} of {sortedAccounts.length}
-                      </span>
-                      <div className="account-pagination-controls" style={{ display:"flex",alignItems:"center",gap:10 }}>
-                        <label style={{ display:"inline-flex",alignItems:"center",gap:7,fontSize:12,color:C.muted }}>
+                      <div className="account-pagination-info" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                        <span style={{ fontSize:12,color:C.muted }}>
+                          Showing {pageStart}-{pageEnd} of {sortedAccounts.length}
+                        </span>
+                        <label className="account-pagination-rows" style={{ display:"inline-flex",alignItems:"center",gap:7,fontSize:12,color:C.muted }}>
                           Rows
-                          <select value={pageSize} onChange={(e)=>setPageSize(e.target.value)} style={{...inputStyle(),width:96,minHeight:32,padding:"5px 8px",fontSize:12}}>
+                          <select value={pageSize} onChange={(e)=>setPageSize(e.target.value)} style={{...inputStyle(),width:72,minHeight:30,padding:"4px 6px",fontSize:12}}>
                             <option value="5">5</option>
                             <option value="10">10</option>
                             <option value="all">All</option>
                           </select>
                         </label>
+                      </div>
+                      <div className="account-pagination-controls" style={{ display:"flex",alignItems:"center",gap:10 }}>
                         <button
                           type="button"
                           disabled={currentPage <= 1 || pageSize === "all"}
@@ -1136,7 +1160,7 @@ export default function Accounts() {
                           <ChevronLeft size={15} />
                           Prev
                         </button>
-                        <span style={{ minWidth:82,textAlign:"center",fontSize:12,color:C.muted }}>
+                        <span className="account-pagination-page-label" style={{ minWidth:82,textAlign:"center",fontSize:12,color:C.muted }}>
                           Page {currentPage} of {totalPages}
                         </span>
                         <button

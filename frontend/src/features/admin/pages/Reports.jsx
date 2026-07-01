@@ -410,6 +410,7 @@ function ActionButton({ icon: Icon, label, onClick }) {
     <button
       type="button"
       onClick={onClick}
+      className="reports-action-btn"
       style={{
         height: 38,
         border: `1px solid ${C.border}`,
@@ -429,7 +430,7 @@ function ActionButton({ icon: Icon, label, onClick }) {
       }}
     >
       <Icon size={14} />
-      {label}
+      <span className="reports-action-btn-label">{label}</span>
     </button>
   );
 }
@@ -941,9 +942,7 @@ function MonthlyLineChart({
         <div style={{ fontSize: 12.5, color: C.muted }}>{description}</div>
       </div>
 
-      <div style={{ 
-        width: "100%", 
-        minHeight: 320, 
+      <div className="reports-chart-wrapper" style={{ 
         borderRadius: 14, 
         background: isDark 
           ? "linear-gradient(135deg, #111009 0%, #161410 58%, #201B12 100%)" 
@@ -954,7 +953,7 @@ function MonthlyLineChart({
           ? "inset 0 1px 0 rgba(255,255,255,0.05)" 
           : "inset 0 1px 0 rgba(255,255,255,0.72)" 
       }}>
-        <ResponsiveContainer width="100%" height={290}>
+        <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 12, right: 28, bottom: 8, left: 12 }}>
             <defs>
               <linearGradient id="reportsReservationFill" x1="0" x2="0" y1="0" y2="1">
@@ -1091,9 +1090,7 @@ function WingRevenueTooltip({ active, payload, label }) {
 function WingRevenueChart({ data }) {
   const { isDark } = useAdminTheme();
   return (
-    <div style={{
-      width: "100%", 
-      minHeight: 280, 
+    <div className="reports-chart-wrapper-small" style={{
       borderRadius: 14, 
       background: isDark 
         ? "linear-gradient(135deg, #111009 0%, #161410 58%, #201B12 100%)" 
@@ -1104,7 +1101,7 @@ function WingRevenueChart({ data }) {
         ? "inset 0 1px 0 rgba(255,255,255,0.05)" 
         : "inset 0 1px 0 rgba(255,255,255,0.72)" 
     }}>
-      <ResponsiveContainer width="100%" height={250}>
+      <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 12, right: 28, bottom: 8, left: 12 }}>
           <CartesianGrid stroke={isDark ? "rgba(255,255,255,0.06)" : "rgba(24,20,14,0.07)"} vertical={false} />
           <XAxis dataKey="name" tick={{ fill: C.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -2985,6 +2982,28 @@ export default function Reports() {
             margin-bottom: 8px;
             -webkit-overflow-scrolling: touch;
           }
+        .reports-chart-wrapper {
+          width: 100%;
+          min-height: 320px;
+          height: 320px;
+        }
+        .reports-chart-wrapper-small {
+          width: 100%;
+          min-height: 260px;
+          height: 260px;
+        }
+        @media (max-width: 980px) {
+          .reports-desktop-tabs-nav {
+            display: none !important;
+          }
+          .reports-mobile-tabs-nav {
+            display: flex !important;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 4px 4px 12px;
+            margin-bottom: 8px;
+            -webkit-overflow-scrolling: touch;
+          }
           .reports-mobile-tabs-nav::-webkit-scrollbar {
             height: 4px;
           }
@@ -3007,18 +3026,46 @@ export default function Reports() {
           .reports-main-content {
             padding: 16px 12px 24px !important;
           }
-          .reports-toolbar {
-            flex-direction: column !important;
-            align-items: stretch !important;
-            width: 100% !important;
-            gap: 12px !important;
+          .reports-chart-wrapper, .reports-chart-wrapper-small {
+            min-height: 220px !important;
+            height: 220px !important;
           }
-          .reports-toolbar > div {
+          .reports-toolbar {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 10px !important;
             width: 100% !important;
+            align-items: flex-end !important;
+          }
+          .reports-toolbar > label {
+            width: 100% !important;
+            min-width: 0 !important;
           }
           .reports-toolbar select, .reports-toolbar input {
             width: 100% !important;
             min-width: 0 !important;
+            height: 38px !important;
+            box-sizing: border-box !important;
+          }
+          .reports-actions-group {
+            grid-column: 1 / -1 !important;
+            display: flex !important;
+            gap: 8px !important;
+            align-items: center !important;
+          }
+          .reports-apply-btn {
+            flex: 1 !important;
+            height: 38px !important;
+          }
+          .reports-action-btn-label {
+            display: none !important;
+          }
+          .reports-action-btn {
+            justify-content: center !important;
+            width: 38px !important;
+            height: 38px !important;
+            padding: 0 !important;
+            flex-shrink: 0 !important;
           }
           .reports-metrics-grid {
             grid-template-columns: 1fr 1fr !important;
@@ -3187,45 +3234,52 @@ export default function Reports() {
                             <option value="ytd">Year to Date</option>
                           </select>
                         </FilterField>
-                        <FilterField label="Start Date">
-                          <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setDatePreset("custom"); }} style={filterStyle()} />
-                        </FilterField>
-                        <FilterField label="End Date">
-                          <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setDatePreset("custom"); }} style={filterStyle()} />
-                        </FilterField>
+                        {datePreset === "custom" && (
+                          <>
+                            <FilterField label="Start Date">
+                              <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setDatePreset("custom"); }} style={filterStyle()} />
+                            </FilterField>
+                            <FilterField label="End Date">
+                              <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setDatePreset("custom"); }} style={filterStyle()} />
+                            </FilterField>
+                          </>
+                        )}
                       </>
                     )}
 
-                    <button
-                      onClick={loadReport}
-                      disabled={loading}
-                      style={{
-                        height: 34,
-                        padding: "0 16px",
-                        border: "none",
-                        borderRadius: 8,
-                        background: C.gold,
-                        color: "#fff",
-                        fontFamily: F.label,
-                        fontSize: 10,
-                        fontWeight: 700,
-                        letterSpacing: "0.12em",
-                        textTransform: "uppercase",
-                        cursor: loading ? "not-allowed" : "pointer",
-                        transition: "background 0.12s",
-                      }}
-                    >
-                      {loading ? "..." : "Apply"}
-                    </button>
-                    <ActionButton
-                      icon={Download}
-                      label="CSV"
-                      onClick={() => {
-                        setCsvFilename("");
-                        setShowCsvConfig(true);
-                      }}
-                    />
-                    <ActionButton icon={Printer} label="Print" onClick={() => setShowPrintConfig(true)} />
+                    <div className="reports-actions-group" style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
+                      <button
+                        className="reports-apply-btn"
+                        onClick={loadReport}
+                        disabled={loading}
+                        style={{
+                          height: 34,
+                          padding: "0 16px",
+                          border: "none",
+                          borderRadius: 8,
+                          background: C.gold,
+                          color: "#fff",
+                          fontFamily: F.label,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: "0.12em",
+                          textTransform: "uppercase",
+                          cursor: loading ? "not-allowed" : "pointer",
+                          transition: "background 0.12s",
+                        }}
+                      >
+                        {loading ? "..." : "Apply"}
+                      </button>
+                      <ActionButton
+                        icon={Download}
+                        label="CSV"
+                        onClick={() => {
+                          setCsvFilename("");
+                          setShowCsvConfig(true);
+                        }}
+                      />
+                      <ActionButton icon={Printer} label="Print" onClick={() => setShowPrintConfig(true)} />
+                    </div>
                   </div>
                 )}
               />
@@ -4940,9 +4994,7 @@ export default function Reports() {
                           No active audit records found for this outlet in the selected date range.
                         </div>
                       ) : (
-                        <div style={{ 
-                          width: "100%", 
-                          minHeight: 260, 
+                        <div className="reports-chart-wrapper-small" style={{ 
                           borderRadius: 14, 
                           background: isDark 
                             ? "linear-gradient(135deg, #111009 0%, #161410 58%, #201B12 100%)" 
@@ -4953,7 +5005,7 @@ export default function Reports() {
                             ? "inset 0 1px 0 rgba(255,255,255,0.05)" 
                             : "inset 0 1px 0 rgba(255,255,255,0.72)"
                         }}>
-                          <ResponsiveContainer width="100%" height={235}>
+                          <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={outletChartData} margin={{ top: 12, right: 26, bottom: 8, left: 12 }}>
                               <defs>
                                 <linearGradient id="modalOutletReservationFill" x1="0" x2="0" y1="0" y2="1">

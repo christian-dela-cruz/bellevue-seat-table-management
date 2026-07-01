@@ -35,7 +35,7 @@ export function AdminPageHeader({
       className="admin-page-header"
       style={{
         display: "grid",
-        gridTemplateColumns: actions ? "minmax(260px,1fr) auto" : "1fr",
+        gridTemplateColumns: actions ? "minmax(200px,1fr) auto" : "1fr",
         gap: 16,
         alignItems: "start",
         marginBottom: compact ? 17 : 18,
@@ -110,6 +110,19 @@ export function AdminPageHeader({
           {actions}
         </div>
       )}
+      <style>{`
+        @media (max-width: 768px) {
+          .admin-page-header {
+            grid-template-columns: 1fr !important;
+          }
+          .admin-page-header h1 {
+            font-size: 24px !important;
+          }
+          .admin-page-header__actions {
+            justify-content: flex-start !important;
+          }
+        }
+      `}</style>
     </section>
   );
 }

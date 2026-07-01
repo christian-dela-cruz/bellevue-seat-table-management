@@ -2258,6 +2258,7 @@ export default function FunctionRooms() {
           }
           .function-room-toolbar > div:first-child {
             width: 100% !important;
+            flex: 0 0 auto !important;
           }
           .function-room-filters-scroll {
             display: flex !important;
@@ -2266,16 +2267,38 @@ export default function FunctionRooms() {
             gap: 8px !important;
             width: 100% !important;
             padding: 4px 0 8px !important;
-            scrollbar-width: none;
-            -ms-overflow-style: none;
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
           }
           .function-room-filters-scroll::-webkit-scrollbar {
-            display: none;
+            display: none !important;
+            width: 0px !important;
+            height: 0px !important;
+            background: transparent !important;
           }
           .function-room-filters-scroll select {
             flex: 0 0 auto !important;
             width: auto !important;
-            min-width: 128px !important;
+            min-width: 135px !important;
+            padding-right: 24px !important;
+          }
+          .venue-expand-placeholder {
+            display: none !important;
+          }
+          .venue-expand-btn {
+            position: absolute !important;
+            right: 14px !important;
+            top: 14px !important;
+            width: 28px !important;
+            height: 28px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            border-radius: 8px !important;
+            background: ${C.surfaceSoft} !important;
+            border: 1px solid ${C.border} !important;
+            z-index: 10 !important;
+            padding: 0 !important;
           }
           .function-room-table-wrap {
             overflow-x: hidden !important;
@@ -2298,6 +2321,7 @@ export default function FunctionRooms() {
             width: 100% !important;
           }
           .function-room-table-wrap table tr {
+            position: relative !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: space-between !important;
@@ -2370,11 +2394,14 @@ export default function FunctionRooms() {
             overflow-x: auto !important;
             padding-bottom: 8px !important;
             margin-bottom: -6px !important;
-            scrollbar-width: none;
-            -ms-overflow-style: none;
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
           }
           .venue-editor-tabs-scroll::-webkit-scrollbar {
             display: none !important;
+            width: 0px !important;
+            height: 0px !important;
+            background: transparent !important;
           }
         }
         @media (max-width: 640px) {
@@ -2612,17 +2639,18 @@ export default function FunctionRooms() {
                             <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.divider}` }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: level ? 26 : 0, minWidth: 0, width: "100%" }}>
                                 {level ? (
-                                  <span style={{ width: 14, color: C.faint, display: "inline-flex", justifyContent: "center" }}><ChevronRight size={14} /></span>
+                                  <span className="venue-expand-placeholder-child" style={{ width: 14, color: C.faint, display: "inline-flex", justifyContent: "center" }}><ChevronRight size={14} /></span>
                                 ) : childCount ? (
                                   <button
                                     type="button"
+                                    className="venue-expand-btn"
                                     onClick={() => toggleParentExpanded(room.id)}
                                     aria-label={`${expandedParents.has(Number(room.id)) ? "Collapse" : "Expand"} ${room.display_name || room.name}`}
                                     style={{ width: 18, height: 18, border: "none", background: "transparent", color: C.gold, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transform: expandedParents.has(Number(room.id)) ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.18s ease" }}
                                   >
                                     <ChevronRight size={15} />
                                   </button>
-                                ) : <span style={{ width: 18 }} />}
+                                ) : <span className="venue-expand-placeholder" style={{ width: 18 }} />}
                                 <div style={{ width: level ? 38 : 46, height: level ? 38 : 46, borderRadius: 10, background: room.type === "dining" ? "#15110C" : C.soft, overflow: "hidden", flexShrink: 0, border: `1px solid ${C.border}`, display: "grid", placeItems: "center" }}>
                                   {room.image ? (
                                     <img
