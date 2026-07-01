@@ -1964,6 +1964,9 @@ export default function FunctionRooms() {
     if (key === "pricing") {
       return true;
     }
+    if (key === "preview") {
+      return true;
+    }
     return false;
   };
 
@@ -3735,11 +3738,11 @@ export default function FunctionRooms() {
                       )}
 
                       {editorTab !== "preview" ? (
-                        <button type="button" onClick={handleNextStep} disabled={saving} style={{ ...buttonBase(), minWidth: 100, border: "none", background: C.gold, color: "#fff" }}>
+                        <button key="btn-next" type="button" onClick={handleNextStep} disabled={saving} style={{ ...buttonBase(), minWidth: 100, border: "none", background: C.gold, color: "#fff" }}>
                           Next
                         </button>
                       ) : (
-                        <button type="submit" disabled={!canManage || saving} style={{ ...buttonBase(), minWidth: 150, border: "none", background: canManage ? C.gold : C.faint, color: "#fff", cursor: canManage && !saving ? "pointer" : "not-allowed" }}>
+                        <button key="btn-submit" type="submit" disabled={!canManage || saving} style={{ ...buttonBase(), minWidth: 150, border: "none", background: canManage ? C.gold : C.faint, color: "#fff", cursor: canManage && !saving ? "pointer" : "not-allowed" }}>
                           {saving ? "Working..." : editing && !form.is_draft ? "Save Changes" : "Publish Venue"}
                         </button>
                       )}

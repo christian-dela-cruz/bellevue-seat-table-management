@@ -2973,18 +2973,6 @@ export default function Reports() {
             top: 20px;
           }
         }
-        @media (max-width: 980px) {
-          .reports-desktop-tabs-nav {
-            display: none !important;
-          }
-          .reports-mobile-tabs-nav {
-            display: flex !important;
-            gap: 8px;
-            overflow-x: auto;
-            padding: 4px 4px 12px;
-            margin-bottom: 8px;
-            -webkit-overflow-scrolling: touch;
-          }
         .reports-chart-wrapper {
           width: 100%;
           min-height: 320px;
