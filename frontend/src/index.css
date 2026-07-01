@@ -65,6 +65,18 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+/* Global Admin Select Styles */
+body.bellevue-admin-page select {
+  padding-right: 26px !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%238C6B2A' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 6px center !important;
+  background-size: 16px !important;
+}
+
 /* Uniform Admin Scrollbar Styles */
 body.bellevue-admin-page * {
   scrollbar-width: thin !important;

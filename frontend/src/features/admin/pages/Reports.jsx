@@ -934,7 +934,10 @@ function MonthlyLineChart({
     reservations: Number(row.reservations || 0),
     promotion_mentions: Number(row.promotion_mentions || 0),
   }));
-  const labelInterval = data.length > 16 ? Math.ceil(data.length / 8) - 1 : 0;
+  const isMobile = window.innerWidth <= 768;
+  const labelInterval = data.length > (isMobile ? 8 : 16) 
+    ? Math.ceil(data.length / (isMobile ? 4 : 8)) - 1 
+    : (isMobile && data.length >= 12 ? 1 : 0);
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
@@ -4950,7 +4953,10 @@ export default function Reports() {
               <div className="reports-grid" style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1.2fr) minmax(280px, 0.8fr)", gap: 14 }}>
                 {/* Daily Transaction Rhythm */}
                 {(() => {
-                  const modalLabelInterval = outletChartData.length > 16 ? Math.ceil(outletChartData.length / 8) - 1 : 0;
+                  const isMobile = window.innerWidth <= 768;
+                  const modalLabelInterval = outletChartData.length > (isMobile ? 8 : 16) 
+                    ? Math.ceil(outletChartData.length / (isMobile ? 4 : 8)) - 1 
+                    : (isMobile && outletChartData.length >= 12 ? 1 : 0);
                   return (
                     <SummaryPanel
                       title="Daily Transaction Rhythm"

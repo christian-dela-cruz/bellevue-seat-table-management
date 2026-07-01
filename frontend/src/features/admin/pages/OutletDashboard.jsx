@@ -521,13 +521,13 @@ function MetricCard({ icon: Icon, label, value, detail, color = C.gold, bg = C.g
       boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-        <span style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.faint }}>{label}</span>
+        <span className="od-card-label" style={{ fontFamily: F.label, fontSize: 8.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.faint }}>{label}</span>
         <span style={{ width: 28, height: 28, borderRadius: 8, background: bg, display: "grid", placeItems: "center", color, flexShrink: 0 }}>
           <Icon size={14} />
         </span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ color, fontSize: 24, lineHeight: 1.15, fontWeight: 700, fontFamily: F.display }}>{value}</span>
+        <span className="od-card-value" style={{ color, fontSize: 24, lineHeight: 1.15, fontWeight: 700, fontFamily: F.display }}>{value}</span>
         {detail && <span style={{ color: C.muted, fontSize: 10.5, fontWeight: 500, letterSpacing: "0.01em" }}>{detail}</span>}
       </div>
     </div>
@@ -635,14 +635,15 @@ function LineChart({ rows, period = "monthly", chartMetric = "volume" }) {
   }));
 
   const labelInterval = useMemo(() => {
-    if (period === "yearly") return 0;
+    const isMobile = window.innerWidth <= 768;
+    if (period === "yearly") return isMobile ? 1 : 0;
     const len = data.length;
     if (len <= 14) {
-      return "preserveStartEnd";
+      return isMobile ? 1 : "preserveStartEnd";
     } else if (len <= 30) {
-      return 2;
+      return isMobile ? 3 : 2;
     } else {
-      return 4;
+      return isMobile ? 6 : 4;
     }
   }, [data.length, period]);
 
@@ -1421,13 +1422,6 @@ function OutletDashboard() {
           .od-filter-outlet, .od-filter-search {
             grid-column: span 2 !important;
           }
-          .od-metrics-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 10px !important;
-          }
-          .od-metric-span-2 {
-            grid-column: span 2 !important;
-          }
           .donut-chart-container {
             grid-template-columns: 1fr !important;
             justify-items: center !important;
@@ -1448,6 +1442,26 @@ function OutletDashboard() {
             width: 100% !important;
           }
         }
+        @media (max-width: 768px) {
+          .od-metrics-grid {
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 8px !important;
+          }
+          .od-metric-span-2 {
+            grid-column: span 3 !important;
+          }
+          .od-card {
+            padding: 8px 6px !important;
+            gap: 6px !important;
+          }
+          .od-card-label {
+            font-size: 7.5px !important;
+            letter-spacing: 0.04em !important;
+          }
+          .od-card-value {
+            font-size: 16px !important;
+          }
+        }
         @media (max-width: 540px) {
           .od-filters {
             grid-template-columns: 1fr !important;
@@ -1460,11 +1474,8 @@ function OutletDashboard() {
           }
         }
         @media (max-width: 480px) {
-          .od-metrics-grid {
-            grid-template-columns: 1fr !important;
-          }
-          .od-metric-span-2 {
-            grid-column: span 1 !important;
+          .od-card-value {
+            font-size: 14px !important;
           }
         }
       `}</style>
