@@ -1029,7 +1029,18 @@ function VenueLandingPreview({ form, preview, childRooms = [], rooms = [], editi
 
 export default function FunctionRooms() {
   const { isDark } = useAdminTheme();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 960);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 960) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const [publishedEvents, setPublishedEvents] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2219,7 +2230,19 @@ export default function FunctionRooms() {
           to { opacity: 1; transform: translate3d(-50%, 0, 0); }
         }
         .function-room-filters-scroll {
-          display: contents;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          flex: 1 1 auto;
+        }
+        .function-room-filters-scroll select {
+          flex: 1 1 128px;
+          min-width: 128px;
+        }
+        .function-room-table-wrap {
+          overflow-x: auto;
+          width: 100%;
+          scrollbar-width: thin;
         }
 
         @media (max-width: 920px) {
@@ -2239,6 +2262,7 @@ export default function FunctionRooms() {
           .function-room-filters-scroll {
             display: flex !important;
             overflow-x: auto !important;
+            flex-wrap: nowrap !important;
             gap: 8px !important;
             width: 100% !important;
             padding: 4px 0 8px !important;
@@ -2502,19 +2526,19 @@ export default function FunctionRooms() {
             }
           `}</style>
 
-            <div className="function-room-stats" style={{ display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 12, marginBottom: 16 }}>
-              <SummaryCard icon={Layers} label="Configured Venues" value={stats.total} />
-              <SummaryCard icon={Camera} label="Dining Outlets" value={stats.dining} tone="gold" />
-              <SummaryCard icon={Layers} label="Function Rooms" value={stats.functionRooms} />
-              <SummaryCard icon={CheckCircle2} label="Enabled" value={stats.enabled} tone="green" />
-              <SummaryCard icon={Eye} label="Landing Visible" value={stats.visible} tone="gold" />
-            </div>
+          <div className="function-room-stats" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
+            <SummaryCard icon={Layers} label="Configured Venues" value={stats.total} />
+            <SummaryCard icon={Camera} label="Dining Outlets" value={stats.dining} tone="gold" />
+            <SummaryCard icon={Layers} label="Function Rooms" value={stats.functionRooms} />
+            <SummaryCard icon={CheckCircle2} label="Enabled" value={stats.enabled} tone="green" />
+            <SummaryCard icon={Eye} label="Landing Visible" value={stats.visible} tone="gold" />
+          </div>
 
-            <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "visible" }}>
-              {viewMode === "table" ? (
-                <>
-                  <div className="function-room-toolbar" style={{ display: "grid", gridTemplateColumns: "minmax(240px,1fr) repeat(6, minmax(128px, auto))", gap: 10, padding: 14, borderBottom: `1px solid ${C.divider}`, background: C.soft }}>
-                    <div style={{ position: "relative" }}>
+          <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "visible" }}>
+            {viewMode === "table" ? (
+              <>
+                <div className="function-room-toolbar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, padding: 14, borderBottom: `1px solid ${C.divider}`, background: C.soft, borderTopLeftRadius: 13, borderTopRightRadius: 13 }}>
+                  <div style={{ position: "relative", flex: "1 1 240px" }}>
                       <Search size={15} style={{ position: "absolute", left: 11, top: 12, color: C.faint }} />
                       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search venues, slugs, wings" style={{ ...inputStyle(), paddingLeft: 34 }} />
                     </div>

@@ -2855,6 +2855,8 @@ function PaginationControls({ pagination, onPageChange, onRowsChange, filteredCo
       flexWrap: "wrap",
       gap: 10,
       background: C.headerGradient,
+      borderBottomLeftRadius: 11,
+      borderBottomRightRadius: 11,
     }}>
       <div style={{ fontFamily: F.body, fontSize: 11, color: C.textTertiary, whiteSpace: "nowrap" }}>
         Showing{" "}
@@ -2938,7 +2940,7 @@ export default function ReservationDashboard() {
   const [search,setSearch]=useState("");
   const [selectedReservation,setSelectedReservation]=useState(null);
   const [showModal,setShowModal]=useState(false);
-  const [sidebarOpen,setSidebarOpen]=useState(true);
+  const [sidebarOpen,setSidebarOpen]=useState(() => window.innerWidth > 960);
   const [stats,setStats]=useState({total:0,pending:0,approved:0,rejected:0,active:0,inactive:0});
   const [toast,setToast]=useState(null);
   const [pagination,setPagination]=useState({currentPage:1,lastPage:1,totalItems:0,rowsPerPage:10});
@@ -2951,7 +2953,12 @@ export default function ReservationDashboard() {
 
   const [windowWidth,setWindowWidth]=useState(window.innerWidth);
   useEffect(()=>{
-    const h=()=>setWindowWidth(window.innerWidth);
+    const h=()=>{
+      setWindowWidth(window.innerWidth);
+      if(window.innerWidth<=960){
+        setSidebarOpen(false);
+      }
+    };
     window.addEventListener("resize",h);
     return()=>window.removeEventListener("resize",h);
   },[]);
@@ -3835,7 +3842,6 @@ export default function ReservationDashboard() {
 
               <div style={{background:C.cardBg,borderRadius:12,border:`1px solid ${C.cardBorder}`,overflow:"visible",boxShadow:"0 1px 4px rgba(24,20,14,0.03)"}}>
 
-                {/* Table toolbar */}
                 <div style={{
                   padding:isMobile?"12px 14px":"14px 22px",
                   borderBottom:`1px solid ${C.divider}`,
@@ -3844,6 +3850,8 @@ export default function ReservationDashboard() {
                   flexWrap:isMobile?"wrap":"nowrap",
                   gap:10,
                   background:C.headerGradient,
+                  borderTopLeftRadius: 11,
+                  borderTopRightRadius: 11,
                 }}>
                   <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                     <div style={{fontFamily:F.label,fontSize:9,letterSpacing:"0.26em",color:C.gold,fontWeight:700,textTransform:"uppercase"}}>

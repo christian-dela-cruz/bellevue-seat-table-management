@@ -1308,48 +1308,112 @@ function TableCard({ title, headers, rows, renderRow, actions, footer }) {
   );
 }
 
+const tabIcons = {
+  summary: LayoutGrid,
+  revenue: TrendingUp,
+  outlets: Building2,
+  monthly: CalendarDays,
+  yearly: Activity,
+  audit: List,
+};
+
 function ReportTabs({ groups, activeTab, onChange }) {
   return (
-    <div className="reports-nav-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: 10 }}>
-      {groups.map((group) => (
-        <div key={group.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 10, display: "grid", gap: 9, minWidth: 0 }}>
-          <div style={{ display: "grid", gap: 3 }}>
-            <div style={{ fontFamily: F.label, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>{group.label}</div>
-            <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.35 }}>{group.description}</div>
+    <>
+      {/* Desktop Sidebar Navigation */}
+      <div className="reports-desktop-tabs-nav" style={{ display: "none" }}>
+        {groups.map((group) => (
+          <div key={group.label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {/* Group Label */}
+            <div style={{
+              fontFamily: F.label,
+              fontSize: 9,
+              fontWeight: 800,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: C.gold,
+              paddingLeft: 8,
+              marginBottom: 4
+            }}>
+              {group.label}
+            </div>
+            {/* Group Tabs */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {group.tabs.map((tab) => {
+                const active = activeTab === tab.id;
+                const Icon = tabIcons[tab.id] || LayoutGrid;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => onChange(tab.id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      border: "none",
+                      borderRadius: 10,
+                      background: active ? C.goldFaint : "transparent",
+                      color: active ? C.gold : C.muted,
+                      padding: "10px 12px",
+                      fontFamily: F.body,
+                      fontSize: 12.5,
+                      fontWeight: active ? 700 : 550,
+                      textAlign: "left",
+                      cursor: "pointer",
+                      transition: "all 0.16s ease",
+                      outline: "none",
+                    }}
+                    className="desktop-tab-button"
+                  >
+                    <Icon size={16} style={{ strokeWidth: active ? 2.2 : 1.8, color: active ? C.gold : C.faint }} />
+                    <span style={{ flex: 1 }}>{tab.label}</span>
+                    {active && <div style={{ width: 4, height: 14, borderRadius: 2, background: C.gold }} />}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {group.tabs.map((tab) => {
-              const active = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => onChange(tab.id)}
-                  style={{
-                    border: `1px solid ${active ? "rgba(140,107,42,0.30)" : C.divider}`,
-                    borderRadius: 9,
-                    background: active ? C.goldFaint : C.soft,
-                    color: active ? C.gold : C.muted,
-                    padding: "8px 10px",
-                    fontFamily: F.label,
-                    fontSize: 10.5,
-                    fontWeight: active ? 800 : 650,
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    whiteSpace: "nowrap",
-                    cursor: "pointer",
-                    transition: "background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease",
-                    boxShadow: active ? "0 1px 5px rgba(140,107,42,0.045)" : "none",
-                  }}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+
+      {/* Mobile Horizontal Pill Scroll */}
+      <div className="reports-mobile-tabs-nav" style={{ display: "none" }}>
+        {groups.flatMap(g => g.tabs).map((tab) => {
+          const active = activeTab === tab.id;
+          const Icon = tabIcons[tab.id] || LayoutGrid;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onChange(tab.id)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                border: `1px solid ${active ? "rgba(140,107,42,0.30)" : C.divider}`,
+                borderRadius: 999,
+                background: active ? C.goldFaint : C.surface,
+                color: active ? C.gold : C.muted,
+                padding: "8px 14px",
+                fontFamily: F.label,
+                fontSize: 10.5,
+                fontWeight: active ? 800 : 600,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                whiteSpace: "nowrap",
+                cursor: "pointer",
+                transition: "all 0.16s ease",
+                boxShadow: active ? "0 2px 6px rgba(140,107,42,0.06)" : "none",
+              }}
+            >
+              <Icon size={13} style={{ strokeWidth: active ? 2.2 : 1.8 }} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -1370,7 +1434,18 @@ const FONT_FAMILIES = {
 export default function Reports() {
   const { isDark } = useAdminTheme();
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 960);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 960) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const [activeTab, setActiveTab] = useState("summary");
   const [startDate, setStartDate] = useState(monthStart());
   const [endDate, setEndDate] = useState(today());
@@ -2865,7 +2940,66 @@ export default function Reports() {
         .reports-table-row:hover {
           background: rgba(140,107,42,0.035);
         }
+        .reports-content-layout {
+          display: flex;
+          gap: 28px;
+          align-items: flex-start;
+          width: 100%;
+        }
+        .reports-content-pane {
+          flex: 1;
+          min-width: 0;
+          display: grid;
+          gap: 22px;
+        }
+        .desktop-tab-button:hover {
+          background: rgba(140,107,42,0.05) !important;
+          color: #8C6B2A !important;
+        }
+        .desktop-tab-button:hover svg {
+          color: #8C6B2A !important;
+        }
+        @media (min-width: 981px) {
+          .reports-mobile-tabs-nav {
+            display: none !important;
+          }
+          .reports-desktop-tabs-nav {
+            display: flex !important;
+            flex-direction: column;
+            gap: 22px;
+            width: 220px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 20px;
+          }
+        }
         @media (max-width: 980px) {
+          .reports-desktop-tabs-nav {
+            display: none !important;
+          }
+          .reports-mobile-tabs-nav {
+            display: flex !important;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 4px 4px 12px;
+            margin-bottom: 8px;
+            -webkit-overflow-scrolling: touch;
+          }
+          .reports-mobile-tabs-nav::-webkit-scrollbar {
+            height: 4px;
+          }
+          .reports-mobile-tabs-nav::-webkit-scrollbar-thumb {
+            background: rgba(140, 107, 42, 0.2);
+            border-radius: 999px;
+          }
+          .reports-content-layout {
+            flex-direction: column;
+            gap: 16px;
+            align-items: stretch;
+          }
+          .reports-content-pane {
+            width: 100%;
+          }
           .reports-top, .reports-grid, .reports-toolbar, .reports-nav-grid { grid-template-columns: 1fr !important; }
           .reports-filter-panel { min-width: 0 !important; }
         }
@@ -4164,10 +4298,10 @@ export default function Reports() {
             ) : loading ? (
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 28, color: C.muted }}>Loading reports...</div>
             ) : (
-              <div style={{ display: "grid", gap: 22 }}>
+              <div className="reports-content-layout">
                 <ReportTabs groups={reportGroups} activeTab={activeTab} onChange={setActiveTab} />
 
-                <div key={activeTab} className="reports-section" style={{ display: "grid", gap: 22 }}>
+                <div key={activeTab} className="reports-section reports-content-pane">
                   {activeTab === "summary" && (
                     <>
                       <div className="print-overview">

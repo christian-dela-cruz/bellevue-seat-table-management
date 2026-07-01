@@ -929,7 +929,18 @@ function OutletDashboard() {
   const { isDark } = useAdminTheme();
   const navigate = useNavigate();
   const params = useParams();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 960);
+  
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 960) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const [startDate, setStartDate] = useState(today());
   const [endDate, setEndDate] = useState(weekFromToday());
   const [statusFilter, setStatusFilter] = useState("all");
@@ -1396,7 +1407,7 @@ function OutletDashboard() {
           align-items: center;
           gap: 8px;
         }
-        @media (max-width: 960px) {
+        @media (max-width: 1200px) {
           .admin-page-content-container {
             padding: 16px 12px 24px !important;
           }

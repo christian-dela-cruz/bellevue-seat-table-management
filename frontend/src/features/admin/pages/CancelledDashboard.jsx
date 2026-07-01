@@ -664,7 +664,7 @@ export default function CancelledDashboard() {
   const [search, setSearch] = useState("");
   const [selectedReservation, setSelectedReservation] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 960);
   const [toast, setToast] = useState(null);
   const [pagination, setPagination] = useState({ currentPage: 1, lastPage: 1, totalItems: 0 });
   const [loading, setLoading] = useState(true);
@@ -677,7 +677,12 @@ export default function CancelledDashboard() {
 
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   useEffect(() => {
-    const h = () => setWindowWidth(window.innerWidth);
+    const h = () => {
+      setWindowWidth(window.innerWidth);
+      if (window.innerWidth <= 960) {
+        setSidebarOpen(false);
+      }
+    };
     window.addEventListener("resize", h);
     return () => window.removeEventListener("resize", h);
   }, []);
@@ -1168,6 +1173,8 @@ export default function CancelledDashboard() {
                   flexWrap: isMobile ? "wrap" : "nowrap",
                   gap: 10,
                   background: C.headerGradient,
+                  borderTopLeftRadius: 11,
+                  borderTopRightRadius: 11,
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={{ fontFamily: F.label, fontSize: 9, letterSpacing: "0.20em", color: C.textSecondary, fontWeight: 700, textTransform: "uppercase" }}>Cancelled</div>
@@ -1409,7 +1416,7 @@ export default function CancelledDashboard() {
 
                 {/* Footer */}
                 {!loading && filteredReservations.length > 0 && (
-                  <div style={{ padding: "10px 18px", borderTop: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div style={{ padding: "10px 18px", borderTop: `1px solid ${C.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, borderBottomLeftRadius: 11, borderBottomRightRadius: 11 }}>
                     <div style={{ fontFamily: F.body, fontSize: 11, color: C.textTertiary }}>
                       Showing <strong style={{ color: C.textSecondary }}>{(pagination.currentPage - 1) * 10 + 1}–{Math.min(pagination.currentPage * 10, filteredReservations.length)}</strong> of <strong style={{ color: C.textSecondary }}>{filteredReservations.length}</strong> cancelled reservations
                     </div>

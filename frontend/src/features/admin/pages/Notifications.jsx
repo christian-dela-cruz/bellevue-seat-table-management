@@ -1040,7 +1040,17 @@ function NotificationDashboard() {
   const canAcknowledgeNotifications = authAPI.hasPermission("acknowledge_notifications");
 
   const [allCards,setAllCards]=useState([]);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 960);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 960) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // New filters state
   const [filterType, setFilterType] = useState("ALL");

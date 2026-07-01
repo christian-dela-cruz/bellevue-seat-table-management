@@ -338,7 +338,18 @@ function InfoTooltip({ title, content }) {
 
 export default function AccountSettings() {
   const { isDark, updateUser, updateAvatar } = useAdminTheme();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 960);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 960) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const [currentUser, setCurrentUser] = useState(() => authAPI.getCurrentUser() || {});
   const [activeSection, setActiveSection] = useState("profile");
   const [message, setMessage] = useState(null);

@@ -123,7 +123,18 @@ function getVenueTypeFromPath(pathname) {
 
 export default function UnifiedSeatMapEditor() {
   const { isDark } = useAdminTheme();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 960);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 960) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const navigate  = useNavigate();
   const location  = useLocation();
 

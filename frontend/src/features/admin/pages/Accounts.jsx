@@ -599,7 +599,18 @@ export default function Accounts() {
   const { isDark } = useAdminTheme();
   const currentUser = authAPI.getCurrentUser();
   const canManage = authAPI.hasPermission("manage_accounts");
-  const [sidebarOpen,setSidebarOpen] = useState(true);
+  const [sidebarOpen,setSidebarOpen] = useState(() => window.innerWidth > 960);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 960) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const [accounts,setAccounts] = useState([]);
   const [form,setForm] = useState(DEFAULT_FORM);
   const [editingId,setEditingId] = useState(null);
