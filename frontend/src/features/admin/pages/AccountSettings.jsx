@@ -990,8 +990,8 @@ export default function AccountSettings() {
       <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
         <AdminNavbar />
 
-        <main className="account-settings-shell" style={{ flex: 1, minWidth: 0, overflow: "auto", padding: "30px 32px 42px", position: "relative" }}>
-          <div style={{ maxWidth: 1440, margin: "0 auto", display: "grid", gap: 18, width: "100%" }}>
+        <main className="admin-page-content-container" style={{ position: "relative" }}>
+          <div style={{ display: "grid", gap: 18, width: "100%" }}>
             <AdminPageHeader
               eyebrow="ACCOUNT"
               title="Account Settings"

@@ -900,7 +900,7 @@ export default function Accounts() {
   const directoryEyebrow = "Directory";
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: C.pageBg, fontFamily: F.body }}>
+    <div style={{ display: "flex", height: "100vh", minHeight: 0, overflow: "hidden", background: C.pageBg, fontFamily: F.body }}>
       <style>{`
         @keyframes accountSpin { to { transform: rotate(360deg); } }
         .account-row { transition: background 0.16s ease !important; }
@@ -964,8 +964,8 @@ export default function Accounts() {
       
       <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
         <AdminNavbar />
-        <main style={{ flex: 1, padding: "30px 32px 42px", overflow: "auto" }}>
-          <div style={{ maxWidth:1440,display:"grid",gap:18 }}>
+        <main className="admin-page-content-container">
+          <div style={{ display:"grid",gap:18 }}>
           <AdminPageHeader
             eyebrow="Access Control"
             title="Account Manager"

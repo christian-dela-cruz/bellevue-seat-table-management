@@ -1876,7 +1876,7 @@ function NotificationDashboard() {
   };
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: C.pageBg, fontFamily: F.body }}>
+    <div style={{ display: "flex", height: "100vh", minHeight: 0, overflow: "hidden", background: C.pageBg, fontFamily: F.body }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
@@ -1902,8 +1902,8 @@ function NotificationDashboard() {
       <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
         <AdminNavbar />
         
-        <main className="nd-main" style={{ flex: 1, padding: "30px 32px 42px", overflow: "auto", position: "relative" }}>
-          <div style={{ maxWidth: 1440, display: "grid", gap: 18, animation: "fadeUp 0.32s ease" }}>
+        <main className="admin-page-content-container nd-main" style={{ position: "relative" }}>
+          <div style={{ display: "grid", gap: 18, animation: "fadeUp 0.32s ease" }}>
             
             {/* Page Header */}
             <AdminPageHeader

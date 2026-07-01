@@ -433,7 +433,7 @@ export default function RolesAndPermissions() {
   const roleAccountsCount = selectedRole ? accounts.filter(a => a.role === selectedRole.slug && a.is_active !== false).length : 0;
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: C.pageBg, fontFamily: F.body }}>
+    <div style={{ display: "flex", height: "100vh", minHeight: 0, overflow: "hidden", background: C.pageBg, fontFamily: F.body }}>
       <style>{`
         @keyframes rolesSpin { to { transform: rotate(360deg); } }
         @keyframes rolesSlideIn { from { opacity: 0; transform: translate3d(34px,0,0); } to { opacity: 1; transform: translate3d(0,0,0); } }
@@ -447,8 +447,8 @@ export default function RolesAndPermissions() {
       <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
         <AdminNavbar />
 
-        <main style={{ flex: 1, padding: "30px 32px 42px", overflow: "auto" }}>
-          <div style={{ maxWidth: 1440, display: "grid", gap: 18 }}>
+        <main className="admin-page-content-container">
+          <div style={{ display: "grid", gap: 18 }}>
             <AdminPageHeader
               eyebrow="Administration"
               title="Roles & Permissions"

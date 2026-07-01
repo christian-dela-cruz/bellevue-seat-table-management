@@ -331,8 +331,8 @@ export default function EventManagement() {
       <div style={{ display: "flex", flexDirection: "column", height: "100vh", flex: 1, minWidth: 0, overflow: "hidden" }}>
         <AdminNavbar />
         
-        <main style={{ flex: 1, padding: "30px 32px 42px", overflow: "auto" }}>
-          <div style={{ maxWidth: 1440, margin: "0 auto", display: "grid", gap: 18 }}>
+        <main className="admin-page-content-container">
+          <div style={{ display: "grid", gap: 18 }}>
             <AdminPageHeader 
               eyebrow="Event Engine"
               title="Event Management" 

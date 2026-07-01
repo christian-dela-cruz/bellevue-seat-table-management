@@ -65,7 +65,7 @@ function StatusBadge({ status }) {
   return (
     <span style={{
       display:"inline-flex",alignItems:"center",gap:5,
-      padding:"3px 10px 3px 7px",
+      padding:"2px 8px 2px 6px",
       background:badge.bg,
       border:`1px solid ${badge.color}33`,
       borderRadius:20,
@@ -98,7 +98,7 @@ function StateBadge({ state }) {
   return (
     <span style={{
       display:"inline-flex",alignItems:"center",gap:5,
-      padding:"3px 9px 3px 7px",
+      padding:"2px 8px 2px 6px",
       background:bg,
       border:`1px solid ${border}`,
       borderRadius:20,
@@ -351,7 +351,7 @@ function PriorityBadge({ priority }) {
   return (
     <span style={{
       display:"inline-flex",alignItems:"center",gap:5,
-      padding:"3px 9px",
+      padding:"2px 8px",
       borderRadius:20,
       background:badge.bg,
       border:`1px solid ${badge.border}`,
@@ -3607,16 +3607,30 @@ export default function ReservationDashboard() {
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          justify-content: flex-end;
-          gap: 7px;
+          justify-content: flex-start;
+          gap: 6px;
           flex-shrink: 0;
+          padding-top: 2px;
+        }
+        .res-badge-group {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+        .res-badge-meta {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          justify-content: flex-end;
         }
         .res-card-grid {
           display: grid;
-          grid-template-columns: repeat(6, minmax(100px, 1fr));
-          gap: 8px;
-          margin-top: 10px;
-          padding-top: 10px;
+          grid-template-columns: 1.2fr 1fr 0.8fr 0.8fr 3.5fr 0.8fr;
+          gap: 10px 12px;
+          margin-top: 8px;
+          padding-top: 8px;
           border-top: 1px solid ${C.divider};
         }
         .res-card-grid-item-last {
@@ -3639,10 +3653,22 @@ export default function ReservationDashboard() {
             padding-top: 10px !important;
             margin-top: 8px !important;
             flex-wrap: wrap !important;
-            gap: 6px 8px !important;
+            gap: 8px 16px !important;
+          }
+          .res-badge-group {
+            display: flex !important;
+            gap: 6px !important;
+            flex-wrap: wrap !important;
+          }
+          .res-badge-meta {
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            margin-left: auto !important;
           }
           .res-card-grid {
             grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
           }
           .res-card-grid-item-last {
             grid-column: span 2 !important;
@@ -4052,7 +4078,7 @@ export default function ReservationDashboard() {
                             background:C.surfaceBase,
                             border:`1px solid ${C.borderDefault}`,
                             borderRadius:8,
-                            padding:isMobile?"12px":"14px 18px",
+                            padding:isMobile?"10px 12px":"12px 16px",
                             transition:"all 0.16s ease",
                             animation:`fadeUp 0.22s ease both`,
                             animationDelay:`${idx*0.025}s`,
@@ -4063,7 +4089,7 @@ export default function ReservationDashboard() {
                           <div className="res-card-header">
 
                               <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{setSelectedReservation(reservation);setShowModal(true);}}>
-                                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
+                                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
                                   <div style={{fontFamily:F.body,fontSize:14,fontWeight:600,color:C.textPrimary}}>{reservation.name||"-"}</div>
                                   {reservation.event_date&&(
                                     <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.textTertiary,padding:"2px 6px",background:"rgba(0,0,0,0.04)",border:`1px solid rgba(0,0,0,0.06)`,borderRadius:4,flexShrink:0}}>
@@ -4081,7 +4107,7 @@ export default function ReservationDashboard() {
                                     </span>
                                   )}
                                 </div>
-                                <div style={{fontFamily:F.body,fontSize:12,color:C.textSecondary,marginBottom:5,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+                                <div style={{fontFamily:F.body,fontSize:12,color:C.textSecondary,marginBottom:4,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
                                   <span>{reservation.email||"-"}</span>
                                   {reservation.phone&&<><span style={{color:C.textTertiary}}>·</span><span>{reservation.phone}</span></>}
                                 </div>
@@ -4178,15 +4204,20 @@ export default function ReservationDashboard() {
                               </div>
                               
                               <div className="res-card-badges">
-                                <PriorityBadge priority={reservation._priority}/>
-                                <StatusBadge status={reservation.status}/>
-                                <StateBadge state={getReservationState(reservation)}/>
-                                <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.textTertiary}}>
-                                  {reservation._historyCount} history
-                                </span>
-                                <div style={{display:"flex",alignItems:"center",gap:3,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.textTertiary}}>
-                                  View
-                                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                                <div className="res-badge-group">
+                                  <PriorityBadge priority={reservation._priority}/>
+                                  <StatusBadge status={reservation.status}/>
+                                  <StateBadge state={getReservationState(reservation)}/>
+                                </div>
+                                <div className="res-badge-meta">
+                                  <span style={{fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.textTertiary}}>
+                                    {reservation._historyCount} history
+                                  </span>
+                                  <span style={{color:C.textTertiary,fontSize:9,opacity:0.5}}>·</span>
+                                  <div style={{display:"flex",alignItems:"center",gap:3,fontFamily:F.label,fontSize:9,fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.textTertiary}}>
+                                    View
+                                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                                  </div>
                                 </div>
                               </div>
                             </div>
