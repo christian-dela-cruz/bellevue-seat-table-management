@@ -189,6 +189,32 @@ const C = {
 // FIX: Use let so these can be reset when a room is loaded
 let _tableCounter = 1, _standaloneCounter = 1, _fixtureCounter = 1;
 
+export function generateNextUniqueLabel(originalLabel, existingLabels) {
+  const label = String(originalLabel || "").trim();
+  if (!label) return "Table";
+  
+  const match = label.match(/^(.*?)\s*(\d+)$/);
+  let prefix = label;
+  let num = 1;
+  
+  if (match) {
+    prefix = match[1] || "";
+    num = parseInt(match[2], 10) + 1;
+  } else {
+    prefix = label + " ";
+  }
+  
+  const existingSet = new Set(existingLabels.map(l => String(l || "").trim().toLowerCase()));
+  
+  while (true) {
+    const candidate = `${prefix}${num}`.trim();
+    if (!existingSet.has(candidate.toLowerCase())) {
+      return candidate;
+    }
+    num++;
+  }
+}
+
 export function checkCollision(t1, t2) {
   const w1 = t1.width || 110;
   const h1 = t1.height || 70;
@@ -525,7 +551,7 @@ function StaticLabel({ item, T }) {
   );
 }
 
-function DraggableLabel({ item, onDragStart, isDragging, T }) {
+function DraggableLabel({ item, onDragStart, isDragging, isSelected, onSelect, T }) {
   const [hov, setHov] = useState(false);
   const isScreen = item.type === "screen";
   const tokens = T || {
@@ -541,15 +567,19 @@ function DraggableLabel({ item, onDragStart, isDragging, T }) {
         position: "absolute", left: (item.x || 0), top: (item.y || 0),
         background: isScreen ? tokens.labelScreen.bg : "transparent",
         color: isScreen ? tokens.labelScreen.color : tokens.labelOther.color,
-        border: isScreen ? "none" : `1px solid ${hov || isDragging ? tokens.borderAccent : tokens.labelOther.border}`,
+        border: isSelected 
+          ? `2px dashed ${tokens.gold}` 
+          : (isScreen ? "none" : `1px solid ${hov || isDragging ? tokens.borderAccent : tokens.labelOther.border}`),
         borderRadius: isScreen ? 6 : 18, padding: isScreen ? "6px 16px" : "5px 12px",
         fontFamily: F, fontWeight: 700, fontSize: isScreen ? 14 : 12,
         letterSpacing: "0.18em", textTransform: "uppercase",
         cursor: isDragging ? "grabbing" : "grab", userSelect: "none", zIndex: 5,
         whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6,
-        transform: isDragging ? "scale(1.04)" : hov ? "scale(1.02)" : "scale(1)",
+        transform: isSelected ? "scale(1.05)" : (isDragging ? "scale(1.04)" : hov ? "scale(1.02)" : "scale(1)"),
         transition: "transform 0.13s, border-color 0.13s", opacity: isDragging ? 0.80 : 1,
+        boxShadow: isSelected ? `0 0 0 3px ${tokens.gold}28` : "none",
       }}
+      onClick={e => { e.stopPropagation(); onSelect?.(item); }}
       onMouseDown={e => { e.stopPropagation(); onDragStart(e, item.id); }}
       onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
     >
@@ -4025,6 +4055,7 @@ export default function SeatMap({
   const [standaloneSeats, setStandaloneSeats] = useState([]);
   const [fixtures, setFixtures] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [copiedItem, setCopiedItem] = useState(null);
   const [selectedStandaloneSeats, setSelectedStandaloneSeats] = useState(new Set());
   const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
   const [saved, setSaved] = useState(false);
@@ -4699,47 +4730,6 @@ export default function SeatMap({
     return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
   }, [editMode, tables, standaloneSeats, labels, fixtures, zoom, snapToGrid, gridSize, roomWidth, roomHeight, pushHistory]);
 
-  // ── Keyboard Shortcuts (ESC, DEL, Undo/Redo/Duplicate) ────────────────────────
-  useEffect(() => {
-    const h = e => {
-      if (e.key === "Escape") { setSelected(null); setTool("select"); }
-      else if (e.key === "Delete" && editMode && selected) {
-        if (selected.type === "table") {
-          const tbl = tables.find(t => t.id === selected.tableId);
-          if (tbl?.editor?.locked) return;
-          setDeleteConfirm({ key: "table", message: `Delete "${tbl?.label || tbl?.id}"? This will also remove all ${tbl?.seats?.length || 0} seats and cannot be undone.` });
-        } else if (selected.type === "seat") {
-          const seatObj = tables.find(t => t.id === selected.tableId)?.seats.find(s => s.id === selected.seatId);
-          setDeleteConfirm({ key: "seat", message: `Delete seat "${seatObj?.label || seatObj?.num}"? This cannot be undone.` });
-        } else if (selected.type === "standaloneSeat") {
-          const ss = standaloneSeats.find(s => s.id === selected.standaloneSeatId);
-          if (ss?.editor?.locked) return;
-          setDeleteConfirm({ key: "standaloneSeat", message: "Delete this standalone seat? This cannot be undone." });
-        } else if (selected.type === "fixture") {
-          const fx = fixtures.find(f => f.id === selected.fixtureId);
-          if (fx?.editor?.locked) return;
-          setDeleteConfirm({ key: "fixture", message: `Delete architectural fixture "${fx?.label || fx?.id}"? This cannot be undone.` });
-        } else if (selected.type === "label") {
-          const lbl = labels.find(l => l.id === selected.labelId);
-          setDeleteConfirm({ key: "label", message: `Delete text label "${lbl?.label || lbl?.id}"? This cannot be undone.` });
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-        e.preventDefault();
-        if (e.shiftKey) redo();
-        else undo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
-        e.preventDefault();
-        redo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d" && editMode && selected) {
-        e.preventDefault();
-        if (selected.type === "table" && selectedTable) duplicateTable(selectedTable);
-        else if (selected.type === "standaloneSeat" && selectedStandaloneSeatObj) duplicateStandaloneSeat(selectedStandaloneSeatObj);
-        else if (selected.type === "fixture" && selectedFixtureObj) duplicateFixture(selectedFixtureObj);
-      }
-    };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [editMode, selected, tables, standaloneSeats, fixtures, selectedTable, selectedStandaloneSeatObj, selectedFixtureObj, undo, redo]);
 
   const startTableDrag = useCallback((e, id) => {
     e.preventDefault();
@@ -4819,10 +4809,12 @@ export default function SeatMap({
   const duplicateFixture = useCallback((fixture) => {
     pushHistory();
     const id = `FX${_fixtureCounter++}`;
+    const existingLabels = fixtures.map(f => f.label || f.id);
+    const newLabel = generateNextUniqueLabel(fixture.label || fixture.id, existingLabels);
     const newFixture = {
       ...fixture,
       id,
-      label: `${fixture.label || fixture.id} (Copy)`,
+      label: newLabel,
       x: Math.min((roomWidth || 1200) - (fixture.width || 80), fixture.x + 30),
       y: Math.min((roomHeight || 800) - (fixture.height || 60), fixture.y + 30),
       editor: {
@@ -4834,6 +4826,20 @@ export default function SeatMap({
     setFixtures(p => [...p, newFixture]);
     setSelected({ type: "fixture", fixtureId: id });
   }, [fixtures, roomWidth, roomHeight, pushHistory]);
+
+  const duplicateLabel = useCallback((label) => {
+    pushHistory();
+    const id = `L-${Date.now()}`;
+    const newLabel = {
+      ...label,
+      id,
+      label: generateNextUniqueLabel(label.label || label.id, labels.map(l => l.label || l.id)),
+      x: Math.min((roomWidth || 1200) - 100, label.x + 30),
+      y: Math.min((roomHeight || 800) - 30, label.y + 30),
+    };
+    setLabels(p => [...p, newLabel]);
+    setSelected({ type: "label", labelId: id });
+  }, [labels, roomWidth, roomHeight, pushHistory]);
 
   const updateLabel = (k, v) => {
     if (!selected?.labelId) return;
@@ -5136,10 +5142,12 @@ export default function SeatMap({
   const duplicateTable = useCallback((table) => {
     pushHistory();
     const id = `T${_tableCounter++}`;
+    const existingLabels = tables.map(t => t.label || t.id);
+    const newLabel = generateNextUniqueLabel(table.label || table.id, existingLabels);
     const newTable = {
       ...table,
       id,
-      label: `${table.label || table.id} (Copy)`,
+      label: newLabel,
       x: Math.min((roomWidth || 1200) - (table.width || 110), table.x + 30),
       y: Math.min((roomHeight || 800) - (table.height || 70), table.y + 30),
       seats: (table.seats || []).map((s, idx) => ({
@@ -5582,6 +5590,66 @@ export default function SeatMap({
     await handleSeatCountChange(selectedTable.id, newCount);
   };
 
+  // ── Keyboard Shortcuts (ESC, DEL, Undo/Redo/Duplicate/Copy/Paste) ─────────────
+  useEffect(() => {
+    const h = e => {
+      // Safety check: if user is typing in form fields, don't trigger canvas shortcuts
+      if (!e.target || e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) {
+        return;
+      }
+
+      if (e.key === "Escape") { setSelected(null); setTool("select"); }
+      else if (e.key === "Delete" && editMode && selected) {
+        if (selected.type === "table") {
+          const tbl = tables.find(t => t.id === selected.tableId);
+          if (tbl?.editor?.locked) return;
+          setDeleteConfirm({ key: "table", message: `Delete "${tbl?.label || tbl?.id}"? This will also remove all ${tbl?.seats?.length || 0} seats and cannot be undone.` });
+        } else if (selected.type === "seat") {
+          const seatObj = tables.find(t => t.id === selected.tableId)?.seats.find(s => s.id === selected.seatId);
+          setDeleteConfirm({ key: "seat", message: `Delete seat "${seatObj?.label || seatObj?.num}"? This cannot be undone.` });
+        } else if (selected.type === "standaloneSeat") {
+          const ss = standaloneSeats.find(s => s.id === selected.standaloneSeatId);
+          if (ss?.editor?.locked) return;
+          setDeleteConfirm({ key: "standaloneSeat", message: "Delete this standalone seat? This cannot be undone." });
+        } else if (selected.type === "fixture") {
+          const fx = fixtures.find(f => f.id === selected.fixtureId);
+          if (fx?.editor?.locked) return;
+          setDeleteConfirm({ key: "fixture", message: `Delete architectural fixture "${fx?.label || fx?.id}"? This cannot be undone.` });
+        } else if (selected.type === "label") {
+          const lbl = labels.find(l => l.id === selected.labelId);
+          setDeleteConfirm({ key: "label", message: `Delete text label "${lbl?.label || lbl?.id}"? This cannot be undone.` });
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && editMode && selected) {
+        e.preventDefault();
+        if (selected.type === "table" && selectedTable) setCopiedItem({ type: "table", data: selectedTable });
+        else if (selected.type === "standaloneSeat" && selectedStandaloneSeatObj) setCopiedItem({ type: "standaloneSeat", data: selectedStandaloneSeatObj });
+        else if (selected.type === "fixture" && selectedFixtureObj) setCopiedItem({ type: "fixture", data: selectedFixtureObj });
+        else if (selected.type === "label" && selectedLabelObj) setCopiedItem({ type: "label", data: selectedLabelObj });
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v" && editMode && copiedItem) {
+        e.preventDefault();
+        if (copiedItem.type === "table") duplicateTable(copiedItem.data);
+        else if (copiedItem.type === "standaloneSeat") duplicateStandaloneSeat(copiedItem.data);
+        else if (copiedItem.type === "fixture") duplicateFixture(copiedItem.data);
+        else if (copiedItem.type === "label") duplicateLabel(copiedItem.data);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d" && editMode && selected) {
+        e.preventDefault();
+        if (selected.type === "table" && selectedTable) duplicateTable(selectedTable);
+        else if (selected.type === "standaloneSeat" && selectedStandaloneSeatObj) duplicateStandaloneSeat(selectedStandaloneSeatObj);
+        else if (selected.type === "fixture" && selectedFixtureObj) duplicateFixture(selectedFixtureObj);
+        else if (selected.type === "label" && selectedLabelObj) duplicateLabel(selectedLabelObj);
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [editMode, selected, tables, standaloneSeats, fixtures, labels, selectedTable, selectedStandaloneSeatObj, selectedFixtureObj, selectedLabelObj, copiedItem, duplicateTable, duplicateStandaloneSeat, duplicateFixture, duplicateLabel, undo, redo]);
+
   // ─── CLIENT VIEW ──────────────────────────────────────────────────────────────
   if (!editMode) {
     return (
@@ -5924,6 +5992,8 @@ export default function SeatMap({
                 {/* Draggable Labels */}
                 {labels.map((l, index) => (
                   <DraggableLabel key={`label-${l.id}-${index}`} item={l}
+                    isSelected={selected?.type === "label" && selected.labelId === l.id}
+                    onSelect={lbl => setSelected({ type: "label", labelId: lbl.id })}
                     onDragStart={(e, id) => startLabelDrag(e, id)}
                     isDragging={activeDragId === l.id}
                     T={T} />
